@@ -1,0 +1,14 @@
+{
+    "speed": [
+        "fast",
+        "performance"
+    ],
+    "seo": [
+        "seo",
+        "search"
+    ],
+    "accessibility": [
+        "accessible",
+        "wcag"
+    ]
+}

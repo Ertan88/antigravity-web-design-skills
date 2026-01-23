@@ -1,0 +1,12 @@
+{
+    "entry": "controller",
+    "default_flow": [
+        "web-strategy",
+        "seo-optimizer",
+        "ux-ui-design",
+        "responsive-layout",
+        "accessibility-core",
+        "performance-optimizer",
+        "visual-polish"
+    ]
+}
