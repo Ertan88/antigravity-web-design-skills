@@ -57,7 +57,7 @@ export function BellCard({ status }: { status: BellStatus }) {
 
   return (
     <section className={`card bell-card tone-${d.tone} ${urgent ? 'urgent' : ''}`}>
-      <BellWatermarkIcon className="card-watermark watermark-bell" size={180} strokeWidth={1.3} />
+      <BellWatermarkIcon className="card-watermark watermark-bell" size={210} strokeWidth={1.4} />
       <div className="card-label">
         <Glyph size={22} /> Zil Vakti
         <span className="card-label-aside">{d.title}</span>
