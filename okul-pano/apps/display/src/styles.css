@@ -1719,3 +1719,45 @@ p {
     transform: translateX(0);
   }
 }
+
+/* Arka plan filigranları: sınav sayacında sol altta sağa yatık kum saati, zil kartında sağ altta sola yatık zil */
+.card-watermark {
+  position: absolute;
+  pointer-events: none;
+  /* Kartın kendi renk tonuyla karışmaması için yazı rengine yakın */
+  color: color-mix(in srgb, var(--hue, var(--primary)) 35%, var(--text));
+  opacity: 0.13;
+  z-index: 0;
+}
+
+.watermark-exam {
+  left: -48px;
+  top: 4px;
+  transform: rotate(16deg);
+}
+
+.watermark-bell {
+  right: -26px;
+  bottom: -40px;
+  transform: rotate(-18deg);
+}
+
+.theme-light .card-watermark {
+  opacity: 0.08;
+}
+
+/* Kart içeriği filigranın üstünde kalır */
+.exam-card > :not(.card-watermark),
+.bell-card > :not(.card-watermark) {
+  position: relative;
+  z-index: 1;
+}
+
+/* Bayram / kutlama günleri: üstte vurgu renginde ince şerit */
+.day-festive .header::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 6px;
+  background: repeating-linear-gradient(90deg, var(--accent) 0 60px, var(--primary) 60px 120px);
+}

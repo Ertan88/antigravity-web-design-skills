@@ -1,6 +1,6 @@
 import { countdown, formatPersonName, type DisplayState } from '@okulpano/shared/client';
 import { AutoPager } from './AutoPager.tsx';
-import { CakeIcon, CapIcon, ShieldIcon, UserMinusIcon } from './Icons.tsx';
+import { CakeIcon, CapIcon, HourglassIcon, ShieldIcon, UserMinusIcon } from './Icons.tsx';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -12,6 +12,7 @@ export function ExamCard({ exams, now, timezone }: { exams: DisplayState['exams'
 
   return (
     <section className="card exam-card">
+      <HourglassIcon className="card-watermark watermark-exam" size={210} strokeWidth={1.4} />
       <div className="card-label">
         <CapIcon size={22} /> Sınav Sayacı
         <span className="card-label-aside">{examDate.format(new Date(first.examAt))}</span>

@@ -56,6 +56,8 @@ export const schoolSettingsSchema = z.object({
   theme: z.enum(['dark', 'light']).default('dark'),
   primaryColor: hexColor.default('#1f8bad'),
   accentColor: hexColor.default('#f59e0b'),
+  /** Özel günlerde (millî bayram, 10 Kasım, bayramlar…) hazır temayı kendiliğinden uygula */
+  autoSpecialThemes: z.boolean().default(true),
   showExams: z.boolean().default(true),
   showDuties: z.boolean().default(true),
   showLeaves: z.boolean().default(true),

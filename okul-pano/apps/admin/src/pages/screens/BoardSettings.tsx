@@ -1,4 +1,4 @@
-import { resolveLayout, type BoardLayout, type SchoolSettings } from '@okulpano/shared';
+import { resolveLayout, SPECIAL_THEMES, type BoardLayout, type SchoolSettings } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 import { LayoutEditor } from '../../components/LayoutEditor.tsx';
@@ -6,7 +6,8 @@ import { useToast } from '../../components/Toast.tsx';
 import { Button, Card, Field, Input, Segmented, Select, Spinner, Toggle } from '../../components/ui.tsx';
 import { api } from '../../lib/api.ts';
 import { useAuth } from '../../lib/auth.tsx';
-import { useSchool, useSchoolPath, type School } from '../../lib/data.ts';
+import { useList, useSchool, useSchoolPath, type School, type Screen } from '../../lib/data.ts';
+import { ScreenLayoutPanel } from './ScreenLayoutDialog.tsx';
 
 /** Okulun panolarda kullandığı renk önerileri (kurumsal, sade) */
 const PRESETS: { name: string; primary: string; accent: string }[] = [
@@ -45,6 +46,48 @@ function Section({ title, description, children }: { title: string; description:
   );
 }
 
+/**
+ * Pano düzeni sekmesi: üstten hangi düzenin düzenleneceği seçilir — okulun varsayılanı
+ * ya da tek tek panolar (her panoya özel düzen verilebilir).
+ */
+export function LayoutTab({ editable, screenEditable }: { editable: boolean; screenEditable: boolean }) {
+  const screens = useList<Screen>('screens');
+  const [target, setTarget] = useState<string>('school');
+  const screen = screens.data?.find((x) => x.id === target) ?? null;
+  return (
+    <div className="space-y-4">
+      {(screens.data?.length ?? 0) > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-slate-500">Düzenlenen:</span>
+          <Segmented
+            value={screen ? screen.id : 'school'}
+            onChange={setTarget}
+            options={[
+              { value: 'school', label: 'Okul varsayılanı' },
+              ...screens.data!.map((x) => ({
+                value: x.id,
+                label: (
+                  <span className="inline-flex items-center gap-1.5">
+                    {x.name}
+                    {x.layout && <span className="size-1.5 rounded-full bg-brand-500" title="Özel düzen" />}
+                  </span>
+                ),
+              })),
+            ]}
+          />
+        </div>
+      )}
+      {screen ? (
+        <Card className="p-5 sm:p-6">
+          <ScreenLayoutPanel key={screen.id} screen={screen} editable={screenEditable} />
+        </Card>
+      ) : (
+        <DefaultLayout editable={editable} />
+      )}
+    </div>
+  );
+}
+
 /** Okulun varsayılan pano düzeni: özel düzeni olmayan tüm panolar bunu kullanır */
 export function DefaultLayout({ editable }: { editable: boolean }) {
   const school = useSchool();
@@ -62,7 +105,7 @@ export function DefaultLayout({ editable }: { editable: boolean }) {
         <div>
           <h2 className="text-base font-semibold text-ink">Okulun varsayılan pano düzeni</h2>
           <p className="text-sm text-slate-500">
-            Kartları sürükleyerek sütunlar arasında taşıyın ve sıralayın. Panolar sekmesinden bir panoya özel düzen de verebilirsiniz.
+            Kartları sürükleyerek sütunlar arasında taşıyın ve sıralayın. Özel düzeni olmayan tüm panolar bunu kullanır; bir panoya özel düzen için yukarıdan panoyu seçin.
           </p>
         </div>
         {editable && (
@@ -142,6 +185,40 @@ export function Appearance({ editable }: { editable: boolean }) {
               )}
             </Field>
           ))}
+        </div>
+      </Section>
+
+      <Section title="Özel gün temaları" description="Millî bayramlarda, 10 Kasım'da, Öğretmenler Günü'nde ve dini bayramlarda panonun havası değişsin.">
+        <Toggle
+          checked={s.autoSpecialThemes}
+          onChange={(x) => set('autoSpecialThemes', x)}
+          label="Özel günlerde temayı kendiliğinden uygula"
+          description="O gün bitince pano kendi renklerine döner. Millî bayramlarda üstte bayrak şeridi, 10 Kasım'da yas görünümü de eklenir."
+        />
+        <div className="grid gap-2.5 sm:grid-cols-2">
+          {SPECIAL_THEMES.map((t) => {
+            const applied = s.primaryColor === t.primary && s.accentColor === t.accent;
+            return (
+              <div key={t.id} className="flex items-center gap-3 rounded-2xl p-3 ring-1 ring-slate-200">
+                <span
+                  className="relative size-11 shrink-0 overflow-hidden rounded-xl shadow-inner"
+                  style={{ background: `linear-gradient(135deg, ${t.primary} 0 60%, ${t.accent} 60% 100%)` }}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm leading-tight font-semibold text-ink">{t.name}</span>
+                  <span className="block text-xs leading-tight text-slate-500">{t.when}</span>
+                </span>
+                <button
+                  type="button"
+                  disabled={!editable || applied}
+                  onClick={() => setS({ ...s, primaryColor: t.primary, accentColor: t.accent })}
+                  className="shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold text-brand-700 ring-1 ring-brand-200 transition hover:bg-brand-50 disabled:text-slate-400 disabled:ring-slate-200 disabled:hover:bg-transparent"
+                >
+                  {applied ? 'Seçili' : 'Şimdi uygula'}
+                </button>
+              </div>
+            );
+          })}
         </div>
       </Section>
 

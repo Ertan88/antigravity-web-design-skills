@@ -1,5 +1,6 @@
 import {
   resolveLayout,
+  specialThemeFor,
   type BoardModule,
   computeBellStatus,
   isBirthdayToday,
@@ -105,10 +106,17 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
   const mourning = today.monthDay === '11-10';
   const silenceMinute = mourning && today.hour === 9 && (today.minute === 5 || today.minute === 6);
 
-  const classes = ['theme-' + s.theme, NATIONAL_DAYS.has(today.monthDay) ? 'day-national' : '', mourning ? 'day-mourning' : '']
+  // Özel günlerde (millî bayram, 10 Kasım, bayramlar…) hazır tema kendiliğinden uygulanır
+  const special = s.autoSpecialThemes ? specialThemeFor(today.isoDate) : null;
+  const classes = [
+    'theme-' + s.theme,
+    NATIONAL_DAYS.has(today.monthDay) ? 'day-national' : '',
+    mourning ? 'day-mourning' : '',
+    special?.decor === 'festive' ? 'day-festive' : '',
+  ]
     .filter(Boolean)
     .join(' ');
-  const themeVars = { '--primary': s.primaryColor, '--accent': s.accentColor } as CSSProperties;
+  const themeVars = { '--primary': special?.primary ?? s.primaryColor, '--accent': special?.accent ?? s.accentColor } as CSSProperties;
 
   return (
     <Stage className={classes} style={themeVars}>
