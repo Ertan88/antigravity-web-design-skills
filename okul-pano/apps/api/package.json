@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=../../.env src/index.ts",
     "build": "node scripts/build.mjs",
-    "start": "node --env-file-if-exists=../../.env dist/index.js",
+    "start": "NODE_ENV=production node --env-file-if-exists=../../.env dist/index.js",
     "seed": "tsx --env-file-if-exists=../../.env src/seed.ts",
+    "seed:prod": "node --env-file-if-exists=../../.env dist/seed.js",
     "db:generate": "drizzle-kit generate",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json"

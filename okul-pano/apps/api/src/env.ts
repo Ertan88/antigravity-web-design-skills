@@ -9,9 +9,9 @@ const schema = z.object({
   PGLITE_DIR: z.string().default('./data/pglite'),
   UPLOAD_DIR: z.string().default('./uploads'),
   PUBLIC_URL: z.string().default('http://localhost:5173'),
-  /** Üretimde derlenmiş panel ve pano dosyaları buradan sunulur */
-  ADMIN_DIST: z.string().optional(),
-  DISPLAY_DIST: z.string().optional(),
+  /** Derlenmiş panel ve pano dosyaları (varsa) API ile aynı adresten sunulur: /admin/ ve /display/ */
+  ADMIN_DIST: z.string().default('../admin/dist'),
+  DISPLAY_DIST: z.string().default('../display/dist'),
 });
 
 export type Env = z.infer<typeof schema>;

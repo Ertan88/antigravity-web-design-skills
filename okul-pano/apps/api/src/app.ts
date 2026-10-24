@@ -41,7 +41,13 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
 
   const useLogger = opts.logger ?? env.NODE_ENV !== 'test';
   const app = Fastify({
-    logger: useLogger ? { level: env.NODE_ENV === 'production' ? 'info' : 'warn' } : false,
+    logger: useLogger
+      ? {
+          level: env.NODE_ENV === 'production' ? 'info' : 'warn',
+          // Ekran anahtarı SSE adresinde sorgu olarak taşınır; loglara yalnızca yol yazılır
+          serializers: { req: (req) => ({ method: req.method, url: req.url.split('?')[0] }) },
+        }
+      : false,
     trustProxy: true,
   });
   app.decorate('deps', deps);
@@ -52,6 +58,8 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     // Pano YouTube videolarını gömdüğü için CSP, ön yüz uygulamalarının kendi başlıklarında yönetilir.
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
+    // YouTube gömülü oynatıcı, kaynağı (Referer) göremezse videoyu oynatmayı reddeder
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   });
   await app.register(cookie);
   await app.register(jwt, { secret: env.JWT_SECRET });

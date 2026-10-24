@@ -211,6 +211,24 @@ describe('içerik doğrulama', () => {
     expect(clash.json().message).toMatch(/5-A sınıfında derste/);
   });
 
+  it('öğrencileri toplu içe aktarır ve eksik sınıfları oluşturur', async () => {
+    const c = client(t.app, ownerToken);
+    const res = await c.post(`/api/schools/${schoolA}/students/import`, {
+      rows: [
+        { fullName: 'Ada Yılmaz', className: '7-c', birthDate: '2013-03-14' },
+        { fullName: 'Can Demir', className: '7-C', birthDate: '2013-11-02' },
+        { fullName: 'Ela Kaya', className: null, birthDate: '2012-05-20' },
+      ],
+    });
+    expectStatus(res, 200);
+    expect(res.json()).toEqual({ created: 3, classesCreated: 1 });
+    const classes = (await c.get(`/api/schools/${schoolA}/classes`)).json();
+    expect(classes.filter((k: { name: string }) => k.name === '7-C')).toHaveLength(1);
+
+    const bad = await c.post(`/api/schools/${schoolA}/students/import`, { rows: [{ fullName: 'X Y', birthDate: '14.03.2013' }] });
+    expect(bad.statusCode).toBe(400);
+  });
+
   it('yalnızca gerçek görsel dosyalarını kabul eder', async () => {
     const png = multipartBody('file', 'afis.png', PNG_1PX, 'image/png');
     const ok = await t.app.inject({

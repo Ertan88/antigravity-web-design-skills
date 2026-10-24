@@ -205,6 +205,20 @@ export const studentSchema = z.object({
   birthDate: isoDate,
 });
 
+/** Excel / e-Okul listesinden yapıştırılan öğrencileri toplu içe aktarma; eksik sınıflar otomatik oluşturulur. */
+export const studentImportSchema = z.object({
+  rows: z
+    .array(
+      z.object({
+        fullName: required('Ad soyad', 80, 2),
+        className: optionalText(20),
+        birthDate: isoDate,
+      }),
+    )
+    .min(1, 'İçe aktarılacak satır yok')
+    .max(5000, 'Tek seferde en fazla 5000 öğrenci aktarılabilir'),
+});
+
 export const periodSchema = z.object({
   no: z.number().int().min(1).max(30),
   start: clock,

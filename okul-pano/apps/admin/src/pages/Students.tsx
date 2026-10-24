@@ -1,0 +1,240 @@
+import { studentSchema } from '@okulpano/shared';
+import { useQueryClient } from '@tanstack/react-query';
+import { Cake, FileSpreadsheet, Search } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { CrudPage } from '../components/CrudPage.tsx';
+import { useToast } from '../components/Toast.tsx';
+import { Alert, Badge, Button, Field, Input, Modal, Select, Textarea, Toggle } from '../components/ui.tsx';
+import { api } from '../lib/api.ts';
+import { useAuth } from '../lib/auth.tsx';
+import { nameMap, useList, useSchool, type ClassGroup, type Student } from '../lib/data.ts';
+import { formatDate } from '../lib/format.ts';
+
+type Form = { fullName: string; classGroupId: string; birthDate: string };
+
+interface ParsedRow {
+  fullName: string;
+  className: string | null;
+  birthDate: string;
+}
+
+const DATE = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$|^(\d{4})-(\d{2})-(\d{2})$/;
+const CLASS = /^(\d{1,2}\s*[-/]?\s*[A-ZÇĞİÖŞÜa-zçğıöşü]{1,2}|anasınıfı.*|ana sınıfı.*)$/i;
+
+/**
+ * Excel'den, Google E-Tablolar'dan ya da e-Okul listesinden kopyalanan satırları çözer.
+ * Sütun sırası serbesttir: tarih ve sınıf biçimlerinden tanınır, kalan metin ad soyad kabul edilir.
+ */
+function parseRows(text: string): { rows: ParsedRow[]; skipped: number } {
+  const rows: ParsedRow[] = [];
+  let skipped = 0;
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    const cells = (line.includes('\t') ? line.split('\t') : line.includes(';') ? line.split(';') : line.split(',')).map((c) => c.trim());
+    let birthDate: string | null = null;
+    let className: string | null = null;
+    const nameParts: string[] = [];
+    for (const cell of cells) {
+      const d = DATE.exec(cell);
+      if (d && !birthDate) {
+        birthDate = d[4] ? `${d[4]}-${d[5]}-${d[6]}` : `${d[3]}-${d[2]!.padStart(2, '0')}-${d[1]!.padStart(2, '0')}`;
+      } else if (CLASS.test(cell) && !className) {
+        className = cell.replace(/\s+/g, '').replace('/', '-').toLocaleUpperCase('tr-TR');
+        if (!className.includes('-') && /^\d/.test(className)) className = className.replace(/^(\d+)/, '$1-');
+      } else if (cell && !/^\d+$/.test(cell)) {
+        nameParts.push(cell);
+      }
+    }
+    const fullName = nameParts.join(' ').replace(/\s+/g, ' ').trim();
+    if (birthDate && fullName.length >= 2) rows.push({ fullName, className, birthDate });
+    else skipped++;
+  }
+  return { rows, skipped };
+}
+
+function ImportModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { schoolId } = useAuth();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const parsed = useMemo(() => parseRows(text), [text]);
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api<{ created: number; classesCreated: number }>(`/api/schools/${schoolId}/students/import`, {
+        method: 'POST',
+        body: { rows: parsed.rows },
+      });
+      await qc.invalidateQueries({ queryKey: [schoolId] });
+      toast.success(`${res.created} öğrenci eklendi${res.classesCreated ? `, ${res.classesCreated} yeni sınıf oluşturuldu` : ''}`);
+      setText('');
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'İçe aktarma başarısız.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      size="lg"
+      title="Listeden içe aktar"
+      description="Excel ya da e-Okul listesindeki satırları kopyalayıp aşağıya yapıştırın."
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Vazgeç
+          </Button>
+          <Button loading={busy} disabled={!parsed.rows.length} onClick={() => void submit()}>
+            {parsed.rows.length ? `${parsed.rows.length} öğrenciyi aktar` : 'Aktar'}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        {error && <Alert tone="red">{error}</Alert>}
+        <Textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={8}
+          className="font-mono text-xs"
+          placeholder={'Ayşe Yılmaz\t9-A\t14.03.2010\nMehmet Demir\t9-B\t02.11.2009'}
+          aria-label="Öğrenci listesi"
+        />
+        <p className="text-xs text-slate-500">
+          Her satırda ad soyad, sınıf (9-A) ve doğum tarihi (GG.AA.YYYY) bulunmalı; sütun sırası önemli değil. Okul numarası gibi sayısal sütunlar yok sayılır.
+        </p>
+        {text && (
+          <div className="rounded-xl ring-1 ring-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5 text-sm">
+              <span className="font-semibold">{parsed.rows.length} satır tanındı</span>
+              {parsed.skipped > 0 && <span className="text-amber-700">{parsed.skipped} satır atlandı (başlık ya da eksik bilgi)</span>}
+            </div>
+            <ul className="divide-y divide-slate-100 text-sm">
+              {parsed.rows.slice(0, 5).map((r, i) => (
+                <li key={i} className="flex justify-between gap-3 px-4 py-2">
+                  <span className="font-medium">{r.fullName}</span>
+                  <span className="text-slate-500">
+                    {r.className ?? 'sınıfsız'} · {formatDate(r.birthDate)}
+                  </span>
+                </li>
+              ))}
+              {parsed.rows.length > 5 && <li className="px-4 py-2 text-xs text-slate-500">… ve {parsed.rows.length - 5} öğrenci daha</li>}
+            </ul>
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+export function Students() {
+  const [q, setQ] = useState('');
+  const [onlyToday, setOnlyToday] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const { can } = useAuth();
+  const classes = useList<ClassGroup>('classes');
+  const school = useSchool();
+  const classNames = nameMap(classes.data, (c) => c.name);
+  const now = new Date();
+  const todayMd = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const needle = q.trim().toLocaleLowerCase('tr-TR');
+  const hidden = school.data && !school.data.settings.showBirthdays;
+
+  return (
+    <>
+      <CrudPage<Student, Form>
+        resource="students"
+        label="Öğrenci"
+        title="Doğum Günleri"
+        description={
+          <>
+            Doğum günü olan öğrenciler o gün panoda kutlanır. Gizlilik için varsayılan olarak soyadın yalnızca baş harfi gösterilir (Ayşe Y.); bunu Okul Ayarları'ndan değiştirebilirsiniz.
+            {hidden && <span className="mt-1 block font-medium text-amber-700">Doğum günü alanı şu an Okul Ayarları'ndan gizlenmiş durumda.</span>}
+          </>
+        }
+        permission="students.manage"
+        icon={<Cake className="size-6" />}
+        emptyTitle="Öğrenci eklenmemiş"
+        emptyText="Öğrencileri tek tek ekleyebilir ya da Excel / e-Okul listesinden toplu aktarabilirsiniz."
+        addLabel="Öğrenci ekle"
+        headerActions={
+          can('students.manage') && (
+            <Button variant="secondary" icon={<FileSpreadsheet className="size-4" />} onClick={() => setImporting(true)}>
+              Listeden içe aktar
+            </Button>
+          )
+        }
+        schema={studentSchema}
+        toolbar={
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="relative w-full max-w-xs">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ad ya da sınıf ara" className="pl-9" aria-label="Öğrenci ara" />
+            </div>
+            <Toggle checked={onlyToday} onChange={setOnlyToday} label="Yalnızca bugün doğanlar" />
+          </div>
+        }
+        select={(rows) =>
+          rows.filter(
+            (r) =>
+              (!onlyToday || r.birthDate.slice(5) === todayMd) &&
+              (!needle || `${r.fullName} ${classNames.get(r.classGroupId ?? '') ?? ''}`.toLocaleLowerCase('tr-TR').includes(needle)),
+          )
+        }
+        columns={[
+          {
+            header: 'Ad soyad',
+            cell: (r) => (
+              <span className="flex items-center gap-2 font-semibold text-slate-900">
+                {r.fullName}
+                {r.birthDate.slice(5) === todayMd && (
+                  <Badge tone="amber" dot>
+                    Bugün
+                  </Badge>
+                )}
+              </span>
+            ),
+          },
+          { header: 'Sınıf', cell: (r) => <span className="text-slate-600">{classNames.get(r.classGroupId ?? '') ?? '—'}</span> },
+          { header: 'Doğum tarihi', cell: (r) => <span className="whitespace-nowrap text-slate-600">{formatDate(r.birthDate)}</span> },
+        ]}
+        emptyForm={() => ({ fullName: '', classGroupId: '', birthDate: '' })}
+        toForm={(r) => ({ fullName: r.fullName, classGroupId: r.classGroupId ?? '', birthDate: r.birthDate })}
+        toPayload={(f) => ({ fullName: f.fullName, classGroupId: f.classGroupId || null, birthDate: f.birthDate })}
+        renderForm={({ values: v, set, errors }) => (
+          <>
+            <Field label="Ad soyad" error={errors.fullName}>
+              {(id) => <Input id={id} value={v.fullName} onChange={(e) => set('fullName', e.target.value)} invalid={Boolean(errors.fullName)} />}
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Sınıf" error={errors.classGroupId}>
+                {(id) => (
+                  <Select id={id} value={v.classGroupId} onChange={(e) => set('classGroupId', e.target.value)}>
+                    <option value="">Sınıfsız</option>
+                    {(classes.data ?? []).map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </Field>
+              <Field label="Doğum tarihi" error={errors.birthDate}>
+                {(id) => <Input id={id} type="date" value={v.birthDate} onChange={(e) => set('birthDate', e.target.value)} invalid={Boolean(errors.birthDate)} />}
+              </Field>
+            </div>
+          </>
+        )}
+      />
+      <ImportModal open={importing} onClose={() => setImporting(false)} />
+    </>
+  );
+}

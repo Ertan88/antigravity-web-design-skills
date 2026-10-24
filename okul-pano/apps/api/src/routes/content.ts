@@ -5,13 +5,16 @@ import {
   dutySchema,
   examSchema,
   leaveSchema,
+  studentImportSchema,
   studentSchema,
   teacherSchema,
   tickerSchema,
   WEEKDAY_NAMES,
 } from '@okulpano/shared';
-import { asc, desc } from 'drizzle-orm';
+import { asc, desc, eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
+import { audit, schoolGuard } from '../context.ts';
+import { parse } from '../lib/errors.ts';
 import {
   announcements,
   bellSchedules,
@@ -115,6 +118,43 @@ export async function contentRoutes(app: FastifyInstance) {
     refs: { classGroupId: classGroups },
     toRow: (i) => ({ ...i, classGroupId: i.classGroupId ?? null }),
   });
+
+  app.post(
+    '/api/schools/:schoolId/students/import',
+    { preHandler: [app.authenticate, schoolGuard('students.manage')] },
+    async (req) => {
+      const { rows } = parse(studentImportSchema, req.body);
+      const schoolId = req.ctx.schoolId;
+      const result = await app.deps.db.transaction(async (tx) => {
+        const existing = await tx.select().from(classGroups).where(eq(classGroups.schoolId, schoolId));
+        const classIds = new Map(existing.map((c) => [c.name.toLocaleUpperCase('tr-TR'), c.id]));
+        const missing = [
+          ...new Set(rows.map((r) => r.className?.trim().toLocaleUpperCase('tr-TR')).filter((n): n is string => Boolean(n))),
+        ].filter((n) => !classIds.has(n));
+        if (missing.length) {
+          const created = await tx
+            .insert(classGroups)
+            .values(missing.map((name, i) => ({ schoolId, name, sortOrder: existing.length + i })))
+            .returning();
+          for (const c of created) classIds.set(c.name, c.id);
+        }
+        for (let i = 0; i < rows.length; i += 500) {
+          await tx.insert(students).values(
+            rows.slice(i, i + 500).map((r) => ({
+              schoolId,
+              fullName: r.fullName,
+              birthDate: r.birthDate,
+              classGroupId: r.className ? (classIds.get(r.className.trim().toLocaleUpperCase('tr-TR')) ?? null) : null,
+            })),
+          );
+        }
+        return { created: rows.length, classesCreated: missing.length };
+      });
+      await audit(req, 'create', 'Öğrenci', null, `${result.created} öğrenci içe aktarıldı`);
+      app.deps.bus.contentChanged(schoolId);
+      return result;
+    },
+  );
 
   registerResource(app, {
     path: 'bell-schedules',

@@ -1,0 +1,307 @@
+import { updateSchoolSchema, type SchoolSettings } from '@okulpano/shared';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { MapPin, Search } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { ImageUpload } from '../components/ImageUpload.tsx';
+import { useToast } from '../components/Toast.tsx';
+import { Alert, Button, Card, Field, Input, Segmented, Select, Spinner, Toggle } from '../components/ui.tsx';
+import { api } from '../lib/api.ts';
+import { useAuth } from '../lib/auth.tsx';
+import { useSchool, useSchoolPath, type School } from '../lib/data.ts';
+import { useForm } from '../lib/form.ts';
+
+interface GeoResult {
+  name: string;
+  region: string | null;
+  country: string | null;
+  latitude: number;
+  longitude: number;
+  timezone: string | null;
+}
+
+type Form = {
+  name: string;
+  logoUrl: string | null;
+  city: string;
+  latitude: string;
+  longitude: string;
+  timezone: string;
+  settings: SchoolSettings;
+};
+
+const EMPTY: Form = { name: '', logoUrl: null, city: '', latitude: '', longitude: '', timezone: 'Europe/Istanbul', settings: {} as SchoolSettings };
+
+const toForm = (s: School): Form => ({
+  name: s.name,
+  logoUrl: s.logoUrl,
+  city: s.city ?? '',
+  latitude: s.latitude?.toString() ?? '',
+  longitude: s.longitude?.toString() ?? '',
+  timezone: s.timezone,
+  settings: s.settings,
+});
+
+function Section({ title, description, children }: { title: string; description: string; children: ReactNode }) {
+  return (
+    <div className="grid gap-6 border-b border-slate-100 py-8 first:pt-0 last:border-0 md:grid-cols-[260px_1fr]">
+      <div>
+        <h2 className="font-semibold">{title}</h2>
+        <p className="mt-1 text-sm text-slate-500">{description}</p>
+      </div>
+      <div className="space-y-5">{children}</div>
+    </div>
+  );
+}
+
+function CitySearch({ onPick }: { onPick: (r: GeoResult) => void }) {
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState<GeoResult[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const search = async () => {
+    if (q.trim().length < 2) return;
+    setBusy(true);
+    setError(null);
+    try {
+      setResults(await api<GeoResult[]>(`/api/geocode?q=${encodeURIComponent(q.trim())}`));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Arama başarısız');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <Input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              void search();
+            }
+          }}
+          placeholder="İlçe ya da il adı yazın (ör. Çankaya)"
+          aria-label="Konum ara"
+        />
+        <Button variant="secondary" loading={busy} icon={<Search className="size-4" />} onClick={() => void search()}>
+          Ara
+        </Button>
+      </div>
+      {error && <p className="text-xs font-medium text-amber-700">{error}</p>}
+      {results && (
+        <ul className="divide-y divide-slate-100 rounded-xl ring-1 ring-slate-200">
+          {results.length === 0 && <li className="px-3 py-2 text-sm text-slate-500">Sonuç bulunamadı.</li>}
+          {results.map((r, i) => (
+            <li key={i}>
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                onClick={() => {
+                  onPick(r);
+                  setResults(null);
+                  setQ('');
+                }}
+              >
+                <MapPin className="size-4 text-slate-400" />
+                <span className="font-medium">{r.name}</span>
+                <span className="text-slate-500">{[r.region, r.country].filter(Boolean).join(', ')}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+export function Settings() {
+  const { schoolId, reloadMe } = useAuth();
+  const path = useSchoolPath();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const school = useSchool();
+  const form = useForm<Form>(EMPTY);
+  const [ready, setReady] = useState(false);
+  const v = form.values;
+
+  useEffect(() => {
+    if (!school.data) return;
+    form.reset(toForm(school.data));
+    setReady(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [school.data]);
+
+  const save = useMutation({
+    mutationFn: (body: unknown) => api<School>(path, { method: 'PATCH', body }),
+    onSuccess: (data) => {
+      qc.setQueryData([schoolId, 'school'], data);
+      void reloadMe();
+      toast.success('Ayarlar kaydedildi; ekranlar güncelleniyor');
+    },
+  });
+
+  if (!ready) return <Spinner />;
+
+  const set = form.set;
+  const setting = <K extends keyof SchoolSettings>(k: K, value: SchoolSettings[K]) => set('settings', { ...v.settings, [k]: value });
+
+  const submit = async () => {
+    const payload = form.validate(updateSchoolSchema, {
+      name: v.name,
+      logoUrl: v.logoUrl,
+      city: v.city || null,
+      latitude: v.latitude ? Number(v.latitude) : null,
+      longitude: v.longitude ? Number(v.longitude) : null,
+      timezone: v.timezone,
+      settings: v.settings,
+    });
+    if (!payload) return;
+    try {
+      await save.mutateAsync(payload);
+    } catch (err) {
+      form.fail(err);
+    }
+  };
+
+  const s = v.settings;
+  return (
+    <div className="pb-24">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight">Okul Ayarları</h1>
+        <p className="mt-1 text-sm text-slate-500">Panoda görünen okul bilgileri, alanların görünürlüğü ve görünüm.</p>
+      </div>
+      {form.errors._form && (
+        <div className="mb-4">
+          <Alert tone="red">{form.errors._form}</Alert>
+        </div>
+      )}
+      <Card className="p-6 sm:p-8">
+        <Section title="Okul bilgileri" description="Panonun üst ortasında okul adı ve logosu görünür.">
+          <Field label="Okul adı" error={form.errors.name}>
+            {(id) => <Input id={id} value={v.name} onChange={(e) => set('name', e.target.value)} />}
+          </Field>
+          <Field label="Logo" help="Şeffaf arka planlı PNG önerilir.">
+            {() => (
+              <div className="max-w-xs">
+                <ImageUpload value={v.logoUrl} onChange={(url) => set('logoUrl', url)} aspect="aspect-[3/2]" hint="PNG · kare ya da yatay" />
+              </div>
+            )}
+          </Field>
+        </Section>
+
+        <Section title="Konum ve hava durumu" description="Hava durumu bu konuma göre 15 dakikada bir güncellenir.">
+          <CitySearch
+            onPick={(r) => {
+              form.reset({ ...v, city: r.name, latitude: r.latitude.toFixed(4), longitude: r.longitude.toFixed(4), timezone: r.timezone ?? v.timezone });
+            }}
+          />
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="Panoda görünen yer adı" error={form.errors.city}>
+              {(id) => <Input id={id} value={v.city} onChange={(e) => set('city', e.target.value)} />}
+            </Field>
+            <Field label="Enlem" error={form.errors.latitude}>
+              {(id) => <Input id={id} inputMode="decimal" value={v.latitude} onChange={(e) => set('latitude', e.target.value)} placeholder="39.9334" />}
+            </Field>
+            <Field label="Boylam" error={form.errors.longitude}>
+              {(id) => <Input id={id} inputMode="decimal" value={v.longitude} onChange={(e) => set('longitude', e.target.value)} placeholder="32.8597" />}
+            </Field>
+          </div>
+          <Field label="Saat dilimi" error={form.errors.timezone} help="Zil sayacı ve tarih bu saat dilimine göre hesaplanır; cihaz saati yanlış olsa da pano doğru çalışır.">
+            {(id) => <Input id={id} value={v.timezone} onChange={(e) => set('timezone', e.target.value)} />}
+          </Field>
+        </Section>
+
+        <Section title="Pano alanları" description="Gizlediğiniz alan panodan kalkar, kalan alanlar boşluğu doldurur. Veriler silinmez.">
+          <Toggle checked={s.showExams} onChange={(x) => setting('showExams', x)} label="Sınav sayacı" />
+          <Toggle checked={s.showDuties} onChange={(x) => setting('showDuties', x)} label="Nöbetçi öğretmenler" />
+          <Toggle checked={s.showLeaves} onChange={(x) => setting('showLeaves', x)} label="İzinli öğretmenler" description="Yalnızca o gün izinli öğretmen varsa görünür." />
+          <Toggle checked={s.showBirthdays} onChange={(x) => setting('showBirthdays', x)} label="Doğum günü kutlamaları" description="Yalnızca o gün doğum günü olan öğrenci varsa görünür." />
+          {s.showBirthdays && (
+            <Field label="Öğrenci adlarının gösterimi" help="KVKK açısından soyadın baş harfiyle gösterim önerilir.">
+              {() => (
+                <Segmented
+                  value={s.birthdayNameFormat}
+                  onChange={(x) => setting('birthdayNameFormat', x)}
+                  options={[
+                    { value: 'initial', label: 'Ayşe Y.' },
+                    { value: 'full', label: 'Ayşe Yılmaz' },
+                  ]}
+                />
+              )}
+            </Field>
+          )}
+          <Toggle checked={s.showTimetable} onChange={(x) => setting('showTimetable', x)} label="O saatteki dersler" description="Zil sayacının altındaki sınıf / ders / öğretmen listesi." />
+        </Section>
+
+        <Section title="Görünüm" description="Okulunuzun renkleriyle uyumlu bir pano.">
+          <Field label="Tema">
+            {() => (
+              <Segmented
+                value={s.theme}
+                onChange={(x) => setting('theme', x)}
+                options={[
+                  { value: 'dark', label: 'Koyu (önerilen)' },
+                  { value: 'light', label: 'Açık' },
+                ]}
+              />
+            )}
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Ana renk" error={form.errors.settings}>
+              {(id) => (
+                <div className="flex items-center gap-2">
+                  <input id={id} type="color" value={s.primaryColor} onChange={(e) => setting('primaryColor', e.target.value)} className="h-10 w-14 cursor-pointer rounded-lg border-0 bg-transparent" />
+                  <Input value={s.primaryColor} onChange={(e) => setting('primaryColor', e.target.value)} className="font-mono" aria-label="Ana renk kodu" />
+                </div>
+              )}
+            </Field>
+            <Field label="Vurgu rengi">
+              {(id) => (
+                <div className="flex items-center gap-2">
+                  <input id={id} type="color" value={s.accentColor} onChange={(e) => setting('accentColor', e.target.value)} className="h-10 w-14 cursor-pointer rounded-lg border-0 bg-transparent" />
+                  <Input value={s.accentColor} onChange={(e) => setting('accentColor', e.target.value)} className="font-mono" aria-label="Vurgu rengi kodu" />
+                </div>
+              )}
+            </Field>
+          </div>
+        </Section>
+
+        <Section title="Akış" description="Slayt ve kayan yazı hızları.">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="Slayt süresi (sn)" help="Süresi girilmemiş duyurular için">
+              {(id) => <Input id={id} type="number" min={3} max={300} value={s.slideDurationSec} onChange={(e) => setting('slideDurationSec', Number(e.target.value))} />}
+            </Field>
+            <Field label="Kayan yazı hızı" help="Piksel / saniye">
+              {(id) => (
+                <Select id={id} value={s.tickerSpeed} onChange={(e) => setting('tickerSpeed', Number(e.target.value))}>
+                  <option value={60}>Yavaş</option>
+                  <option value={90}>Normal</option>
+                  <option value={130}>Hızlı</option>
+                </Select>
+              )}
+            </Field>
+            <Field label="Öğle arası eşiği (dk)" help="Bundan uzun aralar 'Öğle Arası' yazar">
+              {(id) => <Input id={id} type="number" min={10} max={180} value={s.lunchThresholdMin} onChange={(e) => setting('lunchThresholdMin', Number(e.target.value))} />}
+            </Field>
+          </div>
+          <Toggle checked={s.videoSound} onChange={(x) => setting('videoSound', x)} label="Videoları sesli oynat" description="Tarayıcıda otomatik oynatma izni gerekir (Ekranlar sayfasındaki kiosk komutu)." />
+        </Section>
+      </Card>
+
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-200 bg-white/90 backdrop-blur lg:left-72">
+        <div className="mx-auto flex max-w-6xl justify-end gap-2 px-4 py-3 sm:px-6 lg:px-10">
+          <Button variant="secondary" onClick={() => school.data && form.reset(toForm(school.data))}>
+            Değişiklikleri geri al
+          </Button>
+          <Button loading={save.isPending} onClick={() => void submit()}>
+            Kaydet
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
