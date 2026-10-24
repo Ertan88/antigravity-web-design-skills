@@ -1,3 +1,4 @@
+import { mkdirSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { join, resolve } from 'node:path';
@@ -31,6 +32,8 @@ export class LocalStorage implements FileStorage {
     private readonly publicPrefix = '/uploads',
   ) {
     this.root = resolve(root);
+    // Statik dosya sunucusu klasörün açılışta var olmasını bekler
+    mkdirSync(this.root, { recursive: true });
   }
 
   async saveImage(schoolId: string, data: Buffer): Promise<string> {
