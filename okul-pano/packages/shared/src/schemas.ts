@@ -173,9 +173,35 @@ export const examSchema = z.object({
 
 export const teacherSchema = z.object({
   fullName: required('Ad soyad', 80, 2),
-  branch: optionalText(60),
+  branchId: id.nullable().optional(),
+  titleId: id.nullable().optional(),
   isActive: z.boolean().default(true),
 });
+
+/** Branş ve ünvan listelerinin bir öğesi */
+export const teacherOptionSchema = z.object({
+  name: required('Ad', 60),
+});
+
+/**
+ * Excel'den öğretmen içe aktarma. Branş ve ünvan adla gelir; listede yoksa oluşturulur.
+ * Aynı isimli öğretmen varsa (büyük/küçük harf ve boşluk farkı yok sayılarak) güncellenir.
+ */
+export const teacherImportSchema = z.object({
+  rows: z
+    .array(
+      z.object({
+        fullName: required('Ad soyad', 80, 2),
+        branch: optionalText(60),
+        title: optionalText(60),
+        isActive: z.boolean().optional(),
+      }),
+    )
+    .min(1, 'İçe aktarılacak satır yok')
+    .max(2000, 'Tek seferde en fazla 2000 öğretmen aktarılabilir'),
+  updateExisting: z.boolean().default(true),
+});
+export type TeacherImportInput = z.infer<typeof teacherImportSchema>;
 
 export const classGroupSchema = z.object({
   name: required('Sınıf adı', 20),

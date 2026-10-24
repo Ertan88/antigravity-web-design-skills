@@ -59,7 +59,7 @@ const NAV: { title: string; items: NavItem[] }[] = [
     items: [
       { to: '/zil-saatleri', label: 'Zil Saatleri', icon: BellRing, permission: 'schedule.manage' },
       { to: '/ders-programi', label: 'Ders Programı', icon: CalendarClock, permission: 'schedule.manage' },
-      { to: '/ogretmenler', label: 'Öğretmenler', icon: Users, permission: 'directory.manage' },
+      { to: '/ogretmenler', label: 'Öğretmen Kadrosu', icon: Users, permission: 'directory.manage' },
       { to: '/siniflar', label: 'Sınıflar', icon: BookOpenCheck, permission: 'directory.manage' },
     ],
   },

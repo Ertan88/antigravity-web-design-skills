@@ -18,6 +18,19 @@ Okullar için **çok okullu (SaaS'a hazır)** dijital pano sistemi: koridordaki 
 | **Sağ sütun** | Zil vakti: dersin ya da teneffüsün bitmesine kalan süre. Altında o ders saatinde hangi sınıfta hangi ders ve öğretmen var |
 | **Alt bant** | Panelden girilen kısa bilgilerin aktığı kayan yazı |
 
+## Öğretmen kadrosu
+
+![Öğretmen kadrosu](docs/panel-ogretmenler.png)
+
+- **Elle ekleme ve Excel'den yükleme:** ad soyad, branş ve ünvan. Formdan çıkmadan yeni branş/ünvan eklenebilir; "Kaydet ve yenisini ekle" ile hızlı giriş yapılır.
+- **Örnek Excel şablonu:** Branş ve Ünvan sütunlarında okulun kendi listelerinden açılır menü var. Listede olmayan bir değer yazılırsa Excel uyarır, içe aktarırken yeni değer olarak eklenir.
+- **İki adımlı içe aktarma:** Dosya önce okunur; kaç yeni, kaç güncellenecek, hangi satırların neden atlanacağı (satır numarasıyla) gösterilir, onaylanınca kaydedilir. Aynı isimli öğretmen tekrar yüklenirse çift kayıt açılmaz, bilgisi güncellenir. Adı ve soyadı ayrı sütunlu listeler (ör. MEBBİS çıktısı) de okunur.
+- **Excel'e aktarma:** Dışa aktarılan dosya şablonla aynı yapıdadır; düzenlenip geri yüklenebilir.
+- **Kart görünümü:** Düzenle ve sil düğmeleri masaüstünde kartın üzerine gelince, dokunmatik ekranlarda her zaman görünür.
+- **Arama, branşa göre filtre, ada / soyada göre sıralama** (Türkçe alfabe sırasıyla).
+- **Branş ve ünvan yönetimi:** Bir branşın adı değişince o branştaki tüm öğretmenlerde değişir. Yeni okullar önerilen MEB branşları ve ünvanlarıyla açılır.
+- **Tümünü sil:** Silinecek nöbet ve izin kayıtlarının sayısını gösterir, "SİL" yazarak onay ister.
+
 ## Öne çıkan teknik kararlar
 
 - **Gerçek zamanlı:** Panelde yapılan her değişiklik ekranlara Server-Sent Events ile yaklaşık bir saniyede ulaşır. Ekranlar uzaktan yenilenebilir ya da "Tanımla" ile adını gösterebilir.
@@ -62,7 +75,7 @@ npm run dev       # API :3000, panel :5173/admin/, pano :5174/display/
 `npm run seed` çıktısındaki bağlantı örnek ekranı doğrudan açar. Belirli bir anı denemek için panoya `&at=2026-10-28T09:42:00+03:00` ekleyin.
 
 ```bash
-npm test          # 28 birim + 26 entegrasyon testi
+npm test          # 28 birim + 40 entegrasyon testi
 npm run typecheck
 npm run build     # üretim derlemesi
 ```

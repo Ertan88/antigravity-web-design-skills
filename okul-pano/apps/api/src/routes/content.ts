@@ -7,7 +7,6 @@ import {
   leaveSchema,
   studentImportSchema,
   studentSchema,
-  teacherSchema,
   tickerSchema,
   WEEKDAY_NAMES,
 } from '@okulpano/shared';
@@ -66,15 +65,6 @@ export async function contentRoutes(app: FastifyInstance) {
     schema: examSchema,
     orderBy: [asc(exams.examAt)],
     toRow: (i) => ({ ...i, examAt: new Date(i.examAt) }),
-  });
-
-  registerResource(app, {
-    path: 'teachers',
-    entity: 'Öğretmen',
-    table: teachers,
-    permission: 'directory.manage',
-    schema: teacherSchema,
-    orderBy: [asc(teachers.fullName)],
   });
 
   registerResource(app, {

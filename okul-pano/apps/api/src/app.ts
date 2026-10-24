@@ -19,6 +19,7 @@ import { displayRoutes } from './routes/display.ts';
 import { memberRoutes } from './routes/members.ts';
 import { schoolRoutes } from './routes/schools.ts';
 import { screenRoutes } from './routes/screens.ts';
+import { teacherRoutes } from './routes/teachers.ts';
 import { timetableRoutes } from './routes/timetable.ts';
 
 export interface BuildOptions {
@@ -81,6 +82,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   await app.register(schoolRoutes);
   await app.register(memberRoutes);
   await app.register(contentRoutes);
+  await app.register(teacherRoutes);
   await app.register(timetableRoutes);
   await app.register(screenRoutes);
   await app.register(displayRoutes);

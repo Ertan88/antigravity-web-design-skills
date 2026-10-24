@@ -14,14 +14,17 @@ import {
   schools,
   screens,
   students,
+  teacherBranches,
   teacherLeaves,
   teachers,
+  teacherTitles,
   tickerItems,
   timetableEntries,
   users,
 } from './db/schema.ts';
 import { hashPassword, randomToken, sha256 } from './lib/crypto.ts';
 import type { FileStorage } from './lib/storage.ts';
+import { addDefaultTeacherOptions } from './routes/teachers.ts';
 
 export interface SeedResult {
   schoolId: string;
@@ -29,22 +32,23 @@ export interface SeedResult {
   accounts: { role: string; email: string; password: string }[];
 }
 
-const TEACHERS: [string, string, string][] = [
-  ['Ayşe Demir', 'Türk Dili ve Edebiyatı', 'Edebiyat'],
-  ['Mehmet Kaya', 'Matematik', 'Matematik'],
-  ['Zeynep Şahin', 'Fizik', 'Fizik'],
-  ['Ali Yıldız', 'Kimya', 'Kimya'],
-  ['Elif Arslan', 'Biyoloji', 'Biyoloji'],
-  ['Mustafa Çelik', 'Tarih', 'Tarih'],
-  ['Fatma Aydın', 'Coğrafya', 'Coğrafya'],
-  ['Hasan Öztürk', 'İngilizce', 'İngilizce'],
-  ['Emine Koç', 'Almanca', 'Almanca'],
-  ['İbrahim Kurt', 'Beden Eğitimi', 'Beden Eğitimi'],
-  ['Hatice Özdemir', 'Görsel Sanatlar', 'Görsel Sanatlar'],
-  ['Murat Aslan', 'Felsefe', 'Felsefe'],
-  ['Selin Erdoğan', 'Rehberlik', 'Rehberlik'],
-  ['Burak Polat', 'Bilişim Teknolojileri', 'Bilişim'],
-];
+/** [ad soyad, branş, ders programında görünen ders adı, ünvan] */
+const TEACHERS: [string, string, string, string][] = [
+  ['Ayşe Demir', 'Türk Dili ve Edebiyatı', 'Edebiyat', 'Uzman Öğretmen'],
+  ['Mehmet Kaya', 'Matematik', 'Matematik', 'Başöğretmen'],
+  ['Zeynep Şahin', 'Fizik', 'Fizik', 'Öğretmen'],
+  ['Ali Yıldız', 'Kimya', 'Kimya', 'Uzman Öğretmen'],
+  ['Elif Arslan', 'Biyoloji', 'Biyoloji', 'Öğretmen'],
+  ['Mustafa Çelik', 'Tarih', 'Tarih', 'Müdür Yardımcısı'],
+  ['Fatma Aydın', 'Coğrafya', 'Coğrafya', 'Öğretmen'],
+  ['Hasan Öztürk', 'İngilizce', 'İngilizce', 'Uzman Öğretmen'],
+  ['Emine Koç', 'Almanca', 'Almanca', 'Öğretmen'],
+  ['İbrahim Kurt', 'Beden Eğitimi ve Spor', 'Beden Eğitimi', 'Öğretmen'],
+  ['Hatice Özdemir', 'Görsel Sanatlar', 'Görsel Sanatlar', 'Sözleşmeli Öğretmen'],
+  ['Murat Aslan', 'Felsefe', 'Felsefe', 'Öğretmen'],
+  ['Selin Erdoğan', 'Rehberlik ve Psikolojik Danışmanlık', 'Rehberlik', 'Öğretmen'],
+  ['Burak Polat', 'Bilişim Teknolojileri', 'Bilişim', 'Aday Öğretmen'],
+]
 
 const CLASSES = ['9-A', '9-B', '10-A', '10-B', '11-A', '11-B', '12-A', '12-B'];
 const DUTY_AREAS = ['Zemin Kat', '1. Kat', '2. Kat', 'Bahçe', 'Kantin'];
@@ -120,9 +124,19 @@ export async function seedDemo(
     accounts.push({ role: p.role === 'owner' ? 'Okul sahibi' : 'Editör (duyuru + kayan yazı)', email: p.email, password: p.password });
   }
 
+  await addDefaultTeacherOptions(db, schoolId);
+  const branchIds = new Map((await db.select().from(teacherBranches).where(eq(teacherBranches.schoolId, schoolId))).map((b) => [b.name, b.id]));
+  const titleIds = new Map((await db.select().from(teacherTitles).where(eq(teacherTitles.schoolId, schoolId))).map((t) => [t.name, t.id]));
   const teacherRows = await db
     .insert(teachers)
-    .values(TEACHERS.map(([fullName, branch]) => ({ schoolId, fullName, branch })))
+    .values(
+      TEACHERS.map(([fullName, branch, , title]) => ({
+        schoolId,
+        fullName,
+        branchId: branchIds.get(branch) ?? null,
+        titleId: titleIds.get(title) ?? null,
+      })),
+    )
     .returning();
   const classRows = await db
     .insert(classGroups)

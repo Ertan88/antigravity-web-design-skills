@@ -77,3 +77,29 @@ export async function uploadImage(schoolId: string, file: File): Promise<string>
   const { url } = await api<{ url: string }>(`/api/schools/${schoolId}/uploads`, { method: 'POST', form });
   return url;
 }
+
+/**
+ * Kimlik doğrulamalı dosya indirme (Excel şablonu, dışa aktarma). Dosya adı sunucunun
+ * Content-Disposition başlığından alınır; Türkçe karakterler korunur.
+ */
+export async function downloadFile(path: string, fallbackName: string): Promise<void> {
+  const send = () =>
+    fetch(path, { credentials: 'same-origin', headers: accessToken ? { authorization: `Bearer ${accessToken}` } : {} });
+  let res = await send();
+  if (res.status === 401 && (await refreshSession())) res = await send();
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as { message?: string } | null;
+    throw new ApiError(res.status, data?.message ?? 'Dosya indirilemedi.');
+  }
+  const disposition = res.headers.get('content-disposition') ?? '';
+  const match = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
+  const name = match?.[1] ? decodeURIComponent(match[1]) : fallbackName;
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

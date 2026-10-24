@@ -307,6 +307,12 @@ describe('ekran eşleştirme ve pano', () => {
     expect((await state()).statusCode).toBe(401);
   });
 
+  it('platform listesi okul başına ekran sayısını doğru verir', async () => {
+    const rows = (await client(t.app, rootToken).get('/api/platform/schools')).json() as { id: string; screenCount: number }[];
+    expect(rows.find((r) => r.id === schoolA)?.screenCount).toBe(1);
+    expect(rows.find((r) => r.id === schoolB)?.screenCount).toBe(0);
+  });
+
   it('önizleme anahtarı panoyu okuyabilir ama panele erişemez', async () => {
     const { token } = (await client(t.app, ownerToken).post(`/api/schools/${schoolA}/preview-token`)).json();
     const state = await t.app.inject({ method: 'GET', url: '/api/display/state', headers: { authorization: `Bearer ${token}` } });

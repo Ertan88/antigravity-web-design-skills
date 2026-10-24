@@ -40,8 +40,18 @@ export interface Exam extends Base {
 }
 export interface Teacher extends Base {
   fullName: string;
+  branchId: string | null;
+  titleId: string | null;
+  /** Listeden gelen adlar (salt okunur) */
   branch: string | null;
+  title: string | null;
   isActive: boolean;
+}
+/** Branş ya da ünvan listesinin bir öğesi */
+export interface TeacherOption {
+  id: string;
+  name: string;
+  teacherCount: number;
 }
 export interface ClassGroup extends Base {
   name: string;

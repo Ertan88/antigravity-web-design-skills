@@ -27,6 +27,8 @@ export interface ResourceConfig<S extends ZodType> {
   list?: (req: FastifyRequest) => Promise<unknown[]>;
   /** Değişiklik sonrası ekranlara bildirim gönderilsin mi */
   affectsDisplay?: boolean;
+  /** Ek doğrulama (ör. büyük/küçük harf duyarsız tekillik); güncellemede id verilir */
+  validate?: (req: FastifyRequest, row: Record<string, unknown>, id: string | null) => Promise<void>;
 }
 
 const idParam = (req: FastifyRequest) => {
@@ -81,6 +83,7 @@ export function registerResource<S extends ZodType>(app: FastifyInstance, cfg: R
   app.post(base, write, async (req, reply) => {
     const row = toRow(parse(cfg.schema, req.body), req);
     await checkRefs(req, row);
+    await cfg.validate?.(req, row, null);
     const [created] = (await db
       .insert(t)
       .values({ ...row, schoolId: req.ctx.schoolId } as never)
@@ -94,6 +97,7 @@ export function registerResource<S extends ZodType>(app: FastifyInstance, cfg: R
     const id = idParam(req);
     const row = toRow(parse(cfg.schema, req.body), req);
     await checkRefs(req, row);
+    await cfg.validate?.(req, row, id);
     const [updated] = (await db
       .update(t)
       .set(row as never)

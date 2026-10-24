@@ -93,13 +93,40 @@ export const memberships = pgTable(
   (t) => [uniqueIndex('memberships_user_school_uq').on(t.userId, t.schoolId), index('memberships_school_idx').on(t.schoolId)],
 );
 
+/** Okulun branş listesi; adı değişince bağlı tüm öğretmenlerde değişmiş olur. */
+export const teacherBranches = pgTable(
+  'teacher_branches',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    name: text('name').notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex('teacher_branches_school_name_uq').on(t.schoolId, t.name)],
+);
+
+/** Okulun ünvan listesi (Öğretmen, Uzman Öğretmen, Müdür Yardımcısı...) */
+export const teacherTitles = pgTable(
+  'teacher_titles',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    name: text('name').notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex('teacher_titles_school_name_uq').on(t.schoolId, t.name)],
+);
+
 export const teachers = pgTable(
   'teachers',
   {
     id: pk(),
     schoolId: schoolId(),
     fullName: text('full_name').notNull(),
-    branch: text('branch'),
+    branchId: uuid('branch_id').references(() => teacherBranches.id, { onDelete: 'set null' }),
+    titleId: uuid('title_id').references(() => teacherTitles.id, { onDelete: 'set null' }),
     isActive: isActive(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

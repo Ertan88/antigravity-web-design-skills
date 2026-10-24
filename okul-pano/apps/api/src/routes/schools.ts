@@ -7,6 +7,7 @@ import { announcements, auditLogs, memberships, schools, screens, students, teac
 import { hashPassword } from '../lib/crypto.ts';
 import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
 import { geocode } from '../lib/weather.ts';
+import { addDefaultTeacherOptions } from './teachers.ts';
 
 export function publicSchool(s: typeof schools.$inferSelect) {
   return {
@@ -139,8 +140,10 @@ export async function schoolRoutes(app: FastifyInstance) {
 
   app.get('/api/platform/schools', platform, async () => {
     const rows = await db
-      .select({ school: schools, screens: sql<number>`(select count(*)::int from ${screens} where ${screens.schoolId} = ${schools.id})` })
+      .select({ school: schools, screens: count(screens.id) })
       .from(schools)
+      .leftJoin(screens, eq(screens.schoolId, schools.id))
+      .groupBy(schools.id)
       .orderBy(desc(schools.createdAt));
     return rows.map((r) => ({ ...publicSchool(r.school), screenCount: r.screens, createdAt: r.school.createdAt }));
   });
@@ -171,6 +174,7 @@ export async function schoolRoutes(app: FastifyInstance) {
         })
         .returning();
       await tx.insert(memberships).values({ userId: owner!.id, schoolId: school!.id, role: 'owner' });
+      await addDefaultTeacherOptions(tx, school!.id);
       return school!;
     });
     return reply.status(201).send(publicSchool(result));
