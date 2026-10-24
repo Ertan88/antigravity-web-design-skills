@@ -1,9 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { client, createTestApp, expectStatus, login, SUPER, type TestCtx } from './helpers.ts';
+import ExcelJS from 'exceljs';
+import { client, createTestApp, expectStatus, login, multipartBody, SUPER, type TestCtx } from './helpers.ts';
 
 let t: TestCtx;
 let schoolId: string;
 let owner: ReturnType<typeof client>;
+let ownerToken: string;
 const path = (p: string) => `/api/schools/${schoolId}/${p}`;
 const ids: Record<string, string> = {};
 
@@ -19,7 +21,8 @@ beforeAll(async () => {
   });
   expectStatus(res, 201);
   schoolId = res.json().id;
-  owner = client(t.app, (await login(t.app, 'mudur@develi.local', 'MudurDV123!')).token);
+  ownerToken = (await login(t.app, 'mudur@develi.local', 'MudurDV123!')).token;
+  owner = client(t.app, ownerToken);
   for (const fullName of ['Ayşe Demir', 'Ali Kaya', 'Fatma Aydın', 'Mehmet Öztürk', 'Zeynep Arslan']) {
     const r = await owner.post(path('teachers'), { fullName });
     expectStatus(r, 201);
@@ -44,49 +47,96 @@ afterAll(async () => {
   await t.database.close();
 });
 
+
+async function upload(buf: Buffer) {
+  const body = multipartBody('file', 'servis.xlsx', buf, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  return t.app.inject({
+    method: 'POST',
+    url: path('transport-duties/import/preview'),
+    headers: { ...body.headers, authorization: `Bearer ${ownerToken}` },
+    payload: body.payload,
+  });
+}
+
+/** Okulun servis nöbet çizelgesi düzeni: başlık, ay satırı, Nöbet Tarihi | Nöbet Günü | Nöbetçi Öğretmen 1 | 2 */
+async function schoolSheet(rows: (string | null)[][]): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Worksheet');
+  ws.mergeCells('A1:D1');
+  ws.getCell('A1').value = 'ÖĞRETMEN SERVİS NÖBET ÇİZELGESİ';
+  ws.mergeCells('A2:D2');
+  ws.getCell('A2').value = 'AİT OLDUĞU AY: KASIM';
+  ws.getRow(3).values = ['Nöbet Tarihi', 'Nöbet Günü', 'Nöbetçi Öğretmen 1', 'Nöbetçi Öğretmen 2'];
+  rows.forEach((r, i) => (ws.getRow(4 + i).values = r));
+  return Buffer.from(await wb.xlsx.writeBuffer());
+}
+
 type Day = { date: string; teachers: { id: string; fullName: string }[] };
 
-describe('taşımalı öğrenci görevlileri', () => {
-  it('otomatik dağıtım o günün nöbetçilerinden seçer, görevleri eşitler ve izinliyi atlar', async () => {
-    const res = await owner.post(path('transport-duties/auto'), { month: '2026-11', perDay: 2 });
+describe('taşımalı öğrenci (servis) görevlileri', () => {
+  it('okulun çizelgesini okur: büyük harf, Türkçe karakter hatası ve kısaltmalı isimler kadroyla eşleşir', async () => {
+    expectStatus(await owner.post(path('teachers'), { fullName: 'Yasemin Emlek Hakverdi' }), 201);
+    const buf = await schoolSheet([
+      ['02.11.2026', 'PAZARTESİ', 'AYŞE DEMİR', 'ALI KAYA'],
+      ['03.11.2026', 'SALI', 'YASEMİN E.HAKVERDİ', 'M. ÖZTÜRK'],
+      ['04.11.2026', 'ÇARŞAMBA', 'Hasan Yok', 'Zeynep Arslan'],
+      ['31.11.2026', 'PERŞEMBE', 'Fatma Aydın', null],
+    ]);
+    const res = await upload(buf);
     expectStatus(res, 200);
-    // Kasım 2026: 5 pazartesi + 4 salı
-    expect(res.json()).toEqual({ days: 9, skipped: 0 });
+    const body = res.json();
+    expect(body.rows.map((r: { date: string; teachers: { fullName: string }[] }) => `${r.date} ${r.teachers.map((x) => x.fullName).join(', ')}`)).toEqual([
+      '2026-11-02 Ayşe Demir, Ali Kaya',
+      '2026-11-03 Yasemin Emlek Hakverdi, Mehmet Öztürk',
+      '2026-11-04 Zeynep Arslan',
+    ]);
+    expect(body.issues).toEqual([
+      { row: 6, message: expect.stringMatching(/"Hasan Yok" kadroda yok/) },
+      { row: 7, message: 'Tarih anlaşılamadı: "31.11.2026"' },
+    ]);
+    expect(body.totals).toMatchObject({ new: 3, update: 0, unchanged: 0 });
+
+    const saved = await owner.post(path('transport-duties/import'), {
+      days: body.rows.map((r: { date: string; teachers: { id: string }[] }) => ({ date: r.date, teacherIds: r.teachers.map((x) => x.id) })),
+    });
+    expect(saved.json()).toEqual({ days: 3 });
     const days = (await owner.get(path('transport-duties?month=2026-11'))).json() as Day[];
-    expect(days).toHaveLength(9);
-    const monday = new Set(['Ayşe Demir', 'Ali Kaya', 'Fatma Aydın']);
-    const tuesday = new Set(['Mehmet Öztürk', 'Zeynep Arslan']);
-    const counts = new Map<string, number>();
-    for (const d of days) {
-      expect(d.teachers).toHaveLength(2);
-      const weekday = new Date(`${d.date}T12:00:00Z`).getUTCDay();
-      for (const x of d.teachers) {
-        expect((weekday === 1 ? monday : tuesday).has(x.fullName)).toBe(true);
-        counts.set(x.fullName, (counts.get(x.fullName) ?? 0) + 1);
-      }
-    }
-    expect(days.find((d) => d.date === '2026-11-09')!.teachers.map((x) => x.fullName)).not.toContain('Ali Kaya');
-    // 5 pazartesi x 2 = 10 görev üç kişiye: 3-4 arası
-    for (const name of monday) expect(counts.get(name)).toBeGreaterThanOrEqual(3);
-    expect(counts.get('Mehmet Öztürk')).toBe(4);
+    expect(days.map((d) => `${d.date}:${d.teachers.length}`)).toEqual(['2026-11-02:2', '2026-11-03:2', '2026-11-04:1']);
+
+    // Aynı dosya tekrar yüklenirse değişiklik yok
+    expect((await upload(buf)).json().totals).toMatchObject({ new: 0, update: 0, unchanged: 3 });
   });
 
-  it('elle düzenleme günü değiştirir; boş liste kaldırır; otomatik dağıtım dolu günlere dokunmaz', async () => {
+  it('dışa aktarma okulun düzenindedir ve geri yüklenince değişiklik çıkmaz; şablon yalnızca hafta içi tarihleri içerir', async () => {
+    const res = await owner.get(path('transport-duties/export?month=2026-11'));
+    expectStatus(res, 200);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(res.rawPayload as unknown as ArrayBuffer);
+    const ws = wb.getWorksheet('Servis Nöbet Çizelgesi')!;
+    expect(ws.getCell('A1').value).toBe('ÖĞRETMEN SERVİS NÖBET ÇİZELGESİ');
+    expect(ws.getCell('A2').value).toBe('AİT OLDUĞU AY: KASIM 2026');
+    expect(ws.getRow(3).values).toEqual([undefined, 'Nöbet Tarihi', 'Nöbet Günü', 'Nöbetçi Öğretmen 1', 'Nöbetçi Öğretmen 2']);
+    expect(ws.getRow(4).values).toEqual([undefined, '02.11.2026', 'PAZARTESİ', 'Ayşe Demir', 'Ali Kaya']);
+    // Kasım 2026: 21 iş günü
+    expect(ws.getCell(24, 1).value).toBe('30.11.2026');
+    expect(ws.getCell(25, 1).value).toBeFalsy();
+    expect((await upload(res.rawPayload)).json().totals).toMatchObject({ new: 0, update: 0, unchanged: 3, skipped: 0 });
+
+    const tpl = await owner.get(path('transport-duties/template?month=2026-11'));
+    const twb = new ExcelJS.Workbook();
+    await twb.xlsx.load(tpl.rawPayload as unknown as ArrayBuffer);
+    expect(twb.getWorksheet('Servis Nöbet Çizelgesi')!.getCell('C4').value).toBeFalsy();
+  });
+
+  it('elle düzenleme günü değiştirir, boş liste kaldırır; geçersiz istekler reddedilir', async () => {
     expectStatus(await owner.put(path('transport-duties/2026-11-02'), { teacherIds: [ids['Zeynep Arslan'], ids['Ayşe Demir']] }), 200);
-    expectStatus(await owner.put(path('transport-duties/2026-11-03'), { teacherIds: [] }), 200);
-    let days = (await owner.get(path('transport-duties?month=2026-11'))).json() as Day[];
+    expectStatus(await owner.put(path('transport-duties/2026-11-04'), { teacherIds: [] }), 200);
+    const days = (await owner.get(path('transport-duties?month=2026-11'))).json() as Day[];
     expect(days.find((d) => d.date === '2026-11-02')!.teachers.map((x) => x.fullName)).toEqual(['Zeynep Arslan', 'Ayşe Demir']);
-    expect(days.find((d) => d.date === '2026-11-03')).toBeUndefined();
+    expect(days.find((d) => d.date === '2026-11-04')).toBeUndefined();
 
-    expect((await owner.post(path('transport-duties/auto'), { month: '2026-11' })).json()).toEqual({ days: 1, skipped: 0 });
-    days = (await owner.get(path('transport-duties?month=2026-11'))).json();
-    expect(days.find((d) => d.date === '2026-11-02')!.teachers.map((x) => x.fullName)).toEqual(['Zeynep Arslan', 'Ayşe Demir']);
-    expect(days.find((d) => d.date === '2026-11-03')!.teachers).toHaveLength(2);
-  });
-
-  it('geçersiz tarih, ay ve yabancı öğretmen reddedilir', async () => {
     expect((await owner.put(path('transport-duties/2026-13-45'), { teacherIds: [] })).statusCode).toBe(400);
     expect((await owner.get(path('transport-duties?month=2026-1'))).statusCode).toBe(400);
-    expect((await owner.put(path('transport-duties/2026-11-04'), { teacherIds: ['6f1c1f3e-0000-4000-8000-000000000000'] })).statusCode).toBe(400);
+    expect((await owner.put(path('transport-duties/2026-11-05'), { teacherIds: ['6f1c1f3e-0000-4000-8000-000000000000'] })).statusCode).toBe(400);
   });
 });

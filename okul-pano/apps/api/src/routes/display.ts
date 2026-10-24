@@ -154,6 +154,7 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
   ]);
 
   const iso = (d: Date | null) => (d ? d.toISOString() : null);
+  const settings = schoolSettingsSchema.parse(school.settings ?? {});
 
   return {
     serverTime: now.toISOString(),
@@ -164,12 +165,12 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
       logoUrl: school.logoUrl,
       timezone: tz,
       city: school.city,
-      settings: schoolSettingsSchema.parse(school.settings ?? {}),
+      settings,
     },
     exams: examRows.map((e) => ({ ...e, examAt: e.examAt.toISOString() })),
     duties: dutyRows,
     dutySupervisors: supervisorRows,
-    transportDuties: groupTransport(transportRows),
+    transportDuties: settings.hasTransport ? groupTransport(transportRows) : [],
     leaves: leaveRows,
     birthdays: birthdayRows,
     announcements: annRows.map((a) => ({

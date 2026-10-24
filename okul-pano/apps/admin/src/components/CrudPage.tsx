@@ -41,6 +41,10 @@ export interface CrudPageProps<T extends { id: string }, F extends Record<string
   modalSize?: 'md' | 'lg' | 'xl';
   rowActions?: (row: T) => ReactNode;
   headerActions?: ReactNode;
+  /** Başlığın altında sekmeler (ör. Nöbet yerleri / Müdür yardımcısı) */
+  tabs?: ReactNode;
+  /** Verilirse liste kartının yerine gösterilir ve "ekle" düğmesi gizlenir (başka sekme açıkken) */
+  replaceContent?: ReactNode;
 }
 
 /**
@@ -137,7 +141,7 @@ export function CrudPage<T extends { id: string; isActive?: boolean }, F extends
         actions={
           <>
             {p.headerActions}
-            {editable && (
+            {editable && !p.replaceContent && (
               <Button icon={<Plus className="size-4" />} onClick={openNew}>
                 {p.addLabel}
               </Button>
@@ -146,12 +150,15 @@ export function CrudPage<T extends { id: string; isActive?: boolean }, F extends
         }
       />
 
+      {p.tabs && <div className="mb-4">{p.tabs}</div>}
+
       {!editable && (
         <div className="mb-4">
           <Alert tone="blue">Bu bölümü görüntüleyebilirsiniz; değişiklik yapma yetkiniz yok.</Alert>
         </div>
       )}
 
+      {p.replaceContent ?? (
       <Card>
         {p.toolbar && <div className="border-b border-slate-100 px-5 py-3">{p.toolbar}</div>}
         {list.isLoading ? (
@@ -219,6 +226,7 @@ export function CrudPage<T extends { id: string; isActive?: boolean }, F extends
           </>
         )}
       </Card>
+      )}
 
       <Modal
         open={open}

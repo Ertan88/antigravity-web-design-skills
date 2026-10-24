@@ -1,4 +1,4 @@
-import { formatDuration, periodLabel, type BellStatus, type DisplayState } from '@okulpano/shared/client';
+import { formatDuration, gradeHue, periodLabel, type BellStatus, type DisplayState } from '@okulpano/shared/client';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { AutoPager } from './AutoPager.tsx';
 import { BellIcon, BookIcon, CoffeeIcon, UtensilsIcon } from './Icons.tsx';
@@ -78,35 +78,6 @@ export function BellCard({ status }: { status: BellStatus }) {
       {d.next && <div className="bell-next">{d.next}</div>}
     </section>
   );
-}
-
-/** Kademe renkleri: aynı sınıf düzeyindeki tüm şubeler aynı renkte (9-A, 9-B… hepsi mavi) */
-const GRADE_HUES: Record<number, string> = {
-  1: '#06b6d4',
-  2: '#a855f7',
-  3: '#ec4899',
-  4: '#f97316',
-  5: '#14b8a6',
-  6: '#22c55e',
-  7: '#84cc16',
-  8: '#eab308',
-  9: '#0ea5e9',
-  10: '#8b5cf6',
-  11: '#f43f5e',
-  12: '#f59e0b',
-};
-const FALLBACK_HUES = ['#0ea5e9', '#8b5cf6', '#f43f5e', '#f59e0b', '#10b981', '#ec4899'];
-
-export function gradeHue(className: string): string {
-  const name = className.trim().toLocaleLowerCase('tr-TR');
-  const grade = /^(\d{1,2})/.exec(name)?.[1];
-  if (grade && GRADE_HUES[Number(grade)]) return GRADE_HUES[Number(grade)]!;
-  if (/^(haz|hz)/.test(name)) return '#64748b';
-  // Sayısız adlar (ör. "Anasınıfı A"): şube harfi atılarak aynı kademe aynı renge düşer
-  const level = name.replace(/[\s/-]*[a-zçğıöşü]$/u, '');
-  let h = 0;
-  for (const ch of level) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return FALLBACK_HUES[h % FALLBACK_HUES.length]!;
 }
 
 /** Ders ve öğretmen aynı satırda sırayla gösterilir; tüm satırlar birlikte döner */

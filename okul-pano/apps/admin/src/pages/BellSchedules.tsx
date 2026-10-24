@@ -21,6 +21,8 @@ function Editor({ form }: { form: ReturnType<typeof useForm<Form>> }) {
   const { values: v, set, errors } = form;
   const [gen, setGen] = useState(defaultGen);
   const [showGen, setShowGen] = useState(v.periods.length === 0);
+  // Hafta sonu günleri varsayılan olarak gizli; çizelgede seçiliyse ya da istenirse görünür
+  const [showWeekend, setShowWeekend] = useState(() => v.weekdays.some((d) => d > 5));
 
   const updatePeriod = (i: number, patch: Partial<Period>) => set('periods', v.periods.map((p, j) => (j === i ? { ...p, ...patch } : p)));
   const addPeriod = () => {
@@ -35,7 +37,16 @@ function Editor({ form }: { form: ReturnType<typeof useForm<Form>> }) {
         {(id) => <Input id={id} value={v.name} onChange={(e) => set('name', e.target.value)} placeholder="ör. Hafta içi, Cuma, Sınav haftası" invalid={Boolean(errors.name)} />}
       </Field>
       <Field label="Geçerli günler" error={errors.weekdays}>
-        {() => <WeekdayPicker value={v.weekdays} onChange={(d) => set('weekdays', d)} />}
+        {() => (
+          <div className="flex flex-wrap items-center gap-3">
+            <WeekdayPicker value={v.weekdays} onChange={(d) => set('weekdays', d)} days={showWeekend ? [1, 2, 3, 4, 5, 6, 7] : [1, 2, 3, 4, 5]} />
+            {!showWeekend && (
+              <button type="button" onClick={() => setShowWeekend(true)} className="text-xs font-semibold text-brand-600 hover:underline">
+                + Hafta sonu
+              </button>
+            )}
+          </div>
+        )}
       </Field>
 
       <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200/70">

@@ -13,16 +13,20 @@ import {
   type TextareaHTMLAttributes,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { useLocation } from 'react-router-dom';
+import { findNav } from '../lib/nav.ts';
 
 /* ---------- Düğmeler ---------- */
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
 const variants: Record<Variant, string> = {
-  primary: 'bg-brand-600 text-white shadow-sm hover:bg-brand-700 disabled:bg-brand-600/60',
-  secondary: 'bg-white text-slate-700 ring-1 ring-slate-200 shadow-sm hover:bg-slate-50 hover:text-slate-900',
+  primary:
+    'bg-gradient-to-b from-brand-500 to-brand-600 text-white shadow-[0_1px_2px_rgba(37,99,235,0.35),0_4px_12px_-4px_rgba(37,99,235,0.5),inset_0_1px_0_rgba(255,255,255,0.18)] hover:from-brand-600 hover:to-brand-700',
+  secondary:
+    'bg-white text-slate-700 ring-1 ring-slate-200 shadow-[0_1px_2px_rgba(15,23,42,0.05)] hover:bg-slate-50 hover:text-slate-900 hover:ring-slate-300',
   ghost: 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
-  danger: 'bg-red-600 text-white shadow-sm hover:bg-red-700',
+  danger: 'bg-gradient-to-b from-red-500 to-red-600 text-white shadow-[0_1px_2px_rgba(220,38,38,0.35)] hover:from-red-600 hover:to-red-700',
 };
 
 export function Button({
@@ -39,8 +43,8 @@ export function Button({
     <button
       type="button"
       className={clsx(
-        'inline-flex items-center justify-center gap-2 rounded-lg font-semibold whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-60',
-        size === 'sm' ? 'h-8 px-3 text-xs' : 'h-10 px-4 text-sm',
+        'inline-flex items-center justify-center gap-2 rounded-xl font-semibold whitespace-nowrap transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100',
+        size === 'sm' ? 'h-8 rounded-lg px-3 text-xs' : 'h-10 px-4 text-sm',
         variants[variant],
         className,
       )}
@@ -65,7 +69,7 @@ export function IconButton({
       title={label}
       aria-label={label}
       className={clsx(
-        'inline-flex size-9 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:opacity-40',
+        'inline-flex size-9 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:opacity-40',
         className,
       )}
       {...rest}
@@ -78,7 +82,7 @@ export function IconButton({
 /* ---------- Form alanları ---------- */
 
 const control =
-  'block w-full rounded-lg border-0 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm ring-1 ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-brand-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500';
+  'block w-full rounded-xl border-0 bg-white px-3.5 py-2 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] ring-1 ring-slate-200 transition placeholder:text-slate-400 hover:ring-slate-300 focus:ring-2 focus:ring-brand-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500';
 
 export function Field({
   label,
@@ -201,15 +205,15 @@ export function Segmented<T extends string | number>({
   options: { value: T; label: ReactNode }[];
 }) {
   return (
-    <div className="inline-flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
+    <div className="inline-flex flex-wrap gap-1 rounded-2xl bg-slate-100/80 p-1 ring-1 ring-slate-200/60">
       {options.map((o) => (
         <button
           key={String(o.value)}
           type="button"
           onClick={() => onChange(o.value)}
           className={clsx(
-            'rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors',
-            o.value === value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800',
+            'rounded-xl px-3.5 py-1.5 text-sm font-semibold transition-all',
+            o.value === value ? 'bg-white text-slate-900 shadow-[0_1px_3px_rgba(15,23,42,0.1)] ring-1 ring-slate-200/60' : 'text-slate-500 hover:text-slate-800',
           )}
         >
           {o.label}
@@ -221,12 +225,23 @@ export function Segmented<T extends string | number>({
 
 /* ---------- Yerleşim ---------- */
 
+/** Sayfa başlığı: menüdeki simge ve bölüm adı adresten otomatik bulunur */
 export function PageHeader({ title, description, actions }: { title: string; description?: ReactNode; actions?: ReactNode }) {
+  const nav = findNav(useLocation().pathname);
+  const Icon = nav?.item.icon;
   return (
-    <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">{title}</h1>
-        {description && <p className="mt-1 max-w-2xl text-sm text-slate-500">{description}</p>}
+    <div className="mb-7 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="flex min-w-0 items-start gap-4">
+        {Icon && (
+          <div className="hidden size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-indigo-600 text-white shadow-[0_8px_20px_-8px_rgba(37,99,235,0.7)] sm:flex">
+            <Icon className="size-6" />
+          </div>
+        )}
+        <div className="min-w-0">
+          {nav?.group && <div className="mb-0.5 text-xs font-semibold tracking-wider text-brand-600 uppercase">{nav.group}</div>}
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-[26px]">{title}</h1>
+          {description && <p className="mt-1 max-w-3xl text-sm leading-relaxed text-slate-500">{description}</p>}
+        </div>
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
     </div>
@@ -234,7 +249,16 @@ export function PageHeader({ title, description, actions }: { title: string; des
 }
 
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={clsx('rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70', className)}>{children}</div>;
+  return (
+    <div
+      className={clsx(
+        'rounded-2xl bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_30px_-16px_rgba(15,23,42,0.12)] ring-1 ring-slate-900/[0.06]',
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
 }
 
 const badgeTones = {
@@ -257,7 +281,7 @@ export function Badge({ tone = 'slate', children, dot }: { tone?: keyof typeof b
 export function EmptyState({ icon, title, description, action }: { icon: ReactNode; title: string; description?: string; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center px-6 py-14 text-center">
-      <div className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">{icon}</div>
+      <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-50 to-indigo-100 text-brand-600 ring-1 ring-brand-100">{icon}</div>
       <h3 className="text-base font-semibold text-slate-900">{title}</h3>
       {description && <p className="mt-1 max-w-sm text-sm text-slate-500">{description}</p>}
       {action && <div className="mt-5">{action}</div>}

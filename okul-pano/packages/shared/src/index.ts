@@ -7,3 +7,4 @@ export * from './schoolName.ts';
 export * from './teachers.ts';
 export * from './time.ts';
 export * from './youtube.ts';
+export * from './grade.ts';

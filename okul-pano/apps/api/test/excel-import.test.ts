@@ -142,15 +142,16 @@ describe('nöbet çizelgesi Excel', () => {
       'Pazartesi|Bahçe|Ayşe Demir',
       'Salı|Bahçe|Ali Kaya',
       'Salı|Bahçe|Fatma Aydın',
+      // Yalnızca Türkçe harfleri farklı yazılan isim kadrodakiyle eşleşir
+      'Cuma|Bahçe|Ayşe Demir',
       'Salı|1. Kat|Mehmet Öztürk',
     ]);
     expect(body.issues).toEqual([
-      { row: 2, message: '"Ayse Demır" kadroda yok (Ayşe Demir mi?)' },
       { row: 3, message: expect.stringMatching(/"Hasan Yok" kadroda yok; önce Öğretmen Kadrosu/) },
       { row: 4, message: expect.stringMatching(/Nöbet yeri boş/) },
     ]);
     expect(body.additions).toEqual([{ label: 'Yeni nöbet yerleri', values: ['Bahçe', '1. Kat'] }]);
-    expect(body.totals).toMatchObject({ new: 4, unchanged: 0, removed: 0 });
+    expect(body.totals).toMatchObject({ new: 5, unchanged: 0, removed: 0 });
   });
 
   it('"değiştir" dosyadaki günleri yeniler, dosyada olmayan günlere dokunmaz; "ekle" yalnızca eksikleri ekler', async () => {
@@ -186,7 +187,7 @@ describe('nöbet çizelgesi Excel', () => {
     expect(list).toHaveLength(5);
   });
 
-  it('dışa aktarma okulun aylık çizelge düzenindedir, hafta sonu nöbetini de içerir ve geri yüklenince değişiklik çıkmaz', async () => {
+  it('dışa aktarma okulun aylık çizelge düzenindedir, yalnızca hafta içini içerir ve geri yüklenince değişiklik çıkmaz', async () => {
     const res = await owner.get(path('duties/export?month=2026-09'));
     expectStatus(res, 200);
     expect(res.headers['content-disposition']).toMatch(/nobet-cizelgesi-yunus-emre-ortaokulu-/);
@@ -204,13 +205,13 @@ describe('nöbet çizelgesi Excel', () => {
     expect(ws.pageSetup.orientation).toBe('landscape');
     expect(ws.getCell('C5').dataValidation).toMatchObject({ type: 'list' });
     const lastDay = [...Array(ws.rowCount).keys()].map((i) => ws.getCell(i + 1, 1).value).filter(Boolean).pop();
-    expect(lastDay).toBe('CUMARTESİ');
+    expect(lastDay).toBe('CUMA');
 
     const roundtrip = (await preview('duties', res.rawPayload)).json();
     expect(roundtrip.layout).toBe('monthly');
-    expect(roundtrip.weekdays).toEqual([1, 2, 6]);
+    expect(roundtrip.weekdays).toEqual([1, 2]);
     expect(roundtrip.issues).toEqual([]);
-    expect(roundtrip.totals).toMatchObject({ new: 0, unchanged: 5, removed: 0, skipped: 0, supervisors: 0 });
+    expect(roundtrip.totals).toMatchObject({ new: 0, unchanged: 4, removed: 0, skipped: 0, supervisors: 0 });
   });
 
   it('okulun aylık çizelgesini okur: birleşik gün blokları, sıra no, tarih ve nöbetçi müdür yardımcısı', async () => {

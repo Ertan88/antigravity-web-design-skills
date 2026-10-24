@@ -5,6 +5,7 @@ import { CalendarClock, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useToast } from '../components/Toast.tsx';
+import { ClassesPanel } from './timetable/ClassesPanel.tsx';
 import { Alert, Button, Card, EmptyState, Field, Input, Modal, PageHeader, Segmented, Select, Spinner } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
@@ -103,36 +104,57 @@ export function Timetable() {
   };
 
   const loading = classes.isLoading || schedules.isLoading || entries.isLoading;
-  const missing = !loading && (!classes.data?.length || !periods.length);
+  const lessonCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const e of entries.data ?? []) m.set(e.classGroupId, (m.get(e.classGroupId) ?? 0) + 1);
+    return m;
+  }, [entries.data]);
 
   return (
     <>
       <PageHeader
-        title="Ders Programı"
-        description="Pano, zil saatine göre o anda hangi sınıfta hangi dersin ve öğretmenin olduğunu sağ sütunda gösterir. Teneffüste sıradaki dersi gösterir."
+        title="Ders Programı ve Sınıflar"
+        description="Soldan bir sınıf seçip programını düzenleyin. Pano, zil saatine göre o anda hangi sınıfta hangi dersin ve öğretmenin olduğunu gösterir; teneffüste sıradaki dersi gösterir."
       />
 
       {loading ? (
         <Spinner />
-      ) : missing ? (
-        <Card>
-          <EmptyState
-            icon={<CalendarClock className="size-6" />}
-            title="Önce sınıfları ve zil saatlerini tanımlayın"
-            description="Ders programı tablosu, sınıflar ve zil çizelgesindeki ders saatlerinden oluşur."
-            action={
-              <div className="flex gap-2">
-                <Link to="/siniflar">
-                  <Button variant="secondary">Sınıflar</Button>
-                </Link>
-                <Link to="/zil-saatleri">
-                  <Button variant="secondary">Zil saatleri</Button>
-                </Link>
-              </div>
-            }
-          />
-        </Card>
       ) : (
+        <div className="grid items-start gap-5 xl:grid-cols-[19rem_minmax(0,1fr)]">
+          <div className="xl:sticky xl:top-24">
+            <ClassesPanel
+              classes={classes.data ?? []}
+              activeId={activeClass}
+              onSelect={(id) => {
+                setClassId(id);
+                setMode('class');
+              }}
+              editable={can('directory.manage')}
+              lessonCounts={lessonCounts}
+            />
+          </div>
+          {!periods.length ? (
+            <Card>
+              <EmptyState
+                icon={<CalendarClock className="size-6" />}
+                title="Önce zil saatlerini tanımlayın"
+                description="Ders programı tablosunun satırları zil çizelgesindeki ders saatlerinden oluşur."
+                action={
+                  <Link to="/zil-saatleri">
+                    <Button variant="secondary">Zil saatleri</Button>
+                  </Link>
+                }
+              />
+            </Card>
+          ) : !classes.data?.length ? (
+            <Card>
+              <EmptyState
+                icon={<CalendarClock className="size-6" />}
+                title="Sınıf ekleyin"
+                description="Soldaki Sınıflar bölümünden şubeleri ekleyin (ör. 9-A, 9-B, 10-A). Sonra her sınıfın programını buradan girebilirsiniz."
+              />
+            </Card>
+          ) : (
         <Card>
           <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-3 sm:flex-row sm:items-center">
             <Segmented
@@ -144,13 +166,7 @@ export function Timetable() {
               ]}
             />
             {mode === 'class' ? (
-              <Select value={activeClass} onChange={(e) => setClassId(e.target.value)} className="sm:w-48" aria-label="Sınıf">
-                {(classes.data ?? []).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </Select>
+              <span className="text-base font-bold text-slate-900">{classNames.get(activeClass) ?? ''}</span>
             ) : (
               <Select value={activeTeacher} onChange={(e) => setTeacherId(e.target.value)} className="sm:w-64" aria-label="Öğretmen">
                 {(teachers.data ?? []).map((t) => (
@@ -219,6 +235,8 @@ export function Timetable() {
             </table>
           </div>
         </Card>
+          )}
+        </div>
       )}
 
       <Modal

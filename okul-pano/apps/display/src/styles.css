@@ -1504,3 +1504,119 @@ p {
   -webkit-box-orient: vertical;
   line-height: 1.2;
 }
+
+/* ---------- Nöbet satırları: her yer + öğretmen kendi kutusunda ---------- */
+.duty-card .pager-row {
+  border-top: 0;
+  padding: 3px 0;
+}
+
+.duty-card .duty-row {
+  gap: 2px;
+  padding: 6px 14px;
+  border-radius: 12px;
+  border-left: 4px solid var(--row-hue, var(--hue));
+  background: color-mix(in srgb, var(--row-hue, var(--hue)) 9%, transparent);
+}
+
+.duty-card .duty-area {
+  padding: 0;
+  background: none;
+  border-radius: 0;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.duty-card .duty-teacher {
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+/* ---------- İzinli öğretmenler: çerçevesiz isim listesi ---------- */
+.leave-card .pager-chips .pager-page {
+  gap: 6px 0;
+}
+
+.leave-card .pager-chip {
+  padding: 2px 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+
+.leave-card .pager-chip:not(:last-child)::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin: 0 14px;
+  border-radius: 999px;
+  background: var(--hue);
+  align-self: center;
+}
+
+/* ---------- Sınav sayacı ve zil kartı: daha kompakt ---------- */
+.exam-card {
+  padding-top: 18px;
+  padding-bottom: 16px;
+}
+
+.exam-title {
+  font-size: 24px;
+}
+
+.exam-units {
+  margin-top: 10px;
+  gap: 8px;
+}
+
+.exam-unit {
+  padding: 7px 0 6px;
+}
+
+.exam-unit strong {
+  font-size: 36px;
+}
+
+.exam-card .exam-unit-days strong {
+  font-size: 40px;
+}
+
+.exam-unit span {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.exam-next {
+  margin-top: 10px;
+  padding-top: 9px;
+  font-size: 17px;
+}
+
+.bell-card {
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+
+.bell-card .card-label {
+  margin-bottom: 8px;
+}
+
+.bell-title {
+  font-size: 28px;
+}
+
+.bell-countdown {
+  font-size: 72px;
+  margin: 2px 0 10px;
+}
+
+.bell-range {
+  margin-top: 10px;
+  font-size: 19px;
+}

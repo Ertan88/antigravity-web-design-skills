@@ -4,7 +4,6 @@ import {
   isWithinWindow,
   periodLabel,
   pickSchedule,
-  WEEKDAY_NAMES,
   zonedParts,
 } from '@okulpano/shared/client';
 import type { CSSProperties } from 'react';
@@ -95,11 +94,10 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
             {s.showExams && <ExamCard exams={state.exams} now={now} timezone={school.timezone} />}
             {s.showDuties && <DutyCard
                 duties={duties}
-                weekdayName={WEEKDAY_NAMES[today.weekday] ?? ''}
                 supervisor={(state.dutySupervisors ?? []).find((x) => x.date === today.isoDate)?.name ?? null}
                 transport={(state.transportDuties ?? []).find((x) => x.date === today.isoDate)?.teacherNames ?? []}
               />}
-            {s.showLeaves && leaves.length > 0 && <LeaveCard leaves={leaves} todayIso={today.isoDate} />}
+            {s.showLeaves && leaves.length > 0 && <LeaveCard leaves={leaves} />}
             {s.showBirthdays && birthdays.length > 0 && <BirthdayCard birthdays={birthdays} nameFormat={s.birthdayNameFormat} />}
           </aside>
         )}

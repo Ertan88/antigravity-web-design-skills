@@ -39,7 +39,7 @@ export interface SupervisorEntry {
 
 export const DEFAULT_DUTY_AREAS = ['Zemin Kat', '1. Kat', '2. Kat', 'Bahçe', 'Kantin'];
 
-const MONTHS = ['', 'OCAK', 'ŞUBAT', 'MART', 'NİSAN', 'MAYIS', 'HAZİRAN', 'TEMMUZ', 'AĞUSTOS', 'EYLÜL', 'EKİM', 'KASIM', 'ARALIK'];
+export const MONTHS = ['', 'OCAK', 'ŞUBAT', 'MART', 'NİSAN', 'MAYIS', 'HAZİRAN', 'TEMMUZ', 'AĞUSTOS', 'EYLÜL', 'EKİM', 'KASIM', 'ARALIK'];
 
 const DAY_ALIASES: Record<number, readonly string[]> = {
   1: ['pazartesi', 'pzt', 'pts', 'ptesi'],

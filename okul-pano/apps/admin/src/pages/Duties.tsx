@@ -1,18 +1,97 @@
-import { dutySchema, WEEKDAY_NAMES } from '@okulpano/shared';
+import { dutySchema, WEEKDAY_NAMES, WEEKDAY_SHORT } from '@okulpano/shared';
 import clsx from 'clsx';
-import { ShieldCheck } from 'lucide-react';
+import { CalendarDays, ShieldCheck, UserCog } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { CrudPage } from '../components/CrudPage.tsx';
 import { ExcelButtons } from '../components/ExcelButtons.tsx';
 import { ExcelImportDialog, type ImportPreview } from '../components/ExcelImportDialog.tsx';
-import { Badge, Field, Input, Segmented, Select } from '../components/ui.tsx';
+import { Badge, Card, Field, Input, Select } from '../components/ui.tsx';
+import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { nameMap, useList, useSchoolPath, type Duty, type Teacher } from '../lib/data.ts';
-import { currentMonth, DailyDutyPanel, monthLabel } from './duties/DailyDutyPanel.tsx';
+import { currentMonth, filledCount, MonthNav, monthLabel, SupervisorCalendar, type DutySupervisor } from './duties/calendar.tsx';
 
 type Form = { weekday: number; area: string; teacherId: string; sortOrder: number };
 
 const todayWeekday = () => ((new Date().getDay() + 6) % 7) + 1;
+const WEEKDAYS = [1, 2, 3, 4, 5];
+
+/** Gün seçici: her gün bir kart; nöbetçi sayısı ve bugünün işareti */
+function DayBar({ value, onChange, counts }: { value: number; onChange: (d: number) => void; counts: Record<number, number> }) {
+  const today = todayWeekday();
+  const max = Math.max(1, ...WEEKDAYS.map((d) => counts[d] ?? 0));
+  return (
+    <div className="grid grid-cols-5 gap-1.5 sm:gap-2" role="tablist" aria-label="Gün">
+      {WEEKDAYS.map((d) => {
+        const active = d === value;
+        const n = counts[d] ?? 0;
+        return (
+          <button
+            key={d}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(d)}
+            className={clsx(
+              'group relative overflow-hidden rounded-2xl px-2 py-2.5 text-left transition-all sm:px-3.5 sm:py-3',
+              active
+                ? 'bg-gradient-to-br from-brand-500 to-indigo-600 text-white shadow-[0_10px_24px_-12px_rgba(37,99,235,0.8)]'
+                : 'bg-slate-50 text-slate-700 ring-1 ring-slate-200/80 hover:bg-white hover:ring-brand-200',
+            )}
+          >
+            <div className="flex items-center gap-1.5">
+              <span className="truncate text-[13px] font-semibold sm:text-sm">
+                <span className="sm:hidden">{WEEKDAY_SHORT[d]}</span>
+                <span className="hidden sm:inline">{WEEKDAY_NAMES[d]}</span>
+              </span>
+              {d === today && (
+                <span className={clsx('size-1.5 shrink-0 rounded-full', active ? 'bg-white' : 'bg-emerald-500')} title="Bugün" />
+              )}
+            </div>
+            <div className={clsx('mt-0.5 text-xs tabular-nums', active ? 'text-white/80' : 'text-slate-500')}>
+              <span className="sm:hidden">{n || '—'}</span>
+              <span className="hidden sm:inline">{n ? `${n} nöbetçi` : 'Nöbet yok'}</span>
+            </div>
+            <div className={clsx('mt-2 h-1 overflow-hidden rounded-full', active ? 'bg-white/25' : 'bg-slate-200/80')}>
+              <div className={clsx('h-full rounded-full', active ? 'bg-white' : 'bg-brand-400')} style={{ width: `${(n / max) * 100}%` }} />
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+type View = 'duties' | 'supervisor';
+
+function ViewTabs({ view, onView, counts }: { view: View; onView: (v: View) => void; counts: { duties: number; supervisor: string } }) {
+  const tabs: { value: View; label: string; hint: string; icon: typeof ShieldCheck }[] = [
+    { value: 'duties', label: 'Nöbet yerleri ve öğretmenler', hint: `${counts.duties} nöbet`, icon: ShieldCheck },
+    { value: 'supervisor', label: 'Nöbetçi müdür yardımcısı', hint: counts.supervisor, icon: UserCog },
+  ];
+  return (
+    <div className="inline-flex w-full flex-wrap gap-1 rounded-2xl bg-white p-1 shadow-[0_1px_2px_rgba(15,23,42,0.05)] ring-1 ring-slate-200 sm:w-auto">
+      {tabs.map((t) => (
+        <button
+          key={t.value}
+          type="button"
+          onClick={() => onView(t.value)}
+          className={clsx(
+            'flex flex-1 items-center gap-2.5 rounded-xl px-3.5 py-2 text-left transition sm:flex-none',
+            view === t.value ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50',
+          )}
+        >
+          <t.icon className={clsx('size-4 shrink-0', view === t.value ? 'text-brand-300' : 'text-slate-400')} />
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-semibold">{t.label}</span>
+            <span className={clsx('block text-[11px]', view === t.value ? 'text-slate-400' : 'text-slate-400')}>{t.hint}</span>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 type Mode = 'replace' | 'merge';
 type DutyRow = { weekday: number; day: string; area: string; teacherName: string; teacherInactive: boolean };
@@ -137,7 +216,14 @@ export function Duties() {
   const [day, setDay] = useState(() => Math.min(todayWeekday(), 5));
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [month, setMonth] = useState(currentMonth);
-  const { can } = useAuth();
+  const [view, setView] = useState<View>('duties');
+  const { can, schoolId } = useAuth();
+  const supervisorsPath = useSchoolPath('duty-supervisors');
+  const supervisors = useQuery({
+    queryKey: [schoolId, 'duty-supervisors', month],
+    queryFn: () => api<DutySupervisor[]>(`${supervisorsPath}?month=${month}`),
+    enabled: Boolean(schoolId),
+  });
   const dutiesPath = useSchoolPath('duties');
   const teachers = useList<Teacher>('teachers');
   const duties = useList<Duty>('duties');
@@ -151,7 +237,36 @@ export function Duties() {
         resource="duties"
         label="Nöbet"
         title="Nöbet Çizelgesi"
-        description={`Her gün için nöbet yeri ve nöbetçi öğretmen; altta her gün için nöbetçi müdür yardımcısı ve taşımalı öğrenci görevlileri. Excel şablonu ve dışa aktarma okulunuzun aylık çizelge düzenindedir (${monthLabel(month)}).`}
+        description="Haftanın her günü için nöbet yerleri ve nöbetçi öğretmenler, tarih tarih nöbetçi müdür yardımcısı. Excel şablonu ve dışa aktarma okulunuzun aylık çizelge düzenindedir; ayı sağdan seçin."
+        tabs={
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <ViewTabs
+              view={view}
+              onView={setView}
+              counts={{
+                duties: (duties.data ?? []).filter((d) => d.weekday <= 5).length,
+                supervisor: `${monthLabel(month)} · ${filledCount(month, (supervisors.data ?? []).map((x) => x.date))} gün dolu`,
+              }}
+            />
+            <MonthNav month={month} onMonth={setMonth} />
+          </div>
+        }
+        replaceContent={
+          view === 'supervisor' ? (
+            <Card className="overflow-hidden">
+              <div className="flex items-center gap-3 border-b border-slate-100 bg-gradient-to-r from-teal-50/80 to-white px-5 py-3.5">
+                <span className="flex size-9 items-center justify-center rounded-xl bg-teal-600 text-white">
+                  <CalendarDays className="size-4" />
+                </span>
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-900">{monthLabel(month)} · Nöbetçi müdür yardımcısı</h2>
+                  <p className="text-xs text-slate-500">İsmi yazıp çıkın, kendiliğinden kaydedilir. Panoda o günün ismi nöbetçi öğretmenler kartında görünür.</p>
+                </div>
+              </div>
+              <SupervisorCalendar month={month} editable={can('duties.manage')} />
+            </Card>
+          ) : undefined
+        }
         permission="duties.manage"
         icon={<ShieldCheck className="size-6" />}
         emptyTitle={`${WEEKDAY_NAMES[day]} için nöbet girilmemiş`}
@@ -161,8 +276,8 @@ export function Duties() {
         headerActions={
           <ExcelButtons
             basePath={dutiesPath}
-            templateName="nobet-cizelgesi-sablonu.xlsx"
-            exportName="nobet-cizelgesi.xlsx"
+            module="Nöbet Çizelgesi"
+            period={monthLabel(month)}
             canImport={can('duties.manage')}
             onFile={setExcelFile}
             query={`month=${month}`}
@@ -170,19 +285,7 @@ export function Duties() {
         }
         schema={dutySchema}
         toolbar={
-          <Segmented
-            value={day}
-            onChange={setDay}
-            options={[1, 2, 3, 4, 5, 6, 7].map((d) => ({
-              value: d,
-              label: (
-                <span>
-                  {WEEKDAY_NAMES[d]}
-                  {counts[d] ? <span className="ml-1.5 text-xs text-slate-400">{counts[d]}</span> : null}
-                </span>
-              ),
-            }))}
-          />
+          <DayBar value={day} onChange={setDay} counts={counts} />
         }
         select={(rows) => rows.filter((r) => r.weekday === day)}
         columns={[
@@ -197,7 +300,7 @@ export function Duties() {
             <Field label="Gün" error={errors.weekday}>
               {(id) => (
                 <Select id={id} value={v.weekday} onChange={(e) => set('weekday', Number(e.target.value))}>
-                  {[1, 2, 3, 4, 5, 6, 7].map((d) => (
+                  {WEEKDAYS.map((d) => (
                     <option key={d} value={d}>
                       {WEEKDAY_NAMES[d]}
                     </option>
@@ -235,16 +338,6 @@ export function Duties() {
           </>
         )}
       />
-      <div className="mt-6">
-        <DailyDutyPanel
-          month={month}
-          onMonth={setMonth}
-          editable={can('duties.manage')}
-          weekdays={new Set([1, 2, 3, 4, 5, ...[6, 7].filter((d) => counts[d])])}
-          teachers={teachers.data ?? []}
-          duties={duties.data ?? []}
-        />
-      </div>
       <DutyExcelImport file={excelFile} onClose={() => setExcelFile(null)} />
     </>
   );

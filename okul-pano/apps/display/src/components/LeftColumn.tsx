@@ -3,7 +3,6 @@ import { AutoPager } from './AutoPager.tsx';
 import { CakeIcon, CapIcon, ShieldIcon, UserMinusIcon } from './Icons.tsx';
 
 const pad = (n: number) => String(n).padStart(2, '0');
-const shortDate = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 
 export function ExamCard({ exams, now, timezone }: { exams: DisplayState['exams']; now: Date; timezone: string }) {
   const [first, ...rest] = exams;
@@ -54,12 +53,10 @@ export function ExamCard({ exams, now, timezone }: { exams: DisplayState['exams'
 
 export function DutyCard({
   duties,
-  weekdayName,
   supervisor,
   transport,
 }: {
   duties: DisplayState['duties'];
-  weekdayName: string;
   /** Bugünün nöbetçi müdür yardımcısı */
   supervisor: string | null;
   /** Bugünün taşımalı öğrenci görevlileri */
@@ -69,7 +66,6 @@ export function DutyCard({
     <section className="card list-card duty-card">
       <div className="card-label">
         <ShieldIcon size={22} /> Nöbetçi Öğretmenler
-        <span className="card-label-aside">{weekdayName}</span>
       </div>
       <AutoPager
         items={duties}
@@ -103,7 +99,7 @@ export function DutyCard({
   );
 }
 
-export function LeaveCard({ leaves, todayIso }: { leaves: DisplayState['leaves']; todayIso: string }) {
+export function LeaveCard({ leaves }: { leaves: DisplayState['leaves'] }) {
   return (
     <section className="card list-card leave-card">
       <div className="card-label">
@@ -112,14 +108,9 @@ export function LeaveCard({ leaves, todayIso }: { leaves: DisplayState['leaves']
       <AutoPager
         items={leaves}
         layout="chips"
-        pageSize={4}
+        pageSize={6}
         keyOf={(l) => l.id}
-        render={(l) => (
-          <>
-            <span className="person-name">{l.teacherName}</span>
-            {l.endDate > todayIso && <span className="person-meta">son gün {shortDate.format(new Date(`${l.endDate}T00:00:00Z`))}</span>}
-          </>
-        )}
+        render={(l) => <span className="person-name">{l.teacherName}</span>}
       />
     </section>
   );

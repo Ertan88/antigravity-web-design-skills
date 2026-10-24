@@ -1,6 +1,7 @@
 import { FileDown, FileSpreadsheet, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { downloadFile } from '../lib/api.ts';
+import { downloadFile, excelFileName } from '../lib/api.ts';
+import { useSchool } from '../lib/data.ts';
 import { useToast } from './Toast.tsx';
 import { Button } from './ui.tsx';
 
@@ -10,28 +11,34 @@ import { Button } from './ui.tsx';
  */
 export function ExcelButtons({
   basePath,
-  templateName,
-  exportName,
+  module,
+  period,
   canImport,
   onFile,
   query,
 }: {
   basePath: string;
-  templateName: string;
-  exportName: string;
+  /** Dosya adındaki modül adı: "<Okul> - <modül>.xlsx", şablon için "<Okul> - <modül> Şablonu.xlsx" */
+  module: string;
+  /** Dosya adının sonuna eklenen dönem, ör. "Ekim 2026" */
+  period?: string;
   canImport: boolean;
   onFile: (file: File) => void;
   /** İndirme adreslerine eklenecek sorgu (ör. "month=2026-10") */
   query?: string;
 }) {
   const toast = useToast();
+  const school = useSchool();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<'template' | 'export' | null>(null);
 
   const download = async (kind: 'template' | 'export') => {
     setBusy(kind);
     try {
-      await downloadFile(`${basePath}/${kind}${query ? `?${query}` : ''}`, kind === 'template' ? templateName : exportName);
+      await downloadFile(
+        `${basePath}/${kind}${query ? `?${query}` : ''}`,
+        excelFileName(school.data?.name, `${module}${kind === 'template' ? ' Şablonu' : ''}${period ? ` (${period})` : ''}`),
+      );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'İndirilemedi');
     } finally {

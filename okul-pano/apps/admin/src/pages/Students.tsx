@@ -224,8 +224,7 @@ export function Students() {
           <>
             <ExcelButtons
               basePath={studentsPath}
-              templateName="ogrenci-sablonu.xlsx"
-              exportName="ogrenciler.xlsx"
+              module="Öğrenci Listesi"
               canImport={can('students.manage')}
               onFile={setExcelFile}
             />

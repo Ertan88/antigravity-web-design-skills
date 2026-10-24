@@ -11,3 +11,4 @@ export * from './teachers.ts';
 export * from './time.ts';
 export * from './youtube.ts';
 export type { SchoolSettings } from './schemas.ts';
+export * from './grade.ts';

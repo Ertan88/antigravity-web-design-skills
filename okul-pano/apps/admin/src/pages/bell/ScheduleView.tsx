@@ -58,9 +58,11 @@ export function WeekCoverage({
   today: number;
   onSelect: (id: string) => void;
 }) {
+  // Hafta sonu yalnızca bir çizelgede seçiliyse gösterilir
+  const days = [1, 2, 3, 4, 5, ...[6, 7].filter((d) => schedules.some((x) => x.weekdays.includes(d)))];
   return (
-    <div className="grid grid-cols-7 gap-1.5">
-      {[1, 2, 3, 4, 5, 6, 7].map((d) => {
+    <div className={clsx('grid gap-1.5', days.length === 7 ? 'grid-cols-7' : days.length === 6 ? 'grid-cols-6' : 'grid-cols-5')}>
+      {days.map((d) => {
         const s = schedules.find((x) => x.weekdays.includes(d) && x.periods.length > 0);
         return (
           <button

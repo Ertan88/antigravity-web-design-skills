@@ -231,6 +231,12 @@ export function Settings() {
         <Section title="Pano alanları" description="Gizlediğiniz alan panodan kalkar, kalan alanlar boşluğu doldurur. Veriler silinmez.">
           <Toggle checked={s.showExams} onChange={(x) => setting('showExams', x)} label="Sınav sayacı" />
           <Toggle checked={s.showDuties} onChange={(x) => setting('showDuties', x)} label="Nöbetçi öğretmenler" />
+          <Toggle
+            checked={s.hasTransport}
+            onChange={(x) => setting('hasTransport', x)}
+            label="Taşımalı eğitim (servisle gelen öğrenciler)"
+            description="Açıkken menüde Taşımalı Eğitim sayfası çıkar; panoda o günün servis nöbetçileri nöbet kartında görünür."
+          />
           <Toggle checked={s.showLeaves} onChange={(x) => setting('showLeaves', x)} label="İzinli öğretmenler" description="Yalnızca o gün izinli öğretmen varsa görünür." />
           <Toggle checked={s.showBirthdays} onChange={(x) => setting('showBirthdays', x)} label="Doğum günü kutlamaları" description="Yalnızca o gün doğum günü olan öğrenci varsa görünür." />
           {s.showBirthdays && (

@@ -99,7 +99,7 @@ export async function seedDemo(
       timezone: tz,
       plan: 'pro',
       maxScreens: 10,
-      settings: {},
+      settings: { hasTransport: true },
     })
     .returning();
   const schoolId = school!.id;

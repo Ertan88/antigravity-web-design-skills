@@ -82,7 +82,7 @@ export async function uploadImage(schoolId: string, file: File): Promise<string>
  * Kimlik doğrulamalı dosya indirme (Excel şablonu, dışa aktarma). Dosya adı sunucunun
  * Content-Disposition başlığından alınır; Türkçe karakterler korunur.
  */
-export async function downloadFile(path: string, fallbackName: string): Promise<void> {
+export async function downloadFile(path: string, name: string): Promise<void> {
   const send = () =>
     fetch(path, { credentials: 'same-origin', headers: accessToken ? { authorization: `Bearer ${accessToken}` } : {} });
   let res = await send();
@@ -91,9 +91,7 @@ export async function downloadFile(path: string, fallbackName: string): Promise<
     const data = (await res.json().catch(() => null)) as { message?: string } | null;
     throw new ApiError(res.status, data?.message ?? 'Dosya indirilemedi.');
   }
-  const disposition = res.headers.get('content-disposition') ?? '';
-  const match = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
-  const name = match?.[1] ? decodeURIComponent(match[1]) : fallbackName;
+  // Dosya adını panel verir ("Okul Adı - Nöbet Çizelgesi.xlsx"); sunucunun ASCII adı yalnızca doğrudan bağlantılar için
   const url = URL.createObjectURL(await res.blob());
   const a = document.createElement('a');
   a.href = url;
@@ -102,4 +100,13 @@ export async function downloadFile(path: string, fallbackName: string): Promise<
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/**
+ * İndirilen Excel dosyasının adı: "<Okul adı> - <Modül>.xlsx".
+ * Dosya sistemlerinde yasak karakterler ( / \ : * ? " < > | ) atılır.
+ */
+export function excelFileName(schoolName: string | undefined, module: string): string {
+  const clean = (t: string) => t.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return `${[clean(schoolName ?? ''), clean(module)].filter(Boolean).join(' - ')}.xlsx`;
 }

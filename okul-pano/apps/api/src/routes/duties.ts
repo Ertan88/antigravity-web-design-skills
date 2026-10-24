@@ -2,52 +2,12 @@ import { dutyImportSchema, dutySchema, dutySupervisorSchema, normalizeName, tidy
 import { and, asc, eq, gte, inArray, lte, or, sql, type SQL } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { audit, schoolGuard } from '../context.ts';
-import type { DB } from '../db/client.ts';
 import { duties, dutySupervisors, teachers } from '../db/schema.ts';
 import { badRequest, conflict, parse } from '../lib/errors.ts';
 import { exportFileName, readXlsxUpload, sendXlsx } from '../lib/excel.ts';
 import { buildDutiesWorkbook, parseDutiesWorkbook, trDate } from '../lib/sheets/duties.ts';
 import { registerResource } from './crud.ts';
-
-/** Basit düzenleme mesafesi: "Ayse Demır" yazılmışsa "Ayşe Demir mi?" önerisi için */
-function editDistance(a: string, b: string): number {
-  const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
-  for (let i = 1; i <= a.length; i++) {
-    let diag = prev[0]!;
-    prev[0] = i;
-    for (let j = 1; j <= b.length; j++) {
-      const tmp = prev[j]!;
-      prev[j] = Math.min(prev[j]! + 1, prev[j - 1]! + 1, diag + (a[i - 1] === b[j - 1] ? 0 : 1));
-      diag = tmp;
-    }
-  }
-  return prev[b.length]!;
-}
-
-/** Türkçe karakter hatalarını da yakalamak için harfleri sadeleştirerek karşılaştırır */
-const loose = (s: string) =>
-  normalizeName(s).replace(/ı/g, 'i').replace(/ş/g, 's').replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/ç/g, 'c');
-
-async function loadRoster(db: DB, schoolId: string) {
-  const rows = await db
-    .select({ id: teachers.id, fullName: teachers.fullName, isActive: teachers.isActive })
-    .from(teachers)
-    .where(eq(teachers.schoolId, schoolId));
-  // Aynı isimde aktif ve pasif kayıt varsa aktif olan seçilir
-  rows.sort((a, b) => Number(b.isActive) - Number(a.isActive));
-  const byName = new Map<string, (typeof rows)[number]>();
-  for (const t of rows) if (!byName.has(normalizeName(t.fullName))) byName.set(normalizeName(t.fullName), t);
-  const suggest = (name: string): string | null => {
-    const target = loose(name);
-    let best: { name: string; d: number } | null = null;
-    for (const t of rows) {
-      const d = editDistance(target, loose(t.fullName));
-      if (d <= Math.max(2, Math.floor(target.length / 6)) && (!best || d < best.d)) best = { name: t.fullName, d };
-    }
-    return best?.name ?? null;
-  };
-  return { rows, byName, suggest };
-}
+import { loadRoster } from '../lib/roster.ts';
 
 const dutyKey = (weekday: number, area: string, teacherId: string) => `${weekday}|${normalizeName(area)}|${teacherId}`;
 
@@ -149,7 +109,7 @@ export async function dutyRoutes(app: FastifyInstance) {
     const fileKeys = new Set<string>();
 
     const rows = parsed.entries.flatMap((e) => {
-      const teacher = roster.byName.get(normalizeName(e.teacherName));
+      const teacher = roster.find(e.teacherName);
       if (!teacher) {
         const hint = roster.suggest(e.teacherName);
         issues.push({
@@ -228,7 +188,7 @@ export async function dutyRoutes(app: FastifyInstance) {
       let skipped = 0;
       let unchanged = 0;
       for (const r of body.rows) {
-        const teacher = roster.byName.get(normalizeName(r.teacherName));
+        const teacher = roster.find(r.teacherName);
         if (!teacher) {
           skipped++;
           continue;
@@ -304,7 +264,8 @@ export async function dutyRoutes(app: FastifyInstance) {
             .where(and(eq(dutySupervisors.schoolId, schoolId), gte(dutySupervisors.date, from), lte(dutySupervisors.date, to)))
         : Promise.resolve([]),
     ]);
-    const weekdays = [1, 2, 3, 4, 5, ...[6, 7].filter((d) => rows.some((r) => r.weekday === d))];
+    // Okul nöbet çizelgesi hafta içi günlerinden oluşur
+    const weekdays = [1, 2, 3, 4, 5];
     const days = new Map<number, { area: string; teacherName: string }[]>();
     if (withData) for (const r of rows) days.set(r.weekday, [...(days.get(r.weekday) ?? []), { area: r.area, teacherName: r.teacherName }]);
     return buildDutiesWorkbook({

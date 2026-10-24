@@ -5,9 +5,9 @@ import { Download, FileDown, FileSpreadsheet, Search, Tags, Trash2, Upload, User
 import { useMemo, useRef, useState } from 'react';
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Button, Card, EmptyState, Field, Input, Modal, PageHeader, Select, Spinner, Toggle } from '../components/ui.tsx';
-import { api, downloadFile } from '../lib/api.ts';
+import { api, downloadFile, excelFileName } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
-import { useList, useResource, useSchoolPath, type Teacher, type TeacherOption } from '../lib/data.ts';
+import { type Teacher, type TeacherOption, useList, useResource, useSchool, useSchoolPath } from '../lib/data.ts';
 import { useForm } from '../lib/form.ts';
 import { DeleteAllDialog } from './teachers/DeleteAllDialog.tsx';
 import { ImportDialog } from './teachers/ImportDialog.tsx';
@@ -104,6 +104,7 @@ export function Teachers() {
   const qc = useQueryClient();
   const { schoolId } = useAuth();
   const teachersPath = useSchoolPath('teachers');
+  const school = useSchool();
   const list = useList<Teacher>('teachers');
   const branches = useList<TeacherOption>('teacher-branches');
   const titles = useList<TeacherOption>('teacher-titles');
@@ -143,7 +144,7 @@ export function Teachers() {
   const download = async (kind: 'template' | 'export') => {
     setDownloading(kind);
     try {
-      await downloadFile(`${teachersPath}/${kind}`, kind === 'template' ? 'ogretmen-sablonu.xlsx' : 'ogretmenler.xlsx');
+      await downloadFile(`${teachersPath}/${kind}`, excelFileName(school.data?.name, kind === 'template' ? 'Öğretmen Kadrosu Şablonu' : 'Öğretmen Kadrosu'));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'İndirilemedi');
     } finally {

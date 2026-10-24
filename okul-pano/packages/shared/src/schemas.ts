@@ -42,6 +42,8 @@ function endAfterStart(v: { startsAt?: string | null; endsAt?: string | null }, 
 export const schoolSettingsSchema = z.object({
   /** Panoda okul adının altında ikinci satır (ör. "Mesleki ve Teknik Anadolu Lisesi"). Boşsa addan tahmin edilir. */
   schoolType: z.string().trim().max(80).default(''),
+  /** Okulda taşımalı eğitim (servisle gelen öğrenci) var mı; açıksa Taşımalı Eğitim sayfası ve panodaki görevli bilgisi görünür */
+  hasTransport: z.boolean().default(false),
   theme: z.enum(['dark', 'light']).default('dark'),
   primaryColor: hexColor.default('#3b82f6'),
   accentColor: hexColor.default('#f59e0b'),
@@ -228,12 +230,12 @@ export const transportDaySchema = z.object({
   teacherIds: z.array(id).max(4, 'Bir güne en fazla 4 görevli atanabilir'),
 });
 
-/** Ay boyunca her güne o günün nöbetçileri arasından dönüşümlü görevli atar */
-export const transportAutoSchema = z.object({
-  month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Ay YYYY-AA biçiminde olmalı'),
-  perDay: z.number().int().min(1).max(4).default(2),
-  /** Kapalıysa yalnızca boş günler doldurulur */
-  overwrite: z.boolean().default(false),
+/** Excel'den servis (taşımalı eğitim) nöbet çizelgesi: dosyadaki tarihlerin görevlileri yenilenir */
+export const transportImportSchema = z.object({
+  days: z
+    .array(z.object({ date: isoDate, teacherIds: z.array(id).max(4) }))
+    .min(1, 'İçe aktarılacak gün yok')
+    .max(400),
 });
 
 export const leaveSchema = z
