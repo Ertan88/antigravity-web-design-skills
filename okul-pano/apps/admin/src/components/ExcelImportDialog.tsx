@@ -1,0 +1,223 @@
+import { useQueryClient } from '@tanstack/react-query';
+import clsx from 'clsx';
+import { AlertTriangle, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { api } from '../lib/api.ts';
+import { useAuth } from '../lib/auth.tsx';
+import { useToast } from './Toast.tsx';
+import { Alert, Badge, Button, Modal } from './ui.tsx';
+
+export type RowStatus = 'new' | 'update' | 'unchanged';
+
+export interface ImportPreview<R> {
+  sheetName: string;
+  rows: (R & { row: number; status: RowStatus })[];
+  issues: { row: number; message: string }[];
+  totals: { new: number; update: number; unchanged: number; skipped: number; removed?: number };
+}
+
+type Tone = 'green' | 'blue' | 'slate' | 'amber' | 'red';
+
+const TILE: Record<Tone, string> = {
+  green: 'text-emerald-700 bg-emerald-50',
+  blue: 'text-brand-700 bg-brand-50',
+  slate: 'text-slate-600 bg-slate-100',
+  amber: 'text-amber-800 bg-amber-50',
+  red: 'text-red-700 bg-red-50',
+};
+
+export const STATUS_BADGE: Record<RowStatus, { label: string; tone: Tone }> = {
+  new: { label: 'Yeni', tone: 'green' },
+  update: { label: 'Güncellenecek', tone: 'blue' },
+  unchanged: { label: 'Değişiklik yok', tone: 'slate' },
+};
+
+export interface ExcelImportDialogProps<R, P extends ImportPreview<R>, O> {
+  file: File | null;
+  onClose: () => void;
+  /** ör. /api/schools/:id/students */
+  basePath: string;
+  columns: { header: string; cell: (row: P['rows'][number]) => ReactNode }[];
+  initialOptions: O;
+  stats: (p: P, o: O) => { label: string; value: number; tone: Tone }[];
+  /** Listeye eklenecek yeni değerler (branş, sınıf, nöbet yeri…) */
+  additions?: (p: P) => { label: string; values: string[] }[];
+  /** Kaydetme seçenekleri (güncelleme anahtarı, değiştir/ekle…) */
+  renderOptions?: (p: P, o: O, set: (o: O) => void) => ReactNode;
+  /** Önizleme tablosunun altına ek bilgi (ör. kaldırılacak nöbetler) */
+  renderExtra?: (p: P, o: O) => ReactNode;
+  rowStatus?: (row: P['rows'][number], o: O) => RowStatus;
+  commitCount: (p: P, o: O) => number;
+  commitLabel: (n: number, o: O) => string;
+  commitBody: (p: P, o: O) => unknown;
+  successMessage: (result: never, p: P, o: O) => string;
+  /** Başarıdan sonra tazelenecek listeler (sorgu anahtarları) */
+  invalidate: string[];
+}
+
+/**
+ * Excel içe aktarma iki adımlıdır: önce dosya okunup ne olacağı gösterilir, onaylanınca kaydedilir.
+ * Yanlış dosya yüklemek hiçbir veriyi değiştirmez. Öğretmen, öğrenci ve nöbet sayfaları ortak kullanır.
+ */
+export function ExcelImportDialog<R, P extends ImportPreview<R>, O>(props: ExcelImportDialogProps<R, P, O>) {
+  const { file, onClose, basePath } = props;
+  const { schoolId } = useAuth();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [preview, setPreview] = useState<P | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [options, setOptions] = useState<O>(props.initialOptions);
+
+  useEffect(() => {
+    if (!file) return;
+    setPreview(null);
+    setError(null);
+    setOptions(props.initialOptions);
+    setLoading(true);
+    const form = new FormData();
+    form.append('file', file);
+    api<P>(`${basePath}/import/preview`, { method: 'POST', form })
+      .then(setPreview)
+      .catch((err: Error) => setError(err.message))
+      .finally(() => setLoading(false));
+    // initialOptions bilinçli olarak bağımlılık değil: yalnızca yeni dosyada sıfırlanır
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file, basePath]);
+
+  const count = preview ? props.commitCount(preview, options) : 0;
+
+  const commit = async () => {
+    if (!preview) return;
+    setSaving(true);
+    try {
+      const result = await api<never>(`${basePath}/import`, { method: 'POST', body: props.commitBody(preview, options) });
+      await Promise.all(props.invalidate.map((key) => qc.invalidateQueries({ queryKey: [schoolId, key] })));
+      toast.success(props.successMessage(result, preview, options));
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'İçe aktarma başarısız.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const additions = preview && props.additions ? props.additions(preview).filter((a) => a.values.length) : [];
+
+  return (
+    <Modal
+      open={Boolean(file)}
+      onClose={onClose}
+      size="xl"
+      title="Excel'den içe aktar"
+      description={file ? `${file.name}${preview ? ` · "${preview.sheetName}" sayfası` : ''}` : undefined}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Vazgeç
+          </Button>
+          <Button loading={saving} disabled={!preview || !count} onClick={() => void commit()}>
+            {preview && count ? props.commitLabel(count, options) : 'Kaydedilecek değişiklik yok'}
+          </Button>
+        </>
+      }
+    >
+      {loading && (
+        <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-500">
+          <Loader2 className="size-5 animate-spin" /> Dosya okunuyor…
+        </div>
+      )}
+      {error && <Alert tone="red">{error}</Alert>}
+      {preview && (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {props.stats(preview, options).map((s) => (
+              <div key={s.label} className={clsx('rounded-xl px-4 py-3', TILE[s.tone])}>
+                <div className="text-2xl font-bold">{s.value}</div>
+                <div className="text-xs font-medium">{s.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {additions.length > 0 && (
+            <div className="space-y-2 rounded-xl bg-slate-50 p-4 text-sm ring-1 ring-slate-200/70">
+              {additions.map((a) => (
+                <div key={a.label} className="flex flex-wrap items-center gap-1.5">
+                  <span className="font-medium text-slate-700">{a.label}:</span>
+                  {a.values.map((v) => (
+                    <Badge key={v} tone="blue">
+                      {v}
+                    </Badge>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {props.renderOptions?.(preview, options, setOptions)}
+
+          {preview.issues.length > 0 && (
+            <details className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200" open={preview.issues.length <= 6}>
+              <summary className="flex cursor-pointer items-center gap-2 font-semibold">
+                <AlertTriangle className="size-4" /> {preview.issues.length} satır atlanacak
+              </summary>
+              <ul className="mt-2 space-y-1">
+                {preview.issues.map((i, n) => (
+                  <li key={n}>
+                    <span className="font-mono text-xs">{i.row}. satır:</span> {i.message}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+
+          {preview.rows.length > 0 ? (
+            <div className="overflow-hidden rounded-xl ring-1 ring-slate-200">
+              <div className="max-h-80 overflow-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="sticky top-0 bg-slate-50 text-left text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                    <tr>
+                      <th className="px-3 py-2">Satır</th>
+                      {props.columns.map((c) => (
+                        <th key={c.header} className="px-3 py-2">
+                          {c.header}
+                        </th>
+                      ))}
+                      <th className="px-3 py-2">Sonuç</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {preview.rows.map((r, i) => {
+                      const s = STATUS_BADGE[props.rowStatus ? props.rowStatus(r, options) : r.status];
+                      return (
+                        <tr key={i}>
+                          <td className="px-3 py-2 font-mono text-xs text-slate-400">{r.row}</td>
+                          {props.columns.map((c) => (
+                            <td key={c.header} className="px-3 py-2 text-slate-700">
+                              {c.cell(r)}
+                            </td>
+                          ))}
+                          <td className="px-3 py-2">
+                            <Badge tone={s.tone}>{s.label}</Badge>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-2 py-8 text-center text-sm text-slate-500">
+              <FileSpreadsheet className="size-8 text-slate-300" />
+              Dosyada içe aktarılabilecek kayıt bulunamadı.
+            </div>
+          )}
+
+          {props.renderExtra?.(preview, options)}
+        </div>
+      )}
+    </Modal>
+  );
+}

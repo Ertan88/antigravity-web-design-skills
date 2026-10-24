@@ -1,13 +1,15 @@
-import { studentSchema } from '@okulpano/shared';
+import { normalizeClassName, studentSchema } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { Cake, FileSpreadsheet, Search } from 'lucide-react';
+import { Cake, ClipboardPaste, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { CrudPage } from '../components/CrudPage.tsx';
+import { ExcelButtons } from '../components/ExcelButtons.tsx';
+import { ExcelImportDialog, type ImportPreview } from '../components/ExcelImportDialog.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Badge, Button, Field, Input, Modal, Select, Textarea, Toggle } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
-import { nameMap, useList, useSchool, type ClassGroup, type Student } from '../lib/data.ts';
+import { nameMap, useList, useSchool, useSchoolPath, type ClassGroup, type Student } from '../lib/data.ts';
 import { formatDate } from '../lib/format.ts';
 
 type Form = { fullName: string; classGroupId: string; birthDate: string };
@@ -39,8 +41,7 @@ function parseRows(text: string): { rows: ParsedRow[]; skipped: number } {
       if (d && !birthDate) {
         birthDate = d[4] ? `${d[4]}-${d[5]}-${d[6]}` : `${d[3]}-${d[2]!.padStart(2, '0')}-${d[1]!.padStart(2, '0')}`;
       } else if (CLASS.test(cell) && !className) {
-        className = cell.replace(/\s+/g, '').replace('/', '-').toLocaleUpperCase('tr-TR');
-        if (!className.includes('-') && /^\d/.test(className)) className = className.replace(/^(\d+)/, '$1-');
+        className = normalizeClassName(cell);
       } else if (cell && !/^\d+$/.test(cell)) {
         nameParts.push(cell);
       }
@@ -50,6 +51,58 @@ function parseRows(text: string): { rows: ParsedRow[]; skipped: number } {
     else skipped++;
   }
   return { rows, skipped };
+}
+
+function studentImportMessage(res: { created: number; updated: number; classesCreated: number }): string {
+  const parts = [`${res.created} öğrenci eklendi`];
+  if (res.updated) parts.push(`${res.updated} öğrencinin sınıfı güncellendi`);
+  if (res.classesCreated) parts.push(`${res.classesCreated} yeni sınıf oluşturuldu`);
+  return parts.join(', ');
+}
+
+type ExcelRow = { fullName: string; className: string | null; birthDate: string };
+
+function ExcelImport({ file, onClose }: { file: File | null; onClose: () => void }) {
+  const basePath = useSchoolPath('students');
+  return (
+    <ExcelImportDialog<ExcelRow, ImportPreview<ExcelRow> & { additions: { label: string; values: string[] }[] }, { updateExisting: boolean }>
+      file={file}
+      onClose={onClose}
+      basePath={basePath}
+      invalidate={['students', 'classes']}
+      initialOptions={{ updateExisting: true }}
+      columns={[
+        { header: 'Ad soyad', cell: (r) => <span className="font-medium whitespace-nowrap text-slate-900">{r.fullName}</span> },
+        { header: 'Sınıf', cell: (r) => r.className ?? '—' },
+        { header: 'Doğum tarihi', cell: (r) => <span className="whitespace-nowrap">{formatDate(r.birthDate)}</span> },
+      ]}
+      stats={(p) => [
+        { label: 'Yeni öğrenci', value: p.totals.new, tone: 'green' },
+        { label: 'Sınıfı değişecek', value: p.totals.update, tone: 'blue' },
+        { label: 'Değişiklik yok', value: p.totals.unchanged, tone: 'slate' },
+        { label: 'Atlanacak satır', value: p.totals.skipped, tone: p.totals.skipped ? 'amber' : 'slate' },
+      ]}
+      additions={(p) => p.additions}
+      renderOptions={(p, o, set) =>
+        p.totals.update > 0 && (
+          <Toggle
+            checked={o.updateExisting}
+            onChange={(v) => set({ updateExisting: v })}
+            label="Kayıtlı öğrencilerin sınıfını güncelle"
+            description="Yeni dönemde sınıf atlayan öğrenciler için açık bırakın. Öğrenci, ad soyad ve doğum tarihiyle tanınır."
+          />
+        )
+      }
+      rowStatus={(r, o) => (r.status === 'update' && !o.updateExisting ? 'unchanged' : r.status)}
+      commitCount={(p, o) => p.totals.new + (o.updateExisting ? p.totals.update : 0)}
+      commitLabel={(n) => `${n} öğrenciyi kaydet`}
+      commitBody={(p, o) => ({
+        updateExisting: o.updateExisting,
+        rows: p.rows.map(({ fullName, className, birthDate }) => ({ fullName, className, birthDate })),
+      })}
+      successMessage={studentImportMessage}
+    />
+  );
 }
 
 function ImportModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -65,12 +118,12 @@ function ImportModal({ open, onClose }: { open: boolean; onClose: () => void }) 
     setBusy(true);
     setError(null);
     try {
-      const res = await api<{ created: number; classesCreated: number }>(`/api/schools/${schoolId}/students/import`, {
+      const res = await api<{ created: number; updated: number; classesCreated: number }>(`/api/schools/${schoolId}/students/import`, {
         method: 'POST',
         body: { rows: parsed.rows },
       });
       await qc.invalidateQueries({ queryKey: [schoolId] });
-      toast.success(`${res.created} öğrenci eklendi${res.classesCreated ? `, ${res.classesCreated} yeni sınıf oluşturuldu` : ''}`);
+      toast.success(studentImportMessage(res));
       setText('');
       onClose();
     } catch (err) {
@@ -85,7 +138,7 @@ function ImportModal({ open, onClose }: { open: boolean; onClose: () => void }) 
       open={open}
       onClose={onClose}
       size="lg"
-      title="Listeden içe aktar"
+      title="Listeden yapıştır"
       description="Excel ya da e-Okul listesindeki satırları kopyalayıp aşağıya yapıştırın."
       footer={
         <>
@@ -139,7 +192,9 @@ export function Students() {
   const [q, setQ] = useState('');
   const [onlyToday, setOnlyToday] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [excelFile, setExcelFile] = useState<File | null>(null);
   const { can } = useAuth();
+  const studentsPath = useSchoolPath('students');
   const classes = useList<ClassGroup>('classes');
   const school = useSchool();
   const classNames = nameMap(classes.data, (c) => c.name);
@@ -166,11 +221,20 @@ export function Students() {
         emptyText="Öğrencileri tek tek ekleyebilir ya da Excel / e-Okul listesinden toplu aktarabilirsiniz."
         addLabel="Öğrenci ekle"
         headerActions={
-          can('students.manage') && (
-            <Button variant="secondary" icon={<FileSpreadsheet className="size-4" />} onClick={() => setImporting(true)}>
-              Listeden içe aktar
-            </Button>
-          )
+          <>
+            <ExcelButtons
+              basePath={studentsPath}
+              templateName="ogrenci-sablonu.xlsx"
+              exportName="ogrenciler.xlsx"
+              canImport={can('students.manage')}
+              onFile={setExcelFile}
+            />
+            {can('students.manage') && (
+              <Button variant="ghost" icon={<ClipboardPaste className="size-4" />} onClick={() => setImporting(true)}>
+                Yapıştırarak ekle
+              </Button>
+            )}
+          </>
         }
         schema={studentSchema}
         toolbar={
@@ -235,6 +299,7 @@ export function Students() {
         )}
       />
       <ImportModal open={importing} onClose={() => setImporting(false)} />
+      <ExcelImport file={excelFile} onClose={() => setExcelFile(null)} />
     </>
   );
 }

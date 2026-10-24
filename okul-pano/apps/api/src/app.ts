@@ -15,10 +15,12 @@ import { DisplayBus } from './lib/events.ts';
 import { LocalStorage, type FileStorage } from './lib/storage.ts';
 import { authRoutes } from './routes/auth.ts';
 import { contentRoutes } from './routes/content.ts';
+import { dutyRoutes } from './routes/duties.ts';
 import { displayRoutes } from './routes/display.ts';
 import { memberRoutes } from './routes/members.ts';
 import { schoolRoutes } from './routes/schools.ts';
 import { screenRoutes } from './routes/screens.ts';
+import { studentRoutes } from './routes/students.ts';
 import { teacherRoutes } from './routes/teachers.ts';
 import { timetableRoutes } from './routes/timetable.ts';
 
@@ -83,6 +85,8 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   await app.register(memberRoutes);
   await app.register(contentRoutes);
   await app.register(teacherRoutes);
+  await app.register(studentRoutes);
+  await app.register(dutyRoutes);
   await app.register(timetableRoutes);
   await app.register(screenRoutes);
   await app.register(displayRoutes);

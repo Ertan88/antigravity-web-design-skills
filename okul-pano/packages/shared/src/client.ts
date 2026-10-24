@@ -3,6 +3,7 @@
  * düşük güçlü cihazlarda çalışan istemciler bunu kullanır.
  */
 export * from './bell.ts';
+export * from './classes.ts';
 export * from './display.ts';
 export * from './permissions.ts';
 export * from './teachers.ts';

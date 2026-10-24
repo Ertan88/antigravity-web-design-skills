@@ -1,4 +1,5 @@
 export * from './bell.ts';
+export * from './classes.ts';
 export * from './display.ts';
 export * from './permissions.ts';
 export * from './schemas.ts';

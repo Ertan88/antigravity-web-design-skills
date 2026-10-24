@@ -221,7 +221,7 @@ describe('içerik doğrulama', () => {
       ],
     });
     expectStatus(res, 200);
-    expect(res.json()).toEqual({ created: 3, classesCreated: 1 });
+    expect(res.json()).toEqual({ created: 3, updated: 0, unchanged: 0, classesCreated: 1 });
     const classes = (await c.get(`/api/schools/${schoolA}/classes`)).json();
     expect(classes.filter((k: { name: string }) => k.name === '7-C')).toHaveLength(1);
 

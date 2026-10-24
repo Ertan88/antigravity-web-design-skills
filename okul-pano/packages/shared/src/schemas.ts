@@ -243,7 +243,28 @@ export const studentImportSchema = z.object({
     )
     .min(1, 'İçe aktarılacak satır yok')
     .max(5000, 'Tek seferde en fazla 5000 öğrenci aktarılabilir'),
+  /** Aynı ad ve doğum tarihli öğrenci varsa sınıfı güncellenir; kapalıysa dokunulmaz */
+  updateExisting: z.boolean().default(true),
 });
+
+/**
+ * Excel'den nöbet çizelgesi. "replace" dosyadaki günlerin mevcut nöbetlerini silip dosyadakini yazar
+ * (dosyada olmayan günlere dokunmaz); "merge" yalnızca eksik nöbetleri ekler.
+ */
+export const dutyImportSchema = z.object({
+  mode: z.enum(['replace', 'merge']).default('replace'),
+  weekdays: z.array(weekday).min(1).max(7),
+  rows: z
+    .array(
+      z.object({
+        weekday,
+        area: required('Nöbet yeri', 60),
+        teacherName: required('Öğretmen', 80, 2),
+      }),
+    )
+    .max(2000, 'Tek seferde en fazla 2000 nöbet aktarılabilir'),
+});
+export type DutyImportInput = z.infer<typeof dutyImportSchema>;
 
 export const periodSchema = z.object({
   no: z.number().int().min(1).max(30),

@@ -31,6 +31,13 @@ Okullar için **çok okullu (SaaS'a hazır)** dijital pano sistemi: koridordaki 
 - **Branş ve ünvan yönetimi:** Bir branşın adı değişince o branştaki tüm öğretmenlerde değişir. Yeni okullar önerilen MEB branşları ve ünvanlarıyla açılır.
 - **Tümünü sil:** Silinecek nöbet ve izin kayıtlarının sayısını gösterir, "SİL" yazarak onay ister.
 
+## Excel ile öğrenci ve nöbet çizelgesi
+
+Öğretmen kadrosundaki Excel altyapısı **Doğum Günleri (öğrenciler)** ve **Nöbet Çizelgesi** sayfalarında da var: örnek şablon, iki adımlı içe aktarma (önizleme → onay) ve dışa aktarma.
+
+- **Öğrenciler:** Ad Soyad, Sınıf, Doğum Tarihi. e-Okul listeleri olduğu gibi okunur: "Adı / Soyadı" ya da "Sınıfı / Şubesi" ayrı sütunlarda olabilir, okul numarası yok sayılır. Sınıf "9/A", "9A", "9. Sınıf A Şubesi" yazılsa da "9-A" olur; listede olmayan sınıf oluşturulur. Tarih Excel tarihi, "14.03.2010" ya da "2010-03-14" olabilir; 31 Şubat gibi geçersiz tarihler satır numarasıyla bildirilir. Öğrenci "ad soyad + doğum tarihi" ile tanınır: yeniden yüklemek çift kayıt açmaz, yeni dönemde sınıfı güncellenir; aynı isimli iki öğrenci karışmaz.
+- **Nöbet çizelgesi:** Okulların kâğıtta kullandığı biçimde, satırlarda nöbet yerleri ve sütunlarda günler. Hücrelerde kadrodaki öğretmenler açılır listede; bir yerde birden fazla öğretmen virgülle yazılır. Dışa aktarılan dosya yatay A4'e sığacak şekilde ayarlıdır, yazdırılıp asılabilir. Yüklerken "Çizelgeyi değiştir" (dosyadaki günler yenilenir, hafta sonu gibi dosyada olmayan günlere dokunulmaz) ya da "Mevcut çizelgeye ekle" seçilir; kaldırılacak nöbetler önceden listelenir. Kadroda olmayan isim atlanır ve benzer isim önerilir ("Hasan Ozturk" → "Hasan Öztürk mi?"). "Gün | Nöbet Yeri | Öğretmen" sütunlu uzun listeler de okunur.
+
 ## Öne çıkan teknik kararlar
 
 - **Gerçek zamanlı:** Panelde yapılan her değişiklik ekranlara Server-Sent Events ile yaklaşık bir saniyede ulaşır. Ekranlar uzaktan yenilenebilir ya da "Tanımla" ile adını gösterebilir.
@@ -75,7 +82,7 @@ npm run dev       # API :3000, panel :5173/admin/, pano :5174/display/
 `npm run seed` çıktısındaki bağlantı örnek ekranı doğrudan açar. Belirli bir anı denemek için panoya `&at=2026-10-28T09:42:00+03:00` ekleyin.
 
 ```bash
-npm test          # 28 birim + 40 entegrasyon testi
+npm test          # 36 birim + 49 entegrasyon testi
 npm run typecheck
 npm run build     # üretim derlemesi
 ```

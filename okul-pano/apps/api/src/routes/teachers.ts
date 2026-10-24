@@ -14,14 +14,13 @@ import { z } from 'zod';
 import { audit, schoolGuard } from '../context.ts';
 import type { DB } from '../db/client.ts';
 import { duties, teacherBranches, teacherLeaves, teachers, teacherTitles, timetableEntries } from '../db/schema.ts';
-import { attachmentHeader, buildTeachersWorkbook, parseTeachersWorkbook, XLSX_MIME } from '../lib/excel.ts';
-import { badRequest, conflict, parse } from '../lib/errors.ts';
+import { exportFileName, readXlsxUpload, sendXlsx } from '../lib/excel.ts';
+import { buildTeachersWorkbook, parseTeachersWorkbook } from '../lib/sheets/teachers.ts';
+import { conflict, parse } from '../lib/errors.ts';
 import { registerResource } from './crud.ts';
 
 type OptionTable = typeof teacherBranches | typeof teacherTitles;
 type Tx = Parameters<Parameters<DB['transaction']>[0]>[0];
-
-const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 /** Okulun öğretmenlerini branş ve ünvan adlarıyla birlikte, Türkçe alfabeye göre sıralı döndürür. */
 export async function listTeachers(db: DB, schoolId: string) {
@@ -75,17 +74,6 @@ export async function addDefaultTeacherOptions(tx: Tx | DB, schoolId: string) {
   const b = await ensureOptions(tx, teacherBranches, schoolId, [...DEFAULT_BRANCHES]);
   const t = await ensureOptions(tx, teacherTitles, schoolId, [...DEFAULT_TITLES]);
   return { branchesAdded: b.created, titlesAdded: t.created };
-}
-
-/** Dosya adı yalnızca ASCII: bazı tarayıcı ve işletim sistemleri Türkçe karakterli indirme adını reddediyor */
-function safeFilePart(text: string): string {
-  const ascii: Record<string, string> = { ç: 'c', ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u' };
-  return text
-    .toLocaleLowerCase('tr-TR')
-    .replace(/[çğıöşü]/g, (c) => ascii[c] ?? c)
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 40);
 }
 
 export async function teacherRoutes(app: FastifyInstance) {
@@ -180,7 +168,7 @@ export async function teacherRoutes(app: FastifyInstance) {
       optionNames(db, teacherTitles, req.ctx.schoolId),
     ]);
     const buf = await buildTeachersWorkbook({ branches, titles, schoolName: req.ctx.school.name });
-    return reply.header('Content-Type', XLSX_MIME).header('Content-Disposition', attachmentHeader('ogretmen-sablonu.xlsx')).send(buf);
+    return sendXlsx(reply, buf, 'ogretmen-sablonu.xlsx');
   });
 
   app.get(`${base}/teachers/export`, read, async (req, reply) => {
@@ -195,9 +183,7 @@ export async function teacherRoutes(app: FastifyInstance) {
       rows: rows.map((r) => ({ fullName: r.fullName, branch: r.branch, title: r.title, isActive: r.isActive })),
       schoolName: req.ctx.school.name,
     });
-    const date = new Date().toISOString().slice(0, 10);
-    const name = `ogretmenler-${safeFilePart(req.ctx.school.name)}-${date}.xlsx`;
-    return reply.header('Content-Type', XLSX_MIME).header('Content-Disposition', attachmentHeader(name)).send(buf);
+    return sendXlsx(reply, buf, exportFileName('ogretmenler', req.ctx.school.name));
   });
 
   /**
@@ -208,18 +194,7 @@ export async function teacherRoutes(app: FastifyInstance) {
     `${base}/teachers/import/preview`,
     { ...write, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
     async (req) => {
-      const file = await req.file({ limits: { fileSize: MAX_UPLOAD_BYTES } });
-      if (!file) throw badRequest('Dosya bulunamadı.');
-      if (!/\.xlsx$/i.test(file.filename)) {
-        throw badRequest(
-          /\.xls$/i.test(file.filename)
-            ? 'Eski .xls biçimi desteklenmiyor. Excel\'de "Farklı Kaydet → Excel Çalışma Kitabı (.xlsx)" seçin.'
-            : 'Lütfen .xlsx uzantılı bir Excel dosyası yükleyin.',
-        );
-      }
-      const data = await file.toBuffer();
-      if (file.file.truncated) throw badRequest('Dosya 5 MB sınırını aşıyor.');
-      const parsed = await parseTeachersWorkbook(data);
+      const parsed = await parseTeachersWorkbook(await readXlsxUpload(req));
 
       const schoolId = req.ctx.schoolId;
       const [existing, branchRows, titleRows] = await Promise.all([
