@@ -223,6 +223,19 @@ export const dutySupervisorSchema = z.object({
   name: required('Nöbetçi müdür yardımcısı', 80, 2),
 });
 
+/** Bir günün taşımalı öğrenci görevlileri (sıralı); boş liste o günün görevlendirmesini kaldırır */
+export const transportDaySchema = z.object({
+  teacherIds: z.array(id).max(4, 'Bir güne en fazla 4 görevli atanabilir'),
+});
+
+/** Ay boyunca her güne o günün nöbetçileri arasından dönüşümlü görevli atar */
+export const transportAutoSchema = z.object({
+  month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Ay YYYY-AA biçiminde olmalı'),
+  perDay: z.number().int().min(1).max(4).default(2),
+  /** Kapalıysa yalnızca boş günler doldurulur */
+  overwrite: z.boolean().default(false),
+});
+
 export const leaveSchema = z
   .object({
     teacherId: id,

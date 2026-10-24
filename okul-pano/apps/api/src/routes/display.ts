@@ -24,6 +24,7 @@ import {
   teachers,
   tickerItems,
   timetableEntries,
+  transportDuties,
 } from '../db/schema.ts';
 import { pairingCode, randomToken, sha256 } from '../lib/crypto.ts';
 import { forbidden, notFound, unauthorized } from '../lib/errors.ts';
@@ -60,6 +61,12 @@ async function resolveDisplay(app: FastifyInstance, req: FastifyRequest, queryTo
   throw unauthorized('Ekran anahtarı geçersiz.');
 }
 
+function groupTransport(rows: { date: string; teacherName: string }[]) {
+  const byDate = new Map<string, string[]>();
+  for (const r of rows) byDate.set(r.date, [...(byDate.get(r.date) ?? []), r.teacherName]);
+  return [...byDate].map(([date, teacherNames]) => ({ date, teacherNames }));
+}
+
 export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Date()): Promise<DisplayState> {
   const [school] = await db.select().from(schools).where(eq(schools.id, auth.schoolId));
   if (!school) throw notFound('Okul bulunamadı.');
@@ -77,7 +84,7 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
   const windowed = (startsAt: PgColumn, endsAt: PgColumn) =>
     and(or(isNull(endsAt), gt(endsAt, now)), or(isNull(startsAt), lte(startsAt, weekAhead)));
 
-  const [examRows, dutyRows, supervisorRows, leaveRows, birthdayRows, annRows, tickerRows, bellRows, ttRows] = await Promise.all([
+  const [examRows, dutyRows, supervisorRows, transportRows, leaveRows, birthdayRows, annRows, tickerRows, bellRows, ttRows] = await Promise.all([
     db
       .select({ id: exams.id, title: exams.title, examAt: exams.examAt })
       .from(exams)
@@ -95,6 +102,12 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
       .from(dutySupervisors)
       .where(and(eq(dutySupervisors.schoolId, id), gte(dutySupervisors.date, today), lte(dutySupervisors.date, weekAheadDate)))
       .orderBy(asc(dutySupervisors.date)),
+    db
+      .select({ date: transportDuties.date, teacherName: teachers.fullName })
+      .from(transportDuties)
+      .innerJoin(teachers, eq(teachers.id, transportDuties.teacherId))
+      .where(and(eq(transportDuties.schoolId, id), gte(transportDuties.date, today), lte(transportDuties.date, weekAheadDate)))
+      .orderBy(asc(transportDuties.date), asc(transportDuties.sortOrder)),
     db
       .select({ id: teacherLeaves.id, teacherName: teachers.fullName, startDate: teacherLeaves.startDate, endDate: teacherLeaves.endDate })
       .from(teacherLeaves)
@@ -156,6 +169,7 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
     exams: examRows.map((e) => ({ ...e, examAt: e.examAt.toISOString() })),
     duties: dutyRows,
     dutySupervisors: supervisorRows,
+    transportDuties: groupTransport(transportRows),
     leaves: leaveRows,
     birthdays: birthdayRows,
     announcements: annRows.map((a) => ({

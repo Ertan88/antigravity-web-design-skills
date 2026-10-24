@@ -1,10 +1,10 @@
 import { bellScheduleSchema, generatePeriods, WEEKDAY_SHORT, type Period } from '@okulpano/shared';
 import { BellRing, Plus, Trash2, Wand2 } from 'lucide-react';
 import { useState } from 'react';
-import { Alert, Button, Card, EmptyState, Field, IconButton, Input, Modal, PageHeader, Spinner, WeekdayPicker } from '../components/ui.tsx';
+import { Alert, Button, Card, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Spinner, WeekdayPicker } from '../components/ui.tsx';
 import { useAuth } from '../lib/auth.tsx';
 import { useList, useResource, useSchool, type BellSchedule } from '../lib/data.ts';
-import { ScheduleCard } from './bell/ScheduleCard.tsx';
+import { ScheduleView, useNow, WeekCoverage } from './bell/ScheduleView.tsx';
 import { useForm } from '../lib/form.ts';
 
 type Form = { name: string; weekdays: number[]; periods: Period[] };
@@ -117,6 +117,12 @@ export function BellSchedules() {
   const form = useForm<Form>({ name: '', weekdays: [1, 2, 3, 4, 5], periods: [] });
   const [editing, setEditing] = useState<BellSchedule | null>(null);
   const [open, setOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const now = useNow();
+  const schedules = list.data ?? [];
+  // Varsayılan: bugün geçerli olan çizelge, yoksa ilki
+  const selected =
+    schedules.find((x) => x.id === selectedId) ?? schedules.find((x) => x.weekdays.includes(now.weekday)) ?? schedules[0] ?? null;
 
   const covered = new Set((list.data ?? []).flatMap((s) => s.weekdays));
   const overlaps = [1, 2, 3, 4, 5, 6, 7].filter((d) => (list.data ?? []).filter((s) => s.weekdays.includes(d)).length > 1);
@@ -171,17 +177,30 @@ export function BellSchedules() {
           />
         </Card>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,26rem),1fr))] gap-4">
-          {list.data.map((s) => (
-            <ScheduleCard
-              key={s.id}
-              schedule={s}
+        <div className="space-y-5">
+          <div className="flex flex-col gap-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 lg:flex-row lg:items-center">
+            {schedules.length > 1 && (
+              <div className="shrink-0">
+                <Segmented value={selected?.id ?? ''} onChange={setSelectedId} options={schedules.map((x) => ({ value: x.id, label: x.name }))} />
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <WeekCoverage schedules={schedules} selectedId={selected?.id ?? null} today={now.weekday} onSelect={setSelectedId} />
+            </div>
+          </div>
+          {selected && (
+            <ScheduleView
+              key={selected.id}
+              schedule={selected}
               editable={editable}
               lunchThresholdMin={school.data?.settings.lunchThresholdMin ?? 30}
-              onEdit={() => openEditor(s)}
-              onDelete={() => ops.remove.mutate(s.id)}
+              onEdit={() => openEditor(selected)}
+              onDelete={() => {
+                ops.remove.mutate(selected.id);
+                setSelectedId(null);
+              }}
             />
-          ))}
+          )}
         </div>
       )}
 

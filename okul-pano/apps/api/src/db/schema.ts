@@ -178,6 +178,25 @@ export const dutySupervisors = pgTable(
   (t) => [uniqueIndex('duty_supervisors_school_date_uq').on(t.schoolId, t.date)],
 );
 
+/**
+ * Taşımalı öğrenci görevlisi: servisten indirme, öğle yemeği dağıtımı ve servise bindirme için
+ * idarenin o günün nöbetçileri arasından görevlendirdiği öğretmenler (genelde iki kişi).
+ */
+export const transportDuties = pgTable(
+  'transport_duties',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    date: date('date', { mode: 'string' }).notNull(),
+    teacherId: uuid('teacher_id')
+      .notNull()
+      .references(() => teachers.id, { onDelete: 'cascade' }),
+    sortOrder: sortOrder(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('transport_duties_school_date_teacher_uq').on(t.schoolId, t.date, t.teacherId)],
+);
+
 export const teacherLeaves = pgTable(
   'teacher_leaves',
   {

@@ -10,7 +10,7 @@
   --danger: #ef4444;
   --radius: 22px;
   --gap: 22px;
-  --header-h: 116px;
+  --header-h: 132px;
   --footer-h: 74px;
   --col-w: 440px;
   font-family: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -150,8 +150,8 @@ p {
 
 .school-badge {
   flex: none;
-  width: 84px;
-  height: 84px;
+  width: 96px;
+  height: 96px;
   border-radius: 22px;
   display: grid;
   place-items: center;
@@ -165,8 +165,8 @@ p {
 }
 
 .school-logo {
-  width: 72px;
-  height: 72px;
+  width: 84px;
+  height: 84px;
   object-fit: contain;
 }
 
@@ -182,10 +182,10 @@ p {
 }
 
 .school-name {
-  font-size: 44px;
+  font-size: 58px;
   font-weight: 900;
-  letter-spacing: -0.015em;
-  line-height: 1.02;
+  letter-spacing: -0.02em;
+  line-height: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -193,9 +193,9 @@ p {
 }
 
 .school-type {
-  font-size: 25px;
+  font-size: 26px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   line-height: 1.1;
   text-transform: uppercase;
   color: color-mix(in srgb, var(--text) 62%, var(--primary));
@@ -204,36 +204,28 @@ p {
   text-overflow: ellipsis;
 }
 
-/* Sağ: hava durumu + saat */
+/* Sağ: hava durumu + saat; kutu yok, ince ayraçla ayrılır */
 .header-right {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 18px;
-  height: 92px;
+  gap: 30px;
 }
 
 .header-weather {
-  height: 100%;
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 0 22px 0 16px;
-  border-radius: 20px;
-  background: linear-gradient(135deg, color-mix(in srgb, #f59e0b 20%, transparent), color-mix(in srgb, #0ea5e9 16%, transparent));
-  border: 1px solid color-mix(in srgb, #f59e0b 26%, transparent);
   min-width: 0;
-  max-width: 400px;
-}
-
-.theme-light .header-weather {
-  background: linear-gradient(135deg, #fff7e6, #e6f6fd);
+  max-width: 380px;
+  padding-right: 30px;
+  border-right: 2px solid var(--border);
 }
 
 .weather-icon {
   color: #fbbf24;
   flex: none;
-  filter: drop-shadow(0 2px 8px rgba(251, 191, 36, 0.35));
+  filter: drop-shadow(0 2px 10px rgba(251, 191, 36, 0.35));
 }
 
 .theme-light .weather-icon {
@@ -245,21 +237,21 @@ p {
 }
 
 .weather-temp {
-  font-size: 38px;
+  font-size: 42px;
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.02em;
 }
 
 .weather-unit {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 600;
   color: var(--muted);
   margin-left: 2px;
 }
 
 .weather-meta {
-  font-size: 17px;
+  font-size: 18px;
   color: var(--muted);
   margin-top: 4px;
   white-space: nowrap;
@@ -277,20 +269,11 @@ p {
 }
 
 .header-clock {
-  height: 100%;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: flex-end;
-  padding: 0 24px;
-  border-radius: 20px;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 30%, transparent), color-mix(in srgb, #8b5cf6 26%, transparent));
-  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
   position: relative;
-}
-
-.theme-light .header-clock {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 14%, white), color-mix(in srgb, #8b5cf6 12%, white));
 }
 
 .clock {
@@ -299,13 +282,13 @@ p {
 }
 
 .clock-hm {
-  font-size: 54px;
+  font-size: 64px;
   font-weight: 800;
   letter-spacing: -0.03em;
 }
 
 .clock-s {
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 600;
   color: var(--muted);
   margin-left: 6px;
@@ -313,7 +296,7 @@ p {
 
 .date {
   margin-top: 4px;
-  font-size: 18px;
+  font-size: 20px;
   display: flex;
   gap: 8px;
   justify-content: flex-end;
@@ -574,20 +557,28 @@ p {
   text-overflow: ellipsis;
 }
 
-/* Bugünün nöbetçi müdür yardımcısı: kartın altında sabit şerit */
-.duty-supervisor {
+/* Nöbet kartının altı: bugünün nöbetçi müdür yardımcısı ve taşımalı öğrenci görevlileri */
+.duty-extras {
   flex: none;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-top: 12px;
-  padding: 10px 14px;
+  margin-top: 10px;
   border-radius: 14px;
-  background: linear-gradient(120deg, color-mix(in srgb, #14b8a6 22%, transparent), color-mix(in srgb, #0ea5e9 16%, transparent));
-  border: 1px solid color-mix(in srgb, #14b8a6 32%, transparent);
+  overflow: hidden;
+  background: linear-gradient(120deg, color-mix(in srgb, #14b8a6 20%, transparent), color-mix(in srgb, #0ea5e9 14%, transparent));
+  border: 1px solid color-mix(in srgb, #14b8a6 30%, transparent);
 }
 
-.duty-supervisor-label {
+.duty-extra {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 14px;
+}
+
+.duty-extra + .duty-extra {
+  border-top: 1px solid color-mix(in srgb, #14b8a6 24%, transparent);
+}
+
+.duty-extra-label {
   font-size: 13px;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -595,9 +586,13 @@ p {
   color: color-mix(in srgb, #14b8a6 60%, var(--text));
 }
 
-.duty-supervisor-name {
+.duty-extra-transport .duty-extra-label {
+  color: color-mix(in srgb, #f59e0b 65%, var(--text));
+}
+
+.duty-extra-name {
   min-width: 0;
-  font-size: 23px;
+  font-size: 21px;
   font-weight: 750;
   white-space: nowrap;
   overflow: hidden;
@@ -888,7 +883,8 @@ p {
 .bell-card {
   flex: none;
   text-align: center;
-  padding-bottom: 26px;
+  padding-top: 18px;
+  padding-bottom: 20px;
   transition: background 0.6s ease, border-color 0.6s ease;
 }
 
@@ -924,14 +920,14 @@ p {
 }
 
 .bell-title {
-  font-size: 38px;
+  font-size: 32px;
   font-weight: 800;
   letter-spacing: -0.02em;
 }
 
 .bell-caption {
-  margin-top: 8px;
-  font-size: 19px;
+  margin-top: 4px;
+  font-size: 18px;
   color: var(--muted);
 }
 
@@ -941,12 +937,12 @@ p {
 }
 
 .bell-countdown {
-  font-size: 112px;
+  font-size: 88px;
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
-  margin: 6px 0 14px;
+  margin: 4px 0 12px;
   transition: color 0.4s ease;
 }
 
@@ -975,15 +971,15 @@ p {
 }
 
 .bell-range {
-  margin-top: 14px;
-  font-size: 22px;
+  margin-top: 12px;
+  font-size: 20px;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
 }
 
 .bell-next {
-  margin-top: 6px;
-  font-size: 18px;
+  margin-top: 4px;
+  font-size: 17px;
   color: var(--muted);
 }
 
@@ -1025,11 +1021,28 @@ p {
 }
 
 .lesson-teacher {
-  font-size: 17px;
-  color: var(--muted);
+  font-size: 22px;
+  font-weight: 650;
+  color: color-mix(in srgb, var(--hue, var(--primary)) 45%, var(--text));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Ders adı ve öğretmen aynı satırda sırayla */
+.lesson-swap {
+  animation: swap-in 0.45s ease both;
+}
+
+@keyframes swap-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* ---------- Alt bant: kayan yazı ---------- */
@@ -1483,3 +1496,11 @@ p {
 .ticker-item:nth-child(4n + 2)::after { background: #ec4899; }
 .ticker-item:nth-child(4n + 3)::after { background: #10b981; }
 .ticker-item:nth-child(4n + 4)::after { background: #0ea5e9; }
+
+.duty-extra-transport .duty-extra-name {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.2;
+}

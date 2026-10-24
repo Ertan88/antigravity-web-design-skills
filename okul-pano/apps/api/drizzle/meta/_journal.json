@@ -29,6 +29,13 @@
       "when": 1792839498128,
       "tag": "0003_duty_supervisors",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792856910540,
+      "tag": "0004_transport_duties",
+      "breakpoints": true
     }
   ]
 }

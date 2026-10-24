@@ -97,6 +97,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
                 duties={duties}
                 weekdayName={WEEKDAY_NAMES[today.weekday] ?? ''}
                 supervisor={(state.dutySupervisors ?? []).find((x) => x.date === today.isoDate)?.name ?? null}
+                transport={(state.transportDuties ?? []).find((x) => x.date === today.isoDate)?.teacherNames ?? []}
               />}
             {s.showLeaves && leaves.length > 0 && <LeaveCard leaves={leaves} todayIso={today.isoDate} />}
             {s.showBirthdays && birthdays.length > 0 && <BirthdayCard birthdays={birthdays} nameFormat={s.birthdayNameFormat} />}

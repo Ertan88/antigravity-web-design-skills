@@ -10,6 +10,7 @@ import {
   classGroups,
   duties,
   dutySupervisors,
+  transportDuties,
   exams,
   memberships,
   schools,
@@ -164,6 +165,18 @@ export async function seedDemo(
   await db
     .insert(dutySupervisors)
     .values(supervisorDates.map((d, i) => ({ schoolId, date: d.isoDate, name: i % 2 ? 'Ümit Kılıç' : 'Mustafa Akkaya' })));
+
+  // Taşımalı öğrenci görevlileri: o günün nöbetçilerinden dönüşümlü iki kişi
+  await db.insert(transportDuties).values(
+    supervisorDates.flatMap((d, i) =>
+      [0, 1].map((k) => ({
+        schoolId,
+        date: d.isoDate,
+        sortOrder: k,
+        teacherId: teacherRows[(d.weekday * 3 + ((i + k) % DUTY_AREAS.length)) % teacherRows.length]!.id,
+      })),
+    ),
+  );
 
   await db.insert(teacherLeaves).values([
     { schoolId, teacherId: teacherRows[8]!.id, startDate: today.isoDate, endDate: today.isoDate, note: 'Sağlık raporu' },

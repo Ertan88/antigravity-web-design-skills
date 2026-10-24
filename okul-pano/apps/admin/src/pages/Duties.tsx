@@ -8,7 +8,7 @@ import { ExcelImportDialog, type ImportPreview } from '../components/ExcelImport
 import { Badge, Field, Input, Segmented, Select } from '../components/ui.tsx';
 import { useAuth } from '../lib/auth.tsx';
 import { nameMap, useList, useSchoolPath, type Duty, type Teacher } from '../lib/data.ts';
-import { currentMonth, monthLabel, SupervisorPanel } from './duties/SupervisorPanel.tsx';
+import { currentMonth, DailyDutyPanel, monthLabel } from './duties/DailyDutyPanel.tsx';
 
 type Form = { weekday: number; area: string; teacherId: string; sortOrder: number };
 
@@ -151,7 +151,7 @@ export function Duties() {
         resource="duties"
         label="Nöbet"
         title="Nöbet Çizelgesi"
-        description={`Her gün için nöbet yeri ve nöbetçi öğretmen; altta tarih tarih nöbetçi müdür yardımcısı. Excel şablonu ve dışa aktarma okulunuzun aylık çizelge düzenindedir (${monthLabel(month)}).`}
+        description={`Her gün için nöbet yeri ve nöbetçi öğretmen; altta her gün için nöbetçi müdür yardımcısı ve taşımalı öğrenci görevlileri. Excel şablonu ve dışa aktarma okulunuzun aylık çizelge düzenindedir (${monthLabel(month)}).`}
         permission="duties.manage"
         icon={<ShieldCheck className="size-6" />}
         emptyTitle={`${WEEKDAY_NAMES[day]} için nöbet girilmemiş`}
@@ -236,11 +236,13 @@ export function Duties() {
         )}
       />
       <div className="mt-6">
-        <SupervisorPanel
+        <DailyDutyPanel
           month={month}
           onMonth={setMonth}
           editable={can('duties.manage')}
           weekdays={new Set([1, 2, 3, 4, 5, ...[6, 7].filter((d) => counts[d])])}
+          teachers={teachers.data ?? []}
+          duties={duties.data ?? []}
         />
       </div>
       <DutyExcelImport file={excelFile} onClose={() => setExcelFile(null)} />

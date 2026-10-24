@@ -1,4 +1,5 @@
 import { formatDuration, periodLabel, type BellStatus, type DisplayState } from '@okulpano/shared/client';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { AutoPager } from './AutoPager.tsx';
 import { BellIcon, BookIcon, CoffeeIcon, UtensilsIcon } from './Icons.tsx';
 
@@ -79,6 +80,45 @@ export function BellCard({ status }: { status: BellStatus }) {
   );
 }
 
+/** Kademe renkleri: aynı sınıf düzeyindeki tüm şubeler aynı renkte (9-A, 9-B… hepsi mavi) */
+const GRADE_HUES: Record<number, string> = {
+  1: '#06b6d4',
+  2: '#a855f7',
+  3: '#ec4899',
+  4: '#f97316',
+  5: '#14b8a6',
+  6: '#22c55e',
+  7: '#84cc16',
+  8: '#eab308',
+  9: '#0ea5e9',
+  10: '#8b5cf6',
+  11: '#f43f5e',
+  12: '#f59e0b',
+};
+const FALLBACK_HUES = ['#0ea5e9', '#8b5cf6', '#f43f5e', '#f59e0b', '#10b981', '#ec4899'];
+
+export function gradeHue(className: string): string {
+  const name = className.trim().toLocaleLowerCase('tr-TR');
+  const grade = /^(\d{1,2})/.exec(name)?.[1];
+  if (grade && GRADE_HUES[Number(grade)]) return GRADE_HUES[Number(grade)]!;
+  if (/^(haz|hz)/.test(name)) return '#64748b';
+  // Sayısız adlar (ör. "Anasınıfı A"): şube harfi atılarak aynı kademe aynı renge düşer
+  const level = name.replace(/[\s/-]*[a-zçğıöşü]$/u, '');
+  let h = 0;
+  for (const ch of level) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return FALLBACK_HUES[h % FALLBACK_HUES.length]!;
+}
+
+/** Ders ve öğretmen aynı satırda sırayla gösterilir; tüm satırlar birlikte döner */
+function useAlternate(ms: number) {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    const t = setInterval(() => setOn((x) => !x), ms);
+    return () => clearInterval(t);
+  }, [ms]);
+  return on;
+}
+
 export function LessonsCard({
   entries,
   heading,
@@ -88,6 +128,7 @@ export function LessonsCard({
   heading: string;
   periodTitle: string;
 }) {
+  const showTeacher = useAlternate(3500);
   return (
     <section className="card list-card lessons-card">
       <div className="card-label">
@@ -96,16 +137,25 @@ export function LessonsCard({
       </div>
       <AutoPager
         items={entries}
-        rowHeight={66}
+        rowHeight={62}
         intervalMs={7000}
         keyOf={(e) => `${e.className}-${e.periodNo}`}
         empty="Bu ders saati için program girilmemiş"
         render={(e) => (
           <div className="lesson-row">
-            <span className="lesson-class">{e.className}</span>
+            <span className="lesson-class" style={{ '--row-hue': gradeHue(e.className) } as CSSProperties}>
+              {e.className}
+            </span>
             <span className="lesson-info">
-              <span className="lesson-subject">{e.subject}</span>
-              {e.teacherName && <span className="lesson-teacher">{e.teacherName}</span>}
+              {showTeacher && e.teacherName ? (
+                <span key="t" className="lesson-teacher lesson-swap">
+                  {e.teacherName}
+                </span>
+              ) : (
+                <span key="s" className="lesson-subject lesson-swap">
+                  {e.subject}
+                </span>
+              )}
             </span>
           </div>
         )}

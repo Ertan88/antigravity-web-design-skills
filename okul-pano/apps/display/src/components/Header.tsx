@@ -51,7 +51,7 @@ export function Header({ schoolName, schoolType, logoUrl, timezone, now, weather
         <div className="header-weather">
           {weather && WeatherGlyph && info ? (
             <>
-              <WeatherGlyph size={52} className="weather-icon" />
+              <WeatherGlyph size={58} className="weather-icon" />
               <div className="weather-text">
                 <div className="weather-temp">
                   {weather.temperature}°<span className="weather-unit">C</span>

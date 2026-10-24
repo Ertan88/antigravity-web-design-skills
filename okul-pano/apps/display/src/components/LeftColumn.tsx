@@ -56,11 +56,14 @@ export function DutyCard({
   duties,
   weekdayName,
   supervisor,
+  transport,
 }: {
   duties: DisplayState['duties'];
   weekdayName: string;
   /** Bugünün nöbetçi müdür yardımcısı */
   supervisor: string | null;
+  /** Bugünün taşımalı öğrenci görevlileri */
+  transport: string[];
 }) {
   return (
     <section className="card list-card duty-card">
@@ -80,10 +83,20 @@ export function DutyCard({
           </div>
         )}
       />
-      {supervisor && (
-        <div className="duty-supervisor">
-          <span className="duty-supervisor-label">Nöbetçi Müdür Yrd.</span>
-          <span className="duty-supervisor-name">{supervisor}</span>
+      {(supervisor || transport.length > 0) && (
+        <div className="duty-extras">
+          {supervisor && (
+            <div className="duty-extra">
+              <span className="duty-extra-label">Nöbetçi Müdür Yrd.</span>
+              <span className="duty-extra-name">{supervisor}</span>
+            </div>
+          )}
+          {transport.length > 0 && (
+            <div className="duty-extra duty-extra-transport">
+              <span className="duty-extra-label">Taşımalı Öğrenci Görevlisi</span>
+              <span className="duty-extra-name">{transport.join(' · ')}</span>
+            </div>
+          )}
         </div>
       )}
     </section>

@@ -21,6 +21,8 @@ export interface DisplayState {
   duties: { id: string; weekday: number; area: string; teacherName: string }[];
   /** Tarihe bağlı nöbetçi müdür yardımcıları (bugünden itibaren bir hafta) */
   dutySupervisors: { date: string; name: string }[];
+  /** Taşımalı öğrenci görevlileri (bugünden itibaren bir hafta) */
+  transportDuties: { date: string; teacherNames: string[] }[];
   leaves: { id: string; teacherName: string; startDate: string; endDate: string }[];
   birthdays: { id: string; name: string; className: string | null; monthDay: string }[];
   announcements: DisplayAnnouncement[];
