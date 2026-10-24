@@ -1,6 +1,6 @@
-import { computeBellStatus, parseClock, periodLabel, sortPeriods, WEEKDAY_NAMES, WEEKDAY_SHORT, type Period } from '@okulpano/shared';
+import { computeBellStatus, parseClock, periodLabel, pickSchedule, sortPeriods, WEEKDAY_NAMES, WEEKDAY_SHORT, type Period } from '@okulpano/shared';
 import clsx from 'clsx';
-import { BellRing, Clock, Coffee, Pencil, Sunrise, Sunset, Utensils } from 'lucide-react';
+import { BellRing, Clock, Coffee, CopyPlus, Pencil, Sunrise, Sunset, Utensils } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { DeleteButton } from '../../components/ui.tsx';
 import type { BellSchedule } from '../../lib/data.ts';
@@ -63,7 +63,7 @@ export function WeekCoverage({
   return (
     <div className={clsx('grid gap-1.5', days.length === 7 ? 'grid-cols-7' : days.length === 6 ? 'grid-cols-6' : 'grid-cols-5')}>
       {days.map((d) => {
-        const s = schedules.find((x) => x.weekdays.includes(d) && x.periods.length > 0);
+        const s = pickSchedule(schedules, d);
         return (
           <button
             key={d}
@@ -72,7 +72,7 @@ export function WeekCoverage({
             onClick={() => s && onSelect(s.id)}
             className={clsx(
               'min-w-0 rounded-xl px-2 py-2 text-left ring-1 transition-colors',
-              s && s.id === selectedId ? 'bg-brand-50 ring-brand-300' : s ? 'bg-white ring-slate-200 hover:bg-slate-50' : 'bg-slate-50 ring-slate-100',
+              s && s.id === selectedId ? 'bg-brand-50 ring-brand-300' : s ? 'bg-surface ring-slate-200 hover:bg-slate-50' : 'bg-slate-50 ring-slate-100',
             )}
           >
             <div className={clsx('flex items-center gap-1 text-xs font-semibold', d === today ? 'text-brand-700' : 'text-slate-500')}>
@@ -80,7 +80,7 @@ export function WeekCoverage({
               <span className="hidden sm:inline">{WEEKDAY_NAMES[d]}</span>
               {d === today && <span className="size-1.5 rounded-full bg-brand-500" />}
             </div>
-            <div className={clsx('mt-0.5 truncate text-xs sm:text-sm', s ? 'font-medium text-slate-900' : 'text-slate-400')}>
+            <div className={clsx('mt-0.5 truncate text-xs sm:text-sm', s ? 'font-medium text-ink' : 'text-slate-400')}>
               {s ? s.name : 'Ders yok'}
             </div>
           </button>
@@ -102,7 +102,7 @@ function Stat({ icon, label, value, tone = 'slate' }: { icon: ReactNode; label: 
         {icon}
       </span>
       <span className="flex-1 text-sm text-slate-500">{label}</span>
-      <span className="text-sm font-semibold text-slate-900 tabular-nums">{value}</span>
+      <span className="text-sm font-semibold text-ink tabular-nums">{value}</span>
     </div>
   );
 }
@@ -116,12 +116,14 @@ export function ScheduleView({
   editable,
   lunchThresholdMin,
   onEdit,
+  onCopy,
   onDelete,
 }: {
   schedule: BellSchedule;
   editable: boolean;
   lunchThresholdMin: number;
   onEdit: () => void;
+  onCopy: () => void;
   onDelete: () => void;
 }) {
   const now = useNow();
@@ -150,10 +152,10 @@ export function ScheduleView({
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
       {/* Ana alan */}
-      <section className="min-w-0 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70">
+      <section className="min-w-0 overflow-hidden rounded-2xl bg-surface shadow-sm ring-1 ring-slate-200/70">
         <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
           <div className="min-w-0">
-            <h2 className="truncate text-lg font-semibold text-slate-900">{schedule.name}</h2>
+            <h2 className="truncate text-lg font-semibold text-ink">{schedule.name}</h2>
             <p className="text-sm text-slate-500">
               {schedule.weekdays.map((d) => WEEKDAY_NAMES[d]).join(', ') || 'Gün seçilmemiş'}
             </p>
@@ -177,7 +179,7 @@ export function ScheduleView({
                   className={clsx(
                     'flex min-w-0 items-center justify-center text-sm font-bold',
                     s.kind === 'lesson' ? 'bg-brand-500 text-white' : s.kind === 'lunch' ? 'bg-amber-400 text-amber-950' : 'bg-emerald-400',
-                    i > 0 && 'border-l-2 border-white',
+                    i > 0 && 'border-l-2 border-surface',
                     activeStart === s.start && 'ring-4 ring-slate-900/80 ring-inset',
                   )}
                 >
@@ -216,20 +218,15 @@ export function ScheduleView({
                   active ? 'bg-brand-600 text-white shadow-md ring-brand-600' : 'bg-slate-50/60 ring-slate-200',
                 )}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <span className={clsx('text-3xl leading-none font-extrabold tabular-nums', active ? 'text-white' : 'text-brand-600')}>
-                    {s.period.no}
-                  </span>
+                <div className="flex items-center justify-between gap-2">
+                  <span className={clsx('truncate text-base font-extrabold', active ? 'text-white' : 'text-brand-600')}>{periodLabel(s.period)}</span>
                   {active ? (
-                    <span className="rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-semibold">Şu an</span>
+                    <span className="shrink-0 rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-semibold">Şu an</span>
                   ) : (
-                    <span className="text-xs font-medium text-slate-400">{duration(s.end - s.start)}</span>
+                    <span className="shrink-0 text-xs font-medium text-slate-400">{duration(s.end - s.start)}</span>
                   )}
                 </div>
-                <div className={clsx('mt-2 truncate text-sm font-semibold', active ? 'text-white/90' : 'text-slate-700')}>
-                  {periodLabel(s.period)}
-                </div>
-                <div className={clsx('text-[15px] font-bold tabular-nums sm:text-lg', active ? 'text-white' : 'text-slate-900')}>
+                <div className={clsx('text-[15px] font-bold tabular-nums sm:text-lg', active ? 'text-white' : 'text-ink')}>
                   {s.period.start} – {s.period.end}
                 </div>
                 {gap && (
@@ -262,7 +259,7 @@ export function ScheduleView({
         <div
           className={clsx(
             'rounded-2xl p-5 text-white shadow-sm',
-            status?.kind === 'break' ? 'bg-gradient-to-br from-emerald-500 to-teal-600' : 'bg-gradient-to-br from-brand-600 to-indigo-700',
+            status?.kind === 'break' ? 'bg-gradient-to-br from-emerald-500 to-teal-600' : 'bg-gradient-to-br from-brand-600 to-indigo-600',
           )}
         >
           <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-white/75 uppercase">
@@ -292,12 +289,12 @@ export function ScheduleView({
           {!isToday && <div className="mt-2 text-sm text-white/85">Bu çizelge {schedule.weekdays.map((d) => WEEKDAY_SHORT[d]).join(', ')} günleri kullanılır.</div>}
           {status && (status.kind === 'lesson' || status.kind === 'break') && (
             <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/25">
-              <div className="h-full rounded-full bg-white" style={{ width: `${(1 - status.remainingSec / status.totalSec) * 100}%` }} />
+              <div className="h-full rounded-full bg-surface" style={{ width: `${(1 - status.remainingSec / status.totalSec) * 100}%` }} />
             </div>
           )}
         </div>
 
-        <div className="rounded-2xl bg-white px-5 py-3 shadow-sm ring-1 ring-slate-200/70">
+        <div className="rounded-2xl bg-surface px-5 py-3 shadow-sm ring-1 ring-slate-200/70">
           <Stat icon={<BellRing className="size-4" />} label="Ders sayısı" value={`${lessons.length}`} />
           <Stat icon={<Sunrise className="size-4" />} label="İlk ders" value={segs.length ? clock(dayStart) : '—'} />
           <Stat icon={<Sunset className="size-4" />} label="Son zil" value={segs.length ? clock(dayEnd) : '—'} />
@@ -307,16 +304,33 @@ export function ScheduleView({
         </div>
 
         {editable && (
-          <div className="flex items-center gap-2 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200/70">
+          <div className="flex items-center gap-2 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-slate-200/70">
             <button
               type="button"
               onClick={onEdit}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-900/85 dark:bg-brand-600 dark:hover:bg-brand-500"
             >
               <Pencil className="size-4" /> Çizelgeyi düzenle
             </button>
             <DeleteButton onConfirm={onDelete} />
           </div>
+        )}
+        {editable && (
+          <button
+            type="button"
+            onClick={onCopy}
+            className="flex w-full items-start gap-3 rounded-2xl bg-surface p-4 text-left shadow-sm ring-1 ring-slate-200/70 transition hover:ring-brand-300"
+          >
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+              <CopyPlus className="size-4" />
+            </span>
+            <span>
+              <span className="block text-sm font-semibold text-ink">Başka gün için kopyala</span>
+              <span className="block text-xs text-slate-500">
+                Ör. cuma namazı için öğle arasını uzatmak: kopyalayın, günü Cuma seçin, teneffüs sürelerini değiştirin.
+              </span>
+            </span>
+          </button>
         )}
       </aside>
     </div>

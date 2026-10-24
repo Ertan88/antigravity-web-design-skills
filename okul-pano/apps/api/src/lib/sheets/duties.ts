@@ -1,4 +1,4 @@
-import { tidyName, WEEKDAY_NAMES } from '@okulpano/shared';
+import { detectHolidayText, tidyName, WEEKDAY_NAMES } from '@okulpano/shared';
 import { badRequest } from '../errors.ts';
 import {
   addHelpSheet,
@@ -29,6 +29,15 @@ export interface DutyEntry {
   weekday: number;
   area: string;
   teacherName: string;
+}
+
+export interface HolidayEntry {
+  row: number;
+  /** Tatil yazısının bulunduğu gün bloğu (tarih yoksa) */
+  weekday: number | null;
+  /** Tatil yazısının yanındaki tarih (müdür yardımcısı sütunu gibi) */
+  date: string | null;
+  name: string;
 }
 
 export interface SupervisorEntry {
@@ -121,6 +130,9 @@ export async function parseDutiesWorkbook(data: Buffer): Promise<{
   weekdays: number[];
   entries: DutyEntry[];
   supervisors: SupervisorEntry[];
+  holidays: HolidayEntry[];
+  /** Başlık satırlarındaki yazı ("AİT OLDUĞU AY: EKİM"); ayı bulmak için */
+  titleText: string;
   issues: SheetIssue[];
 }> {
   const wb = await loadWorkbook(data);
@@ -150,6 +162,7 @@ export async function parseDutiesWorkbook(data: Buffer): Promise<{
   const ws = pickSheet(wb, 'nobet', (s) => Boolean(findMatrix(s) ?? findHeaderRow(s, LIST_ALIASES, hasList)));
   const entries: DutyEntry[] = [];
   const issues: SheetIssue[] = [];
+  const holidays: HolidayEntry[] = [];
 
   const push = (row: number, weekday: number, area: string, name: string) => {
     if (name.length < 2) return;
@@ -164,7 +177,15 @@ export async function parseDutiesWorkbook(data: Buffer): Promise<{
     for (let r = matrix.row + 1; r <= ws.rowCount; r++) {
       const row = ws.getRow(r);
       const area = tidyName(cellText(row.getCell(matrix.areaCol).value));
-      const cells = [...matrix.days].map(([col, day]) => ({ day, names: splitNames(cellText(row.getCell(col).value)) }));
+      const cells = [...matrix.days].flatMap(([col, day]) => {
+        const text = cellText(row.getCell(col).value);
+        const holiday = detectHolidayText(text);
+        if (holiday) {
+          holidays.push({ row: r, weekday: day, date: null, name: holiday });
+          return [];
+        }
+        return [{ day, names: splitNames(text) }];
+      });
       const hasNames = cells.some((c) => c.names.length);
       if (!hasNames) continue;
       if (!area) {
@@ -173,7 +194,16 @@ export async function parseDutiesWorkbook(data: Buffer): Promise<{
       }
       for (const c of cells) for (const name of c.names) push(r, c.day, area, name);
     }
-    return { sheetName: ws.name, layout: 'matrix', weekdays: [...new Set(matrix.days.values())].sort(), entries, supervisors: [], issues };
+    return {
+      sheetName: ws.name,
+      layout: 'matrix',
+      weekdays: [...new Set(matrix.days.values())].sort(),
+      entries,
+      supervisors: [],
+      holidays,
+      titleText: titleTextOf(ws, matrix.row),
+      issues,
+    };
   }
 
   // 2) Aylık blok biçimi ve uzun liste: Gün | (Sıra) | Öğretmen | Nöbet Yeri | (Tarih | Müdür Yard.)
@@ -207,6 +237,8 @@ export async function parseDutiesWorkbook(data: Buffer): Promise<{
   }
   const supervisors = new Map<string, SupervisorEntry>();
   const headerWords = new Set([...LIST_ALIASES.weekday, ...AREA_ALIASES]);
+  // Gün hücresi yalnızca bloğun ilk satırına yazılmış olabilir (birleştirilmemiş): aşağı doğru taşınır
+  let lastDay: number | null = null;
 
   for (let r = dataStart; r <= ws.rowCount; r++) {
     const row = ws.getRow(r);
@@ -220,9 +252,12 @@ export async function parseDutiesWorkbook(data: Buffer): Promise<{
       const dateCell = row.getCell(sup.date).value;
       const supName = tidyName(cellText(row.getCell(sup.name).value));
       const rawDate = cellText(dateCell);
+      const supHoliday = supName ? detectHolidayText(supName) : null;
       if (rawDate || supName) {
         const date = parseDateCell(dateCell);
-        if (!date) {
+        if (date && supHoliday) {
+          holidays.push({ row: r, weekday: null, date, name: supHoliday });
+        } else if (!date) {
           if (supName) issues.push({ row: r, message: rawDate ? `Tarih anlaşılamadı: "${rawDate}"` : `"${supName}" için tarih yok` });
         } else if (supName.length > 80) {
           issues.push({ row: r, message: 'Müdür yardımcısı adı çok uzun' });
@@ -232,9 +267,17 @@ export async function parseDutiesWorkbook(data: Buffer): Promise<{
       }
     }
 
+    const parsedDay = dayText ? weekdayOf(dayText) : null;
+    if (parsedDay) lastDay = parsedDay;
+    const day = parsedDay ?? (dayText ? null : lastDay);
+    // Öğretmen yerine tatil yazılmış satır ("29 EKİM CUMHURİYET BAYRAMI", "RESMİ TATİL") hata değil, tatildir
+    const holiday = detectHolidayText(cellText(row.getCell(cols.teacher!).value));
+    if (holiday) {
+      holidays.push({ row: r, weekday: day, date: null, name: holiday });
+      continue;
+    }
     // Boş bırakılmış nöbet satırı (şablondaki doldurulmamış yer) sessizce atlanır
     if (!names.length) continue;
-    const day = weekdayOf(dayText);
     if (!day) issues.push({ row: r, message: dayText ? `Gün anlaşılamadı: "${dayText}"` : 'Gün boş' });
     else if (!area) issues.push({ row: r, message: 'Nöbet yeri boş' });
     else for (const name of names) push(r, day, area, name);
@@ -245,8 +288,17 @@ export async function parseDutiesWorkbook(data: Buffer): Promise<{
     weekdays: [...new Set(entries.map((e) => e.weekday))].sort(),
     entries,
     supervisors: [...supervisors.values()].sort((x, y) => x.date.localeCompare(y.date)),
+    holidays,
+    titleText: titleTextOf(ws, header.row),
     issues,
   };
+}
+
+/** Başlık satırlarının (tablo başlığından önceki) yazısı ve sayfa adı: ay adını aramak için */
+export function titleTextOf(ws: { name: string; getRow: (r: number) => { eachCell: (cb: (cell: { value: unknown }) => void) => void } }, headerRow: number): string {
+  const parts = new Set<string>([ws.name]);
+  for (let r = 1; r < headerRow; r++) ws.getRow(r).eachCell((cell) => void parts.add(cellText(cell.value as never)));
+  return [...parts].filter(Boolean).join(' · ');
 }
 
 /**

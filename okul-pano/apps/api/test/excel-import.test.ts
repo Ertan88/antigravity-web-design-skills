@@ -15,11 +15,11 @@ async function xlsx(rows: ExcelJS.CellValue[][], sheetName = 'Sayfa1'): Promise<
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
-async function preview(resource: 'students' | 'duties', buf: Buffer, token = ownerToken) {
+async function preview(resource: 'students' | 'duties', buf: Buffer, token = ownerToken, query = '') {
   const body = multipartBody('file', 'liste.xlsx', buf, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   return t.app.inject({
     method: 'POST',
-    url: path(`${resource}/import/preview`),
+    url: path(`${resource}/import/preview${query}`),
     headers: { ...body.headers, authorization: `Bearer ${token}` },
     payload: body.payload,
   });
@@ -157,8 +157,8 @@ describe('nöbet çizelgesi Excel', () => {
   it('"değiştir" dosyadaki günleri yeniler, dosyada olmayan günlere dokunmaz; "ekle" yalnızca eksikleri ekler', async () => {
     const teachers = (await owner.get(path('teachers'))).json() as { id: string; fullName: string }[];
     const ali = teachers.find((x) => x.fullName === 'Ali Kaya')!;
-    expectStatus(await owner.post(path('duties'), { weekday: 6, area: 'Pansiyon', teacherId: ali.id }), 201);
-    expectStatus(await owner.post(path('duties'), { weekday: 1, area: 'Kantin', teacherId: ali.id }), 201);
+    expectStatus(await owner.post(path('duties'), { month: '2026-09', weekday: 6, area: 'Pansiyon', teacherId: ali.id }), 201);
+    expectStatus(await owner.post(path('duties'), { month: '2026-09', weekday: 1, area: 'Kantin', teacherId: ali.id }), 201);
 
     const rows = [
       { weekday: 1, area: 'Bahçe', teacherName: 'Ayşe Demir' },
@@ -166,8 +166,8 @@ describe('nöbet çizelgesi Excel', () => {
       { weekday: 2, area: '1. Kat', teacherName: 'Mehmet Öztürk' },
       { weekday: 3, area: 'Bahçe', teacherName: 'Bilinmeyen Kişi' },
     ];
-    const replaced = await owner.post(path('duties/import'), { mode: 'replace', weekdays: [1, 2, 3, 4, 5], rows });
-    expect(replaced.json()).toEqual({ created: 3, removed: 1, unchanged: 0, skipped: 1, supervisors: 0 });
+    const replaced = await owner.post(path('duties/import'), { month: '2026-09', mode: 'replace', weekdays: [1, 2, 3, 4, 5], rows });
+    expect(replaced.json()).toEqual({ created: 3, removed: 1, unchanged: 0, skipped: 1, supervisors: 0, holidays: 0 });
     let list = (await owner.get(path('duties'))).json() as { weekday: number; area: string; sortOrder: number }[];
     expect(list.map((d) => `${d.weekday}|${d.area}`).sort()).toEqual(['1|Bahçe', '2|1. Kat', '2|Bahçe', '6|Pansiyon']);
     // Yerler dosyadaki sırayla dizilir
@@ -175,6 +175,7 @@ describe('nöbet çizelgesi Excel', () => {
     expect(list.find((d) => d.weekday === 2 && d.area === '1. Kat')!.sortOrder).toBe(1);
 
     const merged = await owner.post(path('duties/import'), {
+      month: '2026-09',
       mode: 'merge',
       weekdays: [1],
       rows: [
@@ -182,7 +183,7 @@ describe('nöbet çizelgesi Excel', () => {
         { weekday: 1, area: 'Kantin', teacherName: 'Fatma Aydın' },
       ],
     });
-    expect(merged.json()).toEqual({ created: 1, removed: 0, unchanged: 1, skipped: 0, supervisors: 0 });
+    expect(merged.json()).toEqual({ created: 1, removed: 0, unchanged: 1, skipped: 0, supervisors: 0, holidays: 0 });
     list = (await owner.get(path('duties'))).json();
     expect(list).toHaveLength(5);
   });
@@ -209,6 +210,7 @@ describe('nöbet çizelgesi Excel', () => {
 
     const roundtrip = (await preview('duties', res.rawPayload)).json();
     expect(roundtrip.layout).toBe('monthly');
+    expect(roundtrip.month).toMatchObject({ month: '2026-09', titleMonth: '2026-09', conflict: false });
     expect(roundtrip.weekdays).toEqual([1, 2]);
     expect(roundtrip.issues).toEqual([]);
     expect(roundtrip.totals).toMatchObject({ new: 0, unchanged: 4, removed: 0, skipped: 0, supervisors: 0 });
@@ -247,6 +249,7 @@ describe('nöbet çizelgesi Excel', () => {
     expectStatus(res, 200);
     const body = res.json();
     expect(body.layout).toBe('monthly');
+    expect(body.month).toEqual({ month: '2026-10', titleMonth: '2026-10', datesMonth: '2026-10', conflict: false, source: 'title' });
     expect(body.weekdays).toEqual([1, 2]);
     expect(body.rows.map((r: { day: string; area: string; teacherName: string }) => `${r.day}|${r.area}|${r.teacherName}`)).toEqual([
       'Pazartesi|TESİSAT VE MOTOR ATÖLYELERİ ÖNÜ|Mehmet Öztürk',
@@ -254,9 +257,9 @@ describe('nöbet çizelgesi Excel', () => {
       'Salı|EK BİNA KAT 1-2|Fatma Aydın',
     ]);
     expect(body.supervisors).toEqual([
-      { date: '2026-10-05', name: 'MUSTAFA AKKAYA', status: 'new' },
-      { date: '2026-10-06', name: 'M.AKKAYA', status: 'new' },
-      { date: '2026-10-12', name: 'ÜMİT KILIÇ', status: 'new' },
+      { date: '2026-10-05', name: 'MUSTAFA AKKAYA', from: null, status: 'new' },
+      { date: '2026-10-06', name: 'M.AKKAYA', from: null, status: 'new' },
+      { date: '2026-10-12', name: 'ÜMİT KILIÇ', from: null, status: 'new' },
     ]);
     expect(body.issues).toEqual([
       { row: 9, message: 'Tarih anlaşılamadı: "31.02.2026"' },
@@ -264,6 +267,7 @@ describe('nöbet çizelgesi Excel', () => {
     ]);
 
     const saved = await owner.post(path('duties/import'), {
+      month: body.month.month,
       mode: 'merge',
       weekdays: body.weekdays,
       rows: body.rows.map(({ weekday, area, teacherName }: { weekday: number; area: string; teacherName: string }) => ({ weekday, area, teacherName })),
@@ -280,7 +284,7 @@ describe('nöbet çizelgesi Excel', () => {
 
     // "Değiştir": dosyadaki ayda dosyada olmayan tarih silinir
     expectStatus(await owner.post(path('duty-supervisors'), { date: '2026-10-20', name: 'Ümit Kılıç' }), 201);
-    await owner.post(path('duties/import'), { mode: 'replace', weekdays: [7], rows: [], supervisors: [{ date: '2026-10-05', name: 'Mustafa Akkaya' }] });
+    await owner.post(path('duties/import'), { month: '2026-10', mode: 'replace', weekdays: [7], rows: [], supervisors: [{ date: '2026-10-05', name: 'Mustafa Akkaya' }] });
     const after = (await owner.get(path('duty-supervisors?month=2026-10'))).json() as { date: string; name: string }[];
     expect(after.map((x) => `${x.date} ${x.name}`)).toEqual(['2026-10-05 Mustafa Akkaya']);
   });
@@ -292,7 +296,7 @@ describe('nöbet çizelgesi Excel', () => {
       ['Perşembe', 'Kantin', 'Ali Kaya'],
       ['Bayram', 'Kantin', 'Ali Kaya'],
     ]);
-    const body = (await preview('duties', buf)).json();
+    const body = (await preview('duties', buf, ownerToken, '?month=2026-09')).json();
     expect(body.layout).toBe('list');
     expect(body.weekdays).toEqual([1, 4]);
     expect(body.rows.map((r: { status: string }) => r.status)).toEqual(['unchanged', 'new']);
@@ -308,13 +312,71 @@ describe('nöbet çizelgesi Excel', () => {
     expect(ws.getCell('F5').value).toBeFalsy();
     expect(wb.getWorksheet('Listeler')!.getColumn(1).values.filter(Boolean)).toEqual(['Ali Kaya', 'Ayşe Demir', 'Fatma Aydın', 'Mehmet Öztürk']);
     const areas = wb.getWorksheet('Listeler')!.getColumn(2).values.filter(Boolean);
-    expect(areas).toContain('Pansiyon');
-    expect(areas).toContain('Bahçe');
+    // Kasım'ın çizelgesi yok: nöbet yerleri en yakın önceki ayın (Ekim) çizelgesinden gelir
+    expect(areas).toContain('TESİSAT VE MOTOR ATÖLYELERİ ÖNÜ');
+    expect(areas).not.toContain('Pansiyon');
     // Boş şablon geri yüklenirse hiçbir şey değişmez, hata da çıkmaz
     const body = (await preview('duties', res.rawPayload)).json();
     expect(body.issues).toEqual([]);
     expect(body.rows).toEqual([]);
     expect((await owner.get(path('duties/template?month=2026-13'))).statusCode).toBe(400);
+  });
+
+  it('başlıktaki ay ile tarihler çelişirse bildirir; eski aydan kalan tarihleri seçilen aya taşır; tatilleri tanır', async () => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Worksheet');
+    ws.getCell('A1').value = 'AİT OLDUĞU AY: KASIM';
+    ws.getRow(2).values = ['GÜNLER', 'NÖBETÇİ ÖĞRETMENİN ADI VE SOYADI', 'NÖBET YERİ', 'TARİH', 'NÖBETÇİ MÜDÜR YARD.'];
+    // Gün yalnızca bloğun ilk satırında yazılı (birleştirilmemiş); tarihler Ekim'den kalmış
+    ws.getRow(3).values = ['PAZARTESİ', 'Ayşe Demir', 'Bahçe', '05.10.2026', 'Mustafa Akkaya'];
+    ws.getRow(4).values = [null, 'Ali Kaya', 'Kantin', '12.10.2026', 'Ümit Kılıç'];
+    ws.getRow(5).values = ['SALI', 'RESMİ TATİL', 'Bahçe', null, null];
+    ws.getRow(6).values = ['PERŞEMBE', '29 EKİM CUMHURİYET BAYRAMI', 'Bahçe', '29.10.2026', 'CUMHURİYET BAYRAMI'];
+    const buf = Buffer.from(await wb.xlsx.writeBuffer());
+
+    const res = (await preview('duties', buf, ownerToken, '?month=2026-12')).json();
+    // Seçilen ay (Aralık) geçerli; başlık Kasım, tarihler Ekim diyor
+    expect(res.month).toEqual({ month: '2026-12', titleMonth: '2026-11', datesMonth: '2026-10', conflict: true, source: 'chosen' });
+    expect(res.rows.map((r: { day: string; teacherName: string }) => `${r.day}|${r.teacherName}`)).toEqual(['Pazartesi|Ayşe Demir', 'Pazartesi|Ali Kaya']);
+    // 1. ve 2. pazartesi -> Aralık'ın 1. ve 2. pazartesisi
+    expect(res.supervisors.map((x: { date: string; from: string }) => `${x.date}<${x.from}`)).toEqual(['2026-12-07<2026-10-05', '2026-12-14<2026-10-12']);
+    expect(res.issues).toEqual([]);
+    expect(res.undatedHolidays).toEqual([
+      { name: 'Resmi Tatil', day: 'Salı' },
+      { name: 'Cumhuriyet Bayramı', day: null },
+      { name: '29 Ekim Cumhuriyet Bayramı', day: 'Perşembe' },
+    ]);
+
+    // Başlıktaki ay varsayılandır
+    expect((await preview('duties', buf)).json().month).toMatchObject({ month: '2026-11', source: 'title', conflict: true });
+
+    // Ekim seçilirse Cumhuriyet Bayramı tarihine oturur
+    const oct = (await preview('duties', buf, ownerToken, '?month=2026-10')).json();
+    expect(oct.holidays).toEqual([{ date: '2026-10-29', name: '29 Ekim Cumhuriyet Bayramı' }]);
+    const saved = await owner.post(path('duties/import'), {
+      month: '2026-10',
+      mode: 'merge',
+      weekdays: [],
+      rows: [],
+      holidays: oct.holidays,
+    });
+    expect(saved.json()).toMatchObject({ holidays: 1 });
+    const holidays = (await owner.get(path('holidays?month=2026-10'))).json() as { date: string; name: string; source: string }[];
+    expect(holidays).toEqual([
+      { id: null, date: '2026-10-28', name: 'Cumhuriyet Bayramı Arifesi', source: 'official' },
+      { id: expect.any(String), date: '2026-10-29', name: '29 Ekim Cumhuriyet Bayramı', source: 'school' },
+    ]);
+  });
+
+  it('bir ayın çizelgesi başka aya kopyalanır ve ay ay temizlenir', async () => {
+    const copy = await owner.post(path('duties/copy'), { from: '2026-09', to: '2026-12' });
+    expect(copy.json()).toEqual({ copied: 5 });
+    const list = (await owner.get(path('duties'))).json() as { month: string }[];
+    expect(list.filter((d) => d.month === '2026-12')).toHaveLength(5);
+    expect((await owner.post(path('duties/clear'), { month: '2026-12' })).json()).toEqual({ removed: 5 });
+    expect(((await owner.get(path('duties'))).json() as { month: string }[]).filter((d) => d.month === '2026-12')).toHaveLength(0);
+    expect((await owner.post(path('duty-supervisors/clear'), { month: '2026-10' })).json()).toEqual({ removed: 1 });
+    expect((await owner.post(path('duties/clear'), { month: '2026-1' })).statusCode).toBe(400);
   });
 
   it('nöbet yetkisi olmayan editör çizelge yükleyemez', async () => {

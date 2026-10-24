@@ -56,7 +56,7 @@ function AddBlock({ onManual, onFile, onTemplate }: { onManual: () => void; onFi
         }}
         className={clsx(
           'flex cursor-pointer items-center gap-4 rounded-2xl border-2 border-dashed p-4 transition-colors',
-          drag ? 'border-brand-500 bg-brand-50' : 'border-slate-200 bg-white hover:border-brand-300 hover:bg-brand-50/40',
+          drag ? 'border-brand-500 bg-brand-50' : 'border-slate-200 bg-surface hover:border-brand-300 hover:bg-brand-50/40',
         )}
       >
         <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
@@ -144,7 +144,7 @@ export function Teachers() {
   const download = async (kind: 'template' | 'export') => {
     setDownloading(kind);
     try {
-      await downloadFile(`${teachersPath}/${kind}`, excelFileName(school.data?.name, kind === 'template' ? 'Öğretmen Kadrosu Şablonu' : 'Öğretmen Kadrosu'));
+      await downloadFile(`${teachersPath}/${kind}`, kind === 'template' ? excelFileName(undefined, 'Öğretmen Kadrosu Şablonu') : excelFileName(school.data?.name, 'Öğretmen Kadrosu'));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'İndirilemedi');
     } finally {

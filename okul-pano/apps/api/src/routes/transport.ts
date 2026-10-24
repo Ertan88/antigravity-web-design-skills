@@ -1,11 +1,13 @@
-import { transportDaySchema, transportImportSchema, trCompare, WEEKDAY_NAMES, zonedParts } from '@okulpano/shared';
+import { clearMonthSchema, transportDaySchema, transportImportSchema, trCompare, WEEKDAY_NAMES, zonedParts } from '@okulpano/shared';
 import { and, asc, eq, gte, inArray, lte } from 'drizzle-orm';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { audit, schoolGuard } from '../context.ts';
 import { teachers, transportDuties } from '../db/schema.ts';
 import { badRequest, parse } from '../lib/errors.ts';
 import { exportFileName, readXlsxUpload, sendXlsx } from '../lib/excel.ts';
+import { monthRange, remapDate, resolveMonth } from '../lib/months.ts';
 import { loadRoster } from '../lib/roster.ts';
+import { saveHolidays } from './holidays.ts';
 import { trDate } from '../lib/sheets/duties.ts';
 import { buildTransportWorkbook, parseTransportWorkbook } from '../lib/sheets/transport.ts';
 
@@ -79,10 +81,25 @@ export async function transportRoutes(app: FastifyInstance) {
 
   /** Excel önizleme: isimler kadroyla eşleştirilir (kısaltmalar dahil), mevcut kayıtlarla karşılaştırılır */
   app.post(`${base}/import/preview`, { ...write, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req) => {
+    const { month: chosen } = req.query as { month?: string };
     const parsed = await parseTransportWorkbook(await readXlsxUpload(req));
     const schoolId = req.ctx.schoolId;
     const roster = await loadRoster(db, schoolId);
-    const dates = parsed.entries.map((e) => e.date);
+    const today = zonedParts(new Date(), req.ctx.school.timezone).isoDate;
+    // Ay başlıktan bulunur, tarihlerle karşılaştırılır; tarihler başka aydan kalmışsa seçilen aya taşınır
+    const resolution = resolveMonth({ titleText: parsed.titleText, dates: parsed.entries.map((e) => e.date), chosen, today });
+    const issues = [...parsed.issues];
+    const entries = new Map<string, (typeof parsed.entries)[number] & { from: string | null }>();
+    for (const e of parsed.entries) {
+      const date = remapDate(e.date, resolution.month);
+      if (!date) {
+        issues.push({ row: e.row, message: `${e.date.split('-').reverse().join('.')} tarihinin seçilen ayda karşılığı yok; atlandı` });
+        continue;
+      }
+      entries.set(date, { ...e, date, from: date === e.date ? null : e.date });
+    }
+    const holidays = [...entries.values()].filter((e) => e.holiday).map((e) => ({ date: e.date, name: e.holiday! }));
+    const dates = [...entries.keys()];
     const existing = dates.length
       ? await db
           .select({ date: transportDuties.date, teacherId: transportDuties.teacherId, sortOrder: transportDuties.sortOrder })
@@ -93,8 +110,7 @@ export async function transportRoutes(app: FastifyInstance) {
     const current = new Map<string, string[]>();
     for (const r of existing) current.set(r.date, [...(current.get(r.date) ?? []), r.teacherId]);
 
-    const issues = [...parsed.issues];
-    const rows = parsed.entries.flatMap((e) => {
+    const rows = [...entries.values()].flatMap((e) => {
       const teachersFound: { id: string; fullName: string; written: string }[] = [];
       for (const name of e.names) {
         const t = roster.find(name);
@@ -111,12 +127,25 @@ export async function transportRoutes(app: FastifyInstance) {
       if (e.names.length && !after.length) return [];
       if (!after.length && !before.length) return [];
       const status = !before.length ? 'new' : before.join() === after.join() ? 'unchanged' : 'update';
-      return [{ row: e.row, date: e.date, day: WEEKDAY_NAMES[weekdayOfDate(e.date)], teachers: teachersFound, cleared: !after.length, status }];
+      return [
+        {
+          row: e.row,
+          date: e.date,
+          from: e.from,
+          day: WEEKDAY_NAMES[weekdayOfDate(e.date)],
+          teachers: teachersFound,
+          cleared: !after.length,
+          holiday: e.holiday,
+          status,
+        },
+      ];
     });
     issues.sort((x, y) => x.row - y.row);
     return {
       sheetName: parsed.sheetName,
+      month: resolution,
       rows,
+      holidays,
       issues,
       totals: {
         new: rows.filter((r) => r.status === 'new').length,
@@ -138,6 +167,8 @@ export async function transportRoutes(app: FastifyInstance) {
     }
     const days = new Map(body.days.map((d) => [d.date, [...new Set(d.teacherIds)]]));
     await db.transaction(async (tx) => {
+      await saveHolidays(tx, schoolId, body.holidays);
+      if (!days.size) return;
       await tx.delete(transportDuties).where(and(eq(transportDuties.schoolId, schoolId), inArray(transportDuties.date, [...days.keys()])));
       const values = [...days].flatMap(([date, list]) => list.map((teacherId, i) => ({ schoolId, date, teacherId, sortOrder: i })));
       if (values.length) await tx.insert(transportDuties).values(values);
@@ -145,6 +176,20 @@ export async function transportRoutes(app: FastifyInstance) {
     await audit(req, 'update', 'Taşımalı öğrenci görevlisi', null, `Excel'den servis nöbet çizelgesi: ${days.size} gün`);
     bus.contentChanged(schoolId);
     return { days: days.size };
+  });
+
+  /** Bir ayın tüm servis nöbetlerini siler */
+  app.post(`${base}/clear`, write, async (req) => {
+    const { month } = parse(clearMonthSchema, req.body);
+    const schoolId = req.ctx.schoolId;
+    const [from, to] = monthRange(month);
+    const del = await db
+      .delete(transportDuties)
+      .where(and(eq(transportDuties.schoolId, schoolId), gte(transportDuties.date, from), lte(transportDuties.date, to)))
+      .returning({ id: transportDuties.id });
+    await audit(req, 'delete', 'Taşımalı öğrenci görevlisi', null, `${month} temizlendi (${del.length} kayıt)`);
+    bus.contentChanged(schoolId);
+    return { removed: del.length };
   });
 
   async function workbook(req: FastifyRequest, withData: boolean) {

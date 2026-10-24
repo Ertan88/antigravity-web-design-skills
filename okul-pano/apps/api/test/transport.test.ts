@@ -36,7 +36,7 @@ beforeAll(async () => {
     [2, 'Mehmet Öztürk', 'Bahçe'],
     [2, 'Zeynep Arslan', 'Kantin'],
   ] as const) {
-    expectStatus(await owner.post(path('duties'), { weekday, area, teacherId: ids[name] }), 201);
+    expectStatus(await owner.post(path('duties'), { month: '2026-11', weekday, area, teacherId: ids[name] }), 201);
   }
   // Ali Kaya 9 Kasım'da izinli
   expectStatus(await owner.post(path('leaves'), { teacherId: ids['Ali Kaya'], startDate: '2026-11-09', endDate: '2026-11-09' }), 201);
@@ -126,6 +126,28 @@ describe('taşımalı öğrenci (servis) görevlileri', () => {
     const twb = new ExcelJS.Workbook();
     await twb.xlsx.load(tpl.rawPayload as unknown as ArrayBuffer);
     expect(twb.getWorksheet('Servis Nöbet Çizelgesi')!.getCell('C4').value).toBeFalsy();
+  });
+
+  it('başlıktaki ay esas alınır: eski aydan kalan tarihler o aya taşınır; tatil yazısı hata değil tatildir', async () => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Worksheet');
+    ws.getCell('A1').value = 'ÖĞRETMEN SERVİS NÖBET ÇİZELGESİ';
+    ws.getCell('A2').value = 'AİT OLDUĞU AY: ARALIK';
+    ws.getRow(3).values = ['Nöbet Tarihi', 'Nöbet Günü', 'Nöbetçi Öğretmen 1', 'Nöbetçi Öğretmen 2'];
+    ws.getRow(4).values = ['02.11.2026', 'PAZARTESİ', 'Ayşe Demir', 'Ali Kaya'];
+    ws.getRow(5).values = ['03.11.2026', 'SALI', 'YARIYIL TATİLİ', null];
+    const res = await upload(Buffer.from(await wb.xlsx.writeBuffer()));
+    const body = res.json();
+    expect(body.month).toMatchObject({ month: '2026-12', titleMonth: '2026-12', datesMonth: '2026-11', conflict: true });
+    // Kasım'ın 1. pazartesi / salısı -> Aralık'ın 1. pazartesi / salısı
+    expect(body.rows.map((r: { date: string; from: string }) => `${r.date}<${r.from}`)).toEqual(['2026-12-07<2026-11-02']);
+    expect(body.holidays).toEqual([{ date: '2026-12-01', name: 'Yarıyıl Tatili' }]);
+    expect(body.issues).toEqual([]);
+  });
+
+  it('bir ayın tüm servis nöbetleri temizlenir', async () => {
+    expectStatus(await owner.put(path('transport-duties/2026-12-07'), { teacherIds: [ids['Ali Kaya']] }), 200);
+    expect((await owner.post(path('transport-duties/clear'), { month: '2026-12' })).json()).toEqual({ removed: 1 });
   });
 
   it('elle düzenleme günü değiştirir, boş liste kaldırır; geçersiz istekler reddedilir', async () => {

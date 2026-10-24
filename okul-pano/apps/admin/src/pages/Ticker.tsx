@@ -24,7 +24,7 @@ export function Ticker() {
       reorderable
       schema={tickerSchema}
       columns={[
-        { header: 'Metin', cell: (r) => <span className="font-medium text-slate-900">{r.text}</span> },
+        { header: 'Metin', cell: (r) => <span className="font-medium text-ink">{r.text}</span> },
         { header: 'Durum', cell: (r) => <PublishCell row={r} /> },
       ]}
       emptyForm={() => ({ text: '', startsAt: '', endsAt: '', isActive: true })}

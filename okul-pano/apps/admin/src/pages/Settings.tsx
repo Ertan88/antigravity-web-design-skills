@@ -311,7 +311,7 @@ export function Settings() {
         </Section>
       </Card>
 
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-200 bg-white/90 backdrop-blur lg:left-72">
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-200 bg-surface/90 backdrop-blur lg:left-72">
         <div className="mx-auto flex w-full max-w-[1680px] justify-end gap-2 px-4 py-3 sm:px-6 lg:px-8">
           <Button variant="secondary" onClick={() => school.data && form.reset(toForm(school.data))}>
             Değişiklikleri geri al

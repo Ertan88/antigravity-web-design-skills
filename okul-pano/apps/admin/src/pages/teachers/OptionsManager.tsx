@@ -76,7 +76,7 @@ function OptionRow({ kind, option }: { kind: OptionKind; option: TeacherOption }
           <button
             type="button"
             onClick={() => remove.mutate()}
-            className="rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
+            className="rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:brightness-110"
           >
             {option.teacherCount ? `Sil (${option.teacherCount} öğretmende boşalır)` : 'Sil'}
           </button>

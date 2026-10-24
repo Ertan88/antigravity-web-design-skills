@@ -32,11 +32,15 @@ export function sortPeriods(periods: readonly Period[]): Period[] {
   return [...periods].sort((a, b) => parseClock(a.start) - parseClock(b.start));
 }
 
-/** Bugünün hafta gününe uyan ilk zil çizelgesini seçer. */
+/**
+ * Bugünün hafta gününe uyan zil çizelgesini seçer. Birden fazla çizelge aynı günü kapsıyorsa
+ * daha az gün kapsayan (daha özel) olan geçerlidir: "Hafta içi" (Pzt–Cum) yanında "Cuma" (yalnız Cum)
+ * çizelgesi varsa cuma günü "Cuma" kullanılır. Eşitlikte listedeki sıra belirler.
+ */
 export function pickSchedule<T extends BellScheduleLike>(schedules: readonly T[], weekday: number): T | null {
   const matches = schedules
     .filter((s) => s.weekdays.includes(weekday) && s.periods.length > 0)
-    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    .sort((a, b) => a.weekdays.length - b.weekdays.length || (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   return matches[0] ?? null;
 }
 

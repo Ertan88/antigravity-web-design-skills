@@ -166,7 +166,7 @@ export function Timetable() {
               ]}
             />
             {mode === 'class' ? (
-              <span className="text-base font-bold text-slate-900">{classNames.get(activeClass) ?? ''}</span>
+              <span className="text-base font-bold text-ink">{classNames.get(activeClass) ?? ''}</span>
             ) : (
               <Select value={activeTeacher} onChange={(e) => setTeacherId(e.target.value)} className="sm:w-64" aria-label="Öğretmen">
                 {(teachers.data ?? []).map((t) => (
@@ -217,7 +217,7 @@ export function Timetable() {
                           >
                             {e ? (
                               <>
-                                <span className="w-full truncate font-semibold text-slate-900">{mode === 'class' ? e.subject : classNames.get(e.classGroupId)}</span>
+                                <span className="w-full truncate font-semibold text-ink">{mode === 'class' ? e.subject : classNames.get(e.classGroupId)}</span>
                                 <span className="w-full truncate text-xs text-slate-500">
                                   {mode === 'class' ? (e.teacherId ? teacherNames.get(e.teacherId) : 'Öğretmen yok') : e.subject}
                                 </span>

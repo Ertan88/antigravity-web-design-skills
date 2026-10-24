@@ -36,6 +36,13 @@
       "when": 1792856910540,
       "tag": "0004_transport_duties",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792873128271,
+      "tag": "0005_duty_months_holidays",
+      "breakpoints": true
     }
   ]
 }

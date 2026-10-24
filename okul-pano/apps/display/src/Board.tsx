@@ -96,6 +96,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
                 duties={duties}
                 supervisor={(state.dutySupervisors ?? []).find((x) => x.date === today.isoDate)?.name ?? null}
                 transport={(state.transportDuties ?? []).find((x) => x.date === today.isoDate)?.teacherNames ?? []}
+                holiday={(state.holidays ?? []).find((x) => x.date === today.isoDate)?.name ?? null}
               />}
             {s.showLeaves && leaves.length > 0 && <LeaveCard leaves={leaves} />}
             {s.showBirthdays && birthdays.length > 0 && <BirthdayCard birthdays={birthdays} nameFormat={s.birthdayNameFormat} />}

@@ -29,6 +29,7 @@ import {
 import { pairingCode, randomToken, sha256 } from '../lib/crypto.ts';
 import { forbidden, notFound, unauthorized } from '../lib/errors.ts';
 import { getWeather } from '../lib/weather.ts';
+import { holidaysInRange } from './holidays.ts';
 import { DEVICE_TOKEN_PREFIX } from './screens.ts';
 
 const PAIRING_TTL_MS = 10 * 60 * 1000;
@@ -84,7 +85,7 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
   const windowed = (startsAt: PgColumn, endsAt: PgColumn) =>
     and(or(isNull(endsAt), gt(endsAt, now)), or(isNull(startsAt), lte(startsAt, weekAhead)));
 
-  const [examRows, dutyRows, supervisorRows, transportRows, leaveRows, birthdayRows, annRows, tickerRows, bellRows, ttRows] = await Promise.all([
+  const [examRows, dutyRows, holidayRows, supervisorRows, transportRows, leaveRows, birthdayRows, annRows, tickerRows, bellRows, ttRows] = await Promise.all([
     db
       .select({ id: exams.id, title: exams.title, examAt: exams.examAt })
       .from(exams)
@@ -95,8 +96,18 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
       .select({ id: duties.id, weekday: duties.weekday, area: duties.area, teacherName: teachers.fullName })
       .from(duties)
       .innerJoin(teachers, eq(teachers.id, duties.teacherId))
-      .where(eq(duties.schoolId, id))
+      // Bu ayın çizelgesi; yoksa en son yüklenen ayınki (yeni ay listesi gelene kadar pano boş kalmasın)
+      .where(
+        and(
+          eq(duties.schoolId, id),
+          eq(
+            duties.month,
+            sql`coalesce((select max(d2.month) from duties d2 where d2.school_id = ${id} and d2.month <= ${today.slice(0, 7)}), (select min(d3.month) from duties d3 where d3.school_id = ${id}))`,
+          ),
+        ),
+      )
       .orderBy(asc(duties.weekday), asc(duties.sortOrder), asc(duties.area)),
+    holidaysInRange(db, id, today, weekAheadDate),
     db
       .select({ date: dutySupervisors.date, name: dutySupervisors.name })
       .from(dutySupervisors)
@@ -170,6 +181,7 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
     exams: examRows.map((e) => ({ ...e, examAt: e.examAt.toISOString() })),
     duties: dutyRows,
     dutySupervisors: supervisorRows,
+    holidays: holidayRows.map(({ date, name }) => ({ date, name })),
     transportDuties: settings.hasTransport ? groupTransport(transportRows) : [],
     leaves: leaveRows,
     birthdays: birthdayRows,

@@ -87,7 +87,7 @@ export function Announcements() {
             <div className="flex items-center gap-3">
               <Thumb row={r} />
               <div className="min-w-0">
-                <div className="max-w-[20rem] truncate font-semibold text-slate-900">{r.title}</div>
+                <div className="max-w-[20rem] truncate font-semibold text-ink">{r.title}</div>
                 {r.body && <div className="max-w-[20rem] truncate text-slate-500">{r.body}</div>}
               </div>
             </div>

@@ -18,7 +18,7 @@ export function ExcelButtons({
   query,
 }: {
   basePath: string;
-  /** Dosya adındaki modül adı: "<Okul> - <modül>.xlsx", şablon için "<Okul> - <modül> Şablonu.xlsx" */
+  /** Dosya adındaki modül adı: "<Okul> - <modül>.xlsx"; şablon okul adı olmadan "<modül> Şablonu.xlsx" */
   module: string;
   /** Dosya adının sonuna eklenen dönem, ör. "Ekim 2026" */
   period?: string;
@@ -37,7 +37,7 @@ export function ExcelButtons({
     try {
       await downloadFile(
         `${basePath}/${kind}${query ? `?${query}` : ''}`,
-        excelFileName(school.data?.name, `${module}${kind === 'template' ? ' Şablonu' : ''}${period ? ` (${period})` : ''}`),
+        excelFileName(kind === 'template' ? undefined : school.data?.name, `${module}${kind === 'template' ? ' Şablonu' : ''}${period ? ` (${period})` : ''}`),
       );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'İndirilemedi');

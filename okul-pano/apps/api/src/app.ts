@@ -16,6 +16,7 @@ import { LocalStorage, type FileStorage } from './lib/storage.ts';
 import { authRoutes } from './routes/auth.ts';
 import { contentRoutes } from './routes/content.ts';
 import { dutyRoutes } from './routes/duties.ts';
+import { holidayRoutes } from './routes/holidays.ts';
 import { transportRoutes } from './routes/transport.ts';
 import { displayRoutes } from './routes/display.ts';
 import { memberRoutes } from './routes/members.ts';
@@ -89,6 +90,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   await app.register(studentRoutes);
   await app.register(dutyRoutes);
   await app.register(transportRoutes);
+  await app.register(holidayRoutes);
   await app.register(timetableRoutes);
   await app.register(screenRoutes);
   await app.register(displayRoutes);

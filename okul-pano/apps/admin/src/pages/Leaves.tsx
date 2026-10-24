@@ -36,7 +36,7 @@ export function Leaves() {
       toolbar={<Toggle checked={showPast} onChange={setShowPast} label="Geçmiş izinleri de göster" />}
       select={(rows) => (showPast ? rows : rows.filter((r) => r.endDate >= today))}
       columns={[
-        { header: 'Öğretmen', cell: (r) => <span className="font-semibold text-slate-900">{names.get(r.teacherId) ?? '—'}</span> },
+        { header: 'Öğretmen', cell: (r) => <span className="font-semibold text-ink">{names.get(r.teacherId) ?? '—'}</span> },
         {
           header: 'Tarih',
           cell: (r) => (

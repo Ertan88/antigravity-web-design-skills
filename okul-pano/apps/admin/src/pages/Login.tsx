@@ -18,7 +18,7 @@ function MiniBoard() {
           <div className="flex-[1.4] rounded-lg bg-white/10" />
           <div className="flex-1 rounded-lg bg-amber-400/25" />
         </div>
-        <div className="rounded-lg bg-gradient-to-br from-red-500/80 to-red-700/80" />
+        <div className="rounded-lg bg-gradient-to-br from-red-500/80 to-red-600/80" />
         <div className="flex flex-col gap-2">
           <div className="flex flex-1 items-center justify-center rounded-lg bg-brand-500/30 text-sm font-extrabold tabular-nums text-white">17:42</div>
           <div className="flex-[1.6] rounded-lg bg-white/10" />
@@ -51,7 +51,7 @@ export function Login() {
 
   return (
     <div className="grid min-h-dvh lg:grid-cols-2">
-      <div className="relative hidden overflow-hidden bg-slate-950 lg:flex lg:flex-col lg:justify-between lg:p-12">
+      <div className="relative hidden overflow-hidden bg-slate-950 [--color-slate-300:#cbd5e1] [--color-slate-400:#94a3b8] [--color-slate-500:#64748b] lg:flex lg:flex-col lg:justify-between lg:p-12">
         <div className="absolute inset-0 bg-[radial-gradient(800px_500px_at_0%_0%,rgba(59,130,246,0.35),transparent_60%),radial-gradient(600px_400px_at_100%_100%,rgba(245,158,11,0.18),transparent_60%)]" />
         <div className="relative flex items-center gap-2.5 text-white">
           <div className="flex size-9 items-center justify-center rounded-xl bg-brand-600">

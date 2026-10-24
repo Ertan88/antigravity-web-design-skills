@@ -271,7 +271,7 @@ export function Screens() {
         <p className="mt-1 text-sm text-slate-500">
           Ekranın açılışta panoyu tam ekran başlatması için Chromium'u kiosk modunda çalıştırın. Videoların sesli oynaması için otomatik oynatma iznini açın.
         </p>
-        <pre className="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-xs leading-relaxed text-slate-100">
+        <pre className="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-xs leading-relaxed text-[#e2e8f0]">
           {`chromium-browser --kiosk --noerrdialogs --disable-infobars \\
   --autoplay-policy=no-user-gesture-required \\
   --check-for-update-interval=31536000 \\

@@ -1,5 +1,18 @@
-import { dutyImportSchema, dutySchema, dutySupervisorSchema, normalizeName, tidyName, trCompare, WEEKDAY_NAMES, zonedParts } from '@okulpano/shared';
-import { and, asc, eq, gte, inArray, lte, or, sql, type SQL } from 'drizzle-orm';
+import {
+  clearMonthSchema,
+  dutyImportSchema,
+  dutySchema,
+  dutySupervisorSchema,
+  holidayDatesInMonth,
+  monthSchema,
+  normalizeName,
+  tidyName,
+  trCompare,
+  WEEKDAY_NAMES,
+  zonedParts,
+} from '@okulpano/shared';
+import { z } from 'zod';
+import { and, asc, desc, eq, gte, inArray, lte, notInArray, sql, type SQL } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { audit, schoolGuard } from '../context.ts';
 import { duties, dutySupervisors, teachers } from '../db/schema.ts';
@@ -7,17 +20,12 @@ import { badRequest, conflict, parse } from '../lib/errors.ts';
 import { exportFileName, readXlsxUpload, sendXlsx } from '../lib/excel.ts';
 import { buildDutiesWorkbook, parseDutiesWorkbook, trDate } from '../lib/sheets/duties.ts';
 import { registerResource } from './crud.ts';
+import { MONTH_RE, monthRange, remapDate, resolveMonth } from '../lib/months.ts';
 import { loadRoster } from '../lib/roster.ts';
+import { saveHolidays } from './holidays.ts';
 
 const dutyKey = (weekday: number, area: string, teacherId: string) => `${weekday}|${normalizeName(area)}|${teacherId}`;
 
-/** "2026-09" -> ayın ilk ve son günü */
-function monthRange(month: string): [string, string] {
-  const [y, m] = month.split('-').map(Number) as [number, number];
-  const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  return [`${month}-01`, `${month}-${String(days).padStart(2, '0')}`];
-}
-const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 export async function dutyRoutes(app: FastifyInstance) {
   const { db, bus } = app.deps;
@@ -31,7 +39,7 @@ export async function dutyRoutes(app: FastifyInstance) {
     table: duties,
     permission: 'duties.manage',
     schema: dutySchema,
-    orderBy: [asc(duties.weekday), asc(duties.sortOrder), asc(duties.area)],
+    orderBy: [asc(duties.month), asc(duties.weekday), asc(duties.sortOrder), asc(duties.area)],
     refs: { teacherId: teachers },
     summary: (r) => `${WEEKDAY_NAMES[r.weekday as number] ?? ''} · ${r.area}`,
   });
@@ -64,18 +72,31 @@ export async function dutyRoutes(app: FastifyInstance) {
     },
   });
 
-  async function currentDuties(schoolId: string) {
+  async function currentDuties(schoolId: string, month: string) {
     return db
       .select({ id: duties.id, weekday: duties.weekday, area: duties.area, teacherId: duties.teacherId, sortOrder: duties.sortOrder, teacherName: teachers.fullName })
       .from(duties)
       .innerJoin(teachers, eq(teachers.id, duties.teacherId))
-      .where(eq(duties.schoolId, schoolId))
+      .where(and(eq(duties.schoolId, schoolId), eq(duties.month, month)))
       .orderBy(asc(duties.weekday), asc(duties.sortOrder), asc(duties.area));
+  }
+
+  /** Verilen aya en yakın (önceki, yoksa sonraki) çizelgesi olan ay */
+  async function nearestMonth(schoolId: string, month: string): Promise<string | null> {
+    const [before] = await db
+      .select({ month: duties.month })
+      .from(duties)
+      .where(and(eq(duties.schoolId, schoolId), lte(duties.month, month)))
+      .orderBy(desc(duties.month))
+      .limit(1);
+    if (before) return before.month;
+    const [after] = await db.select({ month: duties.month }).from(duties).where(eq(duties.schoolId, schoolId)).orderBy(asc(duties.month)).limit(1);
+    return after?.month ?? null;
   }
 
   /**
    * Çizelge satır sırası: Pazartesi'den başlayıp her günün kendi sırasıyla okunduğunda nöbet yerinin
-   * ilk göründüğü yer. Yalnızca hafta sonu kullanılan yerler doğal olarak sona kalır.
+   * ilk göründüğü yer.
    */
   function areaOrder(rows: { area: string }[]): string[] {
     const seen = new Map<string, string>();
@@ -83,26 +104,70 @@ export async function dutyRoutes(app: FastifyInstance) {
     return [...seen.values()];
   }
 
+  /**
+   * Önizleme: ay başlıktaki "AİT OLDUĞU AY"dan bulunur, tarihlerle karşılaştırılır (?month= ile seçilebilir).
+   * Başka aya ait tarihler (eski aydan kalmış) seçilen aydaki aynı hafta gününe taşınır.
+   */
   app.post(`${base}/import/preview`, { ...write, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req) => {
+    const { month: chosen } = req.query as { month?: string };
     const parsed = await parseDutiesWorkbook(await readXlsxUpload(req));
     const schoolId = req.ctx.schoolId;
+    const today = zonedParts(new Date(), req.ctx.school.timezone).isoDate;
+    const resolution = resolveMonth({
+      titleText: parsed.titleText,
+      dates: [...parsed.supervisors.map((x) => x.date), ...parsed.holidays.flatMap((h) => (h.date ? [h.date] : []))],
+      chosen,
+      today,
+    });
+    const month = resolution.month;
+    const [year, monthNo] = month.split('-').map(Number) as [number, number];
+    const issues = [...parsed.issues];
+
+    // Müdür yardımcıları: tarihler seçilen aya taşınır
+    const supervisorMap = new Map<string, { date: string; name: string; from: string | null }>();
+    for (const x of parsed.supervisors) {
+      const date = remapDate(x.date, month);
+      if (!date) {
+        issues.push({ row: x.row, message: `${x.date.split('-').reverse().join('.')} tarihinin ${monthNo}. ayda karşılığı yok; atlandı` });
+        continue;
+      }
+      supervisorMap.set(date, { date, name: x.name, from: date === x.date ? null : x.date });
+    }
+
+    // Tatiller: yanında tarih varsa o tarih, yoksa adından (ör. Cumhuriyet Bayramı -> 29 Ekim) bulunur
+    const holidayMap = new Map<string, { date: string; name: string }>();
+    const undatedHolidays: { name: string; day: string | null }[] = [];
+    for (const h of parsed.holidays) {
+      // Tatil hafta gününe göre başka aya taşınmaz: tarih bu aydaysa o, değilse adından bu aydaki tarihi aranır
+      const dates = h.date?.startsWith(month)
+        ? [h.date]
+        : holidayDatesInMonth(h.name, year, monthNo).filter(
+            (d) => !h.weekday || ((new Date(`${d}T12:00:00Z`).getUTCDay() + 6) % 7) + 1 === h.weekday,
+          );
+      if (dates.length) for (const d of dates) holidayMap.set(d, { date: d, name: h.name });
+      else if (!undatedHolidays.some((u) => u.name === h.name)) undatedHolidays.push({ name: h.name, day: h.weekday ? (WEEKDAY_NAMES[h.weekday] ?? null) : null });
+      // Tatil yazılmış tarihte müdür yardımcısı olmaz
+      for (const d of dates) supervisorMap.delete(d);
+    }
+
+    const supDates = [...supervisorMap.keys()];
     const [roster, existing, existingSup] = await Promise.all([
       loadRoster(db, schoolId),
-      currentDuties(schoolId),
-      parsed.supervisors.length
+      currentDuties(schoolId, month),
+      supDates.length
         ? db
             .select({ date: dutySupervisors.date, name: dutySupervisors.name })
             .from(dutySupervisors)
-            .where(and(eq(dutySupervisors.schoolId, schoolId), inArray(dutySupervisors.date, parsed.supervisors.map((x) => x.date))))
+            .where(and(eq(dutySupervisors.schoolId, schoolId), inArray(dutySupervisors.date, supDates)))
         : Promise.resolve([]),
     ]);
-    const issues = [...parsed.issues];
     const supByDate = new Map(existingSup.map((x) => [x.date, x.name]));
-    const supervisors = parsed.supervisors.map((x) => ({
-      date: x.date,
-      name: x.name,
-      status: !supByDate.has(x.date) ? ('new' as const) : supByDate.get(x.date) === x.name ? ('unchanged' as const) : ('update' as const),
-    }));
+    const supervisors = [...supervisorMap.values()]
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((x) => ({
+        ...x,
+        status: !supByDate.has(x.date) ? ('new' as const) : supByDate.get(x.date) === x.name ? ('unchanged' as const) : ('update' as const),
+      }));
     const existingKeys = new Set(existing.map((d) => dutyKey(d.weekday, d.area, d.teacherId)));
     const knownAreas = new Set(existing.map((d) => normalizeName(d.area)));
     const newAreas = new Map<string, string>();
@@ -135,7 +200,7 @@ export async function dutyRoutes(app: FastifyInstance) {
       ];
     });
 
-    // "Değiştir" seçilirse: dosyadaki günlerin dosyada olmayan nöbetleri silinir
+    // "Değiştir" seçilirse: o ayın, dosyadaki günlerinde dosyada olmayan nöbetleri silinir
     const removed = existing
       .filter((d) => parsed.weekdays.includes(d.weekday) && !fileKeys.has(dutyKey(d.weekday, d.area, d.teacherId)))
       .map((d) => ({ day: WEEKDAY_NAMES[d.weekday], area: d.area, teacherName: d.teacherName }));
@@ -144,11 +209,14 @@ export async function dutyRoutes(app: FastifyInstance) {
     return {
       sheetName: parsed.sheetName,
       layout: parsed.layout,
+      month: resolution,
       weekdays: parsed.weekdays,
       rows,
       issues,
       removed,
       supervisors,
+      holidays: [...holidayMap.values()].sort((a, b) => a.date.localeCompare(b.date)),
+      undatedHolidays,
       additions: newAreas.size ? [{ label: 'Yeni nöbet yerleri', values: [...newAreas.values()] }] : [],
       totals: {
         new: rows.filter((r) => r.status === 'new').length,
@@ -168,17 +236,17 @@ export async function dutyRoutes(app: FastifyInstance) {
 
     const result = await db.transaction(async (tx) => {
       let removed = 0;
-      if (body.mode === 'replace') {
+      if (body.mode === 'replace' && body.weekdays.length) {
         const del = await tx
           .delete(duties)
-          .where(and(eq(duties.schoolId, schoolId), inArray(duties.weekday, body.weekdays)))
+          .where(and(eq(duties.schoolId, schoolId), eq(duties.month, body.month), inArray(duties.weekday, body.weekdays)))
           .returning({ id: duties.id });
         removed = del.length;
       }
       const existing = await tx
         .select({ weekday: duties.weekday, area: duties.area, teacherId: duties.teacherId })
         .from(duties)
-        .where(eq(duties.schoolId, schoolId));
+        .where(and(eq(duties.schoolId, schoolId), eq(duties.month, body.month)));
       const keys = new Set(existing.map((d) => dutyKey(d.weekday, d.area, d.teacherId)));
       // Aynı yerin farklı yazımları ("bahçe" / "Bahçe") tek yazıma indirgenir
       const spelling = new Map(existing.map((d) => [normalizeName(d.area), d.area]));
@@ -203,27 +271,28 @@ export async function dutyRoutes(app: FastifyInstance) {
           continue;
         }
         keys.add(key);
-        inserts.push({ schoolId, weekday: r.weekday, area, teacherId: teacher.id, sortOrder: areaIndex.get(areaKey)! });
+        inserts.push({ schoolId, month: body.month, weekday: r.weekday, area, teacherId: teacher.id, sortOrder: areaIndex.get(areaKey)! });
       }
       if (inserts.length) await tx.insert(duties).values(inserts);
 
-      // Müdür yardımcıları tarihe göre yazılır; "değiştir"de dosyadaki aylarda dosyada olmayan tarihler silinir
+      // Müdür yardımcıları yalnızca seçilen ayın tarihlerine yazılır; "değiştir"de o ayın dosyada olmayan tarihleri silinir
+      const supervisorsInMonth = body.supervisors.filter((x) => x.date.startsWith(body.month));
       let supervisors = 0;
-      if (body.supervisors.length) {
-        if (body.mode === 'replace') {
-          const months = [...new Set(body.supervisors.map((x) => x.date.slice(0, 7)))].map(monthRange);
-          const dates = body.supervisors.map((x) => x.date);
-          await tx
-            .delete(dutySupervisors)
-            .where(
-              and(
-                eq(dutySupervisors.schoolId, schoolId),
-                or(...months.map(([from, to]) => and(gte(dutySupervisors.date, from), lte(dutySupervisors.date, to)))),
-                sql`${dutySupervisors.date} not in (${sql.join(dates.map((d) => sql`${d}::date`), sql`, `)})`,
-              ),
-            );
-        }
-        const byDate = new Map(body.supervisors.map((x) => [x.date, tidyName(x.name)]));
+      if (body.mode === 'replace' && supervisorsInMonth.length) {
+        const [from, to] = monthRange(body.month);
+        await tx
+          .delete(dutySupervisors)
+          .where(
+            and(
+              eq(dutySupervisors.schoolId, schoolId),
+              gte(dutySupervisors.date, from),
+              lte(dutySupervisors.date, to),
+              notInArray(dutySupervisors.date, supervisorsInMonth.map((x) => x.date)),
+            ),
+          );
+      }
+      if (supervisorsInMonth.length) {
+        const byDate = new Map(supervisorsInMonth.map((x) => [x.date, tidyName(x.name)]));
         const written = await tx
           .insert(dutySupervisors)
           .values([...byDate].map(([date, name]) => ({ schoolId, date, name })))
@@ -234,7 +303,8 @@ export async function dutyRoutes(app: FastifyInstance) {
           .returning({ id: dutySupervisors.id });
         supervisors = written.length;
       }
-      return { created: inserts.length, removed, unchanged, skipped, supervisors };
+      const holidays = await saveHolidays(tx, schoolId, body.holidays);
+      return { created: inserts.length, removed, unchanged, skipped, supervisors, holidays };
     });
 
     await audit(
@@ -242,10 +312,52 @@ export async function dutyRoutes(app: FastifyInstance) {
       'update',
       'Nöbet',
       null,
-      `Excel'den nöbet çizelgesi (${body.mode === 'replace' ? 'değiştir' : 'ekle'}): ${result.created} eklendi, ${result.removed} kaldırıldı`,
+      `Excel'den ${body.month} nöbet çizelgesi (${body.mode === 'replace' ? 'değiştir' : 'ekle'}): ${result.created} eklendi, ${result.removed} kaldırıldı`,
     );
     bus.contentChanged(schoolId);
     return result;
+  });
+
+  /** Bir ayın nöbet listesini başka aydan kopyalar (yeni ay için hazır başlangıç) */
+  app.post(`${base}/copy`, write, async (req) => {
+    const body = parse(z.object({ from: monthSchema, to: monthSchema }), req.body);
+    const schoolId = req.ctx.schoolId;
+    const source = await db.select().from(duties).where(and(eq(duties.schoolId, schoolId), eq(duties.month, body.from)));
+    const copied = await db.transaction(async (tx) => {
+      await tx.delete(duties).where(and(eq(duties.schoolId, schoolId), eq(duties.month, body.to)));
+      if (!source.length) return 0;
+      await tx.insert(duties).values(
+        source.map((d) => ({ schoolId, month: body.to, weekday: d.weekday, area: d.area, teacherId: d.teacherId, sortOrder: d.sortOrder })),
+      );
+      return source.length;
+    });
+    await audit(req, 'update', 'Nöbet', null, `${body.from} nöbet çizelgesi ${body.to} ayına kopyalandı (${copied})`);
+    bus.contentChanged(schoolId);
+    return { copied };
+  });
+
+  /** Bir ayın tüm nöbetlerini siler */
+  app.post(`${base}/clear`, write, async (req) => {
+    const { month } = parse(clearMonthSchema, req.body);
+    const schoolId = req.ctx.schoolId;
+    const del = await db.delete(duties).where(and(eq(duties.schoolId, schoolId), eq(duties.month, month))).returning({ id: duties.id });
+    await audit(req, 'delete', 'Nöbet', null, `${month} nöbet çizelgesi temizlendi (${del.length})`);
+    bus.contentChanged(schoolId);
+    return { removed: del.length };
+  });
+
+  /** Bir ayın tüm nöbetçi müdür yardımcısı kayıtlarını siler */
+  app.post('/api/schools/:schoolId/duty-supervisors/clear', write, async (req) => {
+    const { month } = parse(clearMonthSchema, req.body);
+    const schoolId = req.ctx.schoolId;
+    const [from, to] = monthRange(month);
+    const del = await db
+      .delete(dutySupervisors)
+      .where(and(eq(dutySupervisors.schoolId, schoolId), gte(dutySupervisors.date, from), lte(dutySupervisors.date, to)))
+      .returning({ id: dutySupervisors.id });
+    await audit(req, 'delete', 'Nöbetçi müdür yardımcısı', null, `${month} temizlendi (${del.length})`);
+    bus.contentChanged(schoolId);
+    return { removed: del.length };
   });
 
   async function workbook(req: { ctx: { schoolId: string; school: { name: string; timezone: string } }; query: unknown }, withData: boolean) {
@@ -254,9 +366,12 @@ export async function dutyRoutes(app: FastifyInstance) {
     if (q && !MONTH_RE.test(q)) throw badRequest('Ay YYYY-AA biçiminde olmalı.');
     const month = q ?? zonedParts(new Date(), school.timezone).isoDate.slice(0, 7);
     const [from, to] = monthRange(month);
-    const [roster, rows, sups] = await Promise.all([
+    // Nöbet yerleri o ayın, yoksa en yakın ayın çizelgesinden gelir
+    const areaMonth = (await nearestMonth(schoolId, month)) ?? month;
+    const [roster, rows, areaRows, sups] = await Promise.all([
       loadRoster(db, schoolId),
-      currentDuties(schoolId),
+      currentDuties(schoolId, month),
+      currentDuties(schoolId, areaMonth),
       withData
         ? db
             .select({ date: dutySupervisors.date, name: dutySupervisors.name })
@@ -264,15 +379,14 @@ export async function dutyRoutes(app: FastifyInstance) {
             .where(and(eq(dutySupervisors.schoolId, schoolId), gte(dutySupervisors.date, from), lte(dutySupervisors.date, to)))
         : Promise.resolve([]),
     ]);
-    // Okul nöbet çizelgesi hafta içi günlerinden oluşur
-    const weekdays = [1, 2, 3, 4, 5];
     const days = new Map<number, { area: string; teacherName: string }[]>();
     if (withData) for (const r of rows) days.set(r.weekday, [...(days.get(r.weekday) ?? []), { area: r.area, teacherName: r.teacherName }]);
     return buildDutiesWorkbook({
       schoolName: school.name,
       teachers: roster.rows.filter((t) => t.isActive).map((t) => t.fullName).sort(trCompare),
-      areas: areaOrder(rows),
-      weekdays,
+      areas: areaOrder(rows.length ? rows : areaRows),
+      // Okul nöbet çizelgesi hafta içi günlerinden oluşur
+      weekdays: [1, 2, 3, 4, 5],
       year: Number(month.slice(0, 4)),
       month: Number(month.slice(5, 7)),
       days,

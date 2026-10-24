@@ -1,7 +1,7 @@
 import { WEEKDAY_NAMES, WEEKDAY_SHORT } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Check, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Eraser, Loader2 } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useToast } from '../../components/Toast.tsx';
 import { IconButton } from '../../components/ui.tsx';
@@ -48,7 +48,7 @@ export function schoolDays(month: string): DayInfo[] {
 
 export function MonthNav({ month, onMonth }: { month: string; onMonth: (m: string) => void }) {
   return (
-    <div className="flex items-center gap-1 rounded-2xl bg-white p-1 shadow-[0_1px_2px_rgba(15,23,42,0.05)] ring-1 ring-slate-200">
+    <div className="flex items-center gap-1 rounded-2xl bg-surface p-1 shadow-[0_1px_2px_rgba(15,23,42,0.05)] ring-1 ring-slate-200">
       <IconButton label="Önceki ay" onClick={() => onMonth(shiftMonth(month, -1))}>
         <ChevronLeft className="size-4" />
       </IconButton>
@@ -65,6 +65,26 @@ export function MonthNav({ month, onMonth }: { month: string; onMonth: (m: strin
       </IconButton>
     </div>
   );
+}
+
+export interface Holiday {
+  id: string | null;
+  date: string;
+  name: string;
+  source: 'official' | 'school';
+}
+
+/** Ayın tatilleri: resmi / dini tatiller ve Excel'den tanınan okul tatilleri */
+export function useHolidays(month: string) {
+  const { schoolId } = useAuth();
+  const path = useSchoolPath('holidays');
+  const q = useQuery({
+    queryKey: [schoolId, 'holidays', month],
+    queryFn: () => api<Holiday[]>(`${path}?month=${month}`),
+    enabled: Boolean(schoolId),
+    staleTime: 60_000,
+  });
+  return new Map((q.data ?? []).map((h) => [h.date, h]));
 }
 
 /** Takvim ızgarası: geniş ekranda her satır bir hafta (Pzt–Cum), dar ekranda gün kartları alt alta */
@@ -91,21 +111,47 @@ export function MonthGrid({ month, children }: { month: string; children: (day: 
   );
 }
 
-export function DayShell({ day, isToday, tone, aside, children }: { day: DayInfo; isToday: boolean; tone: 'teal' | 'amber'; aside?: ReactNode; children: ReactNode }) {
+export function DayShell({
+  day,
+  isToday,
+  tone,
+  aside,
+  holiday,
+  children,
+}: {
+  day: DayInfo;
+  isToday: boolean;
+  tone: 'teal' | 'amber';
+  aside?: ReactNode;
+  /** O gün tatilse adı gösterilir */
+  holiday?: Holiday;
+  children: ReactNode;
+}) {
   return (
     <li
       className={clsx(
         'relative rounded-2xl p-2.5 ring-1 transition',
-        isToday ? (tone === 'teal' ? 'bg-teal-50 ring-teal-300' : 'bg-amber-50 ring-amber-300') : 'bg-slate-50/70 ring-slate-200/70 hover:bg-white',
+        holiday
+          ? 'bg-rose-50 ring-rose-100'
+          : isToday
+            ? tone === 'teal'
+              ? 'bg-teal-50 ring-teal-300'
+              : 'bg-amber-50 ring-amber-300'
+            : 'bg-slate-50/70 ring-slate-200/70 hover:bg-surface',
       )}
     >
       <div className="mb-1.5 flex items-center gap-1.5 px-0.5 text-sm">
-        <span className="font-bold text-slate-900 tabular-nums">{day.day}</span>
+        <span className="font-bold text-ink tabular-nums">{day.day}</span>
         <span className={clsx('text-xs font-medium', isToday ? (tone === 'teal' ? 'text-teal-700' : 'text-amber-700') : 'text-slate-500')}>
           {isToday ? 'Bugün' : WEEKDAY_SHORT[day.weekday]}
         </span>
         {aside && <span className="ml-auto">{aside}</span>}
       </div>
+      {holiday && (
+        <div className="mb-1.5 line-clamp-2 rounded-lg bg-rose-100 px-2 py-1 text-[11px] leading-tight font-semibold text-rose-700" title={holiday.name}>
+          {holiday.name}
+        </div>
+      )}
       {children}
     </li>
   );
@@ -137,7 +183,7 @@ export function SaveMark({ state }: { state: 'idle' | 'saving' | 'saved' }) {
 }
 
 export const fieldClass =
-  'h-9 w-full min-w-0 rounded-xl border-0 bg-white px-2.5 text-[13px] font-medium text-slate-900 ring-1 ring-slate-200 transition placeholder:text-slate-300 hover:ring-slate-300 focus:ring-2 focus:ring-brand-500 focus:outline-none disabled:bg-transparent disabled:ring-transparent';
+  'h-9 w-full min-w-0 rounded-xl border-0 bg-surface px-2.5 text-[13px] font-medium text-ink ring-1 ring-slate-200 transition placeholder:text-slate-300 hover:ring-slate-300 focus:ring-2 focus:ring-brand-500 focus:outline-none disabled:bg-transparent disabled:ring-transparent';
 
 /* ---------- Nöbetçi müdür yardımcısı ---------- */
 
@@ -152,12 +198,14 @@ function SupervisorCell({
   isToday,
   current,
   editable,
+  holiday,
   onSave,
 }: {
   day: DayInfo;
   isToday: boolean;
   current: DutySupervisor | undefined;
   editable: boolean;
+  holiday?: Holiday;
   onSave: (name: string) => Promise<void>;
 }) {
   const [value, setValue] = useState(current?.name ?? '');
@@ -174,7 +222,7 @@ function SupervisorCell({
     );
   };
   return (
-    <DayShell day={day} isToday={isToday} tone="teal">
+    <DayShell day={day} isToday={isToday} tone="teal" holiday={holiday}>
       <div className="relative">
         <input
           value={value}
@@ -211,6 +259,7 @@ export function SupervisorCalendar({ month, editable }: { month: string; editabl
   });
   const byDate = new Map((list.data ?? []).map((x) => [x.date, x]));
   const names = [...new Set((list.data ?? []).map((x) => x.name))];
+  const holidays = useHolidays(month);
 
   const save = async (iso: string, name: string) => {
     const current = byDate.get(iso);
@@ -240,7 +289,17 @@ export function SupervisorCalendar({ month, editable }: { month: string; editabl
         ))}
       </datalist>
       <MonthGrid month={month}>
-        {(d, isToday) => <SupervisorCell key={d.iso} day={d} isToday={isToday} current={byDate.get(d.iso)} editable={editable} onSave={(n) => save(d.iso, n)} />}
+        {(d, isToday) => (
+          <SupervisorCell
+            key={d.iso}
+            day={d}
+            isToday={isToday}
+            current={byDate.get(d.iso)}
+            editable={editable}
+            holiday={holidays.get(d.iso)}
+            onSave={(n) => save(d.iso, n)}
+          />
+        )}
       </MonthGrid>
     </>
   );
@@ -251,3 +310,48 @@ export const filledCount = (month: string, dates: Iterable<string>) => {
   return schoolDays(month).filter((d) => set.has(d.iso)).length;
 };
 
+
+/** İki adımlı "bu ayı temizle" düğmesi: önce sorar, sonra siler */
+export function ClearMonthButton({ month, what, onConfirm }: { month: string; what: string; onConfirm: () => Promise<unknown> }) {
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const toast = useToast();
+  useEffect(() => setAsking(false), [month]);
+  if (!asking) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAsking(true)}
+        className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-500 ring-1 ring-slate-200 transition hover:bg-red-50 hover:text-red-700 hover:ring-red-200"
+      >
+        <Eraser className="size-3.5" /> Bu ayı temizle
+      </button>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-xl bg-red-50 p-1 pl-3 text-xs text-red-700 ring-1 ring-red-200">
+      {monthLabel(month)} {what} silinsin mi?
+      <button
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            await onConfirm();
+            setAsking(false);
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Silinemedi');
+          } finally {
+            setBusy(false);
+          }
+        }}
+        className="rounded-lg bg-red-600 px-2.5 py-1 font-semibold text-white hover:brightness-110 disabled:opacity-60"
+      >
+        {busy ? 'Siliniyor…' : 'Evet, temizle'}
+      </button>
+      <button type="button" onClick={() => setAsking(false)} className="rounded-lg px-2 py-1 font-semibold hover:bg-red-100">
+        Vazgeç
+      </button>
+    </span>
+  );
+}

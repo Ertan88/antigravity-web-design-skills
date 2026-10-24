@@ -1,4 +1,4 @@
-import { tidyName, WEEKDAY_NAMES } from '@okulpano/shared';
+import { detectHolidayText, tidyName, WEEKDAY_NAMES } from '@okulpano/shared';
 import type ExcelJS from 'exceljs';
 import { badRequest } from '../errors.ts';
 import {
@@ -16,7 +16,7 @@ import {
   validations,
   type SheetIssue,
 } from '../excel.ts';
-import { MONTHS, trDate } from './duties.ts';
+import { MONTHS, titleTextOf, trDate } from './duties.ts';
 
 /*
  * Taşımalı eğitim (servis) nöbet çizelgesi, okulların kullandığı aylık düzende:
@@ -28,12 +28,16 @@ export interface TransportEntry {
   row: number;
   date: string;
   names: string[];
+  /** Öğretmen yerine tatil yazılmışsa ("29 EKİM CUMHURİYET BAYRAMI") */
+  holiday: string | null;
 }
 
 const DATE_ALIASES = ['nobet tarihi', 'tarih', 'gorev tarihi', 'servis tarihi'];
 const TEACHER_RE = /^(nobetci |gorevli |servis )?(ogretmen|ogretmenler|nobetci|gorevli)( adi soyadi)?( \d)?$/;
 
-export async function parseTransportWorkbook(data: Buffer): Promise<{ sheetName: string; entries: TransportEntry[]; issues: SheetIssue[] }> {
+export async function parseTransportWorkbook(
+  data: Buffer,
+): Promise<{ sheetName: string; entries: TransportEntry[]; titleText: string; issues: SheetIssue[] }> {
   const wb = await loadWorkbook(data);
   const findHeader = (ws: ExcelJS.Worksheet) => {
     for (let r = 1; r <= Math.min(ws.rowCount, 10); r++) {
@@ -60,7 +64,9 @@ export async function parseTransportWorkbook(data: Buffer): Promise<{ sheetName:
     const row = ws.getRow(r);
     const dateCell = row.getCell(header.dateCol).value;
     const rawDate = cellText(dateCell);
-    const names = header.teacherCols.map((c) => tidyName(cellText(row.getCell(c).value))).filter((n) => n.length >= 2);
+    const cells = header.teacherCols.map((c) => tidyName(cellText(row.getCell(c).value))).filter((n) => n.length >= 2);
+    const holiday = cells.map((c) => detectHolidayText(c)).find(Boolean) ?? null;
+    const names = cells.filter((c) => !detectHolidayText(c));
     if (!rawDate && !names.length) continue;
     const date = parseDateCell(dateCell);
     if (!date) {
@@ -72,10 +78,15 @@ export async function parseTransportWorkbook(data: Buffer): Promise<{ sheetName:
       continue;
     }
     // Aynı tarih iki kez yazılmışsa sonraki geçerli
-    byDate.set(date, { row: r, date, names: [...new Set(names)] });
+    byDate.set(date, { row: r, date, names: [...new Set(names)], holiday });
     if (byDate.size > MAX_IMPORT_ROWS) throw badRequest(`Tek seferde en fazla ${MAX_IMPORT_ROWS} gün aktarılabilir.`);
   }
-  return { sheetName: ws.name, entries: [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)), issues };
+  return {
+    sheetName: ws.name,
+    entries: [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)),
+    titleText: titleTextOf(ws, header.row),
+    issues,
+  };
 }
 
 /** Ayın hafta içi günleri (YYYY-AA-GG) */

@@ -1,4 +1,4 @@
-import { bellScheduleSchema, generatePeriods, WEEKDAY_SHORT, type Period } from '@okulpano/shared';
+import { bellScheduleSchema, generatePeriods, pickSchedule, WEEKDAY_NAMES, type Period } from '@okulpano/shared';
 import { BellRing, Plus, Trash2, Wand2 } from 'lucide-react';
 import { useState } from 'react';
 import { Alert, Button, Card, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Spinner, WeekdayPicker } from '../components/ui.tsx';
@@ -10,6 +10,12 @@ import { useForm } from '../lib/form.ts';
 type Form = { name: string; weekdays: number[]; periods: Period[] };
 
 const defaultGen = { firstStart: '08:30', lessonMin: 40, breakMin: 10, count: 8, lunchAfter: 5, lunchMin: 45 };
+
+function addMinutes(clock: string, minutes: number): string {
+  const [h, m] = clock.split(':').map(Number);
+  const total = Math.min(23 * 60 + 59, Math.max(0, h! * 60 + m! + minutes));
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
 
 function minutesBetween(a: string, b: string) {
   const [ah, am] = a.split(':').map(Number);
@@ -24,6 +30,12 @@ function Editor({ form }: { form: ReturnType<typeof useForm<Form>> }) {
   // Hafta sonu günleri varsayılan olarak gizli; çizelgede seçiliyse ya da istenirse görünür
   const [showWeekend, setShowWeekend] = useState(() => v.weekdays.some((d) => d > 5));
 
+  /** i. dersten itibaren tüm derslerin başlangıç ve bitişini kaydırır */
+  const shiftFrom = (i: number, minutes: number) =>
+    set(
+      'periods',
+      v.periods.map((p, j) => (j >= i ? { ...p, start: addMinutes(p.start, minutes), end: addMinutes(p.end, minutes) } : p)),
+    );
   const updatePeriod = (i: number, patch: Partial<Period>) => set('periods', v.periods.map((p, j) => (j === i ? { ...p, ...patch } : p)));
   const addPeriod = () => {
     const last = v.periods[v.periods.length - 1];
@@ -104,9 +116,30 @@ function Editor({ form }: { form: ReturnType<typeof useForm<Form>> }) {
                     <Trash2 className="size-4" />
                   </IconButton>
                 </div>
-                {gap !== null && gap > 0 && (
-                  <div className="py-1 pl-16 text-xs text-slate-400">
-                    {gap >= 30 ? 'Öğle arası' : 'Teneffüs'} · {gap} dk
+                {gap !== null && (
+                  <div className="flex items-center gap-2 py-1 pl-16 text-xs text-slate-500">
+                    <span className="min-w-28">
+                      {gap >= 30 ? 'Öğle arası' : 'Teneffüs'} · <span className="font-semibold text-slate-700 tabular-nums">{gap} dk</span>
+                    </span>
+                    {/* Arayı uzatıp kısaltır; sonraki tüm dersler birlikte kayar (ör. cuma namazı) */}
+                    <button
+                      type="button"
+                      disabled={gap < 5}
+                      onClick={() => shiftFrom(i + 1, -5)}
+                      className="rounded-md px-1.5 py-0.5 font-semibold text-slate-500 ring-1 ring-slate-200 hover:bg-slate-100 disabled:opacity-40"
+                      aria-label="Arayı 5 dakika kısalt"
+                    >
+                      −5
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => shiftFrom(i + 1, 5)}
+                      className="rounded-md px-1.5 py-0.5 font-semibold text-slate-500 ring-1 ring-slate-200 hover:bg-slate-100"
+                      aria-label="Arayı 5 dakika uzat"
+                    >
+                      +5
+                    </button>
+                    <span className="hidden text-[11px] text-slate-400 sm:inline">sonraki dersler kayar</span>
                   </div>
                 )}
               </div>
@@ -133,10 +166,22 @@ export function BellSchedules() {
   const schedules = list.data ?? [];
   // Varsayılan: bugün geçerli olan çizelge, yoksa ilki
   const selected =
-    schedules.find((x) => x.id === selectedId) ?? schedules.find((x) => x.weekdays.includes(now.weekday)) ?? schedules[0] ?? null;
+    schedules.find((x) => x.id === selectedId) ?? pickSchedule(schedules, now.weekday) ?? schedules[0] ?? null;
 
   const covered = new Set((list.data ?? []).flatMap((s) => s.weekdays));
-  const overlaps = [1, 2, 3, 4, 5, 6, 7].filter((d) => (list.data ?? []).filter((s) => s.weekdays.includes(d)).length > 1);
+  // Aynı günü kapsayan çizelgeler: daha özel olan (az günlü) o gün geçerlidir
+  const overrides = [1, 2, 3, 4, 5, 6, 7].flatMap((d) => {
+    const all = schedules.filter((x) => x.weekdays.includes(d) && x.periods.length);
+    const winner = pickSchedule(schedules, d);
+    return all.length > 1 && winner ? [{ day: d, name: winner.name }] : [];
+  });
+
+  /** Seçili çizelgenin kopyası: aynı ders saatleriyle başka gün(ler) için (ör. cuma namazı düzeni) */
+  const openCopy = (s: BellSchedule) => {
+    setEditing(null);
+    form.reset({ name: `${s.name} (kopya)`, weekdays: [], periods: s.periods });
+    setOpen(true);
+  };
 
   const openEditor = (s: BellSchedule | null) => {
     setEditing(s);
@@ -160,7 +205,7 @@ export function BellSchedules() {
     <>
       <PageHeader
         title="Zil Saatleri"
-        description="Panonun sağ üstündeki zil sayacı bu çizelgelere göre ders ve teneffüsün bitmesine kalan süreyi hesaplar. Cuma gibi farklı günler için ayrı çizelge oluşturabilirsiniz."
+        description="Panonun sağ üstündeki zil sayacı bu çizelgelere göre ders ve teneffüsün bitmesine kalan süreyi hesaplar. Cuma namazı gibi farklı saatler gereken günler için çizelgeyi kopyalayıp o güne özel düzenleyin; o gün özel çizelge geçerli olur."
         actions={
           editable && (
             <Button icon={<Plus className="size-4" />} onClick={() => openEditor(null)}>
@@ -169,10 +214,10 @@ export function BellSchedules() {
           )
         }
       />
-      {overlaps.length > 0 && (
+      {overrides.length > 0 && (
         <div className="mb-4">
-          <Alert>
-            {overlaps.map((d) => WEEKDAY_SHORT[d]).join(', ')} günleri birden fazla çizelgede seçili; panoda listedeki ilk çizelge kullanılır.
+          <Alert tone="blue">
+            {overrides.map((o) => `${WEEKDAY_NAMES[o.day]} günü "${o.name}"`).join(', ')} çizelgesi geçerli (o güne özel çizelge genel olanın yerine geçer).
           </Alert>
         </div>
       )}
@@ -189,7 +234,7 @@ export function BellSchedules() {
         </Card>
       ) : (
         <div className="space-y-5">
-          <div className="flex flex-col gap-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 lg:flex-row lg:items-center">
+          <div className="flex flex-col gap-4 rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-slate-200/70 lg:flex-row lg:items-center">
             {schedules.length > 1 && (
               <div className="shrink-0">
                 <Segmented value={selected?.id ?? ''} onChange={setSelectedId} options={schedules.map((x) => ({ value: x.id, label: x.name }))} />
@@ -206,6 +251,7 @@ export function BellSchedules() {
               editable={editable}
               lunchThresholdMin={school.data?.settings.lunchThresholdMin ?? 30}
               onEdit={() => openEditor(selected)}
+              onCopy={() => openCopy(selected)}
               onDelete={() => {
                 ops.remove.mutate(selected.id);
                 setSelectedId(null);

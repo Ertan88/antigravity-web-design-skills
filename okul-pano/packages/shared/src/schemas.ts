@@ -11,6 +11,8 @@ import { parseYouTubeUrl } from './youtube.ts';
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Renk #RRGGBB biçiminde olmalı');
 const clock = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Saat SS:DD biçiminde olmalı');
 const isoDate = z.iso.date({ error: 'Tarih YYYY-AA-GG biçiminde olmalı' });
+/** Ay: YYYY-AA */
+export const monthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Ay YYYY-AA biçiminde olmalı');
 const isoDateTime = z.iso.datetime({ offset: true, error: 'Geçerli bir tarih ve saat girin' });
 const weekday = z.number().int().min(1).max(7);
 const id = z.uuid({ error: 'Geçersiz kimlik' });
@@ -213,6 +215,7 @@ export const classGroupSchema = z.object({
 });
 
 export const dutySchema = z.object({
+  month: monthSchema,
   weekday,
   area: required('Nöbet yeri', 60),
   teacherId: id,
@@ -234,9 +237,12 @@ export const transportDaySchema = z.object({
 export const transportImportSchema = z.object({
   days: z
     .array(z.object({ date: isoDate, teacherIds: z.array(id).max(4) }))
-    .min(1, 'İçe aktarılacak gün yok')
     .max(400),
+  holidays: z.array(z.object({ date: isoDate, name: required('Tatil', 120) })).max(100).default([]),
 });
+
+/** Bir ayın tüm kayıtlarını temizleme (nöbet, müdür yardımcısı, taşımalı) */
+export const clearMonthSchema = z.object({ month: monthSchema });
 
 export const leaveSchema = z
   .object({
@@ -275,8 +281,10 @@ export const studentImportSchema = z.object({
  * (dosyada olmayan günlere dokunmaz); "merge" yalnızca eksik nöbetleri ekler.
  */
 export const dutyImportSchema = z.object({
+  /** Çizelgenin kaydedileceği ay */
+  month: monthSchema,
   mode: z.enum(['replace', 'merge']).default('replace'),
-  weekdays: z.array(weekday).min(1).max(7),
+  weekdays: z.array(weekday).max(7),
   rows: z
     .array(
       z.object({
@@ -288,6 +296,8 @@ export const dutyImportSchema = z.object({
     .max(2000, 'Tek seferde en fazla 2000 nöbet aktarılabilir'),
   /** Dosyadaki tarih / nöbetçi müdür yardımcısı eşleşmeleri; aynı tarihte kayıt varsa güncellenir */
   supervisors: z.array(dutySupervisorSchema).max(400).default([]),
+  /** Dosyada tanınan tatiller (öğretmen yerine tatil adı yazılmış günler) */
+  holidays: z.array(z.object({ date: isoDate, name: required('Tatil', 120) })).max(100).default([]),
 });
 export type DutyImportInput = z.infer<typeof dutyImportSchema>;
 

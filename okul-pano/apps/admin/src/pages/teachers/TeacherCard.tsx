@@ -47,7 +47,7 @@ export function TeacherCard({
   return (
     <article
       className={clsx(
-        'group relative flex min-w-0 gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 transition-shadow hover:shadow-md',
+        'group relative flex min-w-0 gap-3 rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-slate-200/70 transition-shadow hover:shadow-md',
         !teacher.isActive && 'bg-slate-50',
       )}
     >
@@ -65,7 +65,7 @@ export function TeacherCard({
           className={clsx(
             // Dokunmatikte düğmeler hep görünür: isim onların altına girmesin. Faredeyse düğmeler yalnızca üzerine gelince çıkar.
             'line-clamp-2 pr-[5.25rem] text-[15px] leading-snug font-semibold break-words pointer-fine:pr-0',
-            teacher.isActive ? 'text-slate-900' : 'text-slate-500',
+            teacher.isActive ? 'text-ink' : 'text-slate-500',
           )}
           title={teacher.fullName}
         >
@@ -93,7 +93,7 @@ export function TeacherCard({
             onClick={onEdit}
             aria-label={`${teacher.fullName} düzenle`}
             title="Düzenle"
-            className="inline-flex size-9 items-center justify-center rounded-lg bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-brand-50 hover:text-brand-700 hover:ring-brand-200"
+            className="inline-flex size-9 items-center justify-center rounded-lg bg-surface text-slate-500 ring-1 ring-slate-200 hover:bg-brand-50 hover:text-brand-700 hover:ring-brand-200"
           >
             <Pencil className="size-4" />
           </button>
@@ -102,7 +102,7 @@ export function TeacherCard({
             onClick={onDelete}
             aria-label={`${teacher.fullName} sil`}
             title="Sil"
-            className="inline-flex size-9 items-center justify-center rounded-lg bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-red-50 hover:text-red-600 hover:ring-red-200"
+            className="inline-flex size-9 items-center justify-center rounded-lg bg-surface text-slate-500 ring-1 ring-slate-200 hover:bg-red-50 hover:text-red-600 hover:ring-red-200"
           >
             <Trash2 className="size-4" />
           </button>

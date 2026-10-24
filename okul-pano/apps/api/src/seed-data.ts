@@ -150,6 +150,7 @@ export async function seedDemo(
     [1, 2, 3, 4, 5].flatMap((weekday) =>
       DUTY_AREAS.map((area, i) => ({
         schoolId,
+        month: today.isoDate.slice(0, 7),
         weekday,
         area,
         sortOrder: i,

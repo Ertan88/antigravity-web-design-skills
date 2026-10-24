@@ -53,6 +53,8 @@ export interface ExcelImportDialogProps<R, P extends ImportPreview<R>, O> {
   successMessage: (result: never, p: P, o: O) => string;
   /** Başarıdan sonra tazelenecek listeler (sorgu anahtarları) */
   invalidate: string[];
+  /** Önizleme isteğine eklenecek sorgu (ör. "?month=2026-10"); değişince önizleme yeniden alınır */
+  previewQuery?: (o: O) => string;
 }
 
 /**
@@ -70,21 +72,34 @@ export function ExcelImportDialog<R, P extends ImportPreview<R>, O>(props: Excel
   const [saving, setSaving] = useState(false);
   const [options, setOptions] = useState<O>(props.initialOptions);
 
+  // Yeni dosyada seçenekler sıfırlanır
+  useEffect(() => {
+    if (file) setOptions(props.initialOptions);
+    // initialOptions bilinçli olarak bağımlılık değil: yalnızca yeni dosyada sıfırlanır
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file]);
+
+  const query = props.previewQuery?.(options) ?? '';
   useEffect(() => {
     if (!file) return;
-    setPreview(null);
+    let alive = true;
     setError(null);
-    setOptions(props.initialOptions);
     setLoading(true);
     const form = new FormData();
     form.append('file', file);
-    api<P>(`${basePath}/import/preview`, { method: 'POST', form })
-      .then(setPreview)
-      .catch((err: Error) => setError(err.message))
-      .finally(() => setLoading(false));
-    // initialOptions bilinçli olarak bağımlılık değil: yalnızca yeni dosyada sıfırlanır
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [file, basePath]);
+    api<P>(`${basePath}/import/preview${query}`, { method: 'POST', form })
+      .then((p) => alive && setPreview(p))
+      .catch((err: Error) => alive && setError(err.message))
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [file, basePath, query]);
+
+  // Dosya kapanınca önizleme temizlenir
+  useEffect(() => {
+    if (!file) setPreview(null);
+  }, [file]);
 
   const count = preview ? props.commitCount(preview, options) : 0;
 
@@ -123,14 +138,14 @@ export function ExcelImportDialog<R, P extends ImportPreview<R>, O>(props: Excel
         </>
       }
     >
-      {loading && (
+      {loading && !preview && (
         <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-500">
           <Loader2 className="size-5 animate-spin" /> Dosya okunuyor…
         </div>
       )}
       {error && <Alert tone="red">{error}</Alert>}
       {preview && (
-        <div className="space-y-5">
+        <div className={clsx('space-y-5 transition-opacity', loading && 'pointer-events-none opacity-50')}>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fit,minmax(7.5rem,1fr))]">
             {props.stats(preview, options).map((s) => (
               <div key={s.label} className={clsx('rounded-xl px-4 py-3', TILE[s.tone])}>

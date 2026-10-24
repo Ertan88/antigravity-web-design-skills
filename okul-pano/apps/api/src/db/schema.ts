@@ -152,6 +152,8 @@ export const duties = pgTable(
   {
     id: pk(),
     schoolId: schoolId(),
+    /** Çizelgenin ait olduğu ay (YYYY-AA); pano o ayın, yoksa en son ayın çizelgesini gösterir */
+    month: text('month').notNull(),
     weekday: integer('weekday').notNull(),
     area: text('area').notNull(),
     teacherId: uuid('teacher_id')
@@ -161,7 +163,20 @@ export const duties = pgTable(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [index('duties_school_idx').on(t.schoolId, t.weekday)],
+  (t) => [index('duties_school_idx').on(t.schoolId, t.month, t.weekday)],
+);
+
+/** Okulun tatil günleri (Excel'den tanınan ya da elle eklenen); resmi tatiller ayrıca koddan gelir */
+export const schoolHolidays = pgTable(
+  'school_holidays',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    date: date('date', { mode: 'string' }).notNull(),
+    name: text('name').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('school_holidays_school_date_uq').on(t.schoolId, t.date)],
 );
 
 /** Nöbetçi müdür yardımcısı: tarihe bağlı, okul başına günde bir kayıt */

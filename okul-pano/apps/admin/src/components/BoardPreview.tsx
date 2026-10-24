@@ -42,7 +42,7 @@ export function BoardPreview() {
           <Input type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} className="h-9" aria-label="Önizleme zamanı" />
         </div>
         {at && (
-          <button type="button" onClick={() => setAt('')} className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-900">
+          <button type="button" onClick={() => setAt('')} className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-ink">
             <RotateCcw className="size-3.5" /> Şimdiye dön
           </button>
         )}

@@ -22,11 +22,11 @@ type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
 const variants: Record<Variant, string> = {
   primary:
-    'bg-gradient-to-b from-brand-500 to-brand-600 text-white shadow-[0_1px_2px_rgba(37,99,235,0.35),0_4px_12px_-4px_rgba(37,99,235,0.5),inset_0_1px_0_rgba(255,255,255,0.18)] hover:from-brand-600 hover:to-brand-700',
+    'bg-gradient-to-b from-brand-500 to-brand-600 text-white shadow-[0_1px_2px_rgba(37,99,235,0.35),0_4px_12px_-4px_rgba(37,99,235,0.5),inset_0_1px_0_rgba(255,255,255,0.18)] hover:brightness-110',
   secondary:
-    'bg-white text-slate-700 ring-1 ring-slate-200 shadow-[0_1px_2px_rgba(15,23,42,0.05)] hover:bg-slate-50 hover:text-slate-900 hover:ring-slate-300',
-  ghost: 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
-  danger: 'bg-gradient-to-b from-red-500 to-red-600 text-white shadow-[0_1px_2px_rgba(220,38,38,0.35)] hover:from-red-600 hover:to-red-700',
+    'bg-surface text-slate-700 ring-1 ring-slate-200 shadow-[0_1px_2px_rgba(15,23,42,0.05)] hover:bg-slate-50 hover:text-ink hover:ring-slate-300',
+  ghost: 'text-slate-600 hover:bg-slate-100 hover:text-ink',
+  danger: 'bg-gradient-to-b from-red-500 to-red-600 text-white shadow-[0_1px_2px_rgba(220,38,38,0.35)] hover:brightness-110',
 };
 
 export function Button({
@@ -69,7 +69,7 @@ export function IconButton({
       title={label}
       aria-label={label}
       className={clsx(
-        'inline-flex size-9 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:opacity-40',
+        'inline-flex size-9 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-ink disabled:opacity-40',
         className,
       )}
       {...rest}
@@ -82,7 +82,7 @@ export function IconButton({
 /* ---------- Form alanları ---------- */
 
 const control =
-  'block w-full rounded-xl border-0 bg-white px-3.5 py-2 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] ring-1 ring-slate-200 transition placeholder:text-slate-400 hover:ring-slate-300 focus:ring-2 focus:ring-brand-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500';
+  'block w-full rounded-xl border-0 bg-surface px-3.5 py-2 text-sm text-ink shadow-[0_1px_2px_rgba(15,23,42,0.04)] ring-1 ring-slate-200 transition placeholder:text-slate-400 hover:ring-slate-300 focus:ring-2 focus:ring-brand-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500';
 
 export function Field({
   label,
@@ -157,7 +157,7 @@ export function Toggle({
       >
         <span
           className={clsx(
-            'absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow transition-transform',
+            'absolute top-0.5 left-0.5 size-5 rounded-full bg-surface shadow transition-transform',
             checked && 'translate-x-5',
           )}
         />
@@ -184,7 +184,7 @@ export function WeekdayPicker({ value, onChange, days = [1, 2, 3, 4, 5, 6, 7] }:
             onClick={() => onChange(on ? value.filter((x) => x !== d) : [...value, d].sort())}
             className={clsx(
               'h-9 min-w-12 rounded-lg px-2 text-sm font-semibold ring-1 transition-colors',
-              on ? 'bg-brand-600 text-white ring-brand-600' : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50',
+              on ? 'bg-brand-600 text-white ring-brand-600' : 'bg-surface text-slate-600 ring-slate-200 hover:bg-slate-50',
             )}
           >
             {WEEKDAY_SHORT[d]}
@@ -213,7 +213,7 @@ export function Segmented<T extends string | number>({
           onClick={() => onChange(o.value)}
           className={clsx(
             'rounded-xl px-3.5 py-1.5 text-sm font-semibold transition-all',
-            o.value === value ? 'bg-white text-slate-900 shadow-[0_1px_3px_rgba(15,23,42,0.1)] ring-1 ring-slate-200/60' : 'text-slate-500 hover:text-slate-800',
+            o.value === value ? 'bg-surface text-ink shadow-[0_1px_3px_rgba(15,23,42,0.1)] ring-1 ring-slate-200/60' : 'text-slate-500 hover:text-slate-800',
           )}
         >
           {o.label}
@@ -239,7 +239,7 @@ export function PageHeader({ title, description, actions }: { title: string; des
         )}
         <div className="min-w-0">
           {nav?.group && <div className="mb-0.5 text-xs font-semibold tracking-wider text-brand-600 uppercase">{nav.group}</div>}
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-[26px]">{title}</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-[26px]">{title}</h1>
           {description && <p className="mt-1 max-w-3xl text-sm leading-relaxed text-slate-500">{description}</p>}
         </div>
       </div>
@@ -252,7 +252,7 @@ export function Card({ children, className }: { children: ReactNode; className?:
   return (
     <div
       className={clsx(
-        'rounded-2xl bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_30px_-16px_rgba(15,23,42,0.12)] ring-1 ring-slate-900/[0.06]',
+        'rounded-2xl bg-surface shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_30px_-16px_rgba(15,23,42,0.12)] ring-1 ring-slate-900/[0.06]',
         className,
       )}
     >
@@ -282,7 +282,7 @@ export function EmptyState({ icon, title, description, action }: { icon: ReactNo
   return (
     <div className="flex flex-col items-center px-6 py-14 text-center">
       <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-50 to-indigo-100 text-brand-600 ring-1 ring-brand-100">{icon}</div>
-      <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+      <h3 className="text-base font-semibold text-ink">{title}</h3>
       {description && <p className="mt-1 max-w-sm text-sm text-slate-500">{description}</p>}
       {action && <div className="mt-5">{action}</div>}
     </div>
@@ -351,7 +351,7 @@ export function Modal({
         aria-modal="true"
         aria-label={title}
         className={clsx(
-          'relative flex max-h-[92vh] w-full flex-col rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl',
+          'relative flex max-h-[92vh] w-full flex-col rounded-t-2xl bg-surface shadow-2xl sm:rounded-2xl',
           size === 'md' && 'sm:max-w-lg',
           size === 'lg' && 'sm:max-w-2xl',
           size === 'xl' && 'sm:max-w-4xl',
@@ -359,7 +359,7 @@ export function Modal({
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
           <div>
-            <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+            <h2 className="text-base font-semibold text-ink">{title}</h2>
             {description && <p className="mt-0.5 text-sm text-slate-500">{description}</p>}
           </div>
           <IconButton label="Kapat" onClick={onClose} className="-mr-2 -mt-1">
@@ -387,7 +387,7 @@ export function DeleteButton({ onConfirm, label = 'Sil', disabled }: { onConfirm
           setArmed(false);
           onConfirm();
         }}
-        className="inline-flex h-9 items-center rounded-lg bg-red-600 px-3 text-xs font-semibold text-white hover:bg-red-700"
+        className="inline-flex h-9 items-center rounded-lg bg-red-600 px-3 text-xs font-semibold text-white hover:brightness-110"
       >
         Emin misiniz?
       </button>

@@ -58,6 +58,8 @@ export interface ClassGroup extends Base {
   sortOrder: number;
 }
 export interface Duty extends Base {
+  /** YYYY-AA */
+  month: string;
   weekday: number;
   area: string;
   teacherId: string;

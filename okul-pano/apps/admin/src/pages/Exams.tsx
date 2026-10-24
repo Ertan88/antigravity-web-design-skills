@@ -24,7 +24,7 @@ export function Exams() {
       activeToggle
       schema={examSchema}
       columns={[
-        { header: 'Sınav', cell: (r) => <span className="font-semibold text-slate-900">{r.title}</span> },
+        { header: 'Sınav', cell: (r) => <span className="font-semibold text-ink">{r.title}</span> },
         { header: 'Tarih ve saat', cell: (r) => <span className="whitespace-nowrap">{formatDateTime(r.examAt)}</span> },
         {
           header: 'Kalan',

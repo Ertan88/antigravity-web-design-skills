@@ -218,7 +218,7 @@ describe('Excel', () => {
 describe('tüm listeyi silme', () => {
   it('onay ister; silince nöbetleri de kaldırır ve sayıları bildirir', async () => {
     const list = (await owner.get(path('teachers'))).json() as { id: string }[];
-    expectStatus(await owner.post(path('duties'), { weekday: 1, area: 'Bahçe', teacherId: list[0]!.id }), 201);
+    expectStatus(await owner.post(path('duties'), { month: '2026-10', weekday: 1, area: 'Bahçe', teacherId: list[0]!.id }), 201);
     expect((await owner.get(path('teachers/usage'))).json()).toMatchObject({ teachers: 4, duties: 1 });
 
     expect((await owner.post(path('teachers/delete-all'), {})).statusCode).toBe(400);

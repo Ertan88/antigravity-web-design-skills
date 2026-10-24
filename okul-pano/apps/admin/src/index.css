@@ -1,5 +1,8 @@
 @import 'tailwindcss';
 
+/* Koyu tema: <html class="dark"> (kullanıcı sağ üstten seçer) */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --color-brand-50: #eff6ff;
@@ -12,16 +15,95 @@
   --color-brand-700: #1d4ed8;
   --color-brand-800: #1e40af;
   --color-brand-900: #1e3a8a;
+  /* Temaya göre değişen yüzey ve yazı renkleri */
+  --color-surface: #ffffff;
+  --color-ink: #0f172a;
+}
+
+/*
+ * Koyu temada nötr tonlar ters çevrilir (açık arka planlar koyulaşır, koyu yazılar açılır);
+ * renkli açık tonlar (…-50/100/200) yarı saydam vurguya, koyu yazı tonları (…-700/800/900) açık tona döner.
+ * Böylece sayfalar ayrı ayrı "dark:" sınıfı gerektirmeden iki temada da okunur.
+ */
+.dark {
+  color-scheme: dark;
+  --color-surface: #121a2b;
+  --color-ink: #eef2f8;
+
+  --color-slate-50: #0b1120;
+  --color-slate-100: #1a2335;
+  --color-slate-200: #273249;
+  --color-slate-300: #354159;
+  --color-slate-400: #66748c;
+  --color-slate-500: #8f9db3;
+  --color-slate-600: #b3bfd0;
+  --color-slate-700: #d3dae5;
+  --color-slate-800: #e6ebf2;
+
+  --color-brand-50: rgb(59 130 246 / 0.13);
+  --color-brand-100: rgb(59 130 246 / 0.2);
+  --color-brand-200: rgb(59 130 246 / 0.32);
+  --color-brand-700: #93c5fd;
+  --color-brand-900: #dbeafe;
+
+  --color-emerald-50: rgb(16 185 129 / 0.13);
+  --color-emerald-100: rgb(16 185 129 / 0.2);
+  --color-emerald-200: rgb(16 185 129 / 0.3);
+  --color-emerald-700: #6ee7b7;
+  --color-emerald-800: #a7f3d0;
+
+  --color-amber-50: rgb(245 158 11 / 0.12);
+  --color-amber-100: rgb(245 158 11 / 0.2);
+  --color-amber-200: rgb(245 158 11 / 0.3);
+  --color-amber-700: #fcd34d;
+  --color-amber-800: #fde68a;
+  --color-amber-900: #fef3c7;
+  --color-amber-950: #fffbeb;
+
+  --color-red-50: rgb(239 68 68 / 0.13);
+  --color-red-100: rgb(239 68 68 / 0.2);
+  --color-red-200: rgb(239 68 68 / 0.3);
+  --color-red-700: #fca5a5;
+  --color-red-800: #fecaca;
+  --color-red-900: #fee2e2;
+
+  --color-teal-50: rgb(20 184 166 / 0.13);
+  --color-teal-100: rgb(20 184 166 / 0.2);
+  --color-teal-200: rgb(20 184 166 / 0.3);
+  --color-teal-700: #5eead4;
+  --color-teal-800: #99f6e4;
+  --color-teal-950: #f0fdfa;
+
+  --color-indigo-100: rgb(99 102 241 / 0.2);
+  --color-indigo-700: #a5b4fc;
+  --color-blue-100: rgb(59 130 246 / 0.2);
+  --color-blue-700: #93c5fd;
+  --color-cyan-100: rgb(6 182 212 / 0.2);
+  --color-cyan-800: #a5f3fc;
+  --color-fuchsia-100: rgb(217 70 239 / 0.2);
+  --color-fuchsia-700: #f0abfc;
+  --color-lime-100: rgb(132 204 22 / 0.2);
+  --color-lime-800: #d9f99d;
+  --color-orange-100: rgb(249 115 22 / 0.2);
+  --color-orange-800: #fed7aa;
+  --color-rose-50: rgb(244 63 94 / 0.12);
+  --color-rose-100: rgb(244 63 94 / 0.2);
+  --color-rose-200: rgb(244 63 94 / 0.3);
+  --color-rose-700: #fda4af;
+  --color-violet-100: rgb(139 92 246 / 0.2);
+  --color-violet-700: #c4b5fd;
 }
 
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;
     font-feature-settings: 'cv11', 'ss01';
+    /* Kaydırma çubuğu çıkıp kaybolduğunda sayfanın sağa sola kaymaması için yeri hep ayrılır */
+    scrollbar-gutter: stable;
   }
 
   body {
-    @apply bg-slate-50 text-slate-900;
+    @apply bg-slate-50 text-ink transition-colors;
   }
 
   :focus-visible {

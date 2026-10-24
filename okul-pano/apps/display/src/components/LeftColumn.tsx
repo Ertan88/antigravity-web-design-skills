@@ -55,31 +55,41 @@ export function DutyCard({
   duties,
   supervisor,
   transport,
+  holiday,
 }: {
   duties: DisplayState['duties'];
   /** Bugünün nöbetçi müdür yardımcısı */
   supervisor: string | null;
   /** Bugünün taşımalı öğrenci görevlileri */
   transport: string[];
+  /** Bugün tatilse adı: nöbet listesi yerine gösterilir */
+  holiday: string | null;
 }) {
   return (
     <section className="card list-card duty-card">
       <div className="card-label">
         <ShieldIcon size={22} /> Nöbetçi Öğretmenler
       </div>
+      {holiday ? (
+        <div className="duty-holiday">
+          <span className="duty-holiday-label">Bugün tatil</span>
+          <span className="duty-holiday-name">{holiday}</span>
+        </div>
+      ) : (
       <AutoPager
-        items={duties}
-        rowHeight={64}
-        keyOf={(d) => d.id}
-        empty="Bugün nöbet çizelgesi yok"
-        render={(d) => (
-          <div className="duty-row">
-            <span className="duty-area">{d.area}</span>
-            <span className="duty-teacher">{d.teacherName}</span>
-          </div>
-        )}
-      />
-      {(supervisor || transport.length > 0) && (
+          items={duties}
+          rowHeight={64}
+          keyOf={(d) => d.id}
+          empty="Bugün nöbet çizelgesi yok"
+          render={(d) => (
+            <div className="duty-row">
+              <span className="duty-area">{d.area}</span>
+              <span className="duty-teacher">{d.teacherName}</span>
+            </div>
+          )}
+        />
+      )}
+      {!holiday && (supervisor || transport.length > 0) && (
         <div className="duty-extras">
           {supervisor && (
             <div className="duty-extra">

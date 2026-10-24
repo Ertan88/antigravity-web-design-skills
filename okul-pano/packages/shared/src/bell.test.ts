@@ -71,6 +71,13 @@ describe('pickSchedule', () => {
     expect(pickSchedule([weekday, friday], 2)?.id).toBe('a');
     expect(pickSchedule([weekday, friday], 6)).toBeNull();
   });
+
+  it('aynı günü kapsayan çizelgelerden daha özel olanı (az günlü) seçer', () => {
+    const all = { id: 'a', name: 'Hafta içi', weekdays: [1, 2, 3, 4, 5], periods, sortOrder: 0 };
+    const friday = { id: 'b', name: 'Cuma', weekdays: [5], periods: periods.slice(0, 4), sortOrder: 1 };
+    expect(pickSchedule([all, friday], 5)?.id).toBe('b');
+    expect(pickSchedule([all, friday], 4)?.id).toBe('a');
+  });
 });
 
 describe('validatePeriods', () => {

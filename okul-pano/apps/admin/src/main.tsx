@@ -7,7 +7,11 @@ import { App } from './App.tsx';
 import { ToastProvider } from './components/Toast.tsx';
 import { ApiError } from './lib/api.ts';
 import { AuthProvider } from './lib/auth.tsx';
+import { applyTheme, currentTheme } from './lib/theme.ts';
 import './index.css';
+
+// Sayfa çizilmeden tema uygulanır (açılışta beyaz parlama olmasın)
+applyTheme(currentTheme());
 
 const queryClient = new QueryClient({
   defaultOptions: {

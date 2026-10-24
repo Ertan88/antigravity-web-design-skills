@@ -158,7 +158,7 @@ export function Users() {
               return (
                 <tr key={m.id}>
                   <Td>
-                    <div className="font-semibold text-slate-900">{m.fullName}</div>
+                    <div className="font-semibold text-ink">{m.fullName}</div>
                     <div className="text-slate-500">{m.email}</div>
                   </Td>
                   <Td>

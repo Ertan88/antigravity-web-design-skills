@@ -31,7 +31,7 @@ export function ImportDialog({ file, onClose }: { file: File | null; onClose: ()
       invalidate={['teachers', 'teacher-branches', 'teacher-titles']}
       initialOptions={{ updateExisting: true }}
       columns={[
-        { header: 'Ad soyad', cell: (r) => <span className="font-medium whitespace-nowrap text-slate-900">{r.fullName}</span> },
+        { header: 'Ad soyad', cell: (r) => <span className="font-medium whitespace-nowrap text-ink">{r.fullName}</span> },
         { header: 'Branş', cell: (r) => r.branch ?? '—' },
         { header: 'Ünvan', cell: (r) => r.title ?? '—' },
       ]}

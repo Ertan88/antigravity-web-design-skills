@@ -110,7 +110,7 @@ export function ClassesPanel({
     <Card className="overflow-hidden">
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">Sınıflar</h2>
+          <h2 className="text-sm font-semibold text-ink">Sınıflar</h2>
           <p className="text-xs text-slate-500">{classes.length} şube · programını görmek için seçin</p>
         </div>
       </div>
@@ -128,13 +128,13 @@ export function ClassesPanel({
             onChange={(e) => setDraft(e.target.value)}
             placeholder="Sınıf ekle: 9-A, 9-B…"
             aria-label="Yeni sınıf"
-            className="h-9 min-w-0 flex-1 rounded-xl border-0 bg-slate-50 px-3 text-sm ring-1 ring-slate-200 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-brand-500 focus:outline-none"
+            className="h-9 min-w-0 flex-1 rounded-xl border-0 bg-slate-50 px-3 text-sm ring-1 ring-slate-200 placeholder:text-slate-400 focus:bg-surface focus:ring-2 focus:ring-brand-500 focus:outline-none"
           />
           <button
             type="submit"
             disabled={busy || !draft.trim()}
             aria-label="Ekle"
-            className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm transition hover:bg-brand-700 disabled:opacity-40"
+            className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm transition hover:brightness-110 disabled:opacity-40"
           >
             <Plus className="size-4" />
           </button>
@@ -187,11 +187,11 @@ export function ClassesPanel({
                         'flex w-full items-center gap-1.5 rounded-xl px-3 py-2 text-left text-sm font-bold transition',
                         active
                           ? 'bg-[var(--hue)] text-white shadow-[0_6px_16px_-8px_var(--hue)]'
-                          : 'bg-slate-50 text-slate-800 ring-1 ring-slate-200/80 hover:bg-white hover:ring-[var(--hue)]',
+                          : 'bg-slate-50 text-slate-800 ring-1 ring-slate-200/80 hover:bg-surface hover:ring-[var(--hue)]',
                       )}
                     >
                       <span className="truncate">{c.name}</span>
-                      {!count && <span className={clsx('size-1.5 shrink-0 rounded-full', active ? 'bg-white/70' : 'bg-amber-400')} title="Program boş" />}
+                      {!count && <span className={clsx('size-1.5 shrink-0 rounded-full', active ? 'bg-surface/70' : 'bg-amber-400')} title="Program boş" />}
 
                     </button>
                     {editable &&

@@ -72,7 +72,7 @@ function ExcelImport({ file, onClose }: { file: File | null; onClose: () => void
       invalidate={['students', 'classes']}
       initialOptions={{ updateExisting: true }}
       columns={[
-        { header: 'Ad soyad', cell: (r) => <span className="font-medium whitespace-nowrap text-slate-900">{r.fullName}</span> },
+        { header: 'Ad soyad', cell: (r) => <span className="font-medium whitespace-nowrap text-ink">{r.fullName}</span> },
         { header: 'Sınıf', cell: (r) => r.className ?? '—' },
         { header: 'Doğum tarihi', cell: (r) => <span className="whitespace-nowrap">{formatDate(r.birthDate)}</span> },
       ]}
@@ -256,7 +256,7 @@ export function Students() {
           {
             header: 'Ad soyad',
             cell: (r) => (
-              <span className="flex items-center gap-2 font-semibold text-slate-900">
+              <span className="flex items-center gap-2 font-semibold text-ink">
                 {r.fullName}
                 {r.birthDate.slice(5) === todayMd && (
                   <Badge tone="amber" dot>
