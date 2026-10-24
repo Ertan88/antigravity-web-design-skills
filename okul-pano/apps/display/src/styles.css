@@ -1630,10 +1630,14 @@ p {
   text-wrap: balance;
 }
 
-/* ---------- Zil vakti: sınav sayacı yüksekliğinde, kompakt ---------- */
+/* ---------- Zil vakti: sınav sayacı yüksekliğinde ---------- */
 .bell-card {
   text-align: left;
   padding: 18px 26px 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 225px;
 }
 
 .bell-card .card-label {
@@ -1720,13 +1724,13 @@ p {
   }
 }
 
-/* Arka plan filigranları: sınav sayacında sol altta sağa yatık kum saati, zil kartında sağ altta sola yatık zil */
+/* Arka plan filigranları: sınav sayacında sol altta sağa yatık kum saati, zil kartında sağ altta sağa yatık zil */
 .card-watermark {
   position: absolute;
   pointer-events: none;
   /* Kartın kendi renk tonuyla karışmaması için yazı rengine yakın */
   color: color-mix(in srgb, var(--hue, var(--primary)) 35%, var(--text));
-  opacity: 0.13;
+  opacity: 0.09;
   z-index: 0;
 }
 
@@ -1737,13 +1741,13 @@ p {
 }
 
 .watermark-bell {
-  right: -26px;
-  bottom: -40px;
-  transform: rotate(-18deg);
+  right: -34px;
+  bottom: -44px;
+  transform: rotate(18deg);
 }
 
 .theme-light .card-watermark {
-  opacity: 0.08;
+  opacity: 0.06;
 }
 
 /* Kart içeriği filigranın üstünde kalır */

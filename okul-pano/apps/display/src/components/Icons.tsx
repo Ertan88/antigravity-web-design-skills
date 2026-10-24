@@ -117,17 +117,26 @@ export const CakeIcon = make(
     <path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1M2 21h20M7 8v3M12 8v3M17 8v3M7 4h.01M12 4h.01M17 4h.01" />
   </>,
 );
+/** Yumuşak hatlı kum saati (köşeler ve boğaz yuvarlatılmış) */
 export const HourglassIcon = make(
   <>
-    <path d="M5 22h14" />
-    <path d="M5 2h14" />
-    <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" />
-    <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" />
+    <rect x="4.5" y="1.5" width="15" height="2" rx="1" />
+    <rect x="4.5" y="20.5" width="15" height="2" rx="1" />
+    <path d="M7 3.5v2.2c0 2.6 3.6 4.4 3.6 6.3S7 15.7 7 18.3v2.2" />
+    <path d="M17 3.5v2.2c0 2.6-3.6 4.4-3.6 6.3s3.6 3.7 3.6 6.3v2.2" />
+    <path d="M9.2 19.6c.4-1.4 1.6-2.3 2.8-2.6 1.2.3 2.4 1.2 2.8 2.6z" opacity="0.6" />
   </>,
 );
 export const BellIcon = make(
   <>
     <path d="M10.268 21a2 2 0 0 0 3.464 0" />
+    <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />
+  </>,
+);
+/** Filigran için zil: içteki çan yuvarlağı çok silik */
+export const BellWatermarkIcon = make(
+  <>
+    <path d="M10.268 21a2 2 0 0 0 3.464 0" opacity="0.25" />
     <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />
   </>,
 );

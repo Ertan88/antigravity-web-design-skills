@@ -1,7 +1,7 @@
 import { formatDuration, gradeHue, periodLabel, type BellStatus, type DisplayState } from '@okulpano/shared/client';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { AutoPager } from './AutoPager.tsx';
-import { BellIcon, BookIcon, CoffeeIcon, UtensilsIcon } from './Icons.tsx';
+import { BellIcon, BellWatermarkIcon, BookIcon, CoffeeIcon, UtensilsIcon } from './Icons.tsx';
 
 function describe(status: BellStatus) {
   switch (status.kind) {
@@ -57,7 +57,7 @@ export function BellCard({ status }: { status: BellStatus }) {
 
   return (
     <section className={`card bell-card tone-${d.tone} ${urgent ? 'urgent' : ''}`}>
-      <BellIcon className="card-watermark watermark-bell" size={180} strokeWidth={1.3} />
+      <BellWatermarkIcon className="card-watermark watermark-bell" size={180} strokeWidth={1.3} />
       <div className="card-label">
         <Glyph size={22} /> Zil Vakti
         <span className="card-label-aside">{d.title}</span>
