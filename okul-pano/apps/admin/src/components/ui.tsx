@@ -18,15 +18,17 @@ import { findNav } from '../lib/nav.ts';
 
 /* ---------- Düğmeler ---------- */
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
 
 const variants: Record<Variant, string> = {
   primary:
-    'bg-gradient-to-b from-brand-500 to-brand-600 text-white shadow-[0_1px_2px_rgba(37,99,235,0.35),0_4px_12px_-4px_rgba(37,99,235,0.5),inset_0_1px_0_rgba(255,255,255,0.18)] hover:brightness-110',
+    'bg-gradient-to-b from-brand-500 to-brand-600 text-white shadow-[0_1px_2px_rgba(19,112,143,0.35),0_4px_12px_-4px_rgba(19,112,143,0.5),inset_0_1px_0_rgba(255,255,255,0.18)] hover:brightness-110',
   secondary:
     'bg-surface text-slate-700 ring-1 ring-slate-200 shadow-[0_1px_2px_rgba(15,23,42,0.05)] hover:bg-slate-50 hover:text-ink hover:ring-slate-300',
   ghost: 'text-slate-600 hover:bg-slate-100 hover:text-ink',
   danger: 'bg-gradient-to-b from-red-500 to-red-600 text-white shadow-[0_1px_2px_rgba(220,38,38,0.35)] hover:brightness-110',
+  success:
+    'bg-gradient-to-b from-emerald-500 to-emerald-600 text-white shadow-[0_1px_2px_rgba(5,150,105,0.35),0_4px_12px_-4px_rgba(5,150,105,0.5)] hover:brightness-110',
 };
 
 export function Button({
@@ -233,7 +235,7 @@ export function PageHeader({ title, description, actions }: { title: string; des
     <div className="mb-7 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div className="flex min-w-0 items-start gap-4">
         {Icon && (
-          <div className="hidden size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-indigo-600 text-white shadow-[0_8px_20px_-8px_rgba(37,99,235,0.7)] sm:flex">
+          <div className="hidden size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-600 text-white shadow-[0_8px_20px_-8px_rgba(19,112,143,0.7)] sm:flex">
             <Icon className="size-6" />
           </div>
         )}
@@ -281,7 +283,7 @@ export function Badge({ tone = 'slate', children, dot }: { tone?: keyof typeof b
 export function EmptyState({ icon, title, description, action }: { icon: ReactNode; title: string; description?: string; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center px-6 py-14 text-center">
-      <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-50 to-indigo-100 text-brand-600 ring-1 ring-brand-100">{icon}</div>
+      <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-50 to-brand-100 text-brand-600 ring-1 ring-brand-100">{icon}</div>
       <h3 className="text-base font-semibold text-ink">{title}</h3>
       {description && <p className="mt-1 max-w-sm text-sm text-slate-500">{description}</p>}
       {action && <div className="mt-5">{action}</div>}

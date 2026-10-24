@@ -1,4 +1,5 @@
 import {
+  resolveLayout,
   schoolSettingsSchema,
   upcomingMonthDays,
   zonedParts,
@@ -178,10 +179,12 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
       city: school.city,
       settings,
     },
+    layout: resolveLayout(settings, auth.screen?.layout ?? null),
     exams: examRows.map((e) => ({ ...e, examAt: e.examAt.toISOString() })),
     duties: dutyRows,
     dutySupervisors: supervisorRows,
-    holidays: holidayRows.map(({ date, name }) => ({ date, name })),
+    // Arife günleri yarım gündür (sabah ders var): panoda tatil sayılmaz
+    holidays: holidayRows.filter((h) => !(h.source === 'official' && h.name.endsWith('Arifesi'))).map(({ date, name }) => ({ date, name })),
     transportDuties: settings.hasTransport ? groupTransport(transportRows) : [],
     leaves: leaveRows,
     birthdays: birthdayRows,

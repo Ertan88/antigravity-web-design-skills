@@ -22,6 +22,7 @@ export async function screenRoutes(app: FastifyInstance) {
     lastSeenAt: s.lastSeenAt,
     online: bus.isOnline(s.id),
     hasKey: Boolean(s.tokenHash),
+    layout: s.layout ?? null,
     createdAt: s.createdAt,
   });
 
@@ -85,10 +86,12 @@ export async function screenRoutes(app: FastifyInstance) {
     const body = parse(screenSchema, req.body);
     const [updated] = await db
       .update(screens)
-      .set({ name: body.name, location: body.location ?? null })
+      .set({ name: body.name, location: body.location ?? null, ...(body.layout !== undefined ? { layout: body.layout } : {}) })
       .where(eq(screens.id, s.id))
       .returning();
     await audit(req, 'update', 'Ekran', s.id, body.name);
+    // Düzen değişince ekran yeniden veri çeker
+    if (body.layout !== undefined) bus.contentChanged(req.ctx.schoolId);
     return toPublic(updated!);
   });
 

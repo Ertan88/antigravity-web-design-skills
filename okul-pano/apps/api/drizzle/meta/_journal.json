@@ -43,6 +43,13 @@
       "when": 1792873128271,
       "tag": "0005_duty_months_holidays",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792880025209,
+      "tag": "0006_screen_layout",
+      "breakpoints": true
     }
   ]
 }

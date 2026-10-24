@@ -52,7 +52,7 @@ export function Login() {
   return (
     <div className="grid min-h-dvh lg:grid-cols-2">
       <div className="relative hidden overflow-hidden bg-slate-950 [--color-slate-300:#cbd5e1] [--color-slate-400:#94a3b8] [--color-slate-500:#64748b] lg:flex lg:flex-col lg:justify-between lg:p-12">
-        <div className="absolute inset-0 bg-[radial-gradient(800px_500px_at_0%_0%,rgba(59,130,246,0.35),transparent_60%),radial-gradient(600px_400px_at_100%_100%,rgba(245,158,11,0.18),transparent_60%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(800px_500px_at_0%_0%,rgba(31,139,173,0.4),transparent_60%),radial-gradient(600px_400px_at_100%_100%,rgba(245,158,11,0.18),transparent_60%)]" />
         <div className="relative flex items-center gap-2.5 text-white">
           <div className="flex size-9 items-center justify-center rounded-xl bg-brand-600">
             <MonitorSmartphone className="size-5" />

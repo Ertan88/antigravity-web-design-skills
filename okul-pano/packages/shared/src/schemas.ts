@@ -1,3 +1,4 @@
+import { BOARD_MODULES } from './layout.ts';
 import { z } from 'zod';
 import { validatePeriods } from './bell.ts';
 import { PERMISSION_KEYS } from './permissions.ts';
@@ -41,13 +42,19 @@ function endAfterStart(v: { startsAt?: string | null; endsAt?: string | null }, 
 
 /* ---------- Okul ve ayarlar ---------- */
 
+const boardModule = z.enum(BOARD_MODULES);
+/** Pano düzeni: sol / sağ sütundaki kartlar ve sıraları */
+export const boardLayoutSchema = z
+  .object({ left: z.array(boardModule).max(6), right: z.array(boardModule).max(6) })
+  .refine((l) => new Set([...l.left, ...l.right]).size === l.left.length + l.right.length, 'Bir kart yalnızca bir yerde olabilir');
+
 export const schoolSettingsSchema = z.object({
   /** Panoda okul adının altında ikinci satır (ör. "Mesleki ve Teknik Anadolu Lisesi"). Boşsa addan tahmin edilir. */
   schoolType: z.string().trim().max(80).default(''),
   /** Okulda taşımalı eğitim (servisle gelen öğrenci) var mı; açıksa Taşımalı Eğitim sayfası ve panodaki görevli bilgisi görünür */
   hasTransport: z.boolean().default(false),
   theme: z.enum(['dark', 'light']).default('dark'),
-  primaryColor: hexColor.default('#3b82f6'),
+  primaryColor: hexColor.default('#1f8bad'),
   accentColor: hexColor.default('#f59e0b'),
   showExams: z.boolean().default(true),
   showDuties: z.boolean().default(true),
@@ -61,6 +68,8 @@ export const schoolSettingsSchema = z.object({
   tickerSpeed: z.number().int().min(20).max(300).default(90),
   videoSound: z.boolean().default(false),
   lunchThresholdMin: z.number().int().min(10).max(180).default(30),
+  /** Okulun varsayılan pano düzeni; yoksa eski göster/gizle ayarlarından türetilir */
+  layout: boardLayoutSchema.nullable().default(null),
 });
 export type SchoolSettings = z.infer<typeof schoolSettingsSchema>;
 export const defaultSchoolSettings: SchoolSettings = schoolSettingsSchema.parse({});
@@ -332,8 +341,10 @@ export const timetableEntrySchema = z.object({
 });
 
 export const screenSchema = z.object({
-  name: required('Ekran adı', 60),
+  name: required('Pano adı', 60),
   location: optionalText(80),
+  /** Bu panoya özel düzen; null ise okulun varsayılan düzeni kullanılır */
+  layout: boardLayoutSchema.nullable().optional(),
 });
 
 export const pairScreenSchema = screenSchema.extend({

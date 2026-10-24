@@ -1,6 +1,6 @@
 import { pairScreenSchema, screenSchema } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Check, Copy, KeyRound, MonitorSmartphone, Pencil, Plus, RefreshCw, ScanEye } from 'lucide-react';
+import { Check, Copy, KeyRound, LayoutTemplate, MonitorSmartphone, Pencil, Plus, RefreshCw, ScanEye } from 'lucide-react';
 import { useState } from 'react';
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Spinner } from '../components/ui.tsx';
@@ -8,6 +8,8 @@ import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useList, useSchool, useSchoolPath, type Screen } from '../lib/data.ts';
 import { useForm } from '../lib/form.ts';
+import { Appearance, DefaultLayout } from './screens/BoardSettings.tsx';
+import { ScreenLayoutDialog } from './screens/ScreenLayoutDialog.tsx';
 import { timeAgo } from '../lib/format.ts';
 
 const DISPLAY_URL = (import.meta.env.VITE_DISPLAY_URL as string | undefined) ?? '/display/';
@@ -78,7 +80,7 @@ function AddScreen({ open, onClose }: { open: boolean; onClose: () => void }) {
     <Modal
       open={open}
       onClose={close}
-      title="Ekran ekle"
+      title="Pano ekle"
       description="TV'de pano adresini açın; ekranda görünen 6 haneli kodu buraya girin."
       footer={
         setupUrl ? (
@@ -133,7 +135,7 @@ function AddScreen({ open, onClose }: { open: boolean; onClose: () => void }) {
               )}
             </Field>
           )}
-          <Field label="Ekran adı" error={form.errors.name}>
+          <Field label="Pano adı" error={form.errors.name}>
             {(id) => <Input id={id} value={form.values.name} onChange={(e) => form.set('name', e.target.value)} placeholder="ör. Giriş Holü" invalid={Boolean(form.errors.name)} />}
           </Field>
           <Field label="Konum (isteğe bağlı)" error={form.errors.location}>
@@ -147,7 +149,7 @@ function AddScreen({ open, onClose }: { open: boolean; onClose: () => void }) {
 }
 
 export function Screens() {
-  const { schoolId } = useAuth();
+  const { schoolId, can } = useAuth();
   const path = useSchoolPath('screens');
   const qc = useQueryClient();
   const toast = useToast();
@@ -156,6 +158,10 @@ export function Screens() {
   const [adding, setAdding] = useState(false);
   const [renaming, setRenaming] = useState<Screen | null>(null);
   const [keyUrl, setKeyUrl] = useState<string | null>(null);
+  const [tab, setTab] = useState<'boards' | 'layout' | 'appearance'>('boards');
+  const [layoutFor, setLayoutFor] = useState<Screen | null>(null);
+  const editable = can('screens.manage');
+  const canSettings = can('settings.manage');
   const renameForm = useForm({ name: '', location: '' });
   const refresh = () => void qc.invalidateQueries({ queryKey: [schoolId, 'screens'] });
 
@@ -164,8 +170,8 @@ export function Screens() {
       api<{ delivered: boolean }>(`${path}/${id}/command`, { method: 'POST', body: { command } }),
     onSuccess: (r, v) =>
       r.delivered
-        ? toast.success(v.command === 'reload' ? 'Ekran yenileniyor' : 'Ekranda adı 15 saniye gösterilecek')
-        : toast.error('Ekran çevrimdışı; komut iletilemedi'),
+        ? toast.success(v.command === 'reload' ? 'Pano yenileniyor' : 'Panoda adı 15 saniye gösterilecek')
+        : toast.error('Pano çevrimdışı; komut iletilemedi'),
   });
   const rotate = useMutation({
     mutationFn: (id: string) => api<{ token: string }>(`${path}/${id}/rotate-key`, { method: 'POST' }),
@@ -175,7 +181,7 @@ export function Screens() {
     mutationFn: (id: string) => api(`${path}/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
       refresh();
-      toast.success('Ekran silindi; cihaz eşleştirme ekranına döndü');
+      toast.success('Pano silindi; cihaz eşleştirme ekranına döndü');
     },
   });
   const rename = useMutation({
@@ -192,20 +198,37 @@ export function Screens() {
   return (
     <>
       <PageHeader
-        title="Ekranlar"
-        description="Okuldaki her TV bir ekrandır. Ekranları uzaktan yenileyebilir, hangisinin hangisi olduğunu ekranda adını göstererek bulabilirsiniz."
+        title="Panolar"
+        description="Okuldaki her TV bir panodur. Panoları uzaktan yenileyebilir, adını ekranda göstererek bulabilir; kartların yerini okul geneli ya da her pano için ayrı ayarlayabilirsiniz."
         actions={
-          <Button icon={<Plus className="size-4" />} onClick={() => setAdding(true)} disabled={Boolean(max) && count >= max}>
-            Ekran ekle
-          </Button>
+          tab === 'boards' && (
+            <Button icon={<Plus className="size-4" />} onClick={() => setAdding(true)} disabled={Boolean(max) && count >= max}>
+              Pano ekle
+            </Button>
+          )
         }
       />
+      <div className="mb-5">
+        <Segmented
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'boards', label: `Panolar${count ? ` (${count})` : ''}` },
+            { value: 'layout', label: 'Pano düzeni' },
+            { value: 'appearance', label: 'Görünüm ve akış' },
+          ]}
+        />
+      </div>
+      {tab === 'layout' && <DefaultLayout editable={canSettings} />}
+      {tab === 'appearance' && <Appearance editable={canSettings} />}
+      {tab === 'boards' && (
+      <>
       {max > 0 && (
         <div className="mb-4 flex items-center gap-3 text-sm text-slate-500">
           <div className="h-2 w-40 overflow-hidden rounded-full bg-slate-200">
             <div className="h-full rounded-full bg-brand-600" style={{ width: `${Math.min(100, (count / max) * 100)}%` }} />
           </div>
-          Paketinizde {max} ekrandan {count} tanesi kullanılıyor
+          Paketinizde {max} panodan {count} tanesi kullanılıyor
         </div>
       )}
 
@@ -215,9 +238,9 @@ export function Screens() {
         <Card>
           <EmptyState
             icon={<MonitorSmartphone className="size-6" />}
-            title="Henüz ekran yok"
+            title="Henüz pano yok"
             description="TV'ye bağlı bilgisayarda ya da Raspberry Pi'de pano adresini açın, çıkan kodu girin."
-            action={<Button onClick={() => setAdding(true)}>İlk ekranı ekle</Button>}
+            action={<Button onClick={() => setAdding(true)}>İlk panoyu ekle</Button>}
           />
         </Card>
       ) : (
@@ -238,6 +261,16 @@ export function Screens() {
               </div>
               <h2 className="mt-4 font-semibold">{s.name}</h2>
               <p className="text-sm text-slate-500">{s.location ?? 'Konum belirtilmemiş'}</p>
+              <button
+                type="button"
+                onClick={() => setLayoutFor(s)}
+                disabled={!editable}
+                className="mt-3 flex items-center gap-2 self-start rounded-lg px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-ink"
+              >
+                <LayoutTemplate className="size-3.5" />
+                {s.layout ? 'Özel düzen' : 'Okulun varsayılan düzeni'}
+                <span className="text-brand-600">· Düzenle</span>
+              </button>
               <div className="mt-5 flex flex-wrap items-center gap-1 border-t border-slate-100 pt-3">
                 <Button size="sm" variant="ghost" icon={<ScanEye className="size-3.5" />} onClick={() => command.mutate({ id: s.id, command: 'identify' })}>
                   Tanımla
@@ -269,7 +302,7 @@ export function Screens() {
       <Card className="mt-8 p-5">
         <h2 className="font-semibold">Raspberry Pi / kiosk kurulumu</h2>
         <p className="mt-1 text-sm text-slate-500">
-          Ekranın açılışta panoyu tam ekran başlatması için Chromium'u kiosk modunda çalıştırın. Videoların sesli oynaması için otomatik oynatma iznini açın.
+          Panonun açılışta panoyu tam ekran başlatması için Chromium'u kiosk modunda çalıştırın. Videoların sesli oynaması için otomatik oynatma iznini açın.
         </p>
         <pre className="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-xs leading-relaxed text-[#e2e8f0]">
           {`chromium-browser --kiosk --noerrdialogs --disable-infobars \\
@@ -279,12 +312,16 @@ export function Screens() {
         </pre>
       </Card>
 
+      </>
+      )}
+
       <AddScreen open={adding} onClose={() => setAdding(false)} />
+      <ScreenLayoutDialog screen={layoutFor} onClose={() => setLayoutFor(null)} />
 
       <Modal
         open={Boolean(renaming)}
         onClose={() => setRenaming(null)}
-        title="Ekranı düzenle"
+        title="Panoyu düzenle"
         footer={
           <>
             <Button variant="secondary" onClick={() => setRenaming(null)}>
@@ -303,7 +340,7 @@ export function Screens() {
         }
       >
         <div className="space-y-4">
-          <Field label="Ekran adı" error={renameForm.errors.name}>
+          <Field label="Pano adı" error={renameForm.errors.name}>
             {(id) => <Input id={id} value={renameForm.values.name} onChange={(e) => renameForm.set('name', e.target.value)} />}
           </Field>
           <Field label="Konum">

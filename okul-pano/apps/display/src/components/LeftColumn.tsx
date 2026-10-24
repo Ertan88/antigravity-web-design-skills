@@ -99,7 +99,7 @@ export function DutyCard({
           )}
           {transport.length > 0 && (
             <div className="duty-extra duty-extra-transport">
-              <span className="duty-extra-label">Taşımalı Öğrenci Görevlisi</span>
+              <span className="duty-extra-label">Taşıma ve Öğle Yemeği Nöbetçileri</span>
               <span className="duty-extra-name">{transport.join(' · ')}</span>
             </div>
           )}

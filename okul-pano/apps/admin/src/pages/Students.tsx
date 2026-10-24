@@ -1,4 +1,4 @@
-import { normalizeClassName, studentSchema } from '@okulpano/shared';
+import { normalizeClassName, resolveLayout, studentSchema } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { Cake, ClipboardPaste, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -201,7 +201,8 @@ export function Students() {
   const now = new Date();
   const todayMd = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const needle = q.trim().toLocaleLowerCase('tr-TR');
-  const hidden = school.data && !school.data.settings.showBirthdays;
+  const layout = school.data ? resolveLayout(school.data.settings) : null;
+  const hidden = layout && ![...layout.left, ...layout.right].includes('birthdays');
 
   return (
     <>
@@ -212,7 +213,7 @@ export function Students() {
         description={
           <>
             Doğum günü olan öğrenciler o gün panoda kutlanır. Gizlilik için varsayılan olarak soyadın yalnızca baş harfi gösterilir (Ayşe Y.); bunu Okul Ayarları'ndan değiştirebilirsiniz.
-            {hidden && <span className="mt-1 block font-medium text-amber-700">Doğum günü alanı şu an Okul Ayarları'ndan gizlenmiş durumda.</span>}
+            {hidden && <span className="mt-1 block font-medium text-amber-700">Doğum günü alanı şu an pano düzeninde yok (Panolar › Pano düzeni).</span>}
           </>
         }
         permission="students.manage"

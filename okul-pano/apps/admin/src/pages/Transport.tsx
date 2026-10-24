@@ -217,11 +217,11 @@ export function Transport() {
           <EmptyState
             icon={<Bus className="size-6" />}
             title="Taşımalı eğitim kapalı"
-            description="Okulunuzda servisle gelen öğrenciler varsa Okul Ayarları'ndan taşımalı eğitimi açın; bu sayfa ve panodaki görevli bilgisi görünür olur."
+            description="Okulunuzda servisle gelen öğrenciler varsa Genel Ayarlar'dan taşımalı eğitimi açın; bu sayfa ve panodaki görevli bilgisi görünür olur."
             action={
               can('settings.manage') && (
                 <Link to="/ayarlar">
-                  <Button icon={<Settings2 className="size-4" />}>Okul Ayarları</Button>
+                  <Button icon={<Settings2 className="size-4" />}>Genel Ayarlar</Button>
                 </Link>
               )
             }

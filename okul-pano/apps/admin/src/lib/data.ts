@@ -1,4 +1,4 @@
-import type { Period, SchoolSettings } from '@okulpano/shared';
+import type { BoardLayout, Period, SchoolSettings } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './api.ts';
 import { useAuth } from './auth.tsx';
@@ -96,6 +96,8 @@ export interface Screen {
   lastSeenAt: string | null;
   online: boolean;
   hasKey: boolean;
+  /** Bu panoya özel düzen; null ise okulun varsayılanı */
+  layout: BoardLayout | null;
   createdAt: string;
 }
 export interface School {

@@ -1,19 +1,19 @@
 /** Kademe renkleri: aynı sınıf düzeyindeki tüm şubeler aynı renkte (9-A, 9-B… hepsi mavi) */
 const GRADE_HUES: Record<number, string> = {
   1: '#06b6d4',
-  2: '#a855f7',
-  3: '#ec4899',
+  2: '#3b82f6',
+  3: '#e11d48',
   4: '#f97316',
   5: '#14b8a6',
   6: '#22c55e',
   7: '#84cc16',
   8: '#eab308',
   9: '#0ea5e9',
-  10: '#8b5cf6',
+  10: '#14b8a6',
   11: '#f43f5e',
   12: '#f59e0b',
 };
-const FALLBACK_HUES = ['#0ea5e9', '#8b5cf6', '#f43f5e', '#f59e0b', '#10b981', '#ec4899'];
+const FALLBACK_HUES = ['#0ea5e9', '#14b8a6', '#f43f5e', '#f59e0b', '#10b981', '#f97316'];
 
 export function gradeHue(className: string): string {
   const name = className.trim().toLocaleLowerCase('tr-TR');

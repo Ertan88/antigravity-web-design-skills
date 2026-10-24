@@ -63,9 +63,9 @@ export const NAV: NavGroup[] = [
   {
     title: 'Yönetim',
     items: [
-      { to: '/ekranlar', label: 'Ekranlar', icon: MonitorSmartphone, permission: 'screens.manage' },
+      { to: '/ekranlar', label: 'Panolar', icon: MonitorSmartphone, permission: 'screens.manage' },
       { to: '/kullanicilar', label: 'Kullanıcılar ve Yetkiler', icon: UserCog, permission: 'users.manage' },
-      { to: '/ayarlar', label: 'Okul Ayarları', icon: Settings, permission: 'settings.manage' },
+      { to: '/ayarlar', label: 'Genel Ayarlar', icon: Settings, permission: 'settings.manage' },
       { to: '/gecmis', label: 'Etkinlik Geçmişi', icon: History, permission: 'users.manage' },
     ],
   },

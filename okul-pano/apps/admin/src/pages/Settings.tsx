@@ -4,7 +4,8 @@ import { MapPin, Search } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ImageUpload } from '../components/ImageUpload.tsx';
 import { useToast } from '../components/Toast.tsx';
-import { Alert, Button, Card, Field, Input, Segmented, Select, Spinner, Toggle } from '../components/ui.tsx';
+import { Alert, Button, Card, Field, Input, PageHeader, Spinner, Toggle } from '../components/ui.tsx';
+import { Link } from 'react-router-dom';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useSchool, useSchoolPath, type School } from '../lib/data.ts';
@@ -170,10 +171,7 @@ export function Settings() {
   const s = v.settings;
   return (
     <div className="pb-24">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Okul Ayarları</h1>
-        <p className="mt-1 text-sm text-slate-500">Panoda görünen okul bilgileri, alanların görünürlüğü ve görünüm.</p>
-      </div>
+      <PageHeader title="Genel Ayarlar" description="Okul bilgileri, konum ve modüller. Panoların görünümü ve düzeni Panolar sayfasında." />
       {form.errors._form && (
         <div className="mb-4">
           <Alert tone="red">{form.errors._form}</Alert>
@@ -228,86 +226,20 @@ export function Settings() {
           </Field>
         </Section>
 
-        <Section title="Pano alanları" description="Gizlediğiniz alan panodan kalkar, kalan alanlar boşluğu doldurur. Veriler silinmez.">
-          <Toggle checked={s.showExams} onChange={(x) => setting('showExams', x)} label="Sınav sayacı" />
-          <Toggle checked={s.showDuties} onChange={(x) => setting('showDuties', x)} label="Nöbetçi öğretmenler" />
+        <Section title="Modüller" description="Okulunuzda kullanılan isteğe bağlı bölümler.">
           <Toggle
             checked={s.hasTransport}
             onChange={(x) => setting('hasTransport', x)}
             label="Taşımalı eğitim (servisle gelen öğrenciler)"
-            description="Açıkken menüde Taşımalı Eğitim sayfası çıkar; panoda o günün servis nöbetçileri nöbet kartında görünür."
+            description="Açıkken menüde Taşımalı Eğitim sayfası çıkar; panoda o günün taşıma ve öğle yemeği nöbetçileri nöbet kartında görünür."
           />
-          <Toggle checked={s.showLeaves} onChange={(x) => setting('showLeaves', x)} label="İzinli öğretmenler" description="Yalnızca o gün izinli öğretmen varsa görünür." />
-          <Toggle checked={s.showBirthdays} onChange={(x) => setting('showBirthdays', x)} label="Doğum günü kutlamaları" description="Yalnızca o gün doğum günü olan öğrenci varsa görünür." />
-          {s.showBirthdays && (
-            <Field label="Öğrenci adlarının gösterimi" help="KVKK açısından soyadın baş harfiyle gösterim önerilir.">
-              {() => (
-                <Segmented
-                  value={s.birthdayNameFormat}
-                  onChange={(x) => setting('birthdayNameFormat', x)}
-                  options={[
-                    { value: 'initial', label: 'Ayşe Y.' },
-                    { value: 'full', label: 'Ayşe Yılmaz' },
-                  ]}
-                />
-              )}
-            </Field>
-          )}
-          <Toggle checked={s.showTimetable} onChange={(x) => setting('showTimetable', x)} label="O saatteki dersler" description="Zil sayacının altındaki sınıf / ders / öğretmen listesi." />
-        </Section>
-
-        <Section title="Görünüm" description="Okulunuzun renkleriyle uyumlu bir pano.">
-          <Field label="Tema">
-            {() => (
-              <Segmented
-                value={s.theme}
-                onChange={(x) => setting('theme', x)}
-                options={[
-                  { value: 'dark', label: 'Koyu (önerilen)' },
-                  { value: 'light', label: 'Açık' },
-                ]}
-              />
-            )}
-          </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Ana renk" error={form.errors.settings}>
-              {(id) => (
-                <div className="flex items-center gap-2">
-                  <input id={id} type="color" value={s.primaryColor} onChange={(e) => setting('primaryColor', e.target.value)} className="h-10 w-14 cursor-pointer rounded-lg border-0 bg-transparent" />
-                  <Input value={s.primaryColor} onChange={(e) => setting('primaryColor', e.target.value)} className="font-mono" aria-label="Ana renk kodu" />
-                </div>
-              )}
-            </Field>
-            <Field label="Vurgu rengi">
-              {(id) => (
-                <div className="flex items-center gap-2">
-                  <input id={id} type="color" value={s.accentColor} onChange={(e) => setting('accentColor', e.target.value)} className="h-10 w-14 cursor-pointer rounded-lg border-0 bg-transparent" />
-                  <Input value={s.accentColor} onChange={(e) => setting('accentColor', e.target.value)} className="font-mono" aria-label="Vurgu rengi kodu" />
-                </div>
-              )}
-            </Field>
-          </div>
-        </Section>
-
-        <Section title="Akış" description="Slayt ve kayan yazı hızları.">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Slayt süresi (sn)" help="Süresi girilmemiş duyurular için">
-              {(id) => <Input id={id} type="number" min={3} max={300} value={s.slideDurationSec} onChange={(e) => setting('slideDurationSec', Number(e.target.value))} />}
-            </Field>
-            <Field label="Kayan yazı hızı" help="Piksel / saniye">
-              {(id) => (
-                <Select id={id} value={s.tickerSpeed} onChange={(e) => setting('tickerSpeed', Number(e.target.value))}>
-                  <option value={60}>Yavaş</option>
-                  <option value={90}>Normal</option>
-                  <option value={130}>Hızlı</option>
-                </Select>
-              )}
-            </Field>
-            <Field label="Öğle arası eşiği (dk)" help="Bundan uzun aralar 'Öğle Arası' yazar">
-              {(id) => <Input id={id} type="number" min={10} max={180} value={s.lunchThresholdMin} onChange={(e) => setting('lunchThresholdMin', Number(e.target.value))} />}
-            </Field>
-          </div>
-          <Toggle checked={s.videoSound} onChange={(x) => setting('videoSound', x)} label="Videoları sesli oynat" description="Tarayıcıda otomatik oynatma izni gerekir (Ekranlar sayfasındaki kiosk komutu)." />
+          <p className="text-sm text-slate-500">
+            Panodaki kartların yeri, renkler ve slayt süreleri{' '}
+            <Link to="/ekranlar" className="font-semibold text-brand-700 hover:underline">
+              Panolar
+            </Link>{' '}
+            sayfasında.
+          </p>
         </Section>
       </Card>
 

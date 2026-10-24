@@ -46,7 +46,7 @@ function SchoolSwitcher() {
 function SchoolBadge({ name, logo }: { name: string; logo: string | null }) {
   if (logo) return <img src={logo} alt="" className="size-10 shrink-0 rounded-xl bg-surface object-contain p-0.5" />;
   return (
-    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-indigo-600 text-sm font-bold text-white shadow-md shadow-brand-600/30">
+    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 text-sm font-bold text-white shadow-md shadow-brand-600/30">
       {name.trim().charAt(0).toLocaleUpperCase('tr-TR') || <School className="size-4" />}
     </div>
   );
@@ -78,7 +78,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       <div className="pointer-events-none absolute -top-28 -left-28 size-72 rounded-full bg-brand-500/10 blur-3xl" />
 
       <div className="relative flex items-center gap-2.5 px-5 pt-5 pb-4">
-        <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-indigo-600 text-white shadow-md shadow-brand-600/30">
+        <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 text-white shadow-md shadow-brand-600/30">
           <MonitorSmartphone className="size-[18px]" />
         </div>
         <div className="leading-tight">
@@ -124,7 +124,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       <div className="relative border-t border-slate-200/70 p-3">
         <div className="flex items-center gap-1">
           <NavLink to="/hesap" onClick={onNavigate} className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl px-2 py-2 transition hover:bg-slate-100">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-indigo-600 text-xs font-bold text-white ring-2 ring-surface">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-600 text-xs font-bold text-white ring-2 ring-surface">
               {initials(me?.user.fullName)}
             </div>
             <div className="min-w-0 flex-1">

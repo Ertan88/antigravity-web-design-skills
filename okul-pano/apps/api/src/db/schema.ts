@@ -1,4 +1,4 @@
-import type { Period, SchoolSettings } from '@okulpano/shared';
+import type { BoardLayout, Period, SchoolSettings } from '@okulpano/shared';
 import { sql } from 'drizzle-orm';
 import {
   boolean,
@@ -338,6 +338,8 @@ export const screens = pgTable(
     location: text('location'),
     tokenHash: text('token_hash').unique(),
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+    /** Bu panoya özel kart düzeni; null ise okulun varsayılanı */
+    layout: jsonb('layout').$type<BoardLayout>(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

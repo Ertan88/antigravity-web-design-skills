@@ -1,4 +1,6 @@
 import {
+  resolveLayout,
+  type BoardModule,
   computeBellStatus,
   isBirthdayToday,
   isWithinWindow,
@@ -6,7 +8,7 @@ import {
   pickSchedule,
   zonedParts,
 } from '@okulpano/shared/client';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { DisplayAuth } from './api.ts';
 import { Header } from './components/Header.tsx';
 import { MonitorIcon, WifiOffIcon } from './components/Icons.tsx';
@@ -64,8 +66,42 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
     ? state.timetable.filter((e) => e.weekday === today.weekday && e.periodNo === lessonPeriod.no)
     : [];
 
-  const showLeft =
-    (s.showExams && state.exams.length > 0) || s.showDuties || (s.showLeaves && leaves.length > 0) || (s.showBirthdays && birthdays.length > 0);
+  // Kartlar panonun düzenine göre (panoya özel ya da okulun) sol / sağ sütuna yerleşir
+  const layout = state.layout ?? resolveLayout(s);
+  const renderModule = (m: BoardModule): ReactNode => {
+    switch (m) {
+      case 'exams':
+        return state.exams.length > 0 ? <ExamCard key={m} exams={state.exams} now={now} timezone={school.timezone} /> : null;
+      case 'duties':
+        return (
+          <DutyCard
+            key={m}
+            duties={duties}
+            supervisor={(state.dutySupervisors ?? []).find((x) => x.date === today.isoDate)?.name ?? null}
+            transport={(state.transportDuties ?? []).find((x) => x.date === today.isoDate)?.teacherNames ?? []}
+            holiday={(state.holidays ?? []).find((x) => x.date === today.isoDate)?.name ?? null}
+          />
+        );
+      case 'leaves':
+        return leaves.length > 0 ? <LeaveCard key={m} leaves={leaves} /> : null;
+      case 'birthdays':
+        return birthdays.length > 0 ? <BirthdayCard key={m} birthdays={birthdays} nameFormat={s.birthdayNameFormat} /> : null;
+      case 'bell':
+        return <BellCard key={m} status={bell} />;
+      case 'lessons':
+        return lessonPeriod ? (
+          <LessonsCard
+            key={m}
+            entries={lessons}
+            heading={bell.kind === 'lesson' ? 'Şu An Derste' : 'Sıradaki Ders'}
+            periodTitle={bell.kind === 'lesson' ? periodLabel(lessonPeriod) : `${periodLabel(lessonPeriod)} · ${lessonPeriod.start}`}
+          />
+        ) : null;
+    }
+  };
+  const leftCards = layout.left.map(renderModule).filter(Boolean);
+  const rightCards = layout.right.map(renderModule).filter(Boolean);
+
   const mourning = today.monthDay === '11-10';
   const silenceMinute = mourning && today.hour === 9 && (today.minute === 5 || today.minute === 6);
 
@@ -89,19 +125,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
       />
 
       <main className="body">
-        {showLeft && (
-          <aside className="col col-left">
-            {s.showExams && <ExamCard exams={state.exams} now={now} timezone={school.timezone} />}
-            {s.showDuties && <DutyCard
-                duties={duties}
-                supervisor={(state.dutySupervisors ?? []).find((x) => x.date === today.isoDate)?.name ?? null}
-                transport={(state.transportDuties ?? []).find((x) => x.date === today.isoDate)?.teacherNames ?? []}
-                holiday={(state.holidays ?? []).find((x) => x.date === today.isoDate)?.name ?? null}
-              />}
-            {s.showLeaves && leaves.length > 0 && <LeaveCard leaves={leaves} />}
-            {s.showBirthdays && birthdays.length > 0 && <BirthdayCard birthdays={birthdays} nameFormat={s.birthdayNameFormat} />}
-          </aside>
-        )}
+        {leftCards.length > 0 && <aside className="col col-left">{leftCards}</aside>}
 
         <Slideshow
           announcements={state.announcements}
@@ -112,16 +136,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
           logoUrl={school.logoUrl}
         />
 
-        <aside className="col col-right">
-          <BellCard status={bell} />
-          {s.showTimetable && lessonPeriod && (
-            <LessonsCard
-              entries={lessons}
-              heading={bell.kind === 'lesson' ? 'Şu An Derste' : 'Sıradaki Ders'}
-              periodTitle={bell.kind === 'lesson' ? periodLabel(lessonPeriod) : `${periodLabel(lessonPeriod)} · ${lessonPeriod.start}`}
-            />
-          )}
-        </aside>
+        {rightCards.length > 0 && <aside className="col col-right">{rightCards}</aside>}
       </main>
 
       <Ticker items={ticker.length ? ticker : [`${school.name} · İyi dersler dileriz`]} speed={s.tickerSpeed} />

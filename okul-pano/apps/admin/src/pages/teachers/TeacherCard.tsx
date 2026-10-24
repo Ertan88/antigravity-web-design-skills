@@ -8,11 +8,11 @@ const PALETTE = [
   'bg-emerald-100 text-emerald-700',
   'bg-amber-100 text-amber-800',
   'bg-rose-100 text-rose-700',
-  'bg-violet-100 text-violet-700',
+  'bg-sky-100 text-sky-700',
   'bg-cyan-100 text-cyan-800',
   'bg-lime-100 text-lime-800',
   'bg-orange-100 text-orange-800',
-  'bg-fuchsia-100 text-fuchsia-700',
+  'bg-teal-100 text-teal-800',
   'bg-teal-100 text-teal-800',
 ];
 

@@ -59,13 +59,13 @@ export function BellCard({ status }: { status: BellStatus }) {
     <section className={`card bell-card tone-${d.tone} ${urgent ? 'urgent' : ''}`}>
       <div className="card-label">
         <Glyph size={22} /> Zil Vakti
+        <span className="card-label-aside">{d.title}</span>
       </div>
-      <div className="bell-title">{d.title}</div>
       {d.remaining != null ? (
-        <>
-          <div className="bell-caption">{d.caption}</div>
+        <div className="bell-main">
           <div className="bell-countdown">{formatDuration(d.remaining)}</div>
-        </>
+          <div className="bell-caption">{d.caption}</div>
+        </div>
       ) : (
         <div className="bell-caption bell-caption-lg">{d.caption}</div>
       )}
@@ -74,8 +74,12 @@ export function BellCard({ status }: { status: BellStatus }) {
           <div style={{ width: `${Math.min(100, d.progress * 100)}%` }} />
         </div>
       )}
-      {d.range && <div className="bell-range">{d.range}</div>}
-      {d.next && <div className="bell-next">{d.next}</div>}
+      {(d.range || d.next) && (
+        <div className="bell-foot">
+          {d.range && <span className="bell-range">{d.range}</span>}
+          {d.next && <span className="bell-next">{d.next}</span>}
+        </div>
+      )}
     </section>
   );
 }

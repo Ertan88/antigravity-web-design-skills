@@ -76,7 +76,7 @@ function Editor({ form }: { form: ReturnType<typeof useForm<Form>> }) {
               <Field label="Öğle arası (dk)">{(id) => <Input id={id} type="number" min={0} max={120} value={gen.lunchMin} onChange={(e) => setGen({ ...gen, lunchMin: Number(e.target.value) })} />}</Field>
             </div>
             <Button
-              variant="secondary"
+              variant="success"
               icon={<Wand2 className="size-4" />}
               onClick={() => {
                 set('periods', generatePeriods({ ...gen, lunchAfter: gen.lunchAfter || null }));
@@ -161,12 +161,13 @@ export function BellSchedules() {
   const form = useForm<Form>({ name: '', weekdays: [1, 2, 3, 4, 5], periods: [] });
   const [editing, setEditing] = useState<BellSchedule | null>(null);
   const [open, setOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const now = useNow();
+  // Seçili gün: o gün geçerli olan çizelge gösterilir (varsayılan bugün, hafta sonuysa pazartesi)
+  const [day, setDay] = useState(() => (now.weekday <= 5 ? now.weekday : 1));
+  // Belirli bir çizelge sekmesinden seçilmişse o gösterilir
+  const [forcedId, setForcedId] = useState<string | null>(null);
   const schedules = list.data ?? [];
-  // Varsayılan: bugün geçerli olan çizelge, yoksa ilki
-  const selected =
-    schedules.find((x) => x.id === selectedId) ?? pickSchedule(schedules, now.weekday) ?? schedules[0] ?? null;
+  const selected = schedules.find((x) => x.id === forcedId) ?? pickSchedule(schedules, day) ?? null;
 
   const covered = new Set((list.data ?? []).flatMap((s) => s.weekdays));
   // Aynı günü kapsayan çizelgeler: daha özel olan (az günlü) o gün geçerlidir
@@ -237,13 +238,39 @@ export function BellSchedules() {
           <div className="flex flex-col gap-4 rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-slate-200/70 lg:flex-row lg:items-center">
             {schedules.length > 1 && (
               <div className="shrink-0">
-                <Segmented value={selected?.id ?? ''} onChange={setSelectedId} options={schedules.map((x) => ({ value: x.id, label: x.name }))} />
+                <Segmented
+                  value={selected?.id ?? ''}
+                  onChange={(id) => {
+                    setForcedId(id);
+                    const first = schedules.find((x) => x.id === id)?.weekdays.find((d) => pickSchedule(schedules, d)?.id === id);
+                    if (first) setDay(first);
+                  }}
+                  options={schedules.map((x) => ({ value: x.id, label: x.name }))}
+                />
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <WeekCoverage schedules={schedules} selectedId={selected?.id ?? null} today={now.weekday} onSelect={setSelectedId} />
+              <WeekCoverage
+                schedules={schedules}
+                day={day}
+                today={now.weekday}
+                onDay={(d) => {
+                  setDay(d);
+                  setForcedId(null);
+                }}
+              />
             </div>
           </div>
+          {!selected && (
+            <Card>
+              <EmptyState
+                icon={<BellRing className="size-6" />}
+                title={`${WEEKDAY_NAMES[day]} için zil çizelgesi yok`}
+                description="Bu gün ders yapılıyorsa bir çizelge oluşturun ya da mevcut çizelgeyi bu güne kopyalayın."
+                action={editable && <Button onClick={() => openEditor(null)}>Çizelge oluştur</Button>}
+              />
+            </Card>
+          )}
           {selected && (
             <ScheduleView
               key={selected.id}
@@ -254,7 +281,7 @@ export function BellSchedules() {
               onCopy={() => openCopy(selected)}
               onDelete={() => {
                 ops.remove.mutate(selected.id);
-                setSelectedId(null);
+                setForcedId(null);
               }}
             />
           )}

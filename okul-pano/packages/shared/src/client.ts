@@ -13,3 +13,4 @@ export * from './youtube.ts';
 export type { SchoolSettings } from './schemas.ts';
 export * from './grade.ts';
 export * from './holidays.ts';
+export * from './layout.ts';

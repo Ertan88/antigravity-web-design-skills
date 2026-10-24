@@ -49,40 +49,54 @@ export function useNow() {
 /** Haftanın 7 günü ve her güne düşen çizelge (panoda da aynı kural: listede ilk eşleşen) */
 export function WeekCoverage({
   schedules,
-  selectedId,
+  day,
   today,
-  onSelect,
+  onDay,
 }: {
   schedules: BellSchedule[];
-  selectedId: string | null;
+  /** Seçili gün */
+  day: number;
   today: number;
-  onSelect: (id: string) => void;
+  onDay: (d: number) => void;
 }) {
   // Hafta sonu yalnızca bir çizelgede seçiliyse gösterilir
   const days = [1, 2, 3, 4, 5, ...[6, 7].filter((d) => schedules.some((x) => x.weekdays.includes(d)))];
   return (
-    <div className={clsx('grid gap-1.5', days.length === 7 ? 'grid-cols-7' : days.length === 6 ? 'grid-cols-6' : 'grid-cols-5')}>
+    <div className={clsx('grid gap-1.5 sm:gap-2', days.length === 7 ? 'grid-cols-7' : days.length === 6 ? 'grid-cols-6' : 'grid-cols-5')}>
       {days.map((d) => {
         const s = pickSchedule(schedules, d);
+        const sorted = s ? sortPeriods(s.periods) : [];
+        const active = d === day;
         return (
           <button
             key={d}
             type="button"
-            disabled={!s}
-            onClick={() => s && onSelect(s.id)}
+            onClick={() => onDay(d)}
             className={clsx(
-              'min-w-0 rounded-xl px-2 py-2 text-left ring-1 transition-colors',
-              s && s.id === selectedId ? 'bg-brand-50 ring-brand-300' : s ? 'bg-surface ring-slate-200 hover:bg-slate-50' : 'bg-slate-50 ring-slate-100',
+              'min-w-0 rounded-2xl px-2 py-2.5 text-left transition sm:px-3',
+              active
+                ? 'bg-gradient-to-br from-brand-500 to-brand-600 text-white shadow-[0_10px_24px_-12px_rgba(19,112,143,0.8)]'
+                : 'bg-slate-50 ring-1 ring-slate-200/80 hover:bg-surface hover:ring-brand-200',
             )}
           >
-            <div className={clsx('flex items-center gap-1 text-xs font-semibold', d === today ? 'text-brand-700' : 'text-slate-500')}>
+            <div className={clsx('flex items-center gap-1 text-xs font-semibold', active ? 'text-white/85' : d === today ? 'text-brand-700' : 'text-slate-500')}>
               <span className="sm:hidden">{WEEKDAY_SHORT[d]}</span>
               <span className="hidden sm:inline">{WEEKDAY_NAMES[d]}</span>
-              {d === today && <span className="size-1.5 rounded-full bg-brand-500" />}
+              {d === today && <span className={clsx('size-1.5 rounded-full', active ? 'bg-white' : 'bg-brand-500')} title="Bugün" />}
             </div>
-            <div className={clsx('mt-0.5 truncate text-xs sm:text-sm', s ? 'font-medium text-ink' : 'text-slate-400')}>
-              {s ? s.name : 'Ders yok'}
-            </div>
+            {s && sorted.length ? (
+              <>
+                <div className={clsx('mt-0.5 truncate text-sm font-bold tabular-nums', active ? 'text-white' : 'text-ink')}>
+                  {sorted[0]!.start}
+                  <span className="hidden sm:inline">–{sorted[sorted.length - 1]!.end}</span>
+                </div>
+                <div className={clsx('hidden truncate text-[11px] sm:block', active ? 'text-white/75' : 'text-slate-500')}>
+                  {sorted.length} ders · {s.name}
+                </div>
+              </>
+            ) : (
+              <div className={clsx('mt-0.5 text-sm', active ? 'text-white/80' : 'text-slate-400')}>Ders yok</div>
+            )}
           </button>
         );
       })}
@@ -147,7 +161,9 @@ export function ScheduleView({
   const ticks: number[] = [];
   for (let h = Math.ceil(dayStart / 3600) * 3600; h <= dayEnd; h += 3600) ticks.push(h);
 
-  const gapAfter = (lesson: Segment) => gaps.find((g) => g.start === lesson.end);
+  // Öğle arası varsa gün iki parçada gösterilir (öğle arası ilk parçanın sonunda kalır)
+  const lunchIndex = segs.findIndex((x) => x.kind === 'lunch');
+  const halves = lunchIndex > 0 ? [segs.slice(0, lunchIndex + 1), segs.slice(lunchIndex + 1)].filter((h) => h.length) : [segs];
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -204,54 +220,87 @@ export function ScheduleView({
           </div>
         </div>
 
-        {/* Ders kutuları */}
-        <ol className="grid grid-cols-2 gap-2.5 p-4 sm:grid-cols-[repeat(auto-fill,minmax(12.5rem,1fr))] sm:gap-3 sm:p-6">
-          {lessons.map((s) => {
-            const active = activeStart === s.start && status?.kind === 'lesson';
-            const gap = gapAfter(s);
-            const gapActive = gap && activeStart === gap.start && status?.kind === 'break';
-            return (
-              <li
-                key={s.start}
-                className={clsx(
-                  'relative min-w-0 overflow-hidden rounded-xl p-3 ring-1 transition-colors sm:p-4',
-                  active ? 'bg-brand-600 text-white shadow-md ring-brand-600' : 'bg-slate-50/60 ring-slate-200',
-                )}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className={clsx('truncate text-base font-extrabold', active ? 'text-white' : 'text-brand-600')}>{periodLabel(s.period)}</span>
-                  {active ? (
-                    <span className="shrink-0 rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-semibold">Şu an</span>
-                  ) : (
-                    <span className="shrink-0 text-xs font-medium text-slate-400">{duration(s.end - s.start)}</span>
-                  )}
+        {/* Günün akışı: dikey zaman çizelgesi; öğle arası varsa sabah / öğleden sonra iki sütun */}
+        <div className={clsx('grid gap-x-8 p-4 sm:p-6', halves.length > 1 && 'lg:grid-cols-2')}>
+          {halves.map((half, hi) => (
+            <div key={hi} className="min-w-0">
+              {halves.length > 1 && (
+                <div className="mb-3 flex items-center gap-2 text-xs font-semibold tracking-wider text-slate-400 uppercase">
+                  {hi === 0 ? <Sunrise className="size-4" /> : <Sunset className="size-4" />}
+                  {hi === 0 ? 'Sabah' : 'Öğleden sonra'}
+                  <span className="font-medium tracking-normal normal-case">
+                    · {clock(half[0]!.start)}–{clock(half[half.length - 1]!.end)}
+                  </span>
                 </div>
-                <div className={clsx('text-[15px] font-bold tabular-nums sm:text-lg', active ? 'text-white' : 'text-ink')}>
-                  {s.period.start} – {s.period.end}
-                </div>
-                {gap && (
-                  <div
-                    className={clsx(
-                      'mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold',
-                      gap.kind === 'lunch'
-                        ? active
-                          ? 'bg-amber-300 text-amber-950'
-                          : 'bg-amber-50 text-amber-700 ring-1 ring-amber-200'
-                        : active
-                          ? 'bg-white/20 text-white'
-                          : 'bg-emerald-50 text-emerald-700',
-                      gapActive && 'ring-2 ring-emerald-500',
-                    )}
-                  >
-                    {gap.kind === 'lunch' ? <Utensils className="size-3" /> : <Coffee className="size-3" />}
-                    {gap.kind === 'lunch' ? 'Öğle' : 'Teneffüs'} {duration(gap.end - gap.start)}
-                    {gapActive && ' · şu an'}
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ol>
+              )}
+              <ol>
+                {half.map((seg, i) => {
+                  if (seg.kind !== 'lesson') {
+                    const gapActive = activeStart === seg.start && status?.kind === 'break';
+                    return (
+                      <li key={`g${seg.start}`} className="grid grid-cols-[4.5rem_1.5rem_1fr] items-center">
+                        <span />
+                        <span className="flex h-9 justify-center">
+                          <span className={clsx('w-0.5 border-l-2 border-dashed', seg.kind === 'lunch' ? 'border-amber-300' : 'border-emerald-300')} />
+                        </span>
+                        <span
+                          className={clsx(
+                            'inline-flex items-center gap-1.5 justify-self-start rounded-full px-2.5 py-0.5 text-xs font-semibold',
+                            seg.kind === 'lunch' ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' : 'bg-emerald-50 text-emerald-700',
+                            gapActive && 'ring-2 ring-emerald-500',
+                          )}
+                        >
+                          {seg.kind === 'lunch' ? <Utensils className="size-3" /> : <Coffee className="size-3" />}
+                          {seg.kind === 'lunch' ? 'Öğle arası' : 'Teneffüs'} · {duration(seg.end - seg.start)}
+                          {gapActive && ' · şu an'}
+                        </span>
+                      </li>
+                    );
+                  }
+                  const active = activeStart === seg.start && status?.kind === 'lesson';
+                  const progress = active && status?.kind === 'lesson' ? 1 - status.remainingSec / status.totalSec : null;
+                  return (
+                    <li key={seg.start} className="grid grid-cols-[4.5rem_1.5rem_1fr] items-stretch">
+                      <span className="flex flex-col justify-center pr-3 text-right tabular-nums">
+                        <span className={clsx('text-base font-bold', active ? 'text-brand-600' : 'text-ink')}>{seg.period.start}</span>
+                        <span className="text-xs text-slate-400">{seg.period.end}</span>
+                      </span>
+                      <span className="relative flex justify-center">
+                        <span className="absolute w-0.5 bg-slate-200" style={{ top: i === 0 ? '50%' : 0, bottom: i === half.length - 1 ? '50%' : 0 }} />
+                        <span
+                          className={clsx(
+                            'relative z-10 my-auto size-3.5 rounded-full ring-4 ring-surface',
+                            active ? 'bg-brand-500' : status && seg.end <= now.sec && isToday ? 'bg-slate-300' : 'bg-brand-300',
+                          )}
+                        />
+                      </span>
+                      <span
+                        className={clsx(
+                          'my-1 flex min-w-0 items-center gap-3 rounded-xl px-4 py-2.5 ring-1 transition',
+                          active ? 'bg-brand-600 text-white shadow-md ring-brand-600' : 'bg-slate-50/70 ring-slate-200/80',
+                        )}
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className={clsx('block truncate text-[15px] font-bold', active ? 'text-white' : 'text-ink')}>{periodLabel(seg.period)}</span>
+                          {progress !== null && (
+                            <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-white/25">
+                              <span className="block h-full rounded-full bg-white" style={{ width: `${progress * 100}%` }} />
+                            </span>
+                          )}
+                        </span>
+                        {active ? (
+                          <span className="shrink-0 rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-semibold">Şu an</span>
+                        ) : (
+                          <span className="shrink-0 text-xs font-medium text-slate-400">{duration(seg.end - seg.start)}</span>
+                        )}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* Yan panel */}
@@ -259,7 +308,7 @@ export function ScheduleView({
         <div
           className={clsx(
             'rounded-2xl p-5 text-white shadow-sm',
-            status?.kind === 'break' ? 'bg-gradient-to-br from-emerald-500 to-teal-600' : 'bg-gradient-to-br from-brand-600 to-indigo-600',
+            status?.kind === 'break' ? 'bg-gradient-to-br from-emerald-500 to-teal-600' : 'bg-gradient-to-br from-brand-500 to-brand-600',
           )}
         >
           <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-white/75 uppercase">

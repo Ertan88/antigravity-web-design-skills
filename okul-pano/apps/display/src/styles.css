@@ -5,7 +5,7 @@
  */
 
 :root {
-  --primary: #3b82f6;
+  --primary: #1f8bad;
   --accent: #f59e0b;
   --danger: #ef4444;
   --radius: 22px;
@@ -119,17 +119,7 @@ p {
   position: relative;
 }
 
-.header::after {
-  content: '';
-  position: absolute;
-  left: 36px;
-  right: 36px;
-  bottom: 0;
-  height: 3px;
-  border-radius: 3px;
-  background: linear-gradient(90deg, var(--primary), #8b5cf6 30%, #ec4899 55%, var(--accent) 80%, #10b981);
-  opacity: 0.85;
-}
+
 
 .day-national .header::before {
   content: '';
@@ -155,13 +145,13 @@ p {
   border-radius: 22px;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 28%, transparent), color-mix(in srgb, #8b5cf6 24%, transparent));
+  background: color-mix(in srgb, var(--primary) 24%, transparent);
   border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
   overflow: hidden;
 }
 
 .theme-light .school-badge {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 14%, white), color-mix(in srgb, #8b5cf6 12%, white));
+  background: color-mix(in srgb, var(--primary) 12%, white);
 }
 
 .school-logo {
@@ -1328,15 +1318,15 @@ p {
  * Ana / vurgu rengi okul ayarlarından gelir; diğer tonlar sabit, uyumlu bir paletten.
  */
 
-.exam-card { --hue: #8b5cf6; --hue-2: #6366f1; }
-.duty-card { --hue: #14b8a6; --hue-2: #0ea5e9; }
-.leave-card { --hue: #f43f5e; --hue-2: #fb7185; }
-.birthday-card { --hue: #f59e0b; --hue-2: #ec4899; }
+.exam-card { --hue: var(--primary); --hue-2: var(--primary); }
+.duty-card { --hue: #14b8a6; --hue-2: #14b8a6; }
+.leave-card { --hue: #f43f5e; --hue-2: #f43f5e; }
+.birthday-card { --hue: var(--accent); --hue-2: var(--accent); }
 .bell-card.tone-lesson,
-.bell-card.tone-idle { --hue: var(--primary); --hue-2: #8b5cf6; }
+.bell-card.tone-idle { --hue: var(--primary); --hue-2: var(--primary); }
 .bell-card.tone-break,
-.bell-card.tone-lunch { --hue: #10b981; --hue-2: #84cc16; }
-.lessons-card { --hue: #0ea5e9; --hue-2: #6366f1; }
+.bell-card.tone-lunch { --hue: #10b981; --hue-2: #10b981; }
+.lessons-card { --hue: var(--primary); --hue-2: var(--primary); }
 
 .card[class*='-card'] {
   border-color: color-mix(in srgb, var(--hue, var(--primary)) 28%, transparent);
@@ -1418,16 +1408,9 @@ p {
   background: color-mix(in srgb, var(--row-hue, var(--hue)) 16%, transparent);
 }
 
-/* Satır tonları: ders ve nöbet listelerinde sırayla dönen renkler */
-.pager-row:nth-child(6n + 1) { --row-hue: #0ea5e9; }
-.pager-row:nth-child(6n + 2) { --row-hue: #8b5cf6; }
-.pager-row:nth-child(6n + 3) { --row-hue: #f43f5e; }
-.pager-row:nth-child(6n + 4) { --row-hue: #f59e0b; }
-.pager-row:nth-child(6n + 5) { --row-hue: #10b981; }
-.pager-row:nth-child(6n + 6) { --row-hue: #ec4899; }
 
 .lesson-class {
-  background: linear-gradient(140deg, var(--row-hue, var(--primary)), color-mix(in srgb, var(--row-hue, var(--primary)) 65%, #1e1b4b));
+  background: var(--row-hue, var(--primary));
   color: #fff;
   box-shadow: 0 4px 14px color-mix(in srgb, var(--row-hue, var(--primary)) 30%, transparent);
 }
@@ -1444,8 +1427,8 @@ p {
 
 /* Doğum günü: sıcak degrade */
 .birthday-card .pager-chip {
-  background: linear-gradient(135deg, color-mix(in srgb, #f59e0b 18%, transparent), color-mix(in srgb, #ec4899 14%, transparent));
-  border-color: color-mix(in srgb, #f59e0b 32%, transparent);
+  background: color-mix(in srgb, var(--hue) 15%, transparent);
+  border-color: color-mix(in srgb, var(--hue) 30%, transparent);
 }
 
 /* Zil sayacı: büyük rakamlar degrade */
@@ -1468,13 +1451,13 @@ p {
 /* Slayt alt yazısı: renkli kenar */
 .slide-caption {
   border-left: 6px solid transparent;
-  border-image: linear-gradient(180deg, var(--primary), #8b5cf6, #ec4899) 1;
+  border-left-color: var(--primary);
 }
 
 /* Kayan yazı */
 .footer {
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--primary) 14%, transparent), color-mix(in srgb, #8b5cf6 10%, transparent) 50%, color-mix(in srgb, var(--accent) 12%, transparent)),
+    linear-gradient(90deg, color-mix(in srgb, var(--primary) 12%, transparent), transparent 60%),
     var(--panel-strong);
   border-top: 0;
   position: relative;
@@ -1485,17 +1468,13 @@ p {
   position: absolute;
   inset: 0 0 auto 0;
   height: 3px;
-  background: linear-gradient(90deg, var(--primary), #8b5cf6, #ec4899, var(--accent), #10b981);
+  background: color-mix(in srgb, var(--primary) 60%, transparent);
 }
 
 .ticker-label {
-  background: linear-gradient(120deg, var(--primary), #8b5cf6 70%, #ec4899);
+  background: var(--primary);
 }
 
-.ticker-item:nth-child(4n + 1)::after { background: #f59e0b; }
-.ticker-item:nth-child(4n + 2)::after { background: #ec4899; }
-.ticker-item:nth-child(4n + 3)::after { background: #10b981; }
-.ticker-item:nth-child(4n + 4)::after { background: #0ea5e9; }
 
 .duty-extra-transport .duty-extra-name {
   white-space: normal;
@@ -1649,4 +1628,94 @@ p {
   font-weight: 800;
   line-height: 1.15;
   text-wrap: balance;
+}
+
+/* ---------- Zil vakti: sınav sayacı yüksekliğinde, kompakt ---------- */
+.bell-card {
+  text-align: left;
+  padding: 18px 26px 18px;
+}
+
+.bell-card .card-label {
+  justify-content: flex-start;
+  margin-bottom: 6px;
+}
+
+.bell-main {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.bell-card .bell-countdown {
+  font-size: 64px;
+  margin: 0;
+  line-height: 1.05;
+}
+
+.bell-card .bell-caption {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.bell-card .bell-caption-lg {
+  font-size: 24px;
+  margin: 6px 0 4px;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.bell-card .bell-progress {
+  margin: 12px 0 0;
+  height: 10px;
+}
+
+.bell-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.bell-card .bell-range {
+  margin: 0;
+  font-size: 18px;
+}
+
+.bell-card .bell-next {
+  margin: 0;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* İlerleme çubuğu: dolu kısmın başından ucuna doğru tekrar tekrar akan parıltı */
+.bell-progress div {
+  position: relative;
+  overflow: hidden;
+}
+
+.bell-progress div::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.75), transparent);
+  transform: translateX(-120%);
+  animation: progress-shine 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes progress-shine {
+  0% {
+    left: 0;
+    transform: translateX(-120%);
+  }
+  85%,
+  100% {
+    left: 100%;
+    transform: translateX(0);
+  }
 }

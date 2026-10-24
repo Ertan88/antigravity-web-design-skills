@@ -1,4 +1,4 @@
-import { leaveSchema } from '@okulpano/shared';
+import { leaveSchema, resolveLayout } from '@okulpano/shared';
 import { UserMinus } from 'lucide-react';
 import { useState } from 'react';
 import { CrudPage } from '../components/CrudPage.tsx';
@@ -14,7 +14,8 @@ export function Leaves() {
   const school = useSchool();
   const names = nameMap(teachers.data, (t) => t.fullName);
   const today = todayIso();
-  const hidden = school.data && !school.data.settings.showLeaves;
+  const layout = school.data ? resolveLayout(school.data.settings) : null;
+  const hidden = layout && ![...layout.left, ...layout.right].includes('leaves');
 
   return (
     <CrudPage<Leave, Form>
@@ -24,7 +25,7 @@ export function Leaves() {
       description={
         <>
           İzin tarihleri içinde öğretmenin adı panonun sol sütununda görünür. İzin nedeni yalnızca panelde saklanır, panoda gösterilmez.
-          {hidden && <span className="mt-1 block font-medium text-amber-700">Bu alan şu an Okul Ayarları'ndan gizlenmiş durumda.</span>}
+          {hidden && <span className="mt-1 block font-medium text-amber-700">Bu alan şu an pano düzeninde yok (Panolar › Pano düzeni).</span>}
         </>
       }
       permission="leaves.manage"
