@@ -5,7 +5,8 @@
   "type": "module",
   "description": "API, yönetim paneli, pano ve ileride mobil uygulamanın ortak kullandığı tipler, doğrulama şemaları ve zil motoru",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
   },
   "scripts": {
     "test": "vitest run",

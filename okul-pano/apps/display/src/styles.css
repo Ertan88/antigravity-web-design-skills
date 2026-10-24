@@ -1,0 +1,1158 @@
+/*
+ * Okul Pano · Ekran
+ * 1920x1080 tuval, 3-5 metreden okunacak şekilde ölçülendirilmiştir.
+ * Gövde metni >= 22px, başlıklar >= 34px, sayaç rakamları sabit genişlikli (tabular).
+ */
+
+:root {
+  --primary: #3b82f6;
+  --accent: #f59e0b;
+  --danger: #ef4444;
+  --radius: 22px;
+  --gap: 22px;
+  --header-h: 116px;
+  --footer-h: 74px;
+  --col-w: 440px;
+  font-family: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+.theme-dark {
+  --bg: #080e1c;
+  --bg-glow-1: color-mix(in srgb, var(--primary) 22%, transparent);
+  --bg-glow-2: color-mix(in srgb, var(--accent) 10%, transparent);
+  --panel: rgba(255, 255, 255, 0.045);
+  --panel-strong: rgba(255, 255, 255, 0.075);
+  --border: rgba(255, 255, 255, 0.09);
+  --text: #f1f5f9;
+  --muted: #9aa8bd;
+  --faint: #5f6f87;
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  --chip-bg: color-mix(in srgb, var(--primary) 22%, transparent);
+  --chip-text: color-mix(in srgb, var(--primary) 35%, white);
+}
+
+.theme-light {
+  --bg: #eef2f7;
+  --bg-glow-1: color-mix(in srgb, var(--primary) 12%, transparent);
+  --bg-glow-2: color-mix(in srgb, var(--accent) 8%, transparent);
+  --panel: #ffffff;
+  --panel-strong: #f6f8fb;
+  --border: rgba(15, 23, 42, 0.08);
+  --text: #0b1324;
+  --muted: #4b5a70;
+  --faint: #8a97aa;
+  --shadow: 0 10px 30px rgba(15, 23, 42, 0.07);
+  --chip-bg: color-mix(in srgb, var(--primary) 12%, white);
+  --chip-text: color-mix(in srgb, var(--primary) 80%, black);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+  cursor: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.viewport {
+  position: fixed;
+  inset: 0;
+  background: #000;
+}
+
+.stage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform-origin: center center;
+  overflow: hidden;
+  color: var(--text);
+  background:
+    radial-gradient(1100px 620px at 8% -12%, var(--bg-glow-1), transparent 62%),
+    radial-gradient(900px 520px at 105% 115%, var(--bg-glow-2), transparent 60%),
+    var(--bg);
+  display: flex;
+  flex-direction: column;
+  transition: transform 1.2s ease;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--chip-bg);
+  color: var(--chip-text);
+  font-size: 18px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ---------- Üst bar ---------- */
+
+.header {
+  height: var(--header-h);
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 32px;
+  padding: 0 44px;
+  position: relative;
+}
+
+.day-national .header::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 8px;
+  background: repeating-linear-gradient(90deg, #e30a17 0 120px, #ffffff 120px 140px);
+}
+
+.header-weather {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+
+.weather-icon {
+  color: var(--accent);
+  flex: none;
+}
+
+.weather-temp {
+  font-size: 50px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.weather-unit {
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-left: 2px;
+}
+
+.weather-meta {
+  font-size: 20px;
+  color: var(--muted);
+  margin-top: 6px;
+  white-space: nowrap;
+}
+
+.weather-city {
+  font-size: 16px;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 2px;
+}
+
+.header-school {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  max-width: 980px;
+  min-width: 0;
+}
+
+.school-logo {
+  height: 76px;
+  width: auto;
+  max-width: 120px;
+  object-fit: contain;
+  flex: none;
+}
+
+.school-logo-icon {
+  color: var(--primary);
+  flex: none;
+}
+
+.school-name {
+  font-size: 46px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  text-wrap: balance;
+  text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.header-clock {
+  justify-self: end;
+  text-align: right;
+  position: relative;
+}
+
+.clock {
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.clock-hm {
+  font-size: 68px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.clock-s {
+  font-size: 30px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-left: 8px;
+}
+
+.date {
+  margin-top: 6px;
+  font-size: 22px;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.date-day {
+  font-weight: 600;
+}
+
+.date-weekday {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.offline-chip {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 15px;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* ---------- Gövde ---------- */
+
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: var(--gap);
+  padding: 4px 32px 20px;
+}
+
+.col {
+  width: var(--col-w);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  min-height: 0;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 22px 26px;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.card-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 14px;
+  flex: none;
+}
+
+.card-label svg {
+  color: var(--primary);
+}
+
+.card-label-aside {
+  margin-left: auto;
+  color: var(--text);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  font-size: 18px;
+}
+
+.list-card {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Sayfalı listeler */
+.pager {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pager-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.pager-page {
+  animation: fade-up 0.5s ease both;
+}
+
+.pager-row {
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--border);
+}
+
+.pager-row:first-child {
+  border-top: 0;
+}
+
+.pager-row > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.pager-empty {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-size: 20px;
+  color: var(--faint);
+}
+
+.pager-dots {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  padding-top: 10px;
+  flex: none;
+}
+
+.pager-dots span,
+.slide-dots span {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--border);
+  transition: all 0.4s ease;
+}
+
+.pager-dots span.active,
+.slide-dots span.active {
+  width: 26px;
+  background: var(--primary);
+}
+
+/* Sınav sayacı */
+.exam-card {
+  flex: none;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--primary) 26%, transparent), transparent 70%),
+    var(--panel);
+}
+
+.exam-title {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.exam-units {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.exam-unit {
+  background: var(--panel-strong);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 0 8px;
+  text-align: center;
+}
+
+.exam-unit strong {
+  display: block;
+  font-size: 44px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.exam-unit-days strong {
+  color: var(--chip-text);
+  font-size: 50px;
+}
+
+.exam-unit span {
+  display: block;
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.exam-done {
+  margin-top: 16px;
+  font-size: 34px;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.exam-next {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 18px;
+}
+
+.exam-next span:last-child {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* Nöbet */
+.duty-card {
+  flex: 1;
+}
+
+.duty-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.duty-area {
+  flex: none;
+  width: 132px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.duty-teacher {
+  font-size: 23px;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* İzinli öğretmenler ve doğum günleri: kompakt isim çipleri */
+.leave-card,
+.birthday-card {
+  flex: none;
+}
+
+.pager-chips .pager-body {
+  flex: none;
+}
+
+.pager-chips .pager-page {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pager-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  max-width: 100%;
+  padding: 9px 16px;
+  border-radius: 14px;
+  background: var(--panel-strong);
+  border: 1px solid var(--border);
+}
+
+.person-name {
+  font-size: 22px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.person-meta {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--chip-text);
+  white-space: nowrap;
+}
+
+.birthday-card {
+  background:
+    radial-gradient(circle at 92% 12%, color-mix(in srgb, var(--accent) 30%, transparent) 0 60px, transparent 130px),
+    var(--panel);
+}
+
+.birthday-card .pager-chip {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.birthday-card .person-meta {
+  color: var(--accent);
+}
+
+.birthday-card .card-label,
+.birthday-card .card-label svg {
+  color: var(--accent);
+}
+
+/* ---------- Orta alan: slayt gösterisi ---------- */
+
+.slideshow {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.slide {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  animation: slide-in 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.slide-media {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+.slide-media-bg {
+  position: absolute;
+  inset: -40px;
+  background-size: cover;
+  background-position: center;
+  filter: blur(40px) brightness(0.55) saturate(1.2);
+}
+
+.slide-img {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.slide-video .slide-media {
+  flex: none;
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  max-height: calc(100% - 120px);
+}
+
+.video-frame,
+.video-frame iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+.slide-caption {
+  flex: none;
+  padding: 22px 32px 30px;
+  background: var(--panel-strong);
+  border-top: 1px solid var(--border);
+}
+
+.slide-caption h2 {
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  text-wrap: balance;
+}
+
+.slide-caption p {
+  margin-top: 8px;
+  font-size: 24px;
+  line-height: 1.35;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.slide-video .slide-caption {
+  flex: 1;
+}
+
+.slide-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 60px 72px;
+  background:
+    radial-gradient(800px 500px at 100% 0%, color-mix(in srgb, var(--primary) 38%, transparent), transparent 70%),
+    radial-gradient(600px 400px at 0% 100%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%);
+}
+
+.slide-text-icon {
+  color: var(--primary);
+  margin-bottom: 28px;
+}
+
+.slide-text h2 {
+  font-size: 68px;
+  font-weight: 850;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+
+.slide-text p {
+  margin-top: 26px;
+  font-size: 34px;
+  line-height: 1.4;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+.slide-dots {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(6px);
+}
+
+.slide-dots span {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.slide-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 5px;
+  background: transparent;
+}
+
+.slide-progress div {
+  height: 100%;
+  background: var(--primary);
+  transform-origin: left center;
+  animation: progress linear both;
+}
+
+.slideshow-empty {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 18px;
+}
+
+.welcome-logo {
+  max-width: 260px;
+  max-height: 220px;
+  object-fit: contain;
+}
+
+.welcome-icon {
+  color: var(--primary);
+}
+
+.welcome-title {
+  font-size: 56px;
+  font-weight: 850;
+  letter-spacing: -0.03em;
+  padding: 0 40px;
+  text-wrap: balance;
+}
+
+.welcome-sub {
+  font-size: 30px;
+  color: var(--muted);
+}
+
+/* ---------- Sağ alan: zil ve dersler ---------- */
+
+.bell-card {
+  flex: none;
+  text-align: center;
+  padding-bottom: 26px;
+  transition: background 0.6s ease, border-color 0.6s ease;
+}
+
+.bell-card .card-label {
+  justify-content: center;
+}
+
+.bell-card.tone-lesson {
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--primary) 30%, transparent), transparent 75%),
+    var(--panel);
+}
+
+.bell-card.tone-break,
+.bell-card.tone-lunch {
+  background:
+    linear-gradient(160deg, color-mix(in srgb, #10b981 30%, transparent), transparent 75%),
+    var(--panel);
+}
+
+.bell-card.tone-break .card-label svg,
+.bell-card.tone-lunch .card-label svg {
+  color: #10b981;
+}
+
+.bell-card.urgent {
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.bell-card.urgent .bell-countdown {
+  color: var(--accent);
+}
+
+.bell-title {
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.bell-caption {
+  margin-top: 8px;
+  font-size: 19px;
+  color: var(--muted);
+}
+
+.bell-caption-lg {
+  font-size: 26px;
+  margin: 18px 0 6px;
+}
+
+.bell-countdown {
+  font-size: 112px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+  margin: 6px 0 14px;
+  transition: color 0.4s ease;
+}
+
+.bell-progress {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--panel-strong);
+  overflow: hidden;
+  margin: 0 6px;
+}
+
+.bell-progress div {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+  transition: width 1s linear;
+}
+
+.tone-break .bell-progress div,
+.tone-lunch .bell-progress div {
+  background: #10b981;
+}
+
+.urgent .bell-progress div {
+  background: var(--accent);
+}
+
+.bell-range {
+  margin-top: 14px;
+  font-size: 22px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.bell-next {
+  margin-top: 6px;
+  font-size: 18px;
+  color: var(--muted);
+}
+
+.lessons-card {
+  flex: 1;
+}
+
+.lesson-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.lesson-class {
+  flex: none !important;
+  min-width: 86px;
+  text-align: center;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--chip-bg);
+  color: var(--chip-text);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.lesson-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lesson-subject {
+  font-size: 22px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lesson-teacher {
+  font-size: 17px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Alt bant: kayan yazı ---------- */
+
+.footer {
+  height: var(--footer-h);
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  background: var(--panel-strong);
+  border-top: 1px solid var(--border);
+}
+
+.ticker-label {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 30px 0 36px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 22px) 100%, 0 100%);
+  padding-right: 52px;
+}
+
+.day-national .ticker-label {
+  background: #e30a17;
+}
+
+.ticker {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  mask-image: linear-gradient(90deg, transparent, #000 40px, #000 calc(100% - 40px), transparent);
+}
+
+.ticker-probe {
+  position: absolute;
+  visibility: hidden;
+  white-space: nowrap;
+  display: flex;
+}
+
+.ticker-track {
+  display: flex;
+  width: max-content;
+  animation: ticker linear infinite;
+  will-change: transform;
+}
+
+.ticker-copy {
+  display: flex;
+  flex: none;
+}
+
+.ticker-item {
+  font-size: 29px;
+  font-weight: 550;
+  white-space: nowrap;
+  padding: 0 34px;
+  position: relative;
+}
+
+.ticker-item::after {
+  content: '';
+  position: absolute;
+  right: -5px;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+/* ---------- Özel durumlar ---------- */
+
+.day-mourning {
+  filter: grayscale(0.85);
+}
+
+.silence,
+.identify,
+.splash,
+.pairing {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.silence {
+  background: #000;
+  color: #fff;
+  z-index: 20;
+  gap: 40px;
+  animation: fade 1.5s ease both;
+}
+
+.silence-date {
+  font-size: 40px;
+  letter-spacing: 0.2em;
+  color: #cbd5e1;
+}
+
+.silence-text {
+  font-size: 58px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.identify {
+  z-index: 10;
+  gap: 20px;
+  background: color-mix(in srgb, var(--primary) 88%, black);
+  color: #fff;
+  animation: fade 0.4s ease both;
+}
+
+.identify-name {
+  font-size: 110px;
+  font-weight: 850;
+  letter-spacing: -0.03em;
+}
+
+.identify-sub {
+  font-size: 32px;
+  opacity: 0.8;
+}
+
+.splash {
+  gap: 18px;
+  color: var(--muted);
+}
+
+.splash svg {
+  color: var(--primary);
+}
+
+.splash-title {
+  font-size: 64px;
+  font-weight: 850;
+  color: var(--text);
+}
+
+.splash-sub {
+  font-size: 28px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ---------- Eşleştirme ---------- */
+
+.pairing {
+  gap: 28px;
+  padding: 60px;
+}
+
+.pairing-icon {
+  color: var(--primary);
+}
+
+.pairing h1 {
+  font-size: 56px;
+  font-weight: 850;
+  letter-spacing: -0.03em;
+}
+
+.pairing-code {
+  display: flex;
+  gap: 18px;
+  margin: 18px 0;
+}
+
+.pairing-code span {
+  width: 150px;
+  height: 190px;
+  display: grid;
+  place-items: center;
+  font-size: 128px;
+  font-weight: 800;
+  border-radius: 26px;
+  background: var(--panel-strong);
+  border: 2px solid color-mix(in srgb, var(--primary) 55%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+
+.pairing-code span.gap {
+  margin-left: 44px;
+}
+
+.pairing-steps {
+  font-size: 30px;
+  line-height: 1.8;
+  color: var(--muted);
+  text-align: left;
+  margin: 0;
+}
+
+.pairing-steps strong {
+  color: var(--text);
+}
+
+.pairing-expiry,
+.pairing-wait {
+  font-size: 24px;
+  color: var(--faint);
+}
+
+/* ---------- Animasyonlar ---------- */
+
+@keyframes ticker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: scale(1.015);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide,
+  .pager-page,
+  .identify,
+  .silence {
+    animation: none;
+  }
+}

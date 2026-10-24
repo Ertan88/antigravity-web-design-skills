@@ -8,6 +8,8 @@ const database = await openDatabase({ databaseUrl: env.DATABASE_URL, pgliteDir: 
 
 const result = await seedDemo(database.db, {
   storage: new LocalStorage(env.UPLOAD_DIR),
+  // Tanıtım için "bugün"ü değiştirmek isterseniz: SEED_NOW=2026-10-28T09:00:00+03:00
+  now: process.env.SEED_NOW ? new Date(process.env.SEED_NOW) : undefined,
   superAdmin: {
     email: process.env.SEED_SUPERADMIN_EMAIL ?? 'admin@okulpano.local',
     password: process.env.SEED_SUPERADMIN_PASSWORD ?? 'Pano2026!',

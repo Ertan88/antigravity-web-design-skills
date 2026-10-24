@@ -92,13 +92,17 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   ].filter((s): s is { prefix: string; dir: string } => Boolean(s.dir && existsSync(resolve(s.dir, 'index.html'))));
 
   for (const spa of spas) {
-    await app.register(fastifyStatic, { root: resolve(spa.dir), prefix: spa.prefix, decorateReply: false, wildcard: false });
+    await app.register(fastifyStatic, { root: resolve(spa.dir), prefix: spa.prefix, decorateReply: false });
   }
   if (spas.length) {
     app.get('/', (_req, reply) => reply.redirect('/admin/'));
     app.setNotFoundHandler((req, reply) => {
-      const spa = spas.find((s) => req.url.startsWith(s.prefix));
-      if (spa && req.method === 'GET') return reply.sendFile('index.html', resolve(spa.dir), { maxAge: 0 });
+      const path = req.url.split('?')[0] ?? '';
+      const spa = spas.find((s) => path.startsWith(s.prefix));
+      // Sayfa rotaları uygulamanın index.html'ine düşer; eksik dosyalar (.js, .css...) gerçek 404 alır
+      if (spa && req.method === 'GET' && !/\.[a-z0-9]+$/i.test(path)) {
+        return reply.sendFile('index.html', resolve(spa.dir), { maxAge: 0 });
+      }
       return reply.status(404).send({ error: 'not_found', message: 'Sayfa bulunamadı.' });
     });
   }
