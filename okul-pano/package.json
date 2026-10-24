@@ -12,7 +12,7 @@
     "node": ">=22.12"
   },
   "scripts": {
-    "dev": "concurrently -k -n api,admin,pano -c blue,magenta,green \"npm:dev -w @okulpano/api\" \"npm:dev -w @okulpano/admin\" \"npm:dev -w @okulpano/display\"",
+    "dev": "concurrently -k -n api,admin,pano -c blue,magenta,green \"npm run dev -w @okulpano/api\" \"node scripts/wait-for-api.mjs && npm run dev -w @okulpano/admin\" \"node scripts/wait-for-api.mjs && npm run dev -w @okulpano/display\"",
     "build": "npm run build -w @okulpano/admin && npm run build -w @okulpano/display && npm run build -w @okulpano/api",
     "start": "npm run start -w @okulpano/api",
     "test": "npm run test --workspaces --if-present",
