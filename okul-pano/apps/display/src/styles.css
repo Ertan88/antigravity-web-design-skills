@@ -1409,10 +1409,11 @@ p {
 }
 
 
+/* Sınıf rozetleri: sınıf renginde çerçeve, soluk iç dolgu */
 .lesson-class {
-  background: var(--row-hue, var(--primary));
-  color: #fff;
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--row-hue, var(--primary)) 30%, transparent);
+  background: color-mix(in srgb, var(--row-hue, var(--primary)) 16%, transparent);
+  color: color-mix(in srgb, var(--row-hue, var(--primary)) 55%, var(--text));
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--row-hue, var(--primary)) 75%, transparent);
 }
 
 /* İzinli öğretmenler: pembe-kırmızı çipler */
