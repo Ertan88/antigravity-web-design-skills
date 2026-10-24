@@ -1766,3 +1766,20 @@ p {
   height: 6px;
   background: repeating-linear-gradient(90deg, var(--accent) 0 60px, var(--primary) 60px 120px);
 }
+
+/* Düzende olup o gün içeriği olmayan kart: tek satırlık sade not */
+.card.empty-card {
+  flex: none;
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+
+.empty-card .card-label {
+  margin-bottom: 6px;
+}
+
+.empty-card-text {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--muted);
+}

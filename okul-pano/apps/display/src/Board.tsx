@@ -12,8 +12,8 @@ import {
 import type { CSSProperties, ReactNode } from 'react';
 import type { DisplayAuth } from './api.ts';
 import { Header } from './components/Header.tsx';
-import { MonitorIcon, WifiOffIcon } from './components/Icons.tsx';
-import { BirthdayCard, DutyCard, ExamCard, LeaveCard } from './components/LeftColumn.tsx';
+import { BookIcon, CakeIcon, CapIcon, MonitorIcon, UserMinusIcon, WifiOffIcon } from './components/Icons.tsx';
+import { BirthdayCard, DutyCard, EmptyCard, ExamCard, LeaveCard } from './components/LeftColumn.tsx';
 import { BellCard, LessonsCard } from './components/RightColumn.tsx';
 import { Slideshow } from './components/Slideshow.tsx';
 import { Stage } from './components/Stage.tsx';
@@ -69,10 +69,17 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
 
   // Kartlar panonun düzenine göre (panoya özel ya da okulun) sol / sağ sütuna yerleşir
   const layout = state.layout ?? resolveLayout(s);
+  // Düzende olup o gün içeriği olmayan kartlar kısa bir notla görünür (ayar kapalıysa hiç görünmez)
+  const empty = (m: BoardModule, icon: ReactNode, title: string, message: string, className: string) =>
+    s.showEmptyCards ? <EmptyCard key={m} icon={icon} title={title} message={message} className={className} /> : null;
   const renderModule = (m: BoardModule): ReactNode => {
     switch (m) {
       case 'exams':
-        return state.exams.length > 0 ? <ExamCard key={m} exams={state.exams} now={now} timezone={school.timezone} /> : null;
+        return state.exams.length > 0 ? (
+          <ExamCard key={m} exams={state.exams} now={now} timezone={school.timezone} />
+        ) : (
+          empty(m, <CapIcon size={22} />, 'Sınav Sayacı', 'Yaklaşan sınav yok', 'exam-card')
+        );
       case 'duties':
         return (
           <DutyCard
@@ -84,9 +91,13 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
           />
         );
       case 'leaves':
-        return leaves.length > 0 ? <LeaveCard key={m} leaves={leaves} /> : null;
+        return leaves.length > 0 ? <LeaveCard key={m} leaves={leaves} /> : empty(m, <UserMinusIcon size={22} />, 'İzinli Öğretmenler', 'Bugün izinli öğretmen yok', 'leave-card');
       case 'birthdays':
-        return birthdays.length > 0 ? <BirthdayCard key={m} birthdays={birthdays} nameFormat={s.birthdayNameFormat} /> : null;
+        return birthdays.length > 0 ? (
+          <BirthdayCard key={m} birthdays={birthdays} nameFormat={s.birthdayNameFormat} />
+        ) : (
+          empty(m, <CakeIcon size={22} />, 'Doğum Günleri', 'Bugün doğum günü olan yok', 'birthday-card')
+        );
       case 'bell':
         return <BellCard key={m} status={bell} />;
       case 'lessons':
@@ -97,7 +108,9 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
             heading={bell.kind === 'lesson' ? 'Şu An Derste' : 'Sıradaki Ders'}
             periodTitle={bell.kind === 'lesson' ? periodLabel(lessonPeriod) : `${periodLabel(lessonPeriod)} · ${lessonPeriod.start}`}
           />
-        ) : null;
+        ) : (
+          empty(m, <BookIcon size={22} />, 'Şu An Derste', 'Şu an ders yok', 'lessons-card')
+        );
     }
   };
   const leftCards = layout.left.map(renderModule).filter(Boolean);

@@ -2,6 +2,7 @@ import { resolveLayout, SPECIAL_THEMES, type BoardLayout, type SchoolSettings } 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 import { LayoutEditor } from '../../components/LayoutEditor.tsx';
+import { SaveBar } from '../../components/SaveBar.tsx';
 import { useToast } from '../../components/Toast.tsx';
 import { Button, Card, Field, Input, Segmented, Select, Spinner, Toggle } from '../../components/ui.tsx';
 import { api } from '../../lib/api.ts';
@@ -108,20 +109,14 @@ export function DefaultLayout({ editable }: { editable: boolean }) {
             Kartları sürükleyerek sütunlar arasında taşıyın ve sıralayın. Özel düzeni olmayan tüm panolar bunu kullanır; bir panoya özel düzen için yukarıdan panoyu seçin.
           </p>
         </div>
-        {editable && (
-          <div className="flex gap-2">
-            {dirty && (
-              <Button variant="secondary" onClick={() => setLayout(JSON.parse(saved) as BoardLayout)}>
-                Geri al
-              </Button>
-            )}
-            <Button disabled={!dirty} loading={save.isPending} onClick={() => save.mutate({ ...school.data!.settings, layout })}>
-              Düzeni kaydet
-            </Button>
-          </div>
-        )}
       </div>
       <LayoutEditor value={layout} onChange={setLayout} disabled={!editable} />
+      <SaveBar
+        show={editable && dirty}
+        saving={save.isPending}
+        onSave={() => save.mutate({ ...school.data!.settings, layout })}
+        onCancel={() => setLayout(JSON.parse(saved) as BoardLayout)}
+      />
     </Card>
   );
 }
@@ -240,6 +235,12 @@ export function Appearance({ editable }: { editable: boolean }) {
             {(id) => <Input id={id} type="number" min={10} max={180} disabled={!editable} value={s.lunchThresholdMin} onChange={(e) => set('lunchThresholdMin', Number(e.target.value))} />}
           </Field>
         </div>
+        <Toggle
+          checked={s.showEmptyCards}
+          onChange={(x) => set('showEmptyCards', x)}
+          label="Boş kartları da göster"
+          description="Düzende olan kart o gün içeriksizse (izinli yok, doğum günü yok…) kısa bir notla görünür. Kapalıyken o gün panoda hiç yer almaz."
+        />
         <Toggle checked={s.videoSound} onChange={(x) => set('videoSound', x)} label="Videoları sesli oynat" description="Tarayıcıda otomatik oynatma izni gerekir (aşağıdaki kiosk komutu)." />
       </Section>
 
@@ -254,18 +255,7 @@ export function Appearance({ editable }: { editable: boolean }) {
         />
       </Section>
 
-      {editable && (
-        <div className="mt-6 flex justify-end gap-2 border-t border-slate-100 pt-5">
-          {dirty && (
-            <Button variant="secondary" onClick={() => setS(school.data!.settings)}>
-              Geri al
-            </Button>
-          )}
-          <Button disabled={!dirty} loading={save.isPending} onClick={() => save.mutate(s)}>
-            Kaydet
-          </Button>
-        </div>
-      )}
+      <SaveBar show={editable && dirty} saving={save.isPending} onSave={() => save.mutate(s)} onCancel={() => setS(school.data!.settings)} />
     </Card>
   );
 }

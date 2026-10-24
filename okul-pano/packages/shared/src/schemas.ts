@@ -58,6 +58,8 @@ export const schoolSettingsSchema = z.object({
   accentColor: hexColor.default('#f59e0b'),
   /** Özel günlerde (millî bayram, 10 Kasım, bayramlar…) hazır temayı kendiliğinden uygula */
   autoSpecialThemes: z.boolean().default(true),
+  /** Düzende olan ama o gün içeriği olmayan kartlar (izinli, doğum günü…) kısa bir notla görünür */
+  showEmptyCards: z.boolean().default(true),
   showExams: z.boolean().default(true),
   showDuties: z.boolean().default(true),
   showLeaves: z.boolean().default(true),

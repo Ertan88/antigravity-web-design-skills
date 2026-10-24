@@ -2,6 +2,7 @@ import { resolveLayout, type BoardLayout } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { LayoutEditor } from '../../components/LayoutEditor.tsx';
+import { SaveBar } from '../../components/SaveBar.tsx';
 import { useToast } from '../../components/Toast.tsx';
 import { Button, Modal, Toggle } from '../../components/ui.tsx';
 import { api } from '../../lib/api.ts';
@@ -57,13 +58,11 @@ export function ScreenLayoutPanel({ screen, editable, onDone }: { screen: Screen
           label={`${screen.name} panosuna özel düzen`}
           description="Kapalıyken okulun varsayılan düzeni kullanılır."
         />
-        {editable && (
+        {editable && onDone && (
           <div className="flex gap-2">
-            {onDone && (
-              <Button variant="secondary" onClick={onDone}>
-                Vazgeç
-              </Button>
-            )}
+            <Button variant="secondary" onClick={onDone}>
+              Vazgeç
+            </Button>
             <Button disabled={!dirty} loading={saving} onClick={() => void save()}>
               Kaydet
             </Button>
@@ -71,6 +70,17 @@ export function ScreenLayoutPanel({ screen, editable, onDone }: { screen: Screen
         )}
       </div>
       {layout && <LayoutEditor value={custom ? layout : (schoolLayout ?? layout)} onChange={setLayout} disabled={!custom || !editable} />}
+      {!onDone && (
+        <SaveBar
+          show={editable && dirty}
+          saving={saving}
+          onSave={() => void save()}
+          onCancel={() => {
+            setCustom(Boolean(screen.layout));
+            setLayout(screen.layout ?? schoolLayout);
+          }}
+        />
+      )}
     </div>
   );
 }

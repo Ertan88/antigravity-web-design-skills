@@ -29,10 +29,10 @@ const ICONS: Record<BoardModule, LucideIcon> = {
 };
 
 const HINTS: Partial<Record<BoardModule, string>> = {
-  leaves: 'O gün izinli varsa',
-  birthdays: 'O gün doğum günü varsa',
-  exams: 'Yaklaşan sınav varsa',
-  lessons: 'Ders saatlerinde',
+  leaves: 'İzinli yoksa kısa not',
+  birthdays: 'Doğum günü yoksa kısa not',
+  exams: 'Sınav yoksa kısa not',
+  lessons: 'Ders yoksa kısa not',
 };
 
 type Column = 'left' | 'right';

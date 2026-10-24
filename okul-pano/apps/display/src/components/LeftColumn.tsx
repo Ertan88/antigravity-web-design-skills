@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { countdown, formatPersonName, type DisplayState } from '@okulpano/shared/client';
 import { AutoPager } from './AutoPager.tsx';
 import { CakeIcon, CapIcon, HourglassIcon, ShieldIcon, UserMinusIcon } from './Icons.tsx';
@@ -106,6 +107,18 @@ export function DutyCard({
           )}
         </div>
       )}
+    </section>
+  );
+}
+
+/** Düzende olup o gün içeriği olmayan kart: başlık ve kısa bir not, az yer kaplar */
+export function EmptyCard({ icon, title, message, className = '' }: { icon: ReactNode; title: string; message: string; className?: string }) {
+  return (
+    <section className={`card empty-card ${className}`}>
+      <div className="card-label">
+        {icon} {title}
+      </div>
+      <div className="empty-card-text">{message}</div>
     </section>
   );
 }
