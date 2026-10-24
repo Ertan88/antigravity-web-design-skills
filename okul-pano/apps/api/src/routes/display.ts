@@ -4,7 +4,7 @@ import {
   zonedParts,
   type DisplayState,
 } from '@okulpano/shared';
-import { and, asc, eq, gt, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { UUID_RE } from '../context.ts';
@@ -15,6 +15,7 @@ import {
   classGroups,
   displayPairings,
   duties,
+  dutySupervisors,
   exams,
   schools,
   screens,
@@ -76,7 +77,7 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
   const windowed = (startsAt: PgColumn, endsAt: PgColumn) =>
     and(or(isNull(endsAt), gt(endsAt, now)), or(isNull(startsAt), lte(startsAt, weekAhead)));
 
-  const [examRows, dutyRows, leaveRows, birthdayRows, annRows, tickerRows, bellRows, ttRows] = await Promise.all([
+  const [examRows, dutyRows, supervisorRows, leaveRows, birthdayRows, annRows, tickerRows, bellRows, ttRows] = await Promise.all([
     db
       .select({ id: exams.id, title: exams.title, examAt: exams.examAt })
       .from(exams)
@@ -89,6 +90,11 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
       .innerJoin(teachers, eq(teachers.id, duties.teacherId))
       .where(eq(duties.schoolId, id))
       .orderBy(asc(duties.weekday), asc(duties.sortOrder), asc(duties.area)),
+    db
+      .select({ date: dutySupervisors.date, name: dutySupervisors.name })
+      .from(dutySupervisors)
+      .where(and(eq(dutySupervisors.schoolId, id), gte(dutySupervisors.date, today), lte(dutySupervisors.date, weekAheadDate)))
+      .orderBy(asc(dutySupervisors.date)),
     db
       .select({ id: teacherLeaves.id, teacherName: teachers.fullName, startDate: teacherLeaves.startDate, endDate: teacherLeaves.endDate })
       .from(teacherLeaves)
@@ -110,7 +116,8 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
       .select()
       .from(announcements)
       .where(and(eq(announcements.schoolId, id), eq(announcements.isActive, true), windowed(announcements.startsAt, announcements.endsAt)))
-      .orderBy(asc(announcements.sortOrder), asc(announcements.createdAt)),
+      // Paneldeki listeyle birebir aynı sıra: önce elle verilen sıra, eşitse en yeni üstte
+      .orderBy(asc(announcements.sortOrder), desc(announcements.createdAt)),
     db
       .select()
       .from(tickerItems)
@@ -148,6 +155,7 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
     },
     exams: examRows.map((e) => ({ ...e, examAt: e.examAt.toISOString() })),
     duties: dutyRows,
+    dutySupervisors: supervisorRows,
     leaves: leaveRows,
     birthdays: birthdayRows,
     announcements: annRows.map((a) => ({

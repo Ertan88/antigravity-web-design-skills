@@ -40,6 +40,7 @@ export function parseYouTubeUrl(input: string): YouTubeRef | null {
   return start ? { id, start } : { id };
 }
 
-export function youTubeThumbnail(id: string): string {
-  return `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+/** Kapak görseli: "hq" her videoda vardır (4:3, kenar boşluklu); "max" 16:9 ve yüksek çözünürlüklüdür. */
+export function youTubeThumbnail(id: string, size: 'hq' | 'max' = 'hq'): string {
+  return `https://i.ytimg.com/vi/${id}/${size === 'max' ? 'maxresdefault' : 'hqdefault'}.jpg`;
 }

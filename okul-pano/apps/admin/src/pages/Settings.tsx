@@ -1,4 +1,4 @@
-import { updateSchoolSchema, type SchoolSettings } from '@okulpano/shared';
+import { splitSchoolName, updateSchoolSchema, type SchoolSettings } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { MapPin, Search } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -180,9 +180,22 @@ export function Settings() {
         </div>
       )}
       <Card className="p-6 sm:p-8">
-        <Section title="Okul bilgileri" description="Panonun üst ortasında okul adı ve logosu görünür.">
+        <Section title="Okul bilgileri" description="Panonun sol üstünde logo ile birlikte okul adı (kalın) ve altında okul türü görünür.">
           <Field label="Okul adı" error={form.errors.name}>
             {(id) => <Input id={id} value={v.name} onChange={(e) => set('name', e.target.value)} />}
+          </Field>
+          <Field
+            label="Okul türü (ikinci satır)"
+            help={`Boş bırakılırsa addan otomatik ayrılır${splitSchoolName(v.name).type ? `: "${splitSchoolName(v.name).type}"` : ''}. Yalnızca farklı göstermek isterseniz doldurun.`}
+          >
+            {(id) => (
+              <Input
+                id={id}
+                value={v.settings.schoolType ?? ''}
+                onChange={(e) => setting('schoolType', e.target.value)}
+                placeholder={splitSchoolName(v.name).type ?? 'ör. Mesleki ve Teknik Anadolu Lisesi'}
+              />
+            )}
           </Field>
           <Field label="Logo" help="Şeffaf arka planlı PNG önerilir.">
             {() => (
@@ -293,7 +306,7 @@ export function Settings() {
       </Card>
 
       <div className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-200 bg-white/90 backdrop-blur lg:left-72">
-        <div className="mx-auto flex max-w-6xl justify-end gap-2 px-4 py-3 sm:px-6 lg:px-10">
+        <div className="mx-auto flex w-full max-w-[1680px] justify-end gap-2 px-4 py-3 sm:px-6 lg:px-8">
           <Button variant="secondary" onClick={() => school.data && form.reset(toForm(school.data))}>
             Değişiklikleri geri al
           </Button>

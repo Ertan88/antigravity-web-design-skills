@@ -249,7 +249,7 @@ export function Layout() {
         <span className="font-bold tracking-tight">Okul Pano</span>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
+      <main className="mx-auto w-full max-w-[1680px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         <Suspense fallback={<Spinner />}>
           <Outlet />
         </Suspense>

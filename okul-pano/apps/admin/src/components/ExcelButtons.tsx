@@ -14,12 +14,15 @@ export function ExcelButtons({
   exportName,
   canImport,
   onFile,
+  query,
 }: {
   basePath: string;
   templateName: string;
   exportName: string;
   canImport: boolean;
   onFile: (file: File) => void;
+  /** İndirme adreslerine eklenecek sorgu (ör. "month=2026-10") */
+  query?: string;
 }) {
   const toast = useToast();
   const input = useRef<HTMLInputElement>(null);
@@ -28,7 +31,7 @@ export function ExcelButtons({
   const download = async (kind: 'template' | 'export') => {
     setBusy(kind);
     try {
-      await downloadFile(`${basePath}/${kind}`, kind === 'template' ? templateName : exportName);
+      await downloadFile(`${basePath}/${kind}${query ? `?${query}` : ''}`, kind === 'template' ? templateName : exportName);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'İndirilemedi');
     } finally {

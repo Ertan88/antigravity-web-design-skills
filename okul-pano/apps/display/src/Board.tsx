@@ -79,6 +79,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
     <Stage className={classes} style={themeVars}>
       <Header
         schoolName={school.name}
+        schoolType={s.schoolType}
         logoUrl={school.logoUrl}
         timezone={school.timezone}
         now={now}
@@ -92,7 +93,11 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         {showLeft && (
           <aside className="col col-left">
             {s.showExams && <ExamCard exams={state.exams} now={now} timezone={school.timezone} />}
-            {s.showDuties && <DutyCard duties={duties} weekdayName={WEEKDAY_NAMES[today.weekday] ?? ''} />}
+            {s.showDuties && <DutyCard
+                duties={duties}
+                weekdayName={WEEKDAY_NAMES[today.weekday] ?? ''}
+                supervisor={(state.dutySupervisors ?? []).find((x) => x.date === today.isoDate)?.name ?? null}
+              />}
             {s.showLeaves && leaves.length > 0 && <LeaveCard leaves={leaves} todayIso={today.isoDate} />}
             {s.showBirthdays && birthdays.length > 0 && <BirthdayCard birthdays={birthdays} nameFormat={s.birthdayNameFormat} />}
           </aside>

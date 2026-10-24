@@ -1,4 +1,4 @@
-import { isWithinWindow, parseYouTubeUrl, type DisplayAnnouncement } from '@okulpano/shared/client';
+import { isWithinWindow, parseYouTubeUrl, youTubeThumbnail, type DisplayAnnouncement } from '@okulpano/shared/client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MegaphoneIcon, SchoolIcon } from './Icons.tsx';
 
@@ -11,7 +11,7 @@ interface YTPlayer {
 }
 interface YTNamespace {
   Player: new (el: HTMLElement, opts: Record<string, unknown>) => YTPlayer;
-  PlayerState: { ENDED: number };
+  PlayerState: { ENDED: number; PLAYING: number };
 }
 declare global {
   interface Window {
@@ -40,6 +40,8 @@ function VideoSlide({ url, sound, maxSec, onEnd }: { url: string; sound: boolean
   const host = useRef<HTMLDivElement>(null);
   const endRef = useRef(onEnd);
   endRef.current = onEnd;
+  const [playing, setPlaying] = useState(false);
+  const thumb = parseYouTubeUrl(url);
 
   useEffect(() => {
     const ref = parseYouTubeUrl(url);
@@ -61,14 +63,18 @@ function VideoSlide({ url, sound, maxSec, onEnd }: { url: string; sound: boolean
           videoId: ref.id,
           width: '100%',
           height: '100%',
+          host: 'https://www.youtube-nocookie.com',
           playerVars: {
             autoplay: 1,
             mute: sound ? 0 : 1,
             controls: 0,
             rel: 0,
+            fs: 0,
             playsinline: 1,
             iv_load_policy: 3,
+            cc_load_policy: 0,
             disablekb: 1,
+            modestbranding: 1,
             start: ref.start ?? 0,
             origin: location.origin,
           },
@@ -78,6 +84,7 @@ function VideoSlide({ url, sound, maxSec, onEnd }: { url: string; sound: boolean
               e.target.playVideo();
             },
             onStateChange: (e: { data: number }) => {
+              if (e.data === YT.PlayerState.PLAYING) setPlaying(true);
               if (e.data === YT.PlayerState.ENDED) end();
             },
             onError: () => setTimeout(end, 1500),
@@ -96,7 +103,25 @@ function VideoSlide({ url, sound, maxSec, onEnd }: { url: string; sound: boolean
     };
   }, [url, sound, maxSec]);
 
-  return <div className="video-frame" ref={host} />;
+  return (
+    <div className="video-box">
+      {/* Oynatıcı kutudan uzun tutulur: YouTube'un üstteki başlık ve alttaki logo şeritleri görünür alanın dışında kalır */}
+      <div className="video-frame" ref={host} />
+      {/* Video başlayana kadar kapak görseli: siyah ekran beklenmez */}
+      {thumb && (
+        <img
+          className={`video-poster ${playing ? 'hidden' : ''}`}
+          src={youTubeThumbnail(thumb.id, 'max')}
+          alt=""
+          // Bazı videolarda yüksek çözünürlüklü kapak yoktur; standart kapağa düşülür
+          onError={(e) => {
+            const fallback = youTubeThumbnail(thumb.id, 'hq');
+            if (e.currentTarget.src !== fallback) e.currentTarget.src = fallback;
+          }}
+        />
+      )}
+    </div>
+  );
 }
 
 /* ---------- Slayt gösterisi ---------- */
@@ -119,6 +144,22 @@ export function Slideshow({ announcements, now, defaultDurationSec, videoSound, 
   );
   const [cursor, setCursor] = useState({ index: 0, round: 0 });
   const count = slides.length;
+
+  // Duyurular eklenince, sırası ya da içeriği değişince gösteri listenin başından yeniden başlar:
+  // panelde en üstteki (yeni ya da güncellenen) duyuru beklemeden ekrana gelir.
+  const signature = slides.map((s) => [s.id, s.title, s.body, s.imageUrl, s.youtubeUrl, s.durationSec].join('|')).join('§');
+  const lastSignature = useRef(signature);
+  useEffect(() => {
+    if (lastSignature.current === signature) return;
+    lastSignature.current = signature;
+    setCursor((c) => ({ index: 0, round: c.round + 1 }));
+  }, [signature]);
+
+  // Video varsa YouTube kitaplığı baştan yüklenir; sırası gelince video hemen başlar
+  const hasVideo = slides.some((s) => s.kind === 'video');
+  useEffect(() => {
+    if (hasVideo) loadYouTube().catch(() => undefined);
+  }, [hasVideo]);
   const index = count ? cursor.index % count : 0;
   const slide = slides[index] ?? null;
 

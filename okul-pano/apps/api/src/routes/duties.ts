@@ -1,12 +1,12 @@
-import { dutyImportSchema, dutySchema, normalizeName, tidyName, trCompare, WEEKDAY_NAMES } from '@okulpano/shared';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { dutyImportSchema, dutySchema, dutySupervisorSchema, normalizeName, tidyName, trCompare, WEEKDAY_NAMES, zonedParts } from '@okulpano/shared';
+import { and, asc, eq, gte, inArray, lte, or, sql, type SQL } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { audit, schoolGuard } from '../context.ts';
 import type { DB } from '../db/client.ts';
-import { duties, teachers } from '../db/schema.ts';
-import { parse } from '../lib/errors.ts';
+import { duties, dutySupervisors, teachers } from '../db/schema.ts';
+import { badRequest, conflict, parse } from '../lib/errors.ts';
 import { exportFileName, readXlsxUpload, sendXlsx } from '../lib/excel.ts';
-import { buildDutiesWorkbook, parseDutiesWorkbook } from '../lib/sheets/duties.ts';
+import { buildDutiesWorkbook, parseDutiesWorkbook, trDate } from '../lib/sheets/duties.ts';
 import { registerResource } from './crud.ts';
 
 /** Basit düzenleme mesafesi: "Ayse Demır" yazılmışsa "Ayşe Demir mi?" önerisi için */
@@ -51,6 +51,14 @@ async function loadRoster(db: DB, schoolId: string) {
 
 const dutyKey = (weekday: number, area: string, teacherId: string) => `${weekday}|${normalizeName(area)}|${teacherId}`;
 
+/** "2026-09" -> ayın ilk ve son günü */
+function monthRange(month: string): [string, string] {
+  const [y, m] = month.split('-').map(Number) as [number, number];
+  const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return [`${month}-01`, `${month}-${String(days).padStart(2, '0')}`];
+}
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+
 export async function dutyRoutes(app: FastifyInstance) {
   const { db, bus } = app.deps;
   const base = '/api/schools/:schoolId/duties';
@@ -66,6 +74,34 @@ export async function dutyRoutes(app: FastifyInstance) {
     orderBy: [asc(duties.weekday), asc(duties.sortOrder), asc(duties.area)],
     refs: { teacherId: teachers },
     summary: (r) => `${WEEKDAY_NAMES[r.weekday as number] ?? ''} · ${r.area}`,
+  });
+
+  /** Nöbetçi müdür yardımcısı: tarih başına tek kayıt. ?month=YYYY-AA ile o ay listelenir. */
+  registerResource(app, {
+    path: 'duty-supervisors',
+    entity: 'Nöbetçi müdür yardımcısı',
+    table: dutySupervisors,
+    permission: 'duties.manage',
+    schema: dutySupervisorSchema,
+    toRow: (i) => ({ date: i.date, name: tidyName(i.name) }),
+    summary: (r) => `${trDate(String(r.date))} · ${r.name}`,
+    validate: async (req, row, id) => {
+      const [other] = await db
+        .select({ id: dutySupervisors.id })
+        .from(dutySupervisors)
+        .where(and(eq(dutySupervisors.schoolId, req.ctx.schoolId), eq(dutySupervisors.date, row.date as string)));
+      if (other && other.id !== id) throw conflict(`${trDate(row.date as string)} için zaten bir nöbetçi müdür yardımcısı var.`);
+    },
+    list: async (req) => {
+      const { month } = req.query as { month?: string };
+      const where: SQL[] = [eq(dutySupervisors.schoolId, req.ctx.schoolId)];
+      if (month) {
+        if (!MONTH_RE.test(month)) throw badRequest('Ay YYYY-AA biçiminde olmalı.');
+        const [from, to] = monthRange(month);
+        where.push(gte(dutySupervisors.date, from), lte(dutySupervisors.date, to));
+      }
+      return db.select().from(dutySupervisors).where(and(...where)).orderBy(asc(dutySupervisors.date));
+    },
   });
 
   async function currentDuties(schoolId: string) {
@@ -90,8 +126,23 @@ export async function dutyRoutes(app: FastifyInstance) {
   app.post(`${base}/import/preview`, { ...write, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req) => {
     const parsed = await parseDutiesWorkbook(await readXlsxUpload(req));
     const schoolId = req.ctx.schoolId;
-    const [roster, existing] = await Promise.all([loadRoster(db, schoolId), currentDuties(schoolId)]);
+    const [roster, existing, existingSup] = await Promise.all([
+      loadRoster(db, schoolId),
+      currentDuties(schoolId),
+      parsed.supervisors.length
+        ? db
+            .select({ date: dutySupervisors.date, name: dutySupervisors.name })
+            .from(dutySupervisors)
+            .where(and(eq(dutySupervisors.schoolId, schoolId), inArray(dutySupervisors.date, parsed.supervisors.map((x) => x.date))))
+        : Promise.resolve([]),
+    ]);
     const issues = [...parsed.issues];
+    const supByDate = new Map(existingSup.map((x) => [x.date, x.name]));
+    const supervisors = parsed.supervisors.map((x) => ({
+      date: x.date,
+      name: x.name,
+      status: !supByDate.has(x.date) ? ('new' as const) : supByDate.get(x.date) === x.name ? ('unchanged' as const) : ('update' as const),
+    }));
     const existingKeys = new Set(existing.map((d) => dutyKey(d.weekday, d.area, d.teacherId)));
     const knownAreas = new Set(existing.map((d) => normalizeName(d.area)));
     const newAreas = new Map<string, string>();
@@ -137,6 +188,7 @@ export async function dutyRoutes(app: FastifyInstance) {
       rows,
       issues,
       removed,
+      supervisors,
       additions: newAreas.size ? [{ label: 'Yeni nöbet yerleri', values: [...newAreas.values()] }] : [],
       totals: {
         new: rows.filter((r) => r.status === 'new').length,
@@ -144,6 +196,7 @@ export async function dutyRoutes(app: FastifyInstance) {
         unchanged: rows.filter((r) => r.status === 'unchanged').length,
         skipped: issues.length,
         removed: removed.length,
+        supervisors: supervisors.filter((x) => x.status !== 'unchanged').length,
       },
     };
   });
@@ -193,7 +246,35 @@ export async function dutyRoutes(app: FastifyInstance) {
         inserts.push({ schoolId, weekday: r.weekday, area, teacherId: teacher.id, sortOrder: areaIndex.get(areaKey)! });
       }
       if (inserts.length) await tx.insert(duties).values(inserts);
-      return { created: inserts.length, removed, unchanged, skipped };
+
+      // Müdür yardımcıları tarihe göre yazılır; "değiştir"de dosyadaki aylarda dosyada olmayan tarihler silinir
+      let supervisors = 0;
+      if (body.supervisors.length) {
+        if (body.mode === 'replace') {
+          const months = [...new Set(body.supervisors.map((x) => x.date.slice(0, 7)))].map(monthRange);
+          const dates = body.supervisors.map((x) => x.date);
+          await tx
+            .delete(dutySupervisors)
+            .where(
+              and(
+                eq(dutySupervisors.schoolId, schoolId),
+                or(...months.map(([from, to]) => and(gte(dutySupervisors.date, from), lte(dutySupervisors.date, to)))),
+                sql`${dutySupervisors.date} not in (${sql.join(dates.map((d) => sql`${d}::date`), sql`, `)})`,
+              ),
+            );
+        }
+        const byDate = new Map(body.supervisors.map((x) => [x.date, tidyName(x.name)]));
+        const written = await tx
+          .insert(dutySupervisors)
+          .values([...byDate].map(([date, name]) => ({ schoolId, date, name })))
+          .onConflictDoUpdate({
+            target: [dutySupervisors.schoolId, dutySupervisors.date],
+            set: { name: sql`excluded.name`, updatedAt: new Date() },
+          })
+          .returning({ id: dutySupervisors.id });
+        supervisors = written.length;
+      }
+      return { created: inserts.length, removed, unchanged, skipped, supervisors };
     });
 
     await audit(
@@ -207,31 +288,42 @@ export async function dutyRoutes(app: FastifyInstance) {
     return result;
   });
 
-  async function workbook(schoolId: string, schoolName: string, withCells: boolean) {
-    const [roster, rows] = await Promise.all([loadRoster(db, schoolId), currentDuties(schoolId)]);
+  async function workbook(req: { ctx: { schoolId: string; school: { name: string; timezone: string } }; query: unknown }, withData: boolean) {
+    const { schoolId, school } = req.ctx;
+    const { month: q } = req.query as { month?: string };
+    if (q && !MONTH_RE.test(q)) throw badRequest('Ay YYYY-AA biçiminde olmalı.');
+    const month = q ?? zonedParts(new Date(), school.timezone).isoDate.slice(0, 7);
+    const [from, to] = monthRange(month);
+    const [roster, rows, sups] = await Promise.all([
+      loadRoster(db, schoolId),
+      currentDuties(schoolId),
+      withData
+        ? db
+            .select({ date: dutySupervisors.date, name: dutySupervisors.name })
+            .from(dutySupervisors)
+            .where(and(eq(dutySupervisors.schoolId, schoolId), gte(dutySupervisors.date, from), lte(dutySupervisors.date, to)))
+        : Promise.resolve([]),
+    ]);
     const weekdays = [1, 2, 3, 4, 5, ...[6, 7].filter((d) => rows.some((r) => r.weekday === d))];
-    const cells = new Map<string, Map<number, string[]>>();
-    if (withCells) {
-      for (const r of rows) {
-        const byDay = cells.get(normalizeName(r.area)) ?? new Map<number, string[]>();
-        byDay.set(r.weekday, [...(byDay.get(r.weekday) ?? []), r.teacherName]);
-        cells.set(normalizeName(r.area), byDay);
-      }
-    }
+    const days = new Map<number, { area: string; teacherName: string }[]>();
+    if (withData) for (const r of rows) days.set(r.weekday, [...(days.get(r.weekday) ?? []), { area: r.area, teacherName: r.teacherName }]);
     return buildDutiesWorkbook({
-      schoolName,
+      schoolName: school.name,
       teachers: roster.rows.filter((t) => t.isActive).map((t) => t.fullName).sort(trCompare),
       areas: areaOrder(rows),
       weekdays,
-      cells,
+      year: Number(month.slice(0, 4)),
+      month: Number(month.slice(5, 7)),
+      days,
+      supervisors: new Map(sups.map((x) => [x.date, x.name])),
     });
   }
 
   app.get(`${base}/template`, read, async (req, reply) =>
-    sendXlsx(reply, await workbook(req.ctx.schoolId, req.ctx.school.name, false), 'nobet-cizelgesi-sablonu.xlsx'),
+    sendXlsx(reply, await workbook(req, false), 'nobet-cizelgesi-sablonu.xlsx'),
   );
 
   app.get(`${base}/export`, read, async (req, reply) =>
-    sendXlsx(reply, await workbook(req.ctx.schoolId, req.ctx.school.name, true), exportFileName('nobet-cizelgesi', req.ctx.school.name)),
+    sendXlsx(reply, await workbook(req, true), exportFileName('nobet-cizelgesi', req.ctx.school.name)),
   );
 }

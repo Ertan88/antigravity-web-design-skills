@@ -1,9 +1,10 @@
-import { bellScheduleSchema, generatePeriods, periodLabel, WEEKDAY_SHORT, type Period } from '@okulpano/shared';
-import { BellRing, Pencil, Plus, Trash2, Wand2 } from 'lucide-react';
+import { bellScheduleSchema, generatePeriods, WEEKDAY_SHORT, type Period } from '@okulpano/shared';
+import { BellRing, Plus, Trash2, Wand2 } from 'lucide-react';
 import { useState } from 'react';
-import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Spinner, WeekdayPicker } from '../components/ui.tsx';
+import { Alert, Button, Card, EmptyState, Field, IconButton, Input, Modal, PageHeader, Spinner, WeekdayPicker } from '../components/ui.tsx';
 import { useAuth } from '../lib/auth.tsx';
-import { useList, useResource, type BellSchedule } from '../lib/data.ts';
+import { useList, useResource, useSchool, type BellSchedule } from '../lib/data.ts';
+import { ScheduleCard } from './bell/ScheduleCard.tsx';
 import { useForm } from '../lib/form.ts';
 
 type Form = { name: string; weekdays: number[]; periods: Period[] };
@@ -111,6 +112,7 @@ export function BellSchedules() {
   const { can } = useAuth();
   const editable = can('schedule.manage');
   const list = useList<BellSchedule>('bell-schedules');
+  const school = useSchool();
   const ops = useResource<BellSchedule>('bell-schedules', 'Zil çizelgesi');
   const form = useForm<Form>({ name: '', weekdays: [1, 2, 3, 4, 5], periods: [] });
   const [editing, setEditing] = useState<BellSchedule | null>(null);
@@ -169,40 +171,16 @@ export function BellSchedules() {
           />
         </Card>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,26rem),1fr))] gap-4">
           {list.data.map((s) => (
-            <Card key={s.id} className="p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="font-semibold">{s.name}</h2>
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {s.weekdays.map((d) => (
-                      <Badge key={d} tone="blue">
-                        {WEEKDAY_SHORT[d]}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-                {editable && (
-                  <div className="flex">
-                    <IconButton label="Düzenle" onClick={() => openEditor(s)}>
-                      <Pencil className="size-4" />
-                    </IconButton>
-                    <DeleteButton onConfirm={() => ops.remove.mutate(s.id)} />
-                  </div>
-                )}
-              </div>
-              <ol className="mt-4 grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
-                {s.periods.map((p) => (
-                  <li key={p.no} className="flex justify-between gap-2">
-                    <span className="text-slate-500">{periodLabel(p)}</span>
-                    <span className="font-medium tabular-nums">
-                      {p.start} – {p.end}
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            </Card>
+            <ScheduleCard
+              key={s.id}
+              schedule={s}
+              editable={editable}
+              lunchThresholdMin={school.data?.settings.lunchThresholdMin ?? 30}
+              onEdit={() => openEditor(s)}
+              onDelete={() => ops.remove.mutate(s.id)}
+            />
           ))}
         </div>
       )}

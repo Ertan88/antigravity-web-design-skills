@@ -3,6 +3,7 @@ export * from './classes.ts';
 export * from './display.ts';
 export * from './permissions.ts';
 export * from './schemas.ts';
+export * from './schoolName.ts';
 export * from './teachers.ts';
 export * from './time.ts';
 export * from './youtube.ts';

@@ -1,4 +1,4 @@
-import { normalizeName, tidyName, WEEKDAY_NAMES } from '@okulpano/shared';
+import { tidyName, WEEKDAY_NAMES } from '@okulpano/shared';
 import { badRequest } from '../errors.ts';
 import {
   addHelpSheet,
@@ -10,17 +10,18 @@ import {
   loadWorkbook,
   MAX_IMPORT_ROWS,
   newWorkbook,
+  parseDateCell,
   pickSheet,
-  styleHeader,
   toBuffer,
   validations,
   type SheetIssue,
 } from '../excel.ts';
 
 /*
- * Nöbet çizelgesi okulların kâğıtta kullandığı biçimdedir: satırlarda nöbet yerleri, sütunlarda günler,
- * hücrelerde nöbetçi öğretmen (birden fazlaysa virgülle). Bu dosya yazdırılıp panoya da asılabilir.
- * Okurken "Gün | Nöbet Yeri | Öğretmen" sütunlu uzun listeler de kabul edilir.
+ * Nöbet çizelgesi okulların kâğıtta kullandığı aylık biçimdedir: her gün bir blok (birleştirilmiş
+ * gün hücresi), blokta sıra no, nöbetçi öğretmen ve nöbet yeri; sağda o günün tarihleri ve her tarihin
+ * nöbetçi müdür yardımcısı. Nöbet yerleri okulun kendi yerleridir; dosya yazdırılıp panoya da asılabilir.
+ * Okurken ayrıca eski "Nöbet Yeri x Günler" tablosu ve "Gün | Nöbet Yeri | Öğretmen" listeleri kabul edilir.
  */
 
 export interface DutyEntry {
@@ -30,7 +31,15 @@ export interface DutyEntry {
   teacherName: string;
 }
 
+export interface SupervisorEntry {
+  row: number;
+  date: string;
+  name: string;
+}
+
 export const DEFAULT_DUTY_AREAS = ['Zemin Kat', '1. Kat', '2. Kat', 'Bahçe', 'Kantin'];
+
+const MONTHS = ['', 'OCAK', 'ŞUBAT', 'MART', 'NİSAN', 'MAYIS', 'HAZİRAN', 'TEMMUZ', 'AĞUSTOS', 'EYLÜL', 'EKİM', 'KASIM', 'ARALIK'];
 
 const DAY_ALIASES: Record<number, readonly string[]> = {
   1: ['pazartesi', 'pzt', 'pts', 'ptesi'],
@@ -45,7 +54,35 @@ const AREA_ALIASES = ['nobet yeri', 'nobet yerleri', 'yer', 'yerler', 'nobet ala
 const LIST_ALIASES = {
   weekday: ['gun', 'gunu', 'gunler', 'nobet gunu'],
   area: AREA_ALIASES,
-  teacher: ['ogretmen', 'nobetci', 'nobetci ogretmen', 'ogretmen adi soyadi', 'ad soyad', 'adi soyadi', 'nobetci ogretmen adi soyadi'],
+  teacher: [
+    'ogretmen',
+    'nobetci',
+    'nobetci ogretmen',
+    'ogretmen adi soyadi',
+    'ad soyad',
+    'adi soyadi',
+    'adi ve soyadi',
+    'nobetci ogretmen adi soyadi',
+    'nobetci ogretmenin adi soyadi',
+    'nobetci ogretmenin adi ve soyadi',
+    'ogretmenin adi ve soyadi',
+    'ogretmenin adi soyadi',
+  ],
+} as const;
+/** Okulların aylık çizelgesindeki sağ blok: "Tarih | Nöbetçi Müdür Yard." */
+const SUPERVISOR_ALIASES = {
+  date: ['tarih', 'nobet tarihi', 'nobet gunu tarihi'],
+  name: [
+    'nobetci mudur yard',
+    'nobetci mudur yrd',
+    'nobetci mudur yardimcisi',
+    'mudur yard',
+    'mudur yrd',
+    'mudur yardimcisi',
+    'nobetci idareci',
+    'idareci',
+    'nobetci yonetici',
+  ],
 } as const;
 
 export function weekdayOf(text: string): number | null {
@@ -60,14 +97,30 @@ function splitNames(text: string): string[] {
   return text
     .split(/[,;\n]+|\s\/\s/)
     .map(tidyName)
-    .filter(Boolean);
+    .filter((n) => n && !/^\d+[.)]?$/.test(n));
+}
+
+const pad = (n: number) => String(n).padStart(2, '0');
+/** 2026-09-14 -> 14.09.2026 */
+export const trDate = (iso: string) => iso.split('-').reverse().join('.');
+
+/** Ayın verilen haftaiçi günlerine düşen tarihleri (YYYY-AA-GG) */
+export function monthDates(year: number, month: number, weekday: number): string[] {
+  const out: string[] = [];
+  const days = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  for (let d = 1; d <= days; d++) {
+    const wd = ((new Date(Date.UTC(year, month - 1, d)).getUTCDay() + 6) % 7) + 1;
+    if (wd === weekday) out.push(`${year}-${pad(month)}-${pad(d)}`);
+  }
+  return out;
 }
 
 export async function parseDutiesWorkbook(data: Buffer): Promise<{
   sheetName: string;
-  layout: 'matrix' | 'list';
+  layout: 'matrix' | 'list' | 'monthly';
   weekdays: number[];
   entries: DutyEntry[];
+  supervisors: SupervisorEntry[];
   issues: SheetIssue[];
 }> {
   const wb = await loadWorkbook(data);
@@ -79,7 +132,8 @@ export async function parseDutiesWorkbook(data: Buffer): Promise<{
       let areaCol: number | undefined;
       ws.getRow(r).eachCell((cell, col) => {
         const text = cellText(cell.value);
-        const day = weekdayOf(text);
+        // Başlıkta yalnızca gün adı aranır; "1", "2" gibi sıra numaraları gün sayılmaz
+        const day = /^\d+$/.test(text) ? null : weekdayOf(text);
         if (day && ![...days.values()].includes(day)) days.set(col, day);
         else if (areaCol === undefined && AREA_ALIASES.includes(fold(text))) areaCol = col;
       });
@@ -119,96 +173,224 @@ export async function parseDutiesWorkbook(data: Buffer): Promise<{
       }
       for (const c of cells) for (const name of c.names) push(r, c.day, area, name);
     }
-    return { sheetName: ws.name, layout: 'matrix', weekdays: [...new Set(matrix.days.values())].sort(), entries, issues };
+    return { sheetName: ws.name, layout: 'matrix', weekdays: [...new Set(matrix.days.values())].sort(), entries, supervisors: [], issues };
   }
 
-  // 2) Uzun liste biçimi: Gün | Nöbet Yeri | Öğretmen
+  // 2) Aylık blok biçimi ve uzun liste: Gün | (Sıra) | Öğretmen | Nöbet Yeri | (Tarih | Müdür Yard.)
   const header = findHeaderRow(ws, LIST_ALIASES, hasList);
   if (!header) {
-    throw badRequest('Çizelge okunamadı. Şablondaki gibi ilk sütunda "Nöbet Yeri", diğer sütunlarda gün adları (Pazartesi, Salı…) olmalı.');
+    throw badRequest(
+      'Çizelge okunamadı. Şablondaki gibi "Günler", "Nöbetçi Öğretmenin Adı Soyadı" ve "Nöbet Yeri" başlıkları olmalı.',
+    );
   }
-  const { cols } = header;
-  for (let r = header.row + 1; r <= ws.rowCount; r++) {
+  const cols = { ...header.cols };
+  // Birleştirilmiş başlık (ör. "Nöbetçi Öğretmenin Adı Soyadı" B3:C4) birden fazla sütunu kaplar; ilki genelde
+  // sıra numarasıdır. Aynı başlığı taşıyan son sütun öğretmen sütunudur.
+  const headerText = (c: number) => fold(cellText(ws.getRow(header.row).getCell(c).value));
+  while (cols.teacher! + 1 !== cols.area && headerText(cols.teacher! + 1) === headerText(cols.teacher!)) cols.teacher!++;
+
+  // Müdür yardımcısı bloğu başlık satırında ya da hemen altındaki ikinci başlık satırında olabilir
+  let sup: { date?: number; name?: number } = {};
+  let dataStart = header.row + 1;
+  for (let r = header.row; r <= Math.min(header.row + 2, ws.rowCount); r++) {
+    const found: { date?: number; name?: number } = {};
+    ws.getRow(r).eachCell((cell, col) => {
+      const text = fold(cellText(cell.value));
+      if (found.date === undefined && SUPERVISOR_ALIASES.date.includes(text as never)) found.date = col;
+      if (found.name === undefined && SUPERVISOR_ALIASES.name.includes(text as never)) found.name = col;
+    });
+    if (found.date !== undefined && found.name !== undefined) {
+      sup = found;
+      dataStart = Math.max(dataStart, r + 1);
+      break;
+    }
+  }
+  const supervisors = new Map<string, SupervisorEntry>();
+  const headerWords = new Set([...LIST_ALIASES.weekday, ...AREA_ALIASES]);
+
+  for (let r = dataStart; r <= ws.rowCount; r++) {
     const row = ws.getRow(r);
     const dayText = cellText(row.getCell(cols.weekday!).value);
     const area = tidyName(cellText(row.getCell(cols.area!).value));
     const names = splitNames(cellText(row.getCell(cols.teacher!).value));
-    if (!dayText && !area && !names.length) continue;
+    // İkinci başlık satırı (birleştirilmiş başlıkların devamı)
+    if (headerWords.has(fold(dayText)) || headerWords.has(fold(area))) continue;
+
+    if (sup.date !== undefined && sup.name !== undefined) {
+      const dateCell = row.getCell(sup.date).value;
+      const supName = tidyName(cellText(row.getCell(sup.name).value));
+      const rawDate = cellText(dateCell);
+      if (rawDate || supName) {
+        const date = parseDateCell(dateCell);
+        if (!date) {
+          if (supName) issues.push({ row: r, message: rawDate ? `Tarih anlaşılamadı: "${rawDate}"` : `"${supName}" için tarih yok` });
+        } else if (supName.length > 80) {
+          issues.push({ row: r, message: 'Müdür yardımcısı adı çok uzun' });
+        } else if (supName.length >= 2) {
+          supervisors.set(date, { row: r, date, name: supName });
+        }
+      }
+    }
+
+    // Boş bırakılmış nöbet satırı (şablondaki doldurulmamış yer) sessizce atlanır
+    if (!names.length) continue;
     const day = weekdayOf(dayText);
-    if (!day) issues.push({ row: r, message: `Gün anlaşılamadı: "${dayText}"` });
+    if (!day) issues.push({ row: r, message: dayText ? `Gün anlaşılamadı: "${dayText}"` : 'Gün boş' });
     else if (!area) issues.push({ row: r, message: 'Nöbet yeri boş' });
-    else if (!names.length) issues.push({ row: r, message: 'Öğretmen boş' });
     else for (const name of names) push(r, day, area, name);
   }
-  return { sheetName: ws.name, layout: 'list', weekdays: [...new Set(entries.map((e) => e.weekday))].sort(), entries, issues };
+  return {
+    sheetName: ws.name,
+    layout: sup.date !== undefined ? 'monthly' : 'list',
+    weekdays: [...new Set(entries.map((e) => e.weekday))].sort(),
+    entries,
+    supervisors: [...supervisors.values()].sort((x, y) => x.date.localeCompare(y.date)),
+    issues,
+  };
 }
 
 /**
- * Çizelge şablonu / dışa aktarma. Hücrelerde kadrodaki öğretmenler açılır listede; yatay A4'e
- * sığacak şekilde sayfa ayarlı, üst bilgide okul adı yazar.
+ * Aylık çizelge (şablon / dışa aktarma). Okulların kullandığı kâğıt düzenidir: üstte başlık ve ay,
+ * her gün için birleştirilmiş blok, sağda o günün ay içindeki tarihleri ve nöbetçi müdür yardımcısı.
+ * Öğretmen ve nöbet yeri hücrelerinde açılır liste vardır; sayfa yatay A4'e tek sayfa sığar.
  */
 export async function buildDutiesWorkbook(opts: {
   schoolName: string;
   teachers: string[];
   areas: string[];
   weekdays: number[];
-  /** alan -> gün -> öğretmenler; şablonda boş */
-  cells?: Map<string, Map<number, string[]>>;
+  year: number;
+  month: number;
+  /** gün -> o günün nöbetleri (sırasıyla); şablonda boş, nöbet yerleri `areas`tan gelir */
+  days?: Map<number, { area: string; teacherName: string }[]>;
+  /** YYYY-AA-GG -> müdür yardımcısı */
+  supervisors?: Map<string, string>;
 }): Promise<Buffer> {
   const wb = newWorkbook();
   const ws = wb.addWorksheet('Nöbet Çizelgesi', {
-    views: [{ state: 'frozen', xSplit: 1, ySplit: 1 }],
-    pageSetup: { orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0, horizontalCentered: true },
-    headerFooter: { oddHeader: `&C&"-,Bold"&14${opts.schoolName.replace(/&/g, '&&')} · Nöbet Çizelgesi`, oddFooter: '&LOkul Pano&R&D' },
+    views: [{ state: 'frozen', ySplit: 4, showGridLines: false }],
+    pageSetup: {
+      orientation: 'landscape',
+      paperSize: 9,
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 1,
+      horizontalCentered: true,
+      margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 },
+    },
+    headerFooter: { oddHeader: `&C&"-,Bold"&12${opts.schoolName.replace(/&/g, '&&')}`, oddFooter: '&LOkul Pano&R&D' },
   });
   ws.columns = [
-    { header: 'Nöbet Yeri', key: 'area', width: 24 },
-    ...opts.weekdays.map((d) => ({ header: WEEKDAY_NAMES[d], key: `d${d}`, width: 28 })),
+    { key: 'day', width: 16 },
+    { key: 'no', width: 6 },
+    { key: 'teacher', width: 30 },
+    { key: 'area', width: 38 },
+    { key: 'date', width: 13 },
+    { key: 'sup', width: 26 },
   ];
-  styleHeader(ws);
 
-  const border = { style: 'thin' as const, color: { argb: 'FFCBD5E1' } };
+  const black = { style: 'thin' as const, color: { argb: 'FF000000' } };
+  const box = { top: black, left: black, bottom: black, right: black };
+  const bold = { name: 'Calibri', size: 11, bold: true };
+  const center = { horizontal: 'center' as const, vertical: 'middle' as const, wrapText: true };
+
+  ws.mergeCells('A1:F1');
+  ws.getCell('A1').value = 'ÖĞRETMEN NÖBET ÇİZELGESİ';
+  ws.getCell('A1').font = { name: 'Calibri', size: 18, bold: true };
+  ws.getCell('A1').alignment = center;
+  ws.getRow(1).height = 31.5;
+
+  ws.mergeCells('A2:F2');
+  ws.getCell('A2').value = `AİT OLDUĞU AY: ${MONTHS[opts.month]} ${opts.year}`;
+  ws.getCell('A2').font = bold;
+  ws.getCell('A2').alignment = { horizontal: 'left', vertical: 'middle' };
+
+  ws.mergeCells('A3:A4');
+  ws.getCell('A3').value = 'GÜNLER';
+  ws.mergeCells('B3:C4');
+  ws.getCell('B3').value = 'NÖBETÇİ ÖĞRETMENİN\nADI VE SOYADI';
+  ws.mergeCells('D3:D4');
+  ws.getCell('D3').value = 'NÖBET YERİ';
+  ws.mergeCells('E3:F3');
+  ws.getCell('E3').value = 'NÖBETÇİ MÜDÜR YARD. VE\nNÖBET GÜNLERİ';
+  ws.getCell('E4').value = 'TARİH';
+  ws.getCell('F4').value = 'NÖBETÇİ MÜDÜR YARD.';
+  ws.getRow(3).height = 32.25;
+  ws.getRow(4).height = 18;
+
   const areas = opts.areas.length ? opts.areas : DEFAULT_DUTY_AREAS;
-  for (const area of areas) {
-    const byDay = opts.cells?.get(normalizeName(area));
-    const row = ws.addRow({ area, ...Object.fromEntries(opts.weekdays.map((d) => [`d${d}`, (byDay?.get(d) ?? []).join(', ')])) });
-    row.height = 30;
-    row.getCell(1).font = { bold: true };
+  let r = 5;
+  for (const day of opts.weekdays) {
+    const slots = opts.days?.get(day)?.length ? opts.days.get(day)! : areas.map((area) => ({ area, teacherName: '' }));
+    const dates = monthDates(opts.year, opts.month, day);
+    const height = Math.max(slots.length, dates.length, 1);
+    const first = r;
+    for (let i = 0; i < height; i++, r++) {
+      const row = ws.getRow(r);
+      const slot = slots[i];
+      if (slot) {
+        row.getCell(2).value = i + 1;
+        row.getCell(3).value = slot.teacherName || null;
+        row.getCell(4).value = slot.area;
+      }
+      const date = dates[i];
+      if (date) {
+        row.getCell(5).value = trDate(date);
+        row.getCell(6).value = opts.supervisors?.get(date) ?? null;
+      }
+      row.height = 20;
+    }
+    if (r - 1 > first) ws.mergeCells(first, 1, r - 1, 1);
+    ws.getCell(first, 1).value = WEEKDAY_NAMES[day]!.toLocaleUpperCase('tr-TR');
   }
-  const lastCol = opts.weekdays.length + 1;
-  const printedRows = ws.rowCount;
-  for (let r = 1; r <= printedRows; r++) {
-    for (let c = 1; c <= lastCol; c++) {
-      const cell = ws.getCell(r, c);
-      cell.border = { top: border, left: border, bottom: border, right: border };
-      cell.alignment = { vertical: 'middle', wrapText: true };
+  const last = r - 1;
+
+  for (let row = 2; row <= last; row++) {
+    for (let c = 1; c <= 6; c++) {
+      const cell = ws.getCell(row, c);
+      cell.border = box;
+      if (row <= 4) {
+        cell.font = bold;
+        if (row > 2) cell.alignment = center;
+      } else if (c === 1) {
+        cell.font = bold;
+        cell.alignment = center;
+      } else if (c === 2 || c === 5) {
+        cell.font = { name: 'Calibri', size: 11 };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      } else {
+        cell.font = { name: 'Calibri', size: 11 };
+        cell.alignment = { vertical: 'middle', wrapText: true };
+      }
     }
   }
 
   const [teacherRange, areaRange] = addListsSheet(wb, [opts.teachers, areas]);
-  const lastRow = printedRows + 30;
-  const lastLetter = String.fromCharCode(64 + lastCol);
-  validations(ws).add(`A2:A${lastRow}`, listRule(areaRange!, 'Nöbet yeri', { allowNew: true }));
   validations(ws).add(
-    `B2:${lastLetter}${lastRow}`,
+    `C5:C${last}`,
     listRule(teacherRange!, 'Öğretmen', {
       allowNew: true,
-      error: 'Bu isim kadroda yok. Birden fazla öğretmeni virgülle ayırabilirsiniz; isimler Öğretmen Kadrosu\'ndaki gibi yazılmalı.',
+      error: "Bu isim kadroda yok. İsimler Öğretmen Kadrosu'ndaki gibi yazılmalı; birden fazla öğretmeni virgülle ayırabilirsiniz.",
     }),
   );
+  validations(ws).add(`D5:D${last}`, listRule(areaRange!, 'Nöbet yeri', { allowNew: true }));
 
   addHelpSheet(
     wb,
     `${opts.schoolName} · Nöbet çizelgesi`,
     [
-      '1. İlk sütuna nöbet yerlerini (Zemin Kat, Bahçe, Kantin…), gün sütunlarına o gün nöbetçi öğretmeni yazın.',
-      '2. Hücreye tıklayınca öğretmen kadrosu listelenir. Bir yerde birden fazla öğretmen varsa isimleri virgülle ayırın.',
-      '3. Öğretmen isimleri Öğretmen Kadrosu\'ndaki gibi olmalı; kadroda olmayan isimler içe aktarırken atlanır ve size bildirilir.',
-      '4. Yeni nöbet yeri eklemek için alttaki boş satırlara yazmanız yeterli. Cumartesi/Pazar nöbeti varsa o günün adıyla sütun ekleyin.',
-      '5. İçe aktarırken "değiştir" seçilirse dosyadaki günlerin eski nöbetleri silinip bu çizelge yazılır; dosyada olmayan günlere dokunulmaz.',
-      '6. Bu sayfa yatay A4\'e sığacak şekilde ayarlıdır; yazdırıp panoya da asabilirsiniz.',
+      '1. Her günün bloğunda nöbetçi öğretmeni ve nöbet yerini yazın. Hücreye tıklayınca kadro ve okulunuzun nöbet yerleri listelenir.',
+      '2. Yeni bir nöbet yeri yazabilirsiniz; içe aktarırken okulun nöbet yerlerine eklenir.',
+      "3. Öğretmen isimleri Öğretmen Kadrosu'ndaki gibi olmalı; kadroda olmayan isimler atlanır ve size bildirilir.",
+      '4. Sağdaki bölüme tarih ve o günün nöbetçi müdür yardımcısını yazın; pano o tarihte gösterir.',
+      '5. Bir güne satır eklemek için bloğun içine satır ekleyin; gün hücresi birleştirilmiş kalabilir.',
+      "6. İçe aktarırken \"değiştir\" seçilirse dosyadaki günlerin eski nöbetleri silinip bu çizelge yazılır.",
+      '7. Sayfa yatay A4\'e tek sayfa sığacak şekilde ayarlıdır; yazdırıp panoya asabilirsiniz.',
     ],
-    { header: ['Nöbet Yeri', 'Pazartesi', 'Salı'], row: ['Bahçe', 'Ayşe Demir', 'Ali Kaya, Fatma Aydın'] },
+    {
+      header: ['GÜNLER', 'S.No', 'Öğretmen', 'Nöbet Yeri', 'Tarih', 'Nöbetçi Müdür Yard.'],
+      row: ['PAZARTESİ', '1', 'Ayşe Demir', 'Ön Bahçe', '07.09.2026', 'Ali Kaya'],
+    },
   );
   return toBuffer(wb);
 }

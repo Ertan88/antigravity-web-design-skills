@@ -40,6 +40,8 @@ function endAfterStart(v: { startsAt?: string | null; endsAt?: string | null }, 
 /* ---------- Okul ve ayarlar ---------- */
 
 export const schoolSettingsSchema = z.object({
+  /** Panoda okul adının altında ikinci satır (ör. "Mesleki ve Teknik Anadolu Lisesi"). Boşsa addan tahmin edilir. */
+  schoolType: z.string().trim().max(80).default(''),
   theme: z.enum(['dark', 'light']).default('dark'),
   primaryColor: hexColor.default('#3b82f6'),
   accentColor: hexColor.default('#f59e0b'),
@@ -215,6 +217,12 @@ export const dutySchema = z.object({
   sortOrder: z.number().int().default(0),
 });
 
+/** Nöbetçi müdür yardımcısı tarihe bağlıdır; aynı güne tek kayıt. İsim serbest metindir (ör. "M. Akkaya"). */
+export const dutySupervisorSchema = z.object({
+  date: isoDate,
+  name: required('Nöbetçi müdür yardımcısı', 80, 2),
+});
+
 export const leaveSchema = z
   .object({
     teacherId: id,
@@ -263,6 +271,8 @@ export const dutyImportSchema = z.object({
       }),
     )
     .max(2000, 'Tek seferde en fazla 2000 nöbet aktarılabilir'),
+  /** Dosyadaki tarih / nöbetçi müdür yardımcısı eşleşmeleri; aynı tarihte kayıt varsa güncellenir */
+  supervisors: z.array(dutySupervisorSchema).max(400).default([]),
 });
 export type DutyImportInput = z.infer<typeof dutyImportSchema>;
 

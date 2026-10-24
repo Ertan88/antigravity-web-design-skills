@@ -131,7 +131,7 @@ export function ExcelImportDialog<R, P extends ImportPreview<R>, O>(props: Excel
       {error && <Alert tone="red">{error}</Alert>}
       {preview && (
         <div className="space-y-5">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fit,minmax(7.5rem,1fr))]">
             {props.stats(preview, options).map((s) => (
               <div key={s.label} className={clsx('rounded-xl px-4 py-3', TILE[s.tone])}>
                 <div className="text-2xl font-bold">{s.value}</div>

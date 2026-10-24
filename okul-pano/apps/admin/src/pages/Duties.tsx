@@ -8,6 +8,7 @@ import { ExcelImportDialog, type ImportPreview } from '../components/ExcelImport
 import { Badge, Field, Input, Segmented, Select } from '../components/ui.tsx';
 import { useAuth } from '../lib/auth.tsx';
 import { nameMap, useList, useSchoolPath, type Duty, type Teacher } from '../lib/data.ts';
+import { currentMonth, monthLabel, SupervisorPanel } from './duties/SupervisorPanel.tsx';
 
 type Form = { weekday: number; area: string; teacherId: string; sortOrder: number };
 
@@ -15,8 +16,10 @@ const todayWeekday = () => ((new Date().getDay() + 6) % 7) + 1;
 
 type Mode = 'replace' | 'merge';
 type DutyRow = { weekday: number; day: string; area: string; teacherName: string; teacherInactive: boolean };
+type SupervisorRow = { date: string; name: string; status: 'new' | 'update' | 'unchanged' };
 type DutyPreview = ImportPreview<DutyRow> & {
   weekdays: number[];
+  supervisors: SupervisorRow[];
   removed: { day: string; area: string; teacherName: string }[];
   additions: { label: string; values: string[] }[];
 };
@@ -40,7 +43,7 @@ function DutyExcelImport({ file, onClose }: { file: File | null; onClose: () => 
       file={file}
       onClose={onClose}
       basePath={basePath}
-      invalidate={['duties']}
+      invalidate={['duties', 'duty-supervisors']}
       initialOptions={{ mode: 'replace' }}
       columns={[
         { header: 'Gün', cell: (r) => r.day },
@@ -59,6 +62,7 @@ function DutyExcelImport({ file, onClose }: { file: File | null; onClose: () => 
         { label: 'Yeni nöbet', value: p.totals.new, tone: 'green' },
         { label: 'Değişiklik yok', value: p.totals.unchanged, tone: 'slate' },
         { label: 'Kaldırılacak', value: o.mode === 'replace' ? p.removed.length : 0, tone: o.mode === 'replace' && p.removed.length ? 'red' : 'slate' },
+        { label: 'Müdür yrd. (tarih)', value: p.supervisors.filter((x) => x.status !== 'unchanged').length, tone: 'blue' },
         { label: 'Atlanacak satır', value: p.totals.skipped, tone: p.totals.skipped ? 'amber' : 'slate' },
       ]}
       additions={(p) => p.additions}
@@ -80,32 +84,50 @@ function DutyExcelImport({ file, onClose }: { file: File | null; onClose: () => 
           ))}
         </div>
       )}
-      renderExtra={(p, o) =>
-        o.mode === 'replace' &&
-        p.removed.length > 0 && (
-          <details className="rounded-xl bg-red-50 p-4 text-sm text-red-900 ring-1 ring-red-200">
-            <summary className="cursor-pointer font-semibold">Kaldırılacak {p.removed.length} nöbet</summary>
-            <ul className="mt-2 space-y-0.5">
-              {p.removed.map((r, i) => (
-                <li key={i}>
-                  {r.day} · {r.area} · {r.teacherName}
-                </li>
-              ))}
-            </ul>
-          </details>
-        )
+      renderExtra={(p, o) => (
+        <>
+          {p.supervisors.length > 0 && (
+            <details className="rounded-xl bg-teal-50 p-4 text-sm text-teal-950 ring-1 ring-teal-200">
+              <summary className="cursor-pointer font-semibold">Nöbetçi müdür yardımcısı · {p.supervisors.length} tarih</summary>
+              <ul className="mt-2 grid gap-x-6 gap-y-0.5 sm:grid-cols-2">
+                {p.supervisors.map((x) => (
+                  <li key={x.date} className="flex items-center gap-2">
+                    <span className="tabular-nums">{x.date.split('-').reverse().join('.')}</span>
+                    <span className="font-medium">{x.name}</span>
+                    {x.status !== 'unchanged' && <Badge tone={x.status === 'new' ? 'green' : 'blue'}>{x.status === 'new' ? 'yeni' : 'güncellenecek'}</Badge>}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+          {o.mode === 'replace' && p.removed.length > 0 && (
+            <details className="rounded-xl bg-red-50 p-4 text-sm text-red-900 ring-1 ring-red-200">
+              <summary className="cursor-pointer font-semibold">Kaldırılacak {p.removed.length} nöbet</summary>
+              <ul className="mt-2 space-y-0.5">
+                {p.removed.map((r, i) => (
+                  <li key={i}>
+                    {r.day} · {r.area} · {r.teacherName}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </>
+      )}
+      commitCount={(p, o) =>
+        (o.mode === 'replace' ? p.totals.new + p.removed.length : p.totals.new) + p.supervisors.filter((x) => x.status !== 'unchanged').length
       }
-      commitCount={(p, o) => (o.mode === 'replace' ? p.totals.new + p.removed.length : p.totals.new)}
       commitLabel={(_, o) => (o.mode === 'replace' ? 'Çizelgeyi kaydet' : 'Yeni nöbetleri ekle')}
       commitBody={(p, o) => ({
         mode: o.mode,
         weekdays: p.weekdays,
         rows: p.rows.map(({ weekday, area, teacherName }) => ({ weekday, area, teacherName })),
+        supervisors: p.supervisors.map(({ date, name }) => ({ date, name })),
       })}
-      successMessage={(res: { created: number }, p, o) =>
-        o.mode === 'replace'
+      successMessage={(res: { created: number; supervisors: number }, p, o) =>
+        (o.mode === 'replace'
           ? `Nöbet çizelgesi güncellendi: ${p.totals.new} yeni nöbet${p.removed.length ? `, ${p.removed.length} nöbet kaldırıldı` : ''}`
-          : `${res.created} nöbet eklendi`
+          : `${res.created} nöbet eklendi`) + (res.supervisors ? ` · ${res.supervisors} tarihin müdür yardımcısı kaydedildi` : '')
       }
     />
   );
@@ -114,6 +136,7 @@ function DutyExcelImport({ file, onClose }: { file: File | null; onClose: () => 
 export function Duties() {
   const [day, setDay] = useState(() => Math.min(todayWeekday(), 5));
   const [excelFile, setExcelFile] = useState<File | null>(null);
+  const [month, setMonth] = useState(currentMonth);
   const { can } = useAuth();
   const dutiesPath = useSchoolPath('duties');
   const teachers = useList<Teacher>('teachers');
@@ -128,7 +151,7 @@ export function Duties() {
         resource="duties"
         label="Nöbet"
         title="Nöbet Çizelgesi"
-        description="Her gün için nöbet yeri ve nöbetçi öğretmen. Pano bugünün nöbetçilerini kendiliğinden gösterir."
+        description={`Her gün için nöbet yeri ve nöbetçi öğretmen; altta tarih tarih nöbetçi müdür yardımcısı. Excel şablonu ve dışa aktarma okulunuzun aylık çizelge düzenindedir (${monthLabel(month)}).`}
         permission="duties.manage"
         icon={<ShieldCheck className="size-6" />}
         emptyTitle={`${WEEKDAY_NAMES[day]} için nöbet girilmemiş`}
@@ -142,6 +165,7 @@ export function Duties() {
             exportName="nobet-cizelgesi.xlsx"
             canImport={can('duties.manage')}
             onFile={setExcelFile}
+            query={`month=${month}`}
           />
         }
         schema={dutySchema}
@@ -211,6 +235,14 @@ export function Duties() {
           </>
         )}
       />
+      <div className="mt-6">
+        <SupervisorPanel
+          month={month}
+          onMonth={setMonth}
+          editable={can('duties.manage')}
+          weekdays={new Set([1, 2, 3, 4, 5, ...[6, 7].filter((d) => counts[d])])}
+        />
+      </div>
       <DutyExcelImport file={excelFile} onClose={() => setExcelFile(null)} />
     </>
   );

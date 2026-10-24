@@ -19,6 +19,8 @@ export interface DisplayState {
   };
   exams: { id: string; title: string; examAt: string }[];
   duties: { id: string; weekday: number; area: string; teacherName: string }[];
+  /** Tarihe bağlı nöbetçi müdür yardımcıları (bugünden itibaren bir hafta) */
+  dutySupervisors: { date: string; name: string }[];
   leaves: { id: string; teacherName: string; startDate: string; endDate: string }[];
   birthdays: { id: string; name: string; className: string | null; monthDay: string }[];
   announcements: DisplayAnnouncement[];

@@ -164,6 +164,20 @@ export const duties = pgTable(
   (t) => [index('duties_school_idx').on(t.schoolId, t.weekday)],
 );
 
+/** Nöbetçi müdür yardımcısı: tarihe bağlı, okul başına günde bir kayıt */
+export const dutySupervisors = pgTable(
+  'duty_supervisors',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    date: date('date', { mode: 'string' }).notNull(),
+    name: text('name').notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex('duty_supervisors_school_date_uq').on(t.schoolId, t.date)],
+);
+
 export const teacherLeaves = pgTable(
   'teacher_leaves',
   {

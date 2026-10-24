@@ -9,6 +9,7 @@ import {
   bellSchedules,
   classGroups,
   duties,
+  dutySupervisors,
   exams,
   memberships,
   schools,
@@ -155,6 +156,14 @@ export async function seedDemo(
       })),
     ),
   );
+
+  // Nöbetçi müdür yardımcıları: önümüzdeki iki haftanın hafta içi günleri, iki kişi dönüşümlü
+  const supervisorDates = Array.from({ length: 14 }, (_, i) => zonedParts(new Date(now.getTime() + i * 86400_000), tz)).filter(
+    (d) => d.weekday <= 5,
+  );
+  await db
+    .insert(dutySupervisors)
+    .values(supervisorDates.map((d, i) => ({ schoolId, date: d.isoDate, name: i % 2 ? 'Ümit Kılıç' : 'Mustafa Akkaya' })));
 
   await db.insert(teacherLeaves).values([
     { schoolId, teacherId: teacherRows[8]!.id, startDate: today.isoDate, endDate: today.isoDate, note: 'Sağlık raporu' },

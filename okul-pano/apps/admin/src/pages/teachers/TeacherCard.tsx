@@ -47,13 +47,13 @@ export function TeacherCard({
   return (
     <article
       className={clsx(
-        'group relative flex gap-3.5 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 transition-shadow hover:shadow-md',
+        'group relative flex min-w-0 gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 transition-shadow hover:shadow-md',
         !teacher.isActive && 'bg-slate-50',
       )}
     >
       <div
         className={clsx(
-          'flex size-12 shrink-0 items-center justify-center rounded-full text-base font-bold',
+          'flex size-11 shrink-0 items-center justify-center rounded-full text-sm font-bold',
           teacher.isActive ? colorFor(teacher.branch ?? teacher.fullName) : 'bg-slate-200 text-slate-500',
         )}
         aria-hidden="true"
@@ -61,13 +61,20 @@ export function TeacherCard({
         {initials(teacher.fullName)}
       </div>
       <div className="min-w-0 flex-1">
-        <h3 className={clsx('truncate pr-16 font-semibold', teacher.isActive ? 'text-slate-900' : 'text-slate-500')} title={teacher.fullName}>
+        <h3
+          className={clsx(
+            // Dokunmatikte düğmeler hep görünür: isim onların altına girmesin. Faredeyse düğmeler yalnızca üzerine gelince çıkar.
+            'line-clamp-2 pr-[5.25rem] text-[15px] leading-snug font-semibold break-words pointer-fine:pr-0',
+            teacher.isActive ? 'text-slate-900' : 'text-slate-500',
+          )}
+          title={teacher.fullName}
+        >
           {teacher.fullName}
         </h3>
-        <p className="truncate text-sm text-slate-500">{teacher.title ?? 'Ünvan girilmemiş'}</p>
+        <p className="mt-0.5 line-clamp-2 text-sm leading-snug text-slate-500">{teacher.title ?? 'Ünvan girilmemiş'}</p>
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
           {teacher.branch ? (
-            <span className="max-w-full truncate rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{teacher.branch}</span>
+            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs leading-snug font-semibold break-words text-slate-700">{teacher.branch}</span>
           ) : (
             <span className="rounded-md border border-dashed border-slate-300 px-2 py-0.5 text-xs text-slate-400">Branş yok</span>
           )}

@@ -52,7 +52,16 @@ export function ExamCard({ exams, now, timezone }: { exams: DisplayState['exams'
   );
 }
 
-export function DutyCard({ duties, weekdayName }: { duties: DisplayState['duties']; weekdayName: string }) {
+export function DutyCard({
+  duties,
+  weekdayName,
+  supervisor,
+}: {
+  duties: DisplayState['duties'];
+  weekdayName: string;
+  /** Bugünün nöbetçi müdür yardımcısı */
+  supervisor: string | null;
+}) {
   return (
     <section className="card list-card duty-card">
       <div className="card-label">
@@ -61,7 +70,7 @@ export function DutyCard({ duties, weekdayName }: { duties: DisplayState['duties
       </div>
       <AutoPager
         items={duties}
-        rowHeight={54}
+        rowHeight={64}
         keyOf={(d) => d.id}
         empty="Bugün nöbet çizelgesi yok"
         render={(d) => (
@@ -71,6 +80,12 @@ export function DutyCard({ duties, weekdayName }: { duties: DisplayState['duties
           </div>
         )}
       />
+      {supervisor && (
+        <div className="duty-supervisor">
+          <span className="duty-supervisor-label">Nöbetçi Müdür Yrd.</span>
+          <span className="duty-supervisor-name">{supervisor}</span>
+        </div>
+      )}
     </section>
   );
 }
