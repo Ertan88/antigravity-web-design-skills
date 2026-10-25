@@ -74,10 +74,11 @@ export function Header({ schoolName, schoolType, logoUrl, timezone, now, weather
                   <span className="weather-daynight">{weather.isDay ? <SunIcon size={18} /> : <MoonIcon size={18} />}</span>
                 )}
               </span>
-              <div className="weather-temp">
-                {weather.temperature}°<span className="weather-unit">C</span>
-              </div>
-              <div className="weather-detail">
+              {/* Derece üstte, o anki durum hemen altında */}
+              <div className="weather-stack">
+                <div className="weather-temp">
+                  {weather.temperature}°<span className="weather-unit">C</span>
+                </div>
                 <div className="weather-cond">{info.label}</div>
                 {showWeatherAlert && todayAlert && (
                   <div className="weather-alert">

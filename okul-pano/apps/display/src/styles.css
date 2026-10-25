@@ -2725,3 +2725,23 @@ p {
 .header-weather .weather-cond {
   font-size: 21px;
 }
+
+/* Hava durumu: simgenin sağında derece, derecenin altında o anki durum */
+.weather-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.weather-stack .weather-temp {
+  font-size: 42px;
+  line-height: 1;
+}
+
+.weather-stack .weather-cond {
+  margin-top: 3px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--muted);
+}
