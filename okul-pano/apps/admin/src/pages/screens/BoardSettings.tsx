@@ -200,10 +200,16 @@ export function Appearance({ editable }: { editable: boolean }) {
           description="Düzende olan kart o gün içeriksizse (izinli yok, doğum günü yok…) kısa bir notla görünür. Kapalıyken o gün panoda hiç yer almaz."
         />
         <Toggle
-          checked={s.showAirQuality}
-          onChange={(x) => set('showAirQuality', x)}
-          label="Hava kalitesi ve hava durumu uyarısı"
-          description="Üst barda hava durumunun altında hava kalitesi; yoğun kar, aşırı sıcak gibi bir uyarı varsa onun yerine uyarı görünür."
+          checked={s.showWeatherAlert}
+          onChange={(x) => set('showWeatherAlert', x)}
+          label="Hava durumu uyarısı"
+          description="Bugün yoğun kar, aşırı sıcak, fırtına gibi bir durum bekleniyorsa üst barda sıcaklığın yanında uyarı görünür."
+        />
+        <Toggle
+          checked={s.achievementSlides}
+          onChange={(x) => set('achievementSlides', x)}
+          label="Başarılar ve ayın öğrencisi duyurularda da dönsün"
+          description="Başarılar sayfasındaki kayıtlar, duyuru alanında fotoğraflı hazır şablonla ayrı slayt olarak da gösterilir."
         />
         <Toggle
           checked={s.animations}

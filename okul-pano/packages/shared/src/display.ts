@@ -101,10 +101,8 @@ export interface WeatherNow {
   low: number | null;
   city: string | null;
   updatedAt: string;
-  /** Bugün ve yarın için uyarılar (yoğun kar, aşırı sıcak, fırtına…) */
+  /** Bugün ve yarın için uyarılar (yoğun kar, aşırı sıcak, fırtına…); üst barda yalnızca bugünkü */
   alerts?: WeatherAlert[];
-  /** Avrupa hava kalitesi indeksi (0–100+); servis yanıt vermezse yok */
-  aqi?: number | null;
 }
 
 /** SSE üzerinden panoya gönderilen olaylar */

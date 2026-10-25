@@ -7,6 +7,7 @@ import { useSchool } from '../lib/data.ts';
 import { findNav, NAV } from '../lib/nav.ts';
 import { useTheme } from '../lib/theme.ts';
 import { EmergencyBanner, EmergencyButton } from './Emergency.tsx';
+import { NotificationBell } from './Notifications.tsx';
 import { Spinner } from './ui.tsx';
 
 function SchoolSwitcher() {
@@ -194,6 +195,7 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <EmergencyButton />
+          <NotificationBell />
           <ThemeToggle />
         </div>
       </div>

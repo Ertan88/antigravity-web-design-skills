@@ -35,13 +35,3 @@ export function weatherAlerts(d: DailyForecast): WeatherAlert[] {
   }
   return out;
 }
-
-/** Avrupa hava kalitesi indeksi bantları (EEA) */
-export function airQualityLevel(aqi: number): { label: string; tone: 'good' | 'fair' | 'moderate' | 'poor' } {
-  if (aqi <= 20) return { label: 'İyi', tone: 'good' };
-  if (aqi <= 40) return { label: 'Makul', tone: 'good' };
-  if (aqi <= 60) return { label: 'Orta', tone: 'fair' };
-  if (aqi <= 80) return { label: 'Kötü', tone: 'moderate' };
-  if (aqi <= 100) return { label: 'Çok kötü', tone: 'poor' };
-  return { label: 'Son derece kötü', tone: 'poor' };
-}

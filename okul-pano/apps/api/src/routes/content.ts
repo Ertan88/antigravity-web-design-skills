@@ -11,7 +11,7 @@ import {
   schoolSettingsSchema,
   tickerSchema,
 } from '@okulpano/shared';
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, inArray } from 'drizzle-orm';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { audit, schoolGuard, UUID_RE } from '../context.ts';
 import {
@@ -26,6 +26,7 @@ import {
   teacherLeaves,
   teachers,
   tickerItems,
+  users,
 } from '../db/schema.ts';
 import { badRequest, notFound, parse } from '../lib/errors.ts';
 import { registerResource } from './crud.ts';
@@ -35,8 +36,8 @@ function approvalFor(req: FastifyRequest) {
   const settings = schoolSettingsSchema.parse(req.ctx.school.settings ?? {});
   const pending = settings.requireApproval && !req.ctx.permissions.includes('announcements.approve');
   return pending
-    ? { approvalStatus: 'pending' as const, reviewedBy: null, reviewNote: null }
-    : { approvalStatus: 'approved' as const, reviewedBy: null, reviewNote: null };
+    ? { approvalStatus: 'pending' as const, reviewedBy: null, reviewedAt: null, reviewNote: null }
+    : { approvalStatus: 'approved' as const, reviewedBy: null, reviewedAt: null, reviewNote: null };
 }
 
 const toDate = (v: string | null | undefined) => (v ? new Date(v) : null);
@@ -49,6 +50,14 @@ export async function contentRoutes(app: FastifyInstance) {
     permission: 'announcements.manage',
     schema: announcementSchema,
     orderBy: [asc(announcements.sortOrder), desc(announcements.createdAt)],
+    // Listede duyuruyu kimin girdiği de görünür (onay akışı)
+    list: (req) =>
+      app.deps.db
+        .select({ ...getTableColumns(announcements), createdByName: users.fullName })
+        .from(announcements)
+        .leftJoin(users, eq(users.id, announcements.createdBy))
+        .where(eq(announcements.schoolId, req.ctx.schoolId))
+        .orderBy(asc(announcements.sortOrder), desc(announcements.createdAt)),
     toRow: (i, req) => ({
       ...i,
       body: i.body || null,
@@ -80,9 +89,11 @@ export async function contentRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     if (!UUID_RE.test(id)) throw notFound();
     const { note } = parse(reviewSchema, req.body ?? {});
+    // Düzeltmeye gönderirken neden yazılmalı: duyuruyu giren kişi neyi düzelteceğini bilsin
+    if (status === 'rejected' && !note?.trim()) throw badRequest('Düzeltme nedenini yazın.');
     const [updated] = await app.deps.db
       .update(announcements)
-      .set({ approvalStatus: status, reviewedBy: req.ctx.userId, reviewNote: status === 'rejected' ? (note?.trim() || null) : null })
+      .set({ approvalStatus: status, reviewedBy: req.ctx.userId, reviewedAt: new Date(), reviewNote: status === 'rejected' ? note!.trim() : null })
       .where(and(eq(announcements.id, id), eq(announcements.schoolId, req.ctx.schoolId)))
       .returning();
     if (!updated) throw notFound();

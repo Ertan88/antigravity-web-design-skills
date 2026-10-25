@@ -3,7 +3,7 @@ import { TextCursorInput } from 'lucide-react';
 import { CrudPage } from '../components/CrudPage.tsx';
 import { Field, Input, Toggle } from '../components/ui.tsx';
 import type { TickerItem } from '../lib/data.ts';
-import { isoToLocalInput, localInputToIso } from '../lib/format.ts';
+import { expiredRowState, isoToLocalInput, localInputToIso, sortByPublish } from '../lib/format.ts';
 import { PublishCell } from './Announcements.tsx';
 import { TickerSources } from './TickerSources.tsx';
 
@@ -24,6 +24,8 @@ export function Ticker() {
       activeToggle
       reorderable
       tabs={<TickerSources />}
+      select={(rows) => sortByPublish(rows)}
+      rowState={expiredRowState}
       schema={tickerSchema}
       columns={[
         { header: 'Metin', cell: (r) => <span className="font-medium text-ink">{r.text}</span> },

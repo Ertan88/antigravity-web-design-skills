@@ -145,6 +145,34 @@ describe('taşımalı öğrenci (servis) görevlileri', () => {
     expect(body.issues).toEqual([]);
   });
 
+  it('çizelge ayın tamamıdır: dosyada olmayan günler temizlenir, resmî tatilde görevli yazılmaz', async () => {
+    // 29 Ekim'de (Cumhuriyet Bayramı) önceden kalmış bir kayıt var
+    expectStatus(await owner.put(path('transport-duties/2026-10-29'), { teacherIds: [ids['Ali Kaya']] }), 200);
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Worksheet');
+    ws.getCell('A1').value = 'ÖĞRETMEN SERVİS NÖBET ÇİZELGESİ';
+    ws.getCell('A2').value = 'AİT OLDUĞU AY: EKİM';
+    ws.getRow(3).values = ['Nöbet Tarihi', 'Nöbet Günü', 'Nöbetçi Öğretmen 1', 'Nöbetçi Öğretmen 2'];
+    ws.getRow(4).values = ['28.10.2026', 'ÇARŞAMBA', 'Ayşe Demir', null];
+    ws.getRow(5).values = ['30.10.2026', 'CUMA', 'Ali Kaya', null];
+    const body = (await upload(Buffer.from(await wb.xlsx.writeBuffer()))).json();
+    const oct29 = body.rows.find((r: { date: string }) => r.date === '2026-10-29');
+    expect(oct29).toMatchObject({ cleared: true, missing: true, holiday: 'Cumhuriyet Bayramı', teachers: [] });
+
+    // Dosyada tatil gününe isim yazılmışsa alınmaz, uyarı verilir
+    ws.getRow(6).values = ['29.10.2026', 'PERŞEMBE', 'Ayşe Demir', null];
+    const again = (await upload(Buffer.from(await wb.xlsx.writeBuffer()))).json();
+    expect(again.rows.find((r: { date: string }) => r.date === '2026-10-29')).toMatchObject({ cleared: true, teachers: [] });
+    expect(again.issues).toEqual([{ row: 6, message: '29.10.2026 tatil (Cumhuriyet Bayramı); görevli yazılmadı' }]);
+
+    const saved = await owner.post(path('transport-duties/import'), {
+      days: again.rows.map((r: { date: string; teachers: { id: string }[] }) => ({ date: r.date, teacherIds: r.teachers.map((x) => x.id) })),
+    });
+    expectStatus(saved, 200);
+    const days = (await owner.get(path('transport-duties?month=2026-10'))).json() as Day[];
+    expect(days.map((d) => d.date)).toEqual(['2026-10-28', '2026-10-30']);
+  });
+
   it('bir ayın tüm servis nöbetleri temizlenir', async () => {
     expectStatus(await owner.put(path('transport-duties/2026-12-07'), { teacherIds: [ids['Ali Kaya']] }), 200);
     expect((await owner.post(path('transport-duties/clear'), { month: '2026-12' })).json()).toEqual({ removed: 1 });

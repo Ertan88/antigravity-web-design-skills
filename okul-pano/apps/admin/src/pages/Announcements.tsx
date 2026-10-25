@@ -1,16 +1,15 @@
 import { announcementSchema, designTemplate, designTitle, parseYouTubeUrl, youTubeThumbnail, type AnnouncementDesign } from '@okulpano/shared';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Check, Image as ImageIcon, LayoutTemplate, Megaphone, PlayCircle, Type, X } from 'lucide-react';
+import { Image as ImageIcon, LayoutTemplate, Megaphone, PlayCircle, ScanEye, Type } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
 import { CrudPage } from '../components/CrudPage.tsx';
 import { ImageUpload } from '../components/ImageUpload.tsx';
-import { useToast } from '../components/Toast.tsx';
-import { Alert, Badge, Field, IconButton, Input, Segmented, Textarea, Toggle } from '../components/ui.tsx';
-import { api } from '../lib/api.ts';
+import { Alert, Badge, Button, Field, Input, Segmented, Textarea, Toggle } from '../components/ui.tsx';
 import { useAuth } from '../lib/auth.tsx';
-import { useList, useSchool, useSchoolPath, type Announcement, type AnnouncementSchedule, type Screen } from '../lib/data.ts';
-import { formatDateTime, isoToLocalInput, localInputToIso, publishState } from '../lib/format.ts';
+import { useList, useSchool, type Announcement, type AnnouncementSchedule, type Screen } from '../lib/data.ts';
+import { expiredRowState, formatDateTime, isoToLocalInput, localInputToIso, publishState, sortByPublish } from '../lib/format.ts';
 import { DesignEditor, DesignThumb, emptyDesign } from './announcements/DesignEditor.tsx';
+import { ReviewDialog } from './announcements/ReviewDialog.tsx';
 import { emptySchedule, ScheduleFields, scheduleSummary } from './announcements/ScheduleFields.tsx';
 
 type Form = {
@@ -84,29 +83,12 @@ function Thumb({ row }: { row: Announcement }) {
 
 const KIND_LABEL = { image: 'Görsel', video: 'Video', text: 'Metin', design: 'Şablon' };
 
-/** Onay akışı: bekleyen duyuruyu onayla / notla reddet */
-function useReview() {
-  const { schoolId } = useAuth();
-  const path = useSchoolPath('announcements');
-  const qc = useQueryClient();
-  const toast = useToast();
-  return useMutation({
-    mutationFn: ({ id, action, note }: { id: string; action: 'approve' | 'reject'; note?: string }) =>
-      api(`${path}/${id}/${action}`, { method: 'POST', body: { note: note ?? null } }),
-    onSuccess: (_, v) => {
-      void qc.invalidateQueries({ queryKey: [schoolId, 'announcements'] });
-      toast.success(v.action === 'approve' ? 'Duyuru onaylandı, panolarda yayında' : 'Duyuru reddedildi');
-    },
-    onError: (e) => toast.error(e.message),
-  });
-}
-
 export function ApprovalBadge({ row }: { row: Announcement }) {
   if (row.approvalStatus === 'pending') return <Badge tone="amber">Onay bekliyor</Badge>;
   if (row.approvalStatus === 'rejected')
     return (
       <span className="space-y-0.5">
-        <Badge tone="red">Reddedildi</Badge>
+        <Badge tone="red">Düzeltme istendi</Badge>
         {row.reviewNote && <span className="block max-w-[14rem] truncate text-xs text-red-600">{row.reviewNote}</span>}
       </span>
     );
@@ -119,12 +101,17 @@ export function Announcements() {
   const defaultDuration = school.data?.settings.slideDurationSec ?? 10;
   const screens = useList<Screen>('screens');
   const all = useList<Announcement>('announcements');
-  const review = useReview();
   const approver = can('announcements.approve');
+  const [params, setParams] = useSearchParams();
+  const reviewing = (all.data ?? []).find((a) => a.id === params.get('incele')) ?? null;
+  const openReview = (id: string) => setParams({ incele: id });
+  const closeReview = () => setParams({}, { replace: true });
   const pendingCount = (all.data ?? []).filter((a) => a.approvalStatus === 'pending').length;
   const [filter, setFilter] = useState<'all' | 'pending'>('all');
 
   return (
+    <>
+    <ReviewDialog row={reviewing} onClose={closeReview} onEdit={(r) => setParams({ duzenle: r.id }, { replace: true })} />
     <CrudPage<Announcement, Form>
       resource="announcements"
       label="Duyuru"
@@ -139,7 +126,9 @@ export function Announcements() {
       reorderable
       modalSize="xl"
       schema={announcementSchema}
-      select={(rows) => (filter === 'pending' ? rows.filter((r) => r.approvalStatus === 'pending') : rows)}
+      select={(rows) =>
+        sortByPublish(filter === 'pending' ? rows.filter((r) => r.approvalStatus === 'pending') : rows, (r) => r.approvalStatus !== 'approved')
+      }
       tabs={
         (pendingCount > 0 || school.data?.settings.requireApproval) && (
           <div className="space-y-3">
@@ -162,25 +151,22 @@ export function Announcements() {
         )
       }
       rowActions={(r) =>
-        approver && r.approvalStatus !== 'approved' ? (
-          <>
-            <IconButton label="Onayla" className="text-emerald-600 hover:bg-emerald-50" onClick={() => review.mutate({ id: r.id, action: 'approve' })}>
-              <Check className="size-4" />
-            </IconButton>
-            {r.approvalStatus === 'pending' && (
-              <IconButton
-                label="Reddet"
-                className="text-red-600 hover:bg-red-50"
-                onClick={() => {
-                  const note = window.prompt('Reddetme nedeni (öğretmene görünür, isteğe bağlı):') ?? undefined;
-                  review.mutate({ id: r.id, action: 'reject', note });
-                }}
-              >
-                <X className="size-4" />
-              </IconButton>
-            )}
-          </>
+        approver && r.approvalStatus === 'pending' ? (
+          <Button size="sm" variant="success" icon={<ScanEye className="size-3.5" />} onClick={() => openReview(r.id)}>
+            İncele
+          </Button>
         ) : null
+      }
+      // Onay bekleyen / düzeltme istenen en üstte; sonra yayında, pasif, planlanan; en altta süresi dolan
+      savedMessage={(r, isNew) =>
+        r.approvalStatus === 'pending' ? 'Duyuru onaya gönderildi; onaylanınca panolarda yayına çıkar' : isNew ? 'Duyuru eklendi' : 'Duyuru güncellendi'
+      }
+      rowState={(r) =>
+        r.approvalStatus === 'pending'
+          ? { toggle: { checked: false, disabled: 'Onaylanınca yayına çıkar' } }
+          : r.approvalStatus === 'rejected'
+            ? { toggle: { checked: false, disabled: 'Düzeltme istendi: düzenleyip kaydedince yeniden onaya gider' } }
+            : expiredRowState(r)
       }
       columns={[
         {
@@ -309,37 +295,36 @@ export function Announcements() {
             <ScheduleFields
               screenIds={v.screenIds}
               schedule={v.schedule}
+              startsAt={v.startsAt}
+              endsAt={v.endsAt}
               onScreens={(ids) => set('screenIds', ids)}
               onSchedule={(x) => set('schedule', x)}
+              onStartsAt={(x) => set('startsAt', x)}
+              onEndsAt={(x) => set('endsAt', x)}
               error={errors.schedule}
+              endsError={errors.endsAt}
             />
 
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Field label="Gösterim süresi (sn)" error={errors.durationSec}>
-                {(id) => (
-                  <Input
-                    id={id}
-                    type="number"
-                    min={3}
-                    max={1800}
-                    value={v.durationSec}
-                    onChange={(e) => set('durationSec', e.target.value)}
-                    placeholder={v.kind === 'video' ? 'Video süresi' : `Varsayılan (${defaultDuration})`}
-                  />
-                )}
-              </Field>
-              <Field label="Yayın başlangıcı" error={errors.startsAt}>
-                {(id) => <Input id={id} type="datetime-local" value={v.startsAt} onChange={(e) => set('startsAt', e.target.value)} />}
-              </Field>
-              <Field label="Yayın bitişi" error={errors.endsAt}>
-                {(id) => <Input id={id} type="datetime-local" value={v.endsAt} onChange={(e) => set('endsAt', e.target.value)} invalid={Boolean(errors.endsAt)} />}
-              </Field>
-            </div>
+            <Field label="Slaytın ekranda kalma süresi (sn)" error={errors.durationSec}>
+              {(id) => (
+                <Input
+                  id={id}
+                  type="number"
+                  min={3}
+                  max={1800}
+                  className="max-w-56"
+                  value={v.durationSec}
+                  onChange={(e) => set('durationSec', e.target.value)}
+                  placeholder={v.kind === 'video' ? 'Video süresi' : `Varsayılan (${defaultDuration})`}
+                />
+              )}
+            </Field>
 
             <Toggle checked={v.isActive} onChange={(x) => set('isActive', x)} label="Yayında" description="Kapalıysa duyuru saklanır ama panoda gösterilmez." />
           </>
         );
       }}
     />
+    </>
   );
 }

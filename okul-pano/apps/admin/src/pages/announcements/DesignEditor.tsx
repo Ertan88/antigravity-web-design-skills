@@ -2,6 +2,7 @@ import { DESIGN_PALETTE_IDS, DESIGN_PALETTES, DESIGN_TEMPLATES, designFields, de
 import { DesignSlide } from '@okulpano/slides';
 import clsx from 'clsx';
 import { Check } from 'lucide-react';
+import { ImageUpload } from '../../components/ImageUpload.tsx';
 import { Field, Input, Textarea } from '../../components/ui.tsx';
 import { useSchool } from '../../lib/data.ts';
 
@@ -29,7 +30,7 @@ export function DesignEditor({ value, onChange }: { value: AnnouncementDesign; o
     <div className="space-y-5">
       <div>
         <div className="mb-2 text-sm font-medium text-slate-700">Şablon</div>
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
           {DESIGN_TEMPLATES.map((x) => {
             const active = x.id === value.template;
             return (
@@ -61,7 +62,14 @@ export function DesignEditor({ value, onChange }: { value: AnnouncementDesign; o
           {designFields(t).map((f) => (
             <Field key={f.key} label={f.label} help={f.multiline ? `${(value.fields[f.key] ?? '').length}/${f.max}` : undefined}>
               {(id) =>
-                f.multiline ? (
+                f.type === 'image' ? (
+                  <ImageUpload
+                    value={value.fields[f.key] || null}
+                    onChange={(url) => setField(f.key, url ?? '')}
+                    aspect="aspect-square max-w-36"
+                    hint="Kare fotoğraf · velinin izni alınmış olsun (KVKK)"
+                  />
+                ) : f.multiline ? (
                   <Textarea id={id} rows={2} maxLength={f.max} value={value.fields[f.key] ?? ''} placeholder={f.placeholder} onChange={(e) => setField(f.key, e.target.value)} />
                 ) : (
                   <Input id={id} maxLength={f.max} value={value.fields[f.key] ?? ''} placeholder={f.placeholder} onChange={(e) => setField(f.key, e.target.value)} />

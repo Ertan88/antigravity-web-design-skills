@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import { CalendarDays, CopyPlus, ShieldCheck, UserCog } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { TransportToggle } from './duties/TransportToggle.tsx';
 import { CrudPage } from '../components/CrudPage.tsx';
 import { ExcelButtons } from '../components/ExcelButtons.tsx';
 import { ExcelImportDialog, type ImportPreview } from '../components/ExcelImportDialog.tsx';
@@ -291,6 +292,8 @@ export function Duties() {
         title="Nöbet Çizelgesi"
         description="Haftanın her günü için nöbet yerleri ve nöbetçi öğretmenler, tarih tarih nöbetçi müdür yardımcısı. Excel şablonu ve dışa aktarma okulunuzun aylık çizelge düzenindedir; ayı sağdan seçin."
         tabs={
+          <div className="space-y-3">
+          <TransportToggle />
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <ViewTabs
               view={view}
@@ -301,6 +304,7 @@ export function Duties() {
               }}
             />
             <MonthNav month={month} onMonth={setMonth} />
+          </div>
           </div>
         }
         replaceContent={

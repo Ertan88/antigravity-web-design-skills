@@ -47,6 +47,16 @@ export function TickerSources() {
   const md = `${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const history = todayInHistory(md);
   const quote = quoteOfDay(today.toISOString().slice(0, 10));
+  // Hazır kaynaklar: bakanlık ve il millî eğitim haberleri (Google Haberler RSS araması)
+  const news = (q: string) => `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=tr&gl=TR&ceid=TR:tr`;
+  const citySlug = (school.data.city ?? '')
+    .toLocaleLowerCase('tr-TR')
+    .replace(/[çğıöşü]/g, (c) => ({ ç: 'c', ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u' })[c] ?? c)
+    .replace(/[^a-z]/g, '');
+  const presets = [
+    { title: 'MEB haberleri', label: 'MEB', url: news('site:meb.gov.tr') },
+    ...(citySlug ? [{ title: `${school.data.city} Millî Eğitim`, label: `${school.data.city} MEM`, url: news(`site:${citySlug}.meb.gov.tr`) }] : []),
+  ];
   const setFeed = (i: number, patch: Partial<Sources['rssFeeds'][number]>) =>
     setV({ ...v, rssFeeds: v.rssFeeds.map((f, j) => (j === i ? { ...f, ...patch } : f)) });
 
@@ -75,8 +85,26 @@ export function TickerSources() {
             <Rss className="size-4 text-orange-500" /> RSS başlıkları
           </div>
           <p className="mb-3 text-xs text-slate-500">
-            MEB, il / ilçe millî eğitim müdürlüğü ya da okulunuzun sitesindeki RSS adresini ekleyin. Başlıklar 30 dakikada bir yenilenir; “Kaynak · başlık” olarak akar.
+            RSS adresini bilmiyorsanız sitenin adresini yapıştırın; sayfada RSS bağlantısı varsa kendiliğinden bulunur. Bakanlığın sitesinde RSS yoksa aşağıdaki hazır kaynaklar bakanlık
+            ve il millî eğitim haberlerini Google Haberler üzerinden getirir. Başlıklar 30 dakikada bir yenilenir.
           </p>
+          {editable && (
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {presets
+                .filter((p) => !v.rssFeeds.some((f) => f.url === p.url))
+                .map((p) => (
+                  <button
+                    key={p.url}
+                    type="button"
+                    disabled={v.rssFeeds.length >= 5}
+                    onClick={() => setV({ ...v, rssFeeds: [...v.rssFeeds, { label: p.label, url: p.url }] })}
+                    className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-orange-700 ring-1 ring-orange-200 transition hover:bg-orange-50 disabled:opacity-50"
+                  >
+                    <Plus className="size-3.5" /> {p.title}
+                  </button>
+                ))}
+            </div>
+          )}
           <div className="space-y-2">
             {v.rssFeeds.map((f, i) => (
               <div key={i} className="flex gap-2">

@@ -7,7 +7,10 @@ import {
   resolveLayout,
   resolveScreenDisplay,
   specialThemeFor,
+  type AnnouncementDesign,
   type BoardModule,
+  type DisplayAnnouncement,
+  type LayoutItem,
   computeBellStatus,
   isBirthdayToday,
   isWithinWindow,
@@ -18,6 +21,7 @@ import {
 import type { CSSProperties, ReactNode } from 'react';
 import type { DisplayAuth } from './api.ts';
 import { EmergencyScreen } from './components/Emergency.tsx';
+import { GroupCard } from './components/GroupCard.tsx';
 import { Header } from './components/Header.tsx';
 import { SpecialMark } from './components/SpecialMark.tsx';
 import { BookIcon, CakeIcon, CalendarIcon, CapIcon, LibraryIcon, MonitorIcon, TrophyIcon, UserMinusIcon, WifiOffIcon } from './components/Icons.tsx';
@@ -27,10 +31,15 @@ import { BellCard, LessonsCard } from './components/RightColumn.tsx';
 import { Screensaver } from './components/Screensaver.tsx';
 import { Slideshow } from './components/Slideshow.tsx';
 import { Stage, STAGE_H, STAGE_W } from './components/Stage.tsx';
-import { Ticker } from './components/Ticker.tsx';
+import { Ticker, type TickerEntry } from './components/Ticker.tsx';
 import { useClock, useDisplayData, useNightlyReload, useWeather } from './hooks.ts';
 
 const NATIONAL_DAYS = new Set(['10-29', '04-23', '05-19', '08-30']);
+/** "Ekim 2026" */
+const monthName = (iso: string, timeZone: string) => new Intl.DateTimeFormat('tr-TR', { month: 'long', year: 'numeric', timeZone }).format(new Date(iso));
+
+/** Sütunda kalan alanı dolduran kartlar (listeler) */
+const GROW = new Set<BoardModule>(['duties', 'lessons', 'events']);
 
 export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthorized: () => void }) {
   const { state, connection, lastUpdated, offsetMs, identifying } = useDisplayData(auth, onUnauthorized);
@@ -80,19 +89,46 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
   const phase = bell.kind === 'lesson' ? 'lesson' : bell.kind === 'break' ? 'break' : 'other';
   const onAir = state.announcements.filter((a) => announcementOnAir(a.schedule, { weekday: today.weekday, secondsOfDay: today.secondsOfDay, phase }));
 
+
   // Okul hayatı kartları
   const achievementsNow = (state.achievements ?? []).filter((a) => isWithinWindow(nowMs, a.startsAt, a.endsAt));
   const book = (state.books ?? []).find((b) => isWithinWindow(nowMs, b.startsAt, b.endsAt)) ?? null;
   const events = (state.events ?? []).filter((e) => e.date >= today.isoDate);
+  // Başarılar ve ayın öğrencisi duyurularda da hazır şablonla döner (motive edici, büyük ve fotoğraflı)
+  const achievementSlides: DisplayAnnouncement[] = s.achievementSlides
+    ? achievementsNow.map((a) => ({
+        id: `achievement-${a.id}`,
+        kind: 'design',
+        title: a.name,
+        body: null,
+        imageUrl: null,
+        youtubeUrl: null,
+        durationSec: null,
+        startsAt: a.startsAt,
+        endsAt: a.endsAt,
+        design: (a.kind === 'month'
+            ? {
+                template: 'monthStudent',
+                palette: 'amber',
+                fields: { name: a.name, class: a.className ?? '', month: monthName(a.startsAt ?? now.toISOString(), school.timezone), note: a.description ?? a.title, photo: a.photoUrl ?? '' },
+              }
+            : {
+                template: 'achievement',
+                palette: 'emerald',
+                fields: { name: a.name + (a.className ? ` · ${a.className}` : ''), achievement: a.title, note: a.description ?? '', photo: a.photoUrl ?? '' },
+              }) as AnnouncementDesign,
+      }))
+    : [];
+  const slides = [...onAir, ...achievementSlides];
 
   // Kayan yazı: okulun metinleri + hava durumu uyarısı, bugün tarihte, günün sözü, RSS başlıkları
   const quote = quoteOfDay(today.isoDate);
-  const ticker = [
-    ...(s.tickerWeatherAlerts ? (weather?.alerts ?? []).map((a) => `⚠ ${a.text}`) : []),
+  const ticker: TickerEntry[] = [
+    ...(s.tickerWeatherAlerts ? (weather?.alerts ?? []).map((a) => ({ kind: 'weather' as const, tag: 'Hava uyarısı', text: a.text })) : []),
     ...state.ticker.filter((t) => isWithinWindow(nowMs, t.startsAt, t.endsAt)).map((t) => t.text),
-    ...(s.tickerHistory ? todayInHistory(today.monthDay).map((x) => `Bugün tarihte · ${x}`) : []),
-    ...(s.tickerQuote ? [`Günün sözü · “${quote.text}” — ${quote.by}`] : []),
-    ...(state.rss ?? []).map((r) => `${r.source} · ${r.title}`),
+    ...(s.tickerHistory ? todayInHistory(today.monthDay).map((x) => ({ kind: 'history' as const, tag: 'Bugün tarihte', text: x })) : []),
+    ...(s.tickerQuote ? [{ kind: 'quote' as const, tag: 'Günün sözü', text: `“${quote.text}” — ${quote.by}` }] : []),
+    ...(state.rss ?? []).map((r) => ({ kind: 'rss' as const, tag: r.source, text: r.title })),
   ];
 
   // Kartlar panonun düzenine göre (panoya özel ya da okulun) sol / sağ sütuna yerleşir
@@ -155,8 +191,37 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         return book ? <BookCard key={m} book={book} /> : empty(m, <LibraryIcon size={22} />, 'Haftanın Kitabı', 'Bu hafta kitap seçilmedi', 'book-card');
     }
   };
-  const leftCards = layout.left.map(renderModule).filter(Boolean);
-  const rightCards = layout.right.map(renderModule).filter(Boolean);
+  // Birleşik kart: içindekilerden içeriği olanlar aynı yerde sırayla döner; hiçbirinde içerik yoksa
+  // (boş kartlar açıksa) ilkinin kısa notu görünür
+  const renderItem = (item: LayoutItem): ReactNode => {
+    if (!Array.isArray(item)) return renderModule(item);
+    const withContent = item.filter(hasContent);
+    if (!withContent.length) return renderModule(item[0]!);
+    if (withContent.length === 1) return renderModule(withContent[0]!);
+    return <GroupCard key={item.join('+')} members={withContent.map((m) => ({ id: m, node: renderModule(m) }))} grow={item.some((m) => GROW.has(m))} />;
+  };
+  const hasContent = (m: BoardModule): boolean => {
+    switch (m) {
+      case 'exams':
+        return state.exams.length > 0;
+      case 'leaves':
+        return leaves.length > 0;
+      case 'birthdays':
+        return birthdays.length > 0;
+      case 'lessons':
+        return Boolean(lessonPeriod);
+      case 'achievements':
+        return achievementsNow.length > 0;
+      case 'events':
+        return events.length > 0;
+      case 'book':
+        return Boolean(book);
+      default:
+        return true;
+    }
+  };
+  const leftCards = layout.left.map(renderItem).filter(Boolean);
+  const rightCards = layout.right.map(renderItem).filter(Boolean);
 
   const mourning = today.monthDay === '11-10';
   const silenceMinute = mourning && today.hour === 9 && (today.minute === 5 || today.minute === 6);
@@ -214,7 +279,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
 
   const slideshow = (full: boolean) => (
     <Slideshow
-      announcements={onAir}
+      announcements={slides}
       now={now}
       defaultDurationSec={s.slideDurationSec}
       videoSound={s.videoSound}
@@ -261,7 +326,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         connection={connection}
         lastUpdated={lastUpdated}
         specialId={special?.id}
-        showAirQuality={s.showAirQuality}
+        showWeatherAlert={s.showWeatherAlert}
       />
       {special && <SpecialMark id={special.id} className="special-mark-bg" />}
 

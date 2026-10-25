@@ -4,13 +4,35 @@ import { CrudPage } from '../components/CrudPage.tsx';
 import { ImageUpload } from '../components/ImageUpload.tsx';
 import { Badge, Field, Input, Segmented, Textarea, Toggle } from '../components/ui.tsx';
 import type { Achievement, Book, SchoolEvent } from '../lib/data.ts';
-import { isoToLocalInput, localInputToIso } from '../lib/format.ts';
+import { expiredRowState, isoToLocalInput, localInputToIso, sortByPublish } from '../lib/format.ts';
+
+const pad = (n: number) => String(n).padStart(2, '0');
+const thisMonth = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+};
+/** "2026-11" -> 1 Kasım 00:00 ile 1 Aralık 00:00 (yerel saat) */
+const monthWindow = (month: string) => {
+  const [y, m] = month.split('-').map(Number) as [number, number];
+  return { startsAt: new Date(y, m - 1, 1).toISOString(), endsAt: new Date(y, m, 1).toISOString() };
+};
+const monthTitle = (month: string) => {
+  const [y, m] = month.split('-').map(Number) as [number, number];
+  return new Intl.DateTimeFormat('tr-TR', { month: 'long', year: 'numeric' }).format(new Date(y, m - 1, 1));
+};
+const monthOf = (iso: string | null) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+};
 import { PublishCell } from './Announcements.tsx';
 
 /* ---------- Başarılar ve ayın öğrencisi ---------- */
 
 type AchievementForm = {
   kind: 'month' | 'achievement';
+  /** Ayın öğrencisi: hangi ay (YYYY-AA); o ayın 1'inde yayına girer, ay bitince kalkar */
+  month: string;
   name: string;
   className: string;
   title: string;
@@ -37,6 +59,8 @@ export function Achievements() {
       reorderable
       modalSize="lg"
       schema={achievementSchema}
+      select={(rows) => sortByPublish(rows)}
+      rowState={expiredRowState}
       columns={[
         {
           header: 'Öğrenci / takım',
@@ -57,9 +81,21 @@ export function Achievements() {
         { header: 'Tür', cell: (r) => <Badge tone={r.kind === 'month' ? 'amber' : 'blue'}>{r.kind === 'month' ? 'Ayın öğrencisi' : 'Başarı'}</Badge> },
         { header: 'Durum', cell: (r) => <PublishCell row={r} /> },
       ]}
-      emptyForm={() => ({ kind: 'achievement', name: '', className: '', title: '', description: '', photoUrl: null, startsAt: '', endsAt: '', isActive: true })}
+      // Bildirimden gelen ?yeni=ay: form "ayın öğrencisi" ve bu ay seçili açılır
+      emptyForm={(preset) => {
+        const month = preset === 'ay';
+        return { kind: month ? 'month' : 'achievement', month: thisMonth(), name: '', className: '', title: month ? `${monthTitle(thisMonth())} ayının öğrencisi` : '', description: '', photoUrl: null, startsAt: '', endsAt: '', isActive: true };
+      }}
+      savedMessage={(r) => {
+        if (r.kind !== 'month' || !r.startsAt) return null;
+        const month = monthTitle(monthOf(r.startsAt));
+        return Date.parse(r.startsAt) > Date.now()
+          ? `${month} ayının öğrencisi kaydedildi; ayın ilk günü panoda otomatik yayına girecek`
+          : `${month} ayının öğrencisi panoda yayına alındı`;
+      }}
       toForm={(r) => ({
         kind: r.kind,
+        month: monthOf(r.startsAt) || thisMonth(),
         name: r.name,
         className: r.className ?? '',
         title: r.title,
@@ -76,15 +112,18 @@ export function Achievements() {
         title: f.title,
         description: f.description || null,
         photoUrl: f.photoUrl,
-        startsAt: localInputToIso(f.startsAt),
-        endsAt: localInputToIso(f.endsAt),
+        // Ayın öğrencisi: seçilen ayın tamamı; başarı: verilen yayın tarihleri
+        ...(f.kind === 'month' && f.month ? monthWindow(f.month) : { startsAt: localInputToIso(f.startsAt), endsAt: localInputToIso(f.endsAt) }),
         isActive: f.isActive,
       })}
       renderForm={({ values: v, set, errors }) => (
         <>
           <Segmented
             value={v.kind}
-            onChange={(k) => set('kind', k)}
+            onChange={(k) => {
+              set('kind', k);
+              if (k === 'month' && !v.title) set('title', `${monthTitle(v.month || thisMonth())} ayının öğrencisi`);
+            }}
             options={[
               { value: 'achievement', label: 'Başarı / derece' },
               { value: 'month', label: 'Ayın öğrencisi' },
@@ -116,13 +155,42 @@ export function Achievements() {
           <Field label="Fotoğraf (isteğe bağlı)" help="Velinin izni alınmış fotoğraf kullanın (KVKK).">
             {() => <ImageUpload value={v.photoUrl} onChange={(url) => set('photoUrl', url)} aspect="aspect-square max-w-40" hint="Kare fotoğraf · en fazla 10 MB" />}
           </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Yayın başlangıcı">{(id) => <Input id={id} type="datetime-local" value={v.startsAt} onChange={(e) => set('startsAt', e.target.value)} />}</Field>
-            <Field label="Yayın bitişi" error={errors.endsAt}>
-              {(id) => <Input id={id} type="datetime-local" value={v.endsAt} onChange={(e) => set('endsAt', e.target.value)} invalid={Boolean(errors.endsAt)} />}
+          {v.kind === 'month' ? (
+            <Field
+              label="Hangi ayın öğrencisi"
+              help={
+                v.month > thisMonth()
+                  ? `Önceden planlandı: ${monthTitle(v.month)} ayının ilk günü kendiliğinden yayına girer, ay bitince kalkar.`
+                  : v.month === thisMonth()
+                    ? 'Bu ay: kaydettiğiniz anda panoda yayına girer, ay bitince kendiliğinden kalkar.'
+                    : undefined
+              }
+              error={v.month && v.month < thisMonth() ? 'Geçmiş bir ay seçildi; panoda görünmez.' : undefined}
+            >
+              {(id) => (
+                <Input
+                  id={id}
+                  type="month"
+                  min={thisMonth()}
+                  value={v.month}
+                  onChange={(e) => {
+                    const month = e.target.value;
+                    set('month', month);
+                    // Başlık hâlâ önerilen başlıksa ay değişince o da değişir
+                    if (!v.title || /ayının öğrencisi$/.test(v.title)) set('title', month ? `${monthTitle(month)} ayının öğrencisi` : '');
+                  }}
+                />
+              )}
             </Field>
-          </div>
-          <Toggle checked={v.isActive} onChange={(x) => set('isActive', x)} label="Panoda göster" />
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Yayın başlangıcı">{(id) => <Input id={id} type="datetime-local" value={v.startsAt} onChange={(e) => set('startsAt', e.target.value)} />}</Field>
+              <Field label="Yayın bitişi" error={errors.endsAt}>
+                {(id) => <Input id={id} type="datetime-local" value={v.endsAt} onChange={(e) => set('endsAt', e.target.value)} invalid={Boolean(errors.endsAt)} />}
+              </Field>
+            </div>
+          )}
+          <Toggle checked={v.isActive} onChange={(x) => set('isActive', x)} label="Panoda göster" description="Panodaki Başarılar kartında ve duyuru alanında hazır şablonla döner." />
         </>
       )}
     />

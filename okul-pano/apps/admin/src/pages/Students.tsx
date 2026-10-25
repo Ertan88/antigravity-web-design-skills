@@ -1,4 +1,4 @@
-import { normalizeClassName, resolveLayout, studentSchema } from '@okulpano/shared';
+import { layoutModules, normalizeClassName, resolveLayout, studentSchema } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { Cake, ClipboardPaste, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -202,7 +202,7 @@ export function Students() {
   const todayMd = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const needle = q.trim().toLocaleLowerCase('tr-TR');
   const layout = school.data ? resolveLayout(school.data.settings) : null;
-  const hidden = layout && ![...layout.left, ...layout.right].includes('birthdays');
+  const hidden = layout && !layoutModules(layout).includes('birthdays');
 
   return (
     <>

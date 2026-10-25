@@ -323,3 +323,32 @@
     height: calc(var(--u) * 12);
   }
 }
+
+/* Fotoğraflı şablonlar (ayın öğrencisi, başarı) */
+.ds-art-photo {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  border: calc(var(--u) * 0.9) solid var(--ds-accent);
+}
+
+.ds-photo {
+  display: block;
+  overflow: hidden;
+  border-radius: 50%;
+  border: calc(var(--u) * 0.7) solid var(--ds-accent);
+  box-shadow: 0 calc(var(--u) * 1) calc(var(--u) * 3) rgba(0, 0, 0, 0.3);
+}
+
+.ds-photo-center {
+  width: calc(var(--u) * 18);
+  height: calc(var(--u) * 18);
+  margin-bottom: calc(var(--u) * 2);
+}
+
+.ds-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

@@ -7,7 +7,7 @@ import { badRequest, parse } from '../lib/errors.ts';
 import { exportFileName, readXlsxUpload, sendXlsx } from '../lib/excel.ts';
 import { monthRange, remapDate, resolveMonth } from '../lib/months.ts';
 import { loadRoster } from '../lib/roster.ts';
-import { saveHolidays } from './holidays.ts';
+import { holidaysInRange, saveHolidays } from './holidays.ts';
 import { trDate } from '../lib/sheets/duties.ts';
 import { buildTransportWorkbook, parseTransportWorkbook } from '../lib/sheets/transport.ts';
 
@@ -99,16 +99,31 @@ export async function transportRoutes(app: FastifyInstance) {
       entries.set(date, { ...e, date, from: date === e.date ? null : e.date });
     }
     const holidays = [...entries.values()].filter((e) => e.holiday).map((e) => ({ date: e.date, name: e.holiday! }));
-    const dates = [...entries.keys()];
-    const existing = dates.length
-      ? await db
-          .select({ date: transportDuties.date, teacherId: transportDuties.teacherId, sortOrder: transportDuties.sortOrder })
-          .from(transportDuties)
-          .where(and(eq(transportDuties.schoolId, schoolId), inArray(transportDuties.date, dates)))
-          .orderBy(asc(transportDuties.sortOrder))
-      : [];
+    // Çizelge o ayın tamamıdır: ayın bütün kayıtları ve tatilleri karşılaştırılır
+    const [monthFrom, monthTo] = monthRange(resolution.month);
+    const existing = await db
+      .select({ date: transportDuties.date, teacherId: transportDuties.teacherId, sortOrder: transportDuties.sortOrder })
+      .from(transportDuties)
+      .where(and(eq(transportDuties.schoolId, schoolId), gte(transportDuties.date, monthFrom), lte(transportDuties.date, monthTo)))
+      .orderBy(asc(transportDuties.sortOrder));
     const current = new Map<string, string[]>();
     for (const r of existing) current.set(r.date, [...(current.get(r.date) ?? []), r.teacherId]);
+    // Resmî / dini tatiller ve dosyada tatil yazılan günler: görevli yazılmaz (arife yarım gün, sayılmaz)
+    const offDays = new Map<string, string>();
+    for (const h of await holidaysInRange(db, schoolId, monthFrom, monthTo)) if (!h.name.endsWith('Arifesi')) offDays.set(h.date, h.name);
+    for (const h of holidays) offDays.set(h.date, h.name);
+    for (const e of entries.values()) {
+      const off = offDays.get(e.date);
+      if (off && e.names.length) {
+        issues.push({ row: e.row, message: `${e.date.split('-').reverse().join('.')} tatil (${off}); görevli yazılmadı` });
+        e.names = [];
+      }
+      if (off) e.holiday = off;
+    }
+    // Dosyada hiç yer almayan ama kayıtlı görevlisi olan günler (ör. listeden çıkarılan tatil günleri) temizlenir
+    for (const date of current.keys()) {
+      if (!entries.has(date)) entries.set(date, { row: 0, date, names: [], holiday: offDays.get(date) ?? null, from: null });
+    }
 
     const rows = [...entries.values()].flatMap((e) => {
       const teachersFound: { id: string; fullName: string; written: string }[] = [];
@@ -136,11 +151,14 @@ export async function transportRoutes(app: FastifyInstance) {
           teachers: teachersFound,
           cleared: !after.length,
           holiday: e.holiday,
+          /** Dosyada yoktu; ayın listesi dosyadan ibaret olduğu için silinecek */
+          missing: e.row === 0,
           status,
         },
       ];
     });
     issues.sort((x, y) => x.row - y.row);
+    rows.sort((a, b) => a.date.localeCompare(b.date));
     return {
       sheetName: parsed.sheetName,
       month: resolution,

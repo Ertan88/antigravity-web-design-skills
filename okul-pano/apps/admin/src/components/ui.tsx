@@ -9,6 +9,7 @@ import {
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
+  type Ref,
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from 'react';
@@ -63,10 +64,12 @@ export function IconButton({
   label,
   className,
   children,
+  ref,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; ref?: Ref<HTMLButtonElement> }) {
   return (
     <button
+      ref={ref}
       type="button"
       title={label}
       aria-label={label}
@@ -377,36 +380,100 @@ export function Modal({
 }
 
 /** Tek tıkla silmeyi önleyen iki aşamalı sil düğmesi */
-export function DeleteButton({ onConfirm, label = 'Sil', disabled }: { onConfirm: () => void; label?: string; disabled?: boolean }) {
-  const [armed, setArmed] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  useEffect(() => () => clearTimeout(timer.current), []);
-  if (armed) {
-    return (
-      <button
-        type="button"
-        onClick={() => {
-          setArmed(false);
-          onConfirm();
-        }}
-        className="inline-flex h-9 items-center rounded-lg bg-red-600 px-3 text-xs font-semibold text-white hover:brightness-110"
-      >
-        Emin misiniz?
-      </button>
-    );
-  }
+/**
+ * Silme: çöp kutusuna basınca hemen yanında küçük bir onay kutusu açılır ("Silinsin mi?" · Vazgeç · Sil).
+ * Kendiliğinden kapanmaz; Vazgeç, Esc ya da dışarı tıklamak kapatır. Kutu sayfanın üstünde açılır,
+ * tablo kenarlarında kesilmez.
+ */
+export function DeleteButton({
+  onConfirm,
+  label = 'Sil',
+  disabled,
+  what,
+}: {
+  onConfirm: () => void;
+  label?: string;
+  disabled?: boolean;
+  /** Onay kutusunda ne silineceği (ör. "Bu duyuru") */
+  what?: string;
+}) {
+  const [pos, setPos] = useState<{ top: number; right: number; above: boolean } | null>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const cancel = useRef<HTMLButtonElement>(null);
+  const open = () => {
+    const r = button.current?.getBoundingClientRect();
+    if (!r) return;
+    const above = r.bottom + 120 > window.innerHeight;
+    setPos({ top: above ? r.top - 8 : r.bottom + 8, right: Math.max(8, window.innerWidth - r.right), above });
+  };
+  useEffect(() => {
+    if (!pos) return;
+    cancel.current?.focus();
+    const close = (e: Event) => {
+      if (e.type === 'keydown' && (e as KeyboardEvent).key !== 'Escape') return;
+      if (e.type === 'pointerdown' && (box.current?.contains(e.target as Node) || button.current?.contains(e.target as Node))) return;
+      setPos(null);
+    };
+    const reset = () => setPos(null);
+    window.addEventListener('pointerdown', close, true);
+    window.addEventListener('keydown', close);
+    window.addEventListener('scroll', reset, true);
+    window.addEventListener('resize', reset);
+    return () => {
+      window.removeEventListener('pointerdown', close, true);
+      window.removeEventListener('keydown', close);
+      window.removeEventListener('scroll', reset, true);
+      window.removeEventListener('resize', reset);
+    };
+  }, [pos]);
   return (
-    <IconButton
-      label={label}
-      disabled={disabled}
-      className="hover:bg-red-50 hover:text-red-600"
-      onClick={() => {
-        setArmed(true);
-        timer.current = setTimeout(() => setArmed(false), 3000);
-      }}
-    >
-      <Trash2 className="size-4" />
-    </IconButton>
+    <>
+      <IconButton
+        ref={button}
+        label={label}
+        disabled={disabled}
+        aria-expanded={Boolean(pos)}
+        className={clsx('hover:bg-red-50 hover:text-red-600', pos && 'bg-red-50 text-red-600')}
+        onClick={() => (pos ? setPos(null) : open())}
+      >
+        <Trash2 className="size-4" />
+      </IconButton>
+      {pos &&
+        createPortal(
+          <div
+            ref={box}
+            role="dialog"
+            aria-label="Silme onayı"
+            className="animate-toast fixed z-[60] w-60 rounded-xl bg-surface p-3 text-left shadow-[0_12px_40px_-8px_rgba(15,23,42,0.35)] ring-1 ring-slate-200"
+            style={{ top: pos.top, right: pos.right, transform: pos.above ? 'translateY(-100%)' : undefined }}
+          >
+            <div className="text-sm font-semibold text-ink">{what ? `${what} silinsin mi?` : 'Silinsin mi?'}</div>
+            <div className="mt-0.5 text-xs text-slate-500">Bu işlem geri alınamaz.</div>
+            <div className="mt-3 flex justify-end gap-2">
+              <button
+                ref={cancel}
+                type="button"
+                onClick={() => setPos(null)}
+                className="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+              >
+                Vazgeç
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPos(null);
+                  onConfirm();
+                }}
+                className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:brightness-110"
+              >
+                <Trash2 className="size-3.5" /> Sil
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
 

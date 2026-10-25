@@ -148,6 +148,8 @@ export function DesignSlide({ design, schoolName, schoolType, logoUrl, sample = 
   const subline = val(t.subline);
   const info = t.info.map((f) => ({ f, v: val(f) })).filter((x) => x.v);
   const note = val(t.note);
+  // Fotoğraf: örnek görünümde yoktur; yalnızca yüklenmişse simgenin yerine geçer
+  const photo = t.photo ? design.fields[t.photo.key]?.trim() || '' : '';
   const school = schoolName ? splitSchoolName(schoolName, schoolType) : null;
   const style = { '--ds-from': p.from, '--ds-to': p.to, '--ds-accent': p.accent } as CSSProperties;
   const root = useRef<HTMLDivElement>(null);
@@ -165,7 +167,14 @@ export function DesignSlide({ design, schoolName, schoolType, logoUrl, sample = 
 
       <div className="ds-content">
         <div className="ds-text">
-          {t.layout === 'center' && <DesignIconSvg icon={t.icon} className="ds-center-icon" strokeWidth={1.5} />}
+          {t.layout === 'center' &&
+            (photo ? (
+              <span className="ds-photo ds-photo-center">
+                <img src={photo} alt="" />
+              </span>
+            ) : (
+              <DesignIconSvg icon={t.icon} className="ds-center-icon" strokeWidth={1.5} />
+            ))}
           <span className="ds-kicker">{t.kicker}</span>
           <h2 className={`ds-headline ${sizeClass(headline)}`}>{headline}</h2>
           {subline && <div className="ds-subline">{subline}</div>}
@@ -189,7 +198,7 @@ export function DesignSlide({ design, schoolName, schoolType, logoUrl, sample = 
         {t.layout === 'split' && (
           <div className="ds-art" aria-hidden="true">
             <span className="ds-art-ring" />
-            <DesignIconSvg icon={t.icon} className="ds-art-icon" strokeWidth={1.4} />
+            {photo ? <img src={photo} alt="" className="ds-art-photo" /> : <DesignIconSvg icon={t.icon} className="ds-art-icon" strokeWidth={1.4} />}
           </div>
         )}
       </div>

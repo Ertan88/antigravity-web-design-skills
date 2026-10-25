@@ -20,6 +20,7 @@ import { holidayRoutes } from './routes/holidays.ts';
 import { transportRoutes } from './routes/transport.ts';
 import { displayRoutes } from './routes/display.ts';
 import { emergencyRoutes } from './routes/emergency.ts';
+import { notificationRoutes } from './routes/notifications.ts';
 import { memberRoutes } from './routes/members.ts';
 import { schoolRoutes } from './routes/schools.ts';
 import { screenRoutes } from './routes/screens.ts';
@@ -96,6 +97,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   await app.register(screenRoutes);
   await app.register(displayRoutes);
   await app.register(emergencyRoutes);
+  await app.register(notificationRoutes);
 
   /* ---------- Statik dosyalar: yüklenen görseller ve derlenmiş ön yüzler ---------- */
   await app.register(fastifyStatic, {

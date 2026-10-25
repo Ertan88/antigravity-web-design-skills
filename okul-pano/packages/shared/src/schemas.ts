@@ -45,10 +45,15 @@ function endAfterStart(v: { startsAt?: string | null; endsAt?: string | null }, 
 /* ---------- Okul ve ayarlar ---------- */
 
 const boardModule = z.enum(BOARD_MODULES);
+/** Sütun öğesi: tek kart ya da 2-4 kartlık birleşik kart (aynı yerde sırayla döner) */
+const layoutItem = z.union([boardModule, z.array(boardModule).min(2).max(4)]);
 /** Pano düzeni: sol / sağ sütundaki kartlar ve sıraları */
 export const boardLayoutSchema = z
-  .object({ left: z.array(boardModule).max(9), right: z.array(boardModule).max(9) })
-  .refine((l) => new Set([...l.left, ...l.right]).size === l.left.length + l.right.length, 'Bir kart yalnızca bir yerde olabilir');
+  .object({ left: z.array(layoutItem).max(9), right: z.array(layoutItem).max(9) })
+  .refine((l) => {
+    const all = [...l.left, ...l.right].flat();
+    return new Set(all).size === all.length;
+  }, 'Bir kart yalnızca bir yerde olabilir');
 
 export const schoolSettingsSchema = z.object({
   /** Panoda okul adının altında ikinci satır (ör. "Mesleki ve Teknik Anadolu Lisesi"). Boşsa addan tahmin edilir. */
@@ -76,6 +81,8 @@ export const schoolSettingsSchema = z.object({
   specialTheme: z.string().max(20).nullable().default(null),
   /** Onay akışı: açıkken onay yetkisi olmayanların eklediği duyurular onaylanınca yayına çıkar */
   requireApproval: z.boolean().default(false),
+  /** Başarılar ve ayın öğrencisi duyuru alanında da hazır şablonlu slayt olarak döner */
+  achievementSlides: z.boolean().default(true),
   /** Kayan yazıya ek kaynaklar */
   tickerHistory: z.boolean().default(false),
   tickerQuote: z.boolean().default(false),
@@ -84,8 +91,8 @@ export const schoolSettingsSchema = z.object({
     .array(z.object({ label: z.string().trim().min(1).max(30), url: z.url('Geçerli bir RSS adresi girin').max(500) }))
     .max(5)
     .default([]),
-  /** Üst barda hava kalitesi ve hava durumu uyarıları */
-  showAirQuality: z.boolean().default(true),
+  /** Üst barda bugünün hava durumu uyarısı (yoğun kar, aşırı sıcak…) */
+  showWeatherAlert: z.boolean().default(true),
   showExams: z.boolean().default(true),
   showDuties: z.boolean().default(true),
   showLeaves: z.boolean().default(true),
@@ -189,7 +196,7 @@ export const announcementScheduleSchema = z.object({
 export const announcementDesignSchema = z.object({
   template: z.enum(DESIGN_TEMPLATE_IDS),
   palette: z.enum(DESIGN_PALETTE_IDS),
-  fields: z.record(z.string().max(40), z.string().trim().max(300)),
+  fields: z.record(z.string().max(40), z.string().trim().max(500)),
 });
 
 export const announcementSchema = z

@@ -43,12 +43,44 @@ export function timeAgo(iso: string | null | undefined): string {
 
 /** Duyuru/kayan yazının yayın durumu */
 export type PublishState = 'live' | 'scheduled' | 'expired' | 'off';
-export function publishState(row: { isActive: boolean; startsAt: string | null; endsAt: string | null }): PublishState {
-  if (!row.isActive) return 'off';
+type Publishable = { isActive: boolean; startsAt: string | null; endsAt: string | null };
+
+export function publishState(row: Publishable): PublishState {
   const now = Date.now();
-  if (row.startsAt && Date.parse(row.startsAt) > now) return 'scheduled';
+  // Süresi dolan kayıt, yayında anahtarı ne olursa olsun "süresi doldu"dur
   if (row.endsAt && Date.parse(row.endsAt) <= now) return 'expired';
+  if (!row.isActive) return 'off';
+  if (row.startsAt && Date.parse(row.startsAt) > now) return 'scheduled';
   return 'live';
+}
+
+const RANK: Record<PublishState, number> = { live: 0, off: 1, scheduled: 2, expired: 3 };
+
+/**
+ * Liste sırası: yayındakiler üstte (kendi sıralarıyla), sonra pasifler, sonra planlananlar
+ * (en yakın başlayan önce), en altta süresi dolanlar.
+ */
+export function sortByPublish<T extends Publishable>(rows: T[], first?: (row: T) => boolean): T[] {
+  return rows
+    .map((row, i) => ({ row, i }))
+    .sort((a, b) => {
+      const fa = first?.(a.row) ? 0 : 1;
+      const fb = first?.(b.row) ? 0 : 1;
+      if (fa !== fb) return fa - fb;
+      const ra = RANK[publishState(a.row)];
+      const rb = RANK[publishState(b.row)];
+      if (ra !== rb) return ra - rb;
+      if (ra === 2) return Date.parse(a.row.startsAt!) - Date.parse(b.row.startsAt!);
+      return a.i - b.i;
+    })
+    .map((x) => x.row);
+}
+
+/** Süresi dolan kayıt soluk görünür, yayın anahtarı ancak tarihi düzenlenince açılır */
+export function expiredRowState(row: Publishable) {
+  return publishState(row) === 'expired'
+    ? { dim: true, toggle: { checked: false, disabled: 'Süresi doldu: yeniden yayınlamak için düzenleyip bitiş tarihini değiştirin' } }
+    : {};
 }
 
 export function slugify(text: string): string {

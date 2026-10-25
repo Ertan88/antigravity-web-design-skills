@@ -339,6 +339,7 @@ export const announcements = pgTable(
     /** Onay akışı: onaylanmamış duyuru panoda görünmez */
     approvalStatus: text('approval_status').$type<'approved' | 'pending' | 'rejected'>().notNull().default('approved'),
     reviewedBy: uuid('reviewed_by').references(() => users.id, { onDelete: 'set null' }),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
     reviewNote: text('review_note'),
     durationSec: integer('duration_sec'),
     startsAt: timestamp('starts_at', { withTimezone: true }),

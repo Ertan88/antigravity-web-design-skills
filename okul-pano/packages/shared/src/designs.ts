@@ -3,7 +3,7 @@
  * Görünüm @okulpano/slides paketinde; burada yalnızca şablonların alanları ve renkleri var
  * (API doğrulaması, panel formu ve pano aynı tanımı kullanır).
  */
-export const DESIGN_TEMPLATE_IDS = ['parents', 'trip', 'congrats', 'event', 'exam', 'notice', 'celebration'] as const;
+export const DESIGN_TEMPLATE_IDS = ['monthStudent', 'achievement', 'parents', 'trip', 'congrats', 'event', 'exam', 'notice', 'celebration'] as const;
 export type DesignTemplateId = (typeof DESIGN_TEMPLATE_IDS)[number];
 
 export const DESIGN_PALETTE_IDS = ['petrol', 'navy', 'emerald', 'burgundy', 'amber', 'red', 'slate'] as const;
@@ -28,6 +28,8 @@ export interface DesignField {
   /** Bilgi satırlarında yanında görünen simge */
   icon?: DesignIcon;
   multiline?: boolean;
+  /** 'image': fotoğraf (slaytta büyük simgenin yerine yuvarlak fotoğraf) */
+  type?: 'text' | 'image';
   max: number;
 }
 
@@ -49,6 +51,8 @@ export interface DesignTemplate {
   info: DesignField[];
   /** En alttaki not */
   note?: DesignField;
+  /** Fotoğraf alanı (ayın öğrencisi, başarı) */
+  photo?: DesignField;
 }
 
 const DATE: DesignField = { key: 'date', label: 'Tarih', placeholder: '14 Kasım 2026 Cuma', icon: 'calendar', max: 40 };
@@ -56,7 +60,40 @@ const TIME: DesignField = { key: 'time', label: 'Saat', placeholder: '14:00', ic
 const PLACE: DesignField = { key: 'place', label: 'Yer', placeholder: 'Konferans salonu', icon: 'pin', max: 60 };
 const NOTE: DesignField = { key: 'note', label: 'Not (isteğe bağlı)', placeholder: '', multiline: true, max: 160 };
 
+const PHOTO: DesignField = { key: 'photo', label: 'Fotoğraf (isteğe bağlı)', placeholder: '', type: 'image', max: 500 };
+
 export const DESIGN_TEMPLATES: DesignTemplate[] = [
+  {
+    id: 'monthStudent',
+    name: 'Ayın öğrencisi',
+    description: 'Fotoğraf, ad, sınıf ve neden',
+    kicker: 'Ayın Öğrencisi',
+    icon: 'star',
+    palette: 'amber',
+    layout: 'center',
+    headline: { key: 'name', label: 'Öğrenci', placeholder: 'Elif Yılmaz', max: 60 },
+    subline: { key: 'class', label: 'Sınıf', placeholder: '11-B', max: 30 },
+    info: [{ key: 'month', label: 'Ay', placeholder: 'Ekim 2026', icon: 'calendar', max: 30 }],
+    note: { ...{ key: 'note', label: 'Neden seçildi', placeholder: 'Derslerdeki başarısı, yardımseverliği ve örnek davranışlarıyla.', multiline: true, max: 160 } },
+    photo: PHOTO,
+  },
+  {
+    id: 'achievement',
+    name: 'Başarı / derece',
+    description: 'Fotoğraflı başarı duyurusu',
+    kicker: 'Gururla Duyururuz',
+    icon: 'trophy',
+    palette: 'emerald',
+    layout: 'split',
+    headline: { key: 'name', label: 'Öğrenci / takım', placeholder: 'Robotik Takımımız', max: 60 },
+    subline: { key: 'achievement', label: 'Derece', placeholder: 'Türkiye Üçüncüsü', max: 50 },
+    info: [
+      { key: 'event', label: 'Yarışma', placeholder: 'FIRST LEGO League', icon: 'trophy', max: 70 },
+      { key: 'date', label: 'Tarih', placeholder: 'Ekim 2026', icon: 'calendar', max: 40 },
+    ],
+    note: { key: 'note', label: 'Not (isteğe bağlı)', placeholder: 'Takımımızı ve danışman öğretmenlerini kutlarız.', multiline: true, max: 160 },
+    photo: PHOTO,
+  },
   {
     id: 'parents',
     name: 'Veli toplantısı',
@@ -158,7 +195,7 @@ export interface AnnouncementDesign {
 
 /** Şablonun bütün alanları (başlık, alt satır, bilgiler, not) */
 export function designFields(t: DesignTemplate): DesignField[] {
-  return [t.headline, ...(t.subline ? [t.subline] : []), ...t.info, ...(t.note ? [t.note] : [])];
+  return [...(t.photo ? [t.photo] : []), t.headline, ...(t.subline ? [t.subline] : []), ...t.info, ...(t.note ? [t.note] : [])];
 }
 
 /** Listede ve kayan özetlerde görünen başlık */

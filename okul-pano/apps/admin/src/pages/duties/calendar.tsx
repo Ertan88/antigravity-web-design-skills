@@ -148,7 +148,7 @@ export function DayShell({
         {aside && <span className="ml-auto">{aside}</span>}
       </div>
       {holiday && (
-        <div className="mb-1.5 line-clamp-2 rounded-lg bg-rose-100 px-2 py-1 text-[11px] leading-tight font-semibold text-rose-700" title={holiday.name}>
+        <div className="mb-1.5 rounded-lg bg-rose-100 px-2 py-1 text-[11px] leading-tight font-semibold text-rose-700" title={holiday.name}>
           {holiday.name}
         </div>
       )}

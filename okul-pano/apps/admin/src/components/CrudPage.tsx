@@ -1,4 +1,5 @@
 import type { Permission } from '@okulpano/shared';
+import clsx from 'clsx';
 import { ArrowDown, ArrowUp, Pencil, Plus } from 'lucide-react';
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -31,7 +32,8 @@ export interface CrudPageProps<T extends { id: string }, F extends Record<string
   /** Listeyi süzmek/sıralamak için */
   select?: (rows: T[]) => T[];
   toolbar?: ReactNode;
-  emptyForm: () => F;
+  /** Boş form; ?yeni=<değer> kısayolundaki değer verilir (ör. "ay": ayın öğrencisi) */
+  emptyForm: (preset?: string | null) => F;
   toForm: (row: T) => F;
   toPayload: (form: F) => unknown;
   schema: ZodType;
@@ -45,6 +47,10 @@ export interface CrudPageProps<T extends { id: string }, F extends Record<string
   tabs?: ReactNode;
   /** Verilirse liste kartının yerine gösterilir ve "ekle" düğmesi gizlenir (başka sekme açıkken) */
   replaceContent?: ReactNode;
+  /** Kayıttan sonra özel mesaj (yoksa "… eklendi / güncellendi") */
+  savedMessage?: (saved: T, isNew: boolean) => string | null;
+  /** Satırın görünümü: soluk (süresi dolmuş) ve yayın anahtarının durumu */
+  rowState?: (row: T) => { dim?: boolean; toggle?: { checked: boolean; disabled: string } };
 }
 
 /**
@@ -55,7 +61,7 @@ export function CrudPage<T extends { id: string; isActive?: boolean }, F extends
   const { can } = useAuth();
   const editable = can(p.permission);
   const list = useList<T>(p.resource);
-  const ops = useResource<T>(p.resource, p.label);
+  const ops = useResource<T>(p.resource, p.label, p.savedMessage);
   const form = useForm<F>(p.emptyForm());
   const [editing, setEditing] = useState<T | null>(null);
   const [open, setOpen] = useState(false);
@@ -63,20 +69,31 @@ export function CrudPage<T extends { id: string; isActive?: boolean }, F extends
   const rows = p.select ? p.select(list.data ?? []) : (list.data ?? []);
   const [params, setParams] = useSearchParams();
 
-  const openNew = () => {
+  const openNew = (preset?: string | null) => {
     setEditing(null);
-    form.reset(p.emptyForm());
+    form.reset(p.emptyForm(preset));
     setOpen(true);
   };
 
   // Genel bakıştaki "Duyuru ekle" gibi kısayollar: ?yeni=1 ile form doğrudan açılır
   useEffect(() => {
     if (params.get('yeni') && editable) {
-      openNew();
+      openNew(params.get('yeni'));
       setParams({}, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Bildirimden gelen ?duzenle=<id>: liste yüklenince o kaydın formu açılır
+  const editId = params.get('duzenle');
+  useEffect(() => {
+    if (!editId || !list.data) return;
+    const row = list.data.find((r) => r.id === editId);
+    const next = new URLSearchParams(params);
+    next.delete('duzenle');
+    setParams(next, { replace: true });
+    if (row && editable) openEdit(row);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editId, list.data]);
   const openEdit = (row: T) => {
     setEditing(row);
     form.reset(p.toForm(row));
@@ -105,9 +122,18 @@ export function CrudPage<T extends { id: string; isActive?: boolean }, F extends
 
   const saving = ops.create.isPending || ops.update.isPending;
 
-  const toggle = (row: T) => (
-    <Toggle checked={Boolean(row.isActive)} disabled={!editable} onChange={(v) => ops.patch.mutate({ id: row.id, body: { isActive: v } })} />
-  );
+  const toggle = (row: T) => {
+    const st = p.rowState?.(row).toggle;
+    return (
+      <span title={st?.disabled}>
+        <Toggle
+          checked={st ? st.checked : Boolean(row.isActive)}
+          disabled={!editable || Boolean(st?.disabled)}
+          onChange={(v) => ops.patch.mutate({ id: row.id, body: { isActive: v } })}
+        />
+      </span>
+    );
+  };
 
   const actions = (row: T, i: number) => (
     <div className="flex items-center justify-end gap-0.5">
@@ -142,7 +168,7 @@ export function CrudPage<T extends { id: string; isActive?: boolean }, F extends
           <>
             {p.headerActions}
             {editable && !p.replaceContent && (
-              <Button icon={<Plus className="size-4" />} onClick={openNew}>
+              <Button icon={<Plus className="size-4" />} onClick={() => openNew()}>
                 {p.addLabel}
               </Button>
             )}
@@ -174,7 +200,7 @@ export function CrudPage<T extends { id: string; isActive?: boolean }, F extends
             description={p.emptyText}
             action={
               editable && (
-                <Button icon={<Plus className="size-4" />} onClick={openNew}>
+                <Button icon={<Plus className="size-4" />} onClick={() => openNew()}>
                   {p.addLabel}
                 </Button>
               )
@@ -186,7 +212,7 @@ export function CrudPage<T extends { id: string; isActive?: boolean }, F extends
             <div className="hidden md:block">
               <Table head={[...p.columns.map((c) => c.header), ...(p.activeToggle ? ['Yayında'] : []), '']}>
                 {rows.map((row, i) => (
-                  <tr key={row.id} className="hover:bg-slate-50/60">
+                  <tr key={row.id} className={p.rowState?.(row).dim ? 'opacity-55 hover:opacity-80' : 'hover:bg-slate-50/60'}>
                     {p.columns.map((c, ci) => (
                       <Td key={ci} className={c.className}>
                         {c.cell(row)}
@@ -203,7 +229,7 @@ export function CrudPage<T extends { id: string; isActive?: boolean }, F extends
               {rows.map((row, i) => {
                 const [main, ...rest] = p.columns;
                 return (
-                  <li key={row.id} className="space-y-3 px-4 py-4">
+                  <li key={row.id} className={clsx("space-y-3 px-4 py-4", p.rowState?.(row).dim && "opacity-55")}>
                     {main && <div>{main.cell(row)}</div>}
                     {rest.length > 0 && (
                       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">

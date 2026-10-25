@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { announcementOnAir } from './display.ts';
 import { quoteOfDay, todayInHistory } from './tickerContent.ts';
-import { airQualityLevel, weatherAlerts } from './weather.ts';
+import { weatherAlerts } from './weather.ts';
 
 const at = (hm: string) => Number(hm.slice(0, 2)) * 3600 + Number(hm.slice(3, 5)) * 60;
 
@@ -34,11 +34,6 @@ describe('hava durumu uyarıları', () => {
     const a = weatherAlerts({ ...base, tempMax: [38, 30], gustMax: [70, 10] });
     expect(a.map((x) => x.kind)).toEqual(['heat', 'storm']);
   });
-  it('hava kalitesi bantları', () => {
-    expect(airQualityLevel(15).label).toBe('İyi');
-    expect(airQualityLevel(55).label).toBe('Orta');
-    expect(airQualityLevel(120).tone).toBe('poor');
-  });
 });
 
 describe('kayan yazı içerikleri', () => {
@@ -49,5 +44,17 @@ describe('kayan yazı içerikleri', () => {
   it('günün sözü gün içinde sabit, ertesi gün değişir', () => {
     expect(quoteOfDay('2026-10-29')).toEqual(quoteOfDay('2026-10-29'));
     expect(quoteOfDay('2026-10-29')).not.toEqual(quoteOfDay('2026-10-30'));
+  });
+});
+
+describe('birleşik kartlar', () => {
+  it('düzende birleşik kart tutulur, tek kartı kalan düz karta döner, tekrarlar ayıklanır', async () => {
+    const { cleanLayout, layoutModules } = await import('./layout.ts');
+    const { boardLayoutSchema } = await import('./schemas.ts');
+    const l = cleanLayout({ left: ['duties', ['leaves', 'birthdays']], right: ['bell', ['events', 'events' as never], 'book'] });
+    expect(l).toEqual({ left: ['duties', ['leaves', 'birthdays']], right: ['bell', 'events', 'book'] });
+    expect(layoutModules(l)).toEqual(['duties', 'leaves', 'birthdays', 'bell', 'events', 'book']);
+    expect(boardLayoutSchema.safeParse({ left: [['leaves', 'birthdays']], right: ['leaves'] }).success).toBe(false);
+    expect(boardLayoutSchema.safeParse({ left: [['leaves', 'birthdays']], right: ['bell'] }).success).toBe(true);
   });
 });

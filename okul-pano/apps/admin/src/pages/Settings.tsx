@@ -227,12 +227,13 @@ export function Settings() {
         </Section>
 
         <Section title="Modüller" description="Okulunuzda kullanılan isteğe bağlı bölümler.">
-          <Toggle
-            checked={s.hasTransport}
-            onChange={(x) => setting('hasTransport', x)}
-            label="Taşımalı eğitim (servisle gelen öğrenciler)"
-            description="Açıkken menüde Taşımalı Eğitim sayfası çıkar; panoda o günün taşıma ve öğle yemeği nöbetçileri nöbet kartında görünür."
-          />
+          <p className="text-sm text-slate-500">
+            Taşımalı eğitim (servis) modülü{' '}
+            <Link to="/nobet" className="font-semibold text-brand-700 hover:underline">
+              Nöbet Çizelgesi
+            </Link>{' '}
+            sayfasından açılır.
+          </p>
           <Toggle
             checked={s.requireApproval}
             onChange={(x) => setting('requireApproval', x)}

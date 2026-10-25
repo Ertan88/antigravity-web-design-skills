@@ -24,6 +24,7 @@ export interface Announcement extends Base {
   approvalStatus: 'approved' | 'pending' | 'rejected';
   reviewNote: string | null;
   createdBy: string | null;
+  createdByName: string | null;
   body: string | null;
   imageUrl: string | null;
   youtubeUrl: string | null;
@@ -158,7 +159,12 @@ export function useSchool() {
 }
 
 /** Standart CRUD işlemleri; başarıda listeyi tazeler ve bildirim gösterir. */
-export function useResource<T extends { id: string }>(resource: string, label: string) {
+export function useResource<T extends { id: string }>(
+  resource: string,
+  label: string,
+  /** Kayıttan sonra gösterilecek özel mesaj (ör. "Duyuru onaya gönderildi") */
+  savedMessage?: (saved: T, isNew: boolean) => string | null,
+) {
   const { schoolId } = useAuth();
   const path = useSchoolPath(resource);
   const qc = useQueryClient();
@@ -167,16 +173,16 @@ export function useResource<T extends { id: string }>(resource: string, label: s
 
   const create = useMutation({
     mutationFn: (body: unknown) => api<T>(path, { method: 'POST', body }),
-    onSuccess: () => {
+    onSuccess: (saved) => {
       void invalidate();
-      toast.success(`${label} eklendi`);
+      toast.success(savedMessage?.(saved, true) ?? `${label} eklendi`);
     },
   });
   const update = useMutation({
     mutationFn: ({ id, body }: { id: string; body: unknown }) => api<T>(`${path}/${id}`, { method: 'PUT', body }),
-    onSuccess: () => {
+    onSuccess: (saved) => {
       void invalidate();
-      toast.success(`${label} güncellendi`);
+      toast.success(savedMessage?.(saved, false) ?? `${label} güncellendi`);
     },
   });
   const patch = useMutation({

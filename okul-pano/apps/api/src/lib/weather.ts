@@ -16,22 +16,6 @@ interface OpenMeteoResponse {
   };
 }
 
-/** Avrupa hava kalitesi indeksi; servis yanıt vermezse null (hava durumu yine gösterilir) */
-async function fetchAirQuality(lat: number, lon: number): Promise<number | null> {
-  try {
-    const url = new URL('https://air-quality-api.open-meteo.com/v1/air-quality');
-    url.searchParams.set('latitude', String(lat));
-    url.searchParams.set('longitude', String(lon));
-    url.searchParams.set('current', 'european_aqi');
-    const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
-    if (!res.ok) return null;
-    const json = (await res.json()) as { current?: { european_aqi?: number | null } };
-    return json.current?.european_aqi != null ? Math.round(json.current.european_aqi) : null;
-  } catch {
-    return null;
-  }
-}
-
 export async function getWeather(lat: number, lon: number, timezone: string, city: string | null): Promise<WeatherNow | null> {
   const key = `${lat.toFixed(3)},${lon.toFixed(3)}`;
   const hit = cache.get(key);
@@ -61,7 +45,7 @@ async function fetchWeather(lat: number, lon: number, timezone: string): Promise
   // Bugün ve yarın: yarın için uyarı (ör. yoğun kar) bir gün önceden görünür
   url.searchParams.set('forecast_days', '2');
   url.searchParams.set('timezone', timezone);
-  const [res, aqi] = await Promise.all([fetch(url, { signal: AbortSignal.timeout(8000) }), fetchAirQuality(lat, lon)]);
+  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
   if (!res.ok) throw new Error(`Hava durumu servisi yanıt vermedi: ${res.status}`);
   const json = (await res.json()) as OpenMeteoResponse;
   if (!json.current) throw new Error('Hava durumu verisi eksik');
@@ -80,7 +64,6 @@ async function fetchWeather(lat: number, lon: number, timezone: string): Promise
       snowfall: json.daily?.snowfall_sum ?? [],
       gustMax: json.daily?.wind_gusts_10m_max ?? [],
     }),
-    aqi,
   };
 }
 

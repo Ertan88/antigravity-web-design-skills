@@ -1,6 +1,6 @@
-import { airQualityLevel, splitSchoolName, weatherInfo, type WeatherNow } from '@okulpano/shared/client';
+import { splitSchoolName, weatherInfo, type WeatherNow } from '@okulpano/shared/client';
 import type { Connection } from '../hooks.ts';
-import { AlertIcon, SchoolIcon, WEATHER_ICONS, WifiOffIcon } from './Icons.tsx';
+import { AlertIcon, PinIcon, SchoolIcon, WEATHER_ICONS, WifiOffIcon } from './Icons.tsx';
 import { SpecialMark } from './SpecialMark.tsx';
 
 const timeFmt = new Map<string, Intl.DateTimeFormat>();
@@ -13,6 +13,8 @@ function fmt(tz: string, opts: Intl.DateTimeFormatOptions, key: string) {
   }
   return f;
 }
+
+const capitalize = (t: string) => t.charAt(0).toLocaleUpperCase('tr-TR') + t.slice(1);
 
 interface Props {
   schoolName: string;
@@ -27,11 +29,12 @@ interface Props {
   lastUpdated: number | null;
   /** O günün özel teması (millî bayram, 10 Kasım…): üst barın ortasında filigran */
   specialId?: string;
-  /** Hava kalitesi ve hava durumu uyarısı */
-  showAirQuality?: boolean;
+  /** Bugün için hava durumu uyarısı (yoğun kar, aşırı sıcak…) */
+  showWeatherAlert?: boolean;
 }
 
-export function Header({ schoolName, schoolType, logoUrl, timezone, now, weather, city, connection, lastUpdated, specialId, showAirQuality = true }: Props) {
+export function Header({ schoolName, schoolType, logoUrl, timezone, now, weather, city, connection, lastUpdated, specialId, showWeatherAlert = true }: Props) {
+  const todayAlert = weather?.alerts?.find((a) => a.day === 'today') ?? null;
   const hm = fmt(timezone, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }, 'hm').format(now);
   const sec = fmt(timezone, { second: '2-digit' }, 's').format(now).padStart(2, '0');
   const date = fmt(timezone, { day: 'numeric', month: 'long', year: 'numeric' }, 'date').format(now);
@@ -55,43 +58,37 @@ export function Header({ schoolName, schoolType, logoUrl, timezone, now, weather
 
       <div className="header-right">
         <div className="header-weather">
+          {/* Konum üstte belirgin; altında sıcaklık ve bugünün durumu (yarının tahmini burada yok) */}
+          {(weather?.city ?? city) && (
+            <div className="weather-city">
+              <PinIcon size={17} />
+              {weather?.city ?? city}
+            </div>
+          )}
           {weather && WeatherGlyph && info ? (
-            <>
-              <WeatherGlyph size={58} className="weather-icon" />
-              <div className="weather-text">
-                <div className="weather-temp">
-                  {weather.temperature}°<span className="weather-unit">C</span>
-                </div>
-                <div className="weather-meta">
-                  {info.label}
-                  {weather.high != null && weather.low != null && (
-                    <span className="weather-range">
-                      {' '}
-                      · {weather.high}° / {weather.low}°
-                    </span>
-                  )}
-                </div>
-                {showAirQuality && weather.alerts?.[0] ? (
-                  // Hava durumu uyarısı şehir satırının yerine (ör. yarın yoğun kar)
+            <div className="weather-now">
+              <WeatherGlyph size={52} className="weather-icon" />
+              <div className="weather-temp">
+                {weather.temperature}°<span className="weather-unit">C</span>
+              </div>
+              <div className="weather-detail">
+                <div className="weather-cond">{info.label}</div>
+                {showWeatherAlert && todayAlert ? (
                   <div className="weather-alert">
-                    <AlertIcon size={15} /> {weather.alerts[0].text}
+                    <AlertIcon size={14} /> {capitalize(todayAlert.text.replace(/^Bugün /, ''))}
                   </div>
                 ) : (
-                  (weather.city ?? city ?? (showAirQuality && weather.aqi != null)) && (
-                    <div className="weather-city">
-                      {weather.city ?? city}
-                      {showAirQuality && weather.aqi != null && (
-                        <span className={`aqi aqi-${airQualityLevel(weather.aqi).tone}`}>
-                          {(weather.city ?? city) && ' · '}Hava kalitesi {airQualityLevel(weather.aqi).label.toLocaleLowerCase('tr-TR')}
-                        </span>
-                      )}
+                  weather.high != null &&
+                  weather.low != null && (
+                    <div className="weather-range">
+                      En yüksek {weather.high}° · en düşük {weather.low}°
                     </div>
                   )
                 )}
               </div>
-            </>
+            </div>
           ) : (
-            <div className="weather-meta muted">{city ?? 'Hava durumu'}</div>
+            <div className="weather-cond muted">Hava durumu bekleniyor</div>
           )}
         </div>
 

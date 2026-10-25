@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { parseFeedTitles } from '../src/lib/rss.ts';
+import { discoverFeedUrl, parseFeedTitles, tidyNewsTitle } from '../src/lib/rss.ts';
 import { client, createTestApp, expectStatus, login, SUPER, type TestCtx } from './helpers.ts';
 
 let t: TestCtx;
@@ -82,10 +82,25 @@ describe('onay akışı', () => {
     expectStatus(await owner.post(path(`announcements/${a.id}/approve`), {}), 200);
     expect(await titles(hol.token)).toContain('Gezi duyurusu');
 
+    // Bildirim: onay yetkilisine bekleyen duyuru, duyuruyu girene onay
+    const ownerNotes = (await owner.get(path('notifications'))).json() as { kind: string; to: string }[];
+    expect(ownerNotes.some((n) => n.kind === 'approval')).toBe(false);
+    const editorNotes = (await editor.get(path('notifications'))).json() as { kind: string; body: string }[];
+    expect(editorNotes.find((n) => n.kind === 'approved')?.body).toContain('Gezi duyurusu');
+
     const b = (await editor.post(path('announcements'), { kind: 'text', title: 'Yanlış duyuru' })).json() as { id: string };
+    const pendingNote = ((await owner.get(path('notifications'))).json() as { kind: string; to: string }[]).find((n) => n.kind === 'approval');
+    expect(pendingNote?.to).toBe(`/duyurular?incele=${b.id}`);
+    // Düzeltmeye gönderirken neden zorunlu
+    expect((await owner.post(path(`announcements/${b.id}/reject`), {})).statusCode).toBe(400);
     const rejected = (await owner.post(path(`announcements/${b.id}/reject`), { note: 'Tarih hatalı' })).json() as { approvalStatus: string; reviewNote: string };
     expect(rejected).toMatchObject({ approvalStatus: 'rejected', reviewNote: 'Tarih hatalı' });
     expect(await titles(hol.token)).not.toContain('Yanlış duyuru');
+    const returned = ((await editor.get(path('notifications'))).json() as { kind: string; body: string; to: string }[]).find((n) => n.kind === 'returned');
+    expect(returned).toMatchObject({ body: '“Yanlış duyuru”: Tarih hatalı', to: `/duyurular?duzenle=${b.id}` });
+    // Öğretmen düzeltip kaydedince yeniden onaya düşer
+    const fixed = (await editor.put(path(`announcements/${b.id}`), { kind: 'text', title: 'Doğru duyuru' })).json() as { approvalStatus: string };
+    expect(fixed.approvalStatus).toBe('pending');
 
     // Yöneticinin duyurusu onaysız yayında
     expectStatus(await owner.post(path('announcements'), { kind: 'text', title: 'Müdür duyurusu' }), 201);
@@ -116,5 +131,8 @@ describe('RSS başlıkları', () => {
     expect(parseFeedTitles(rss)).toEqual(['2026-2027 takvimi & tatiller', 'Öğretmen atama sonuçları']);
     const atom = `<feed><entry><title type="html">Yeni &#304;l duyurusu</title></entry></feed>`;
     expect(parseFeedTitles(atom)).toEqual(['Yeni İl duyurusu']);
+    // Web sayfası verilirse sayfadaki RSS bağlantısı bulunur; Google Haberler'de kaynak eki atılır
+    expect(discoverFeedUrl('<head><link rel="alternate" type="application/rss+xml" href="/rss/haber.xml"></head>', 'https://il.meb.gov.tr/duyurular')).toBe('https://il.meb.gov.tr/rss/haber.xml');
+    expect(tidyNewsTitle('Yeni dönem takvimi açıklandı - T.C. Millî Eğitim Bakanlığı', 'https://news.google.com/rss/search?q=x')).toBe('Yeni dönem takvimi açıklandı');
   });
 });

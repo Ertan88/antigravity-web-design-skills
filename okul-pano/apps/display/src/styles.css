@@ -2363,7 +2363,7 @@ p {
 
 /* ---------- Hava durumu uyarısı ve hava kalitesi ---------- */
 .weather-alert {
-  margin-top: 4px;
+  margin-top: 3px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -2380,18 +2380,6 @@ p {
   color: #b45309;
 }
 
-.aqi-good {
-  color: #34d399;
-}
-
-.aqi-fair {
-  color: #fbbf24;
-}
-
-.aqi-moderate,
-.aqi-poor {
-  color: #f87171;
-}
 
 /* ---------- Okul hayatı kartları ---------- */
 .achievements-card { --hue: #f59e0b; --hue-2: #f59e0b; flex: none; }
@@ -2555,4 +2543,147 @@ p {
   font-size: 19px;
   font-weight: 600;
   color: color-mix(in srgb, var(--hue) 65%, var(--text));
+}
+
+/* ---------- Hava durumu (yeniden tasarım): konum üstte, altında sıcaklık ve bugünün durumu ---------- */
+.header-weather {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  max-width: 420px;
+}
+
+.header-weather .weather-city {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--chip-text);
+}
+
+.header-weather .weather-city svg {
+  color: var(--accent);
+}
+
+.weather-now {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-weather .weather-temp {
+  font-size: 46px;
+}
+
+.weather-detail {
+  min-width: 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--border);
+}
+
+.weather-cond {
+  font-size: 19px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header-weather .weather-range {
+  display: block;
+  margin-top: 2px;
+  font-size: 15px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ---------- Kayan yazı: ek kaynaklar etiketli ve farklı renkte ---------- */
+.ticker-item[class*='ticker-'] {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ticker-tag {
+  padding: 4px 12px;
+  border-radius: 10px;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--tag-bg);
+  color: var(--tag-fg);
+}
+
+.ticker-weather { --tag-bg: #f59e0b; --tag-fg: #1c1917; }
+.ticker-weather .ticker-text { color: #fbbf24; font-weight: 700; }
+.ticker-history { --tag-bg: color-mix(in srgb, #38bdf8 25%, transparent); --tag-fg: #7dd3fc; }
+.ticker-quote { --tag-bg: color-mix(in srgb, #a3e635 22%, transparent); --tag-fg: #bef264; }
+.ticker-quote .ticker-text { font-style: italic; }
+.ticker-rss { --tag-bg: color-mix(in srgb, #f87171 22%, transparent); --tag-fg: #fca5a5; }
+
+.theme-light .ticker-weather .ticker-text { color: #b45309; }
+.theme-light .ticker-history { --tag-fg: #0369a1; }
+.theme-light .ticker-quote { --tag-fg: #3f6212; }
+.theme-light .ticker-rss { --tag-fg: #b91c1c; }
+
+/* ---------- Birleşik kart: aynı yerde sırayla dönen kartlar ---------- */
+.card-group {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.card-group-grow {
+  flex: 1;
+}
+
+.card-group-item {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  animation: fade-up 0.5s ease both;
+}
+
+.card-group-item > .card {
+  flex: 1;
+  min-height: 0;
+}
+
+.group-bars {
+  position: absolute;
+  top: 9px;
+  left: 26px;
+  right: 26px;
+  display: flex;
+  gap: 6px;
+  z-index: 3;
+}
+
+.group-bars span {
+  flex: 1;
+  height: 4px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--text) 14%, transparent);
+}
+
+.group-bars span.done {
+  background: color-mix(in srgb, var(--text) 45%, transparent);
+}
+
+.group-bars i {
+  display: block;
+  height: 100%;
+  background: color-mix(in srgb, var(--text) 60%, transparent);
+  transform-origin: left center;
+  animation: progress linear both;
 }

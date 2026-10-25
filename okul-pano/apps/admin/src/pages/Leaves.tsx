@@ -1,4 +1,4 @@
-import { leaveSchema, resolveLayout } from '@okulpano/shared';
+import { layoutModules, leaveSchema, resolveLayout } from '@okulpano/shared';
 import { UserMinus } from 'lucide-react';
 import { useState } from 'react';
 import { CrudPage } from '../components/CrudPage.tsx';
@@ -15,7 +15,7 @@ export function Leaves() {
   const names = nameMap(teachers.data, (t) => t.fullName);
   const today = todayIso();
   const layout = school.data ? resolveLayout(school.data.settings) : null;
-  const hidden = layout && ![...layout.left, ...layout.right].includes('leaves');
+  const hidden = layout && !layoutModules(layout).includes('leaves');
 
   return (
     <CrudPage<Leave, Form>

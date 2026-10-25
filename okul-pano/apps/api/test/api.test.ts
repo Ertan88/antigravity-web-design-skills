@@ -341,11 +341,8 @@ describe('ekran eşleştirme ve pano', () => {
   it('hava durumunu okul konumuna göre getirir ve önbelleğe alır', async () => {
     clearWeatherCache();
     const seeded = await seedDemo(t.database.db);
-    // Tahmin ve hava kalitesi ayrı servislerden gelir
-    const fetchMock = vi.fn(async (url: URL | string) =>
-      String(url).includes('air-quality')
-        ? Response.json({ current: { european_aqi: 31.6 } })
-        : Response.json({
+    const fetchMock = vi.fn(async () =>
+      Response.json({
             current: { temperature_2m: 17.6, weather_code: 2, is_day: 1 },
             daily: {
               temperature_2m_max: [21.2, 4],
@@ -354,18 +351,17 @@ describe('ekran eşleştirme ve pano', () => {
               snowfall_sum: [0, 14],
               wind_gusts_10m_max: [20, 30],
             },
-          }),
+      }),
     );
     vi.stubGlobal('fetch', fetchMock);
     try {
       const get = () =>
         t.app.inject({ method: 'GET', url: '/api/display/weather', headers: { authorization: `Bearer ${seeded.screenToken}` } });
       const first = (await get()).json();
-      expect(first).toMatchObject({ temperature: 18, weatherCode: 2, isDay: true, high: 21, low: 9, city: 'Ankara', aqi: 32 });
+      expect(first).toMatchObject({ temperature: 18, weatherCode: 2, isDay: true, high: 21, low: 9, city: 'Ankara' });
       expect(first.alerts).toEqual([{ kind: 'snow', day: 'tomorrow', text: 'Yarın yoğun kar yağışı bekleniyor' }]);
       await get();
-      // İkinci istek önbellekten: tahmin ve hava kalitesi birer kez çağrıldı
-      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     } finally {
       vi.unstubAllGlobals();
     }

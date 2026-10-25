@@ -60,6 +60,23 @@ function TransportCell({
     next[i] = id;
     void run(() => onSave(next.filter(Boolean)));
   };
+  // Resmî / dini tatilde görevli olmaz: yalnızca tatilin adı (arife yarım gün, normal gün sayılır)
+  if (holiday && !holiday.name.endsWith('Arifesi')) {
+    return (
+      <DayShell day={day} isToday={isToday} tone="amber" aside={<SaveMark state={state} />} holiday={holiday}>
+        {ids.length > 0 && (
+          <div className="space-y-1 text-[11px] text-slate-500">
+            <div>Kayıtlı görevli var; tatil olduğu için panoda gösterilmez.</div>
+            {editable && (
+              <button type="button" className="font-semibold text-rose-700 hover:underline" onClick={() => void run(() => onSave([]))}>
+                Kaydı kaldır
+              </button>
+            )}
+          </div>
+        )}
+      </DayShell>
+    );
+  }
   return (
     <DayShell day={day} isToday={isToday} tone="amber" aside={<SaveMark state={state} />} holiday={holiday}>
       <div className="space-y-1">
@@ -104,6 +121,8 @@ type ImportRow = {
   teachers: (TeacherOption & { written: string })[];
   cleared: boolean;
   holiday: string | null;
+  /** Dosyada yoktu: ayın listesi dosyadan ibaret olduğu için silinecek */
+  missing?: boolean;
 };
 type Preview = ImportPreview<ImportRow> & { month: MonthResolution; holidays: { date: string; name: string }[] };
 
@@ -151,7 +170,12 @@ function TransportImport({ file, onClose, onSaved }: { file: File | null; onClos
           header: 'Görevliler',
           cell: (r) =>
             r.holiday ? (
-              <span className="font-medium text-rose-600">{r.holiday}</span>
+              <span className="font-medium text-rose-600">
+                {r.holiday}
+                {r.cleared && r.status !== 'unchanged' && <span className="ml-2 text-xs font-normal text-slate-400">· kayıtlı görevli silinecek</span>}
+              </span>
+            ) : r.missing ? (
+              <span className="text-slate-400">Dosyada yok · kayıtlı görevli silinecek</span>
             ) : r.cleared ? (
               <span className="text-slate-400">Görevlendirme kaldırılacak</span>
             ) : (
