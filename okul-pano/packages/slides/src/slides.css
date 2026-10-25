@@ -255,16 +255,16 @@
 }
 
 .ds-school-name {
-  font-size: calc(var(--u) * 1.9);
+  font-size: calc(var(--u) * 2.1);
   font-weight: 900;
-  opacity: 0.9;
 }
 
 .ds-school-type {
-  font-size: calc(var(--u) * 1.35);
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  opacity: 0.75;
+  margin-top: calc(var(--u) * 0.2);
+  font-size: calc(var(--u) * 1.7);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ds-accent);
 }
 
 /* Ortalı şablonlar: tebrik, kutlama */
