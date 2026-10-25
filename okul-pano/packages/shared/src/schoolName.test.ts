@@ -20,4 +20,9 @@ describe('splitSchoolName', () => {
     expect(splitSchoolName('Kardelen Okulları')).toEqual({ name: 'Kardelen Okulları', type: null });
     expect(splitSchoolName('Lisesi')).toEqual({ name: 'Lisesi', type: null });
   });
+  it('kısaltmayı tanır', () => {
+    expect(splitSchoolName('Muammer Kocatürk MTAL')).toEqual({ name: 'Muammer Kocatürk', type: 'Mesleki ve Teknik Anadolu Lisesi' });
+    expect(splitSchoolName('Atatürk A.İ.H.L.')).toEqual({ name: 'Atatürk', type: 'Anadolu İmam Hatip Lisesi' });
+    expect(splitSchoolName('Muammer Kocatürk')).toEqual({ name: 'Muammer Kocatürk', type: null });
+  });
 });

@@ -1,4 +1,4 @@
-import { splitSchoolName, updateSchoolSchema, type SchoolSettings } from '@okulpano/shared';
+import { SCHOOL_TYPES, splitSchoolName, updateSchoolSchema, type SchoolSettings } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { MapPin, Search } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -184,15 +184,28 @@ export function Settings() {
           </Field>
           <Field
             label="Okul türü (ikinci satır)"
-            help={`Boş bırakılırsa addan otomatik ayrılır${splitSchoolName(v.name).type ? `: "${splitSchoolName(v.name).type}"` : ''}. Yalnızca farklı göstermek isterseniz doldurun.`}
+            help={
+              splitSchoolName(v.name).type
+                ? `Boş bırakılırsa addan ayrılır: "${splitSchoolName(v.name).type}". Yalnızca farklı göstermek isterseniz doldurun.`
+                : 'Listeden seçin ya da yazın. Panonun üst barında, ekran koruyucuda ve hazır şablonlarda okul adının altında görünür.'
+            }
+            error={!v.settings.schoolType?.trim() && !splitSchoolName(v.name).type ? 'Okul türü boş: panoda okul adının altı boş kalıyor.' : undefined}
           >
             {(id) => (
-              <Input
-                id={id}
-                value={v.settings.schoolType ?? ''}
-                onChange={(e) => setting('schoolType', e.target.value)}
-                placeholder={splitSchoolName(v.name).type ?? 'ör. Mesleki ve Teknik Anadolu Lisesi'}
-              />
+              <>
+                <Input
+                  id={id}
+                  list="school-types"
+                  value={v.settings.schoolType ?? ''}
+                  onChange={(e) => setting('schoolType', e.target.value)}
+                  placeholder={splitSchoolName(v.name).type ?? 'ör. Mesleki ve Teknik Anadolu Lisesi'}
+                />
+                <datalist id="school-types">
+                  {SCHOOL_TYPES.map((t) => (
+                    <option key={t} value={t} />
+                  ))}
+                </datalist>
+              </>
             )}
           </Field>
           <Field label="Logo" help="Şeffaf arka planlı PNG önerilir.">

@@ -2,7 +2,7 @@
  * Panonun üst barı için okul adını iki satıra böler: "MUAMMER KOCATÜRK" / "MESLEKİ VE TEKNİK ANADOLU LİSESİ".
  * Ayarlarda okul türü girilmişse o kullanılır; girilmemişse addaki bilinen tür ekinden (en uzunu) tahmin edilir.
  */
-const SCHOOL_TYPES = [
+export const SCHOOL_TYPES = [
   'Mesleki ve Teknik Anadolu Lisesi',
   'Çok Programlı Anadolu Lisesi',
   'Anadolu İmam Hatip Lisesi',
@@ -22,6 +22,21 @@ const SCHOOL_TYPES = [
   'Lisesi',
 ];
 
+/** Okul adlarında sık yazılan kısaltmalar: "… MTAL" -> Mesleki ve Teknik Anadolu Lisesi */
+const ABBREVIATIONS: Record<string, string> = {
+  mtal: 'Mesleki ve Teknik Anadolu Lisesi',
+  çpal: 'Çok Programlı Anadolu Lisesi',
+  aihl: 'Anadolu İmam Hatip Lisesi',
+  aıhl: 'Anadolu İmam Hatip Lisesi',
+  sbl: 'Sosyal Bilimler Lisesi',
+  gsl: 'Güzel Sanatlar Lisesi',
+  mem: 'Mesleki Eğitim Merkezi',
+  iho: 'İmam Hatip Ortaokulu',
+  bilsem: 'Bilim ve Sanat Merkezi',
+  al: 'Anadolu Lisesi',
+  fl: 'Fen Lisesi',
+};
+
 const lower = (s: string) => s.toLocaleLowerCase('tr-TR').replace(/\s+/g, ' ').trim();
 
 export function splitSchoolName(fullName: string, schoolType?: string | null): { name: string; type: string | null } {
@@ -35,6 +50,10 @@ export function splitSchoolName(fullName: string, schoolType?: string | null): {
     return { name: base, type: typed };
   }
   const n = lower(name);
+  const last = n.split(' ').pop()!.replace(/\./g, '');
+  if (n.includes(' ') && ABBREVIATIONS[last]) {
+    return { name: name.slice(0, name.lastIndexOf(' ')).trim(), type: ABBREVIATIONS[last] };
+  }
   for (const type of SCHOOL_TYPES) {
     const t = lower(type);
     if (n.endsWith(` ${t}`)) {
