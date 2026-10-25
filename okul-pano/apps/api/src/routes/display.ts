@@ -12,7 +12,10 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { UUID_RE } from '../context.ts';
 import type { DB } from '../db/client.ts';
 import {
+  achievements,
   announcements,
+  books,
+  schoolEvents,
   bellSchedules,
   classGroups,
   displayPairings,
@@ -30,6 +33,7 @@ import {
 } from '../db/schema.ts';
 import { pairingCode, randomToken, sha256 } from '../lib/crypto.ts';
 import { forbidden, notFound, unauthorized } from '../lib/errors.ts';
+import { feedTitlesNow } from '../lib/rss.ts';
 import { getWeather } from '../lib/weather.ts';
 import { holidaysInRange } from './holidays.ts';
 import { DEVICE_TOKEN_PREFIX } from './screens.ts';
@@ -102,7 +106,10 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
   const windowed = (startsAt: PgColumn, endsAt: PgColumn) =>
     and(or(isNull(endsAt), gt(endsAt, now)), or(isNull(startsAt), lte(startsAt, weekAhead)));
 
-  const [examRows, dutyRows, holidayRows, supervisorRows, transportRows, leaveRows, birthdayRows, annRows, tickerRows, bellRows, ttRows] = await Promise.all([
+  const monthAheadDate = zonedParts(new Date(now.getTime() + 30 * 86400_000), tz).isoDate;
+  const settingsEarly = schoolSettingsSchema.parse(school.settings ?? {});
+
+  const [examRows, dutyRows, holidayRows, supervisorRows, transportRows, leaveRows, birthdayRows, annRows, tickerRows, bellRows, ttRows, achievementRows, eventRows, bookRows, rssRows] = await Promise.all([
     db
       .select({ id: exams.id, title: exams.title, examAt: exams.examAt })
       .from(exams)
@@ -156,7 +163,15 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
     db
       .select()
       .from(announcements)
-      .where(and(eq(announcements.schoolId, id), eq(announcements.isActive, true), windowed(announcements.startsAt, announcements.endsAt)))
+      .where(
+        and(
+          eq(announcements.schoolId, id),
+          eq(announcements.isActive, true),
+          // Onay akışı: onay bekleyen ya da reddedilen duyuru panoya gitmez
+          eq(announcements.approvalStatus, 'approved'),
+          windowed(announcements.startsAt, announcements.endsAt),
+        ),
+      )
       // Paneldeki listeyle birebir aynı sıra: önce elle verilen sıra, eşitse en yeni üstte
       .orderBy(asc(announcements.sortOrder), desc(announcements.createdAt)),
     db
@@ -179,6 +194,25 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
       .leftJoin(teachers, eq(teachers.id, timetableEntries.teacherId))
       .where(eq(timetableEntries.schoolId, id))
       .orderBy(asc(timetableEntries.weekday), asc(timetableEntries.periodNo), asc(classGroups.sortOrder), asc(classGroups.name)),
+    db
+      .select()
+      .from(achievements)
+      .where(and(eq(achievements.schoolId, id), eq(achievements.isActive, true), windowed(achievements.startsAt, achievements.endsAt)))
+      .orderBy(asc(achievements.sortOrder), desc(achievements.createdAt))
+      .limit(20),
+    db
+      .select()
+      .from(schoolEvents)
+      .where(and(eq(schoolEvents.schoolId, id), eq(schoolEvents.isActive, true), gte(schoolEvents.date, today), lte(schoolEvents.date, monthAheadDate)))
+      .orderBy(asc(schoolEvents.date), asc(schoolEvents.time))
+      .limit(20),
+    db
+      .select()
+      .from(books)
+      .where(and(eq(books.schoolId, id), eq(books.isActive, true), windowed(books.startsAt, books.endsAt)))
+      .orderBy(asc(books.sortOrder), desc(books.createdAt))
+      .limit(5),
+    Promise.resolve(settingsEarly.rssFeeds.flatMap((f) => feedTitlesNow(f.url).map((title) => ({ source: f.label, title })))),
   ]);
 
   const iso = (d: Date | null) => (d ? d.toISOString() : null);
@@ -207,7 +241,10 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
     transportDuties: settings.hasTransport ? groupTransport(transportRows) : [],
     leaves: leaveRows,
     birthdays: birthdayRows,
-    announcements: annRows.map((a) => ({
+    announcements: annRows
+      // Panoya özel duyurular: yalnızca seçilen panolarda (önizlemede pano seçilmemişse hepsi)
+      .filter((a) => !a.screenIds?.length || !auth.screen || a.screenIds.includes(auth.screen.id))
+      .map((a) => ({
       id: a.id,
       kind: a.kind,
       title: a.title,
@@ -215,6 +252,7 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
       imageUrl: a.imageUrl,
       youtubeUrl: a.youtubeUrl,
       design: a.design ?? null,
+      schedule: a.schedule ?? null,
       durationSec: a.durationSec,
       startsAt: iso(a.startsAt),
       endsAt: iso(a.endsAt),
@@ -222,6 +260,20 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
     ticker: tickerRows.map((t) => ({ id: t.id, text: t.text, startsAt: iso(t.startsAt), endsAt: iso(t.endsAt) })),
     bellSchedules: bellRows.map((b) => ({ id: b.id, name: b.name, weekdays: b.weekdays, periods: b.periods, sortOrder: b.sortOrder })),
     timetable: ttRows.map(({ classOrder: _, ...r }) => r),
+    achievements: achievementRows.map((a) => ({
+      id: a.id,
+      kind: a.kind,
+      name: a.name,
+      className: a.className,
+      title: a.title,
+      description: a.description,
+      photoUrl: a.photoUrl,
+      startsAt: iso(a.startsAt),
+      endsAt: iso(a.endsAt),
+    })),
+    events: eventRows.map((e) => ({ id: e.id, title: e.title, organizer: e.organizer, date: e.date, time: e.time, place: e.place })),
+    books: bookRows.map((b) => ({ id: b.id, title: b.title, author: b.author, coverUrl: b.coverUrl, note: b.note, startsAt: iso(b.startsAt), endsAt: iso(b.endsAt) })),
+    rss: rssRows,
   };
 }
 

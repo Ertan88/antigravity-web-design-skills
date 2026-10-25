@@ -5,6 +5,7 @@ import { Field, Input, Toggle } from '../components/ui.tsx';
 import type { TickerItem } from '../lib/data.ts';
 import { isoToLocalInput, localInputToIso } from '../lib/format.ts';
 import { PublishCell } from './Announcements.tsx';
+import { TickerSources } from './TickerSources.tsx';
 
 type Form = { text: string; startsAt: string; endsAt: string; isActive: boolean };
 
@@ -22,6 +23,7 @@ export function Ticker() {
       addLabel="Yeni kayan yazı"
       activeToggle
       reorderable
+      tabs={<TickerSources />}
       schema={tickerSchema}
       columns={[
         { header: 'Metin', cell: (r) => <span className="font-medium text-ink">{r.text}</span> },

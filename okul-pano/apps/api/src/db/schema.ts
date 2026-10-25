@@ -260,6 +260,66 @@ export const exams = pgTable(
   (t) => [index('exams_school_idx').on(t.schoolId)],
 );
 
+/** Başarılar ve ayın öğrencisi */
+export const achievements = pgTable(
+  'achievements',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    kind: text('kind').$type<'month' | 'achievement'>().notNull(),
+    name: text('name').notNull(),
+    className: text('class_name'),
+    title: text('title').notNull(),
+    description: text('description'),
+    photoUrl: text('photo_url'),
+    startsAt: timestamp('starts_at', { withTimezone: true }),
+    endsAt: timestamp('ends_at', { withTimezone: true }),
+    isActive: isActive(),
+    sortOrder: sortOrder(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index('achievements_school_idx').on(t.schoolId)],
+);
+
+/** Kulüp ve etkinlik takvimi */
+export const schoolEvents = pgTable(
+  'school_events',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    title: text('title').notNull(),
+    organizer: text('organizer'),
+    date: date('date', { mode: 'string' }).notNull(),
+    time: text('time'),
+    place: text('place'),
+    isActive: isActive(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index('school_events_school_idx').on(t.schoolId, t.date)],
+);
+
+/** Kütüphane: haftanın kitabı */
+export const books = pgTable(
+  'books',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    title: text('title').notNull(),
+    author: text('author').notNull(),
+    coverUrl: text('cover_url'),
+    note: text('note'),
+    startsAt: timestamp('starts_at', { withTimezone: true }),
+    endsAt: timestamp('ends_at', { withTimezone: true }),
+    isActive: isActive(),
+    sortOrder: sortOrder(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index('books_school_idx').on(t.schoolId)],
+);
+
 export const announcements = pgTable(
   'announcements',
   {
@@ -272,6 +332,14 @@ export const announcements = pgTable(
     youtubeUrl: text('youtube_url'),
     /** Hazır şablonla hazırlanan duyuru (şablon, renk, metinler) */
     design: jsonb('design').$type<AnnouncementDesign>(),
+    /** Yalnızca bu panolarda (boşsa bütün panolarda) */
+    screenIds: jsonb('screen_ids').$type<string[]>(),
+    /** Yayın akışı: günler, saat aralığı, zilin durumu */
+    schedule: jsonb('schedule').$type<{ days: number[]; from: string | null; to: string | null; phase: 'any' | 'break' | 'lesson' }>(),
+    /** Onay akışı: onaylanmamış duyuru panoda görünmez */
+    approvalStatus: text('approval_status').$type<'approved' | 'pending' | 'rejected'>().notNull().default('approved'),
+    reviewedBy: uuid('reviewed_by').references(() => users.id, { onDelete: 'set null' }),
+    reviewNote: text('review_note'),
     durationSec: integer('duration_sec'),
     startsAt: timestamp('starts_at', { withTimezone: true }),
     endsAt: timestamp('ends_at', { withTimezone: true }),

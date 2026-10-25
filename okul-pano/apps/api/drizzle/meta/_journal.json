@@ -64,6 +64,13 @@
       "when": 1792889234151,
       "tag": "0008_design_emergency",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792946117096,
+      "tag": "0009_school_life_approval",
+      "breakpoints": true
     }
   ]
 }

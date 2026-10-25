@@ -47,7 +47,7 @@ function endAfterStart(v: { startsAt?: string | null; endsAt?: string | null }, 
 const boardModule = z.enum(BOARD_MODULES);
 /** Pano düzeni: sol / sağ sütundaki kartlar ve sıraları */
 export const boardLayoutSchema = z
-  .object({ left: z.array(boardModule).max(6), right: z.array(boardModule).max(6) })
+  .object({ left: z.array(boardModule).max(9), right: z.array(boardModule).max(9) })
   .refine((l) => new Set([...l.left, ...l.right]).size === l.left.length + l.right.length, 'Bir kart yalnızca bir yerde olabilir');
 
 export const schoolSettingsSchema = z.object({
@@ -72,6 +72,20 @@ export const schoolSettingsSchema = z.object({
   sleepAfterMin: z.number().int().min(0).max(240).default(30),
   sleepBeforeMin: z.number().int().min(0).max(240).default(30),
   sleepOffDays: z.boolean().default(true),
+  /** Elle uygulanan özel gün teması (filigranı da gösterilir); renkler değişince temizlenir */
+  specialTheme: z.string().max(20).nullable().default(null),
+  /** Onay akışı: açıkken onay yetkisi olmayanların eklediği duyurular onaylanınca yayına çıkar */
+  requireApproval: z.boolean().default(false),
+  /** Kayan yazıya ek kaynaklar */
+  tickerHistory: z.boolean().default(false),
+  tickerQuote: z.boolean().default(false),
+  tickerWeatherAlerts: z.boolean().default(true),
+  rssFeeds: z
+    .array(z.object({ label: z.string().trim().min(1).max(30), url: z.url('Geçerli bir RSS adresi girin').max(500) }))
+    .max(5)
+    .default([]),
+  /** Üst barda hava kalitesi ve hava durumu uyarıları */
+  showAirQuality: z.boolean().default(true),
   showExams: z.boolean().default(true),
   showDuties: z.boolean().default(true),
   showLeaves: z.boolean().default(true),
@@ -160,6 +174,17 @@ export const updateMemberSchema = z.object({
 
 /* ---------- Pano içerikleri ---------- */
 
+/**
+ * Duyurunun yayın akışı: hangi günlerde, hangi saatlerde ve zilin hangi durumunda görünsün
+ * (ör. kantindeki panoda yalnızca teneffüste). Boş alanlar sınır koymaz.
+ */
+export const announcementScheduleSchema = z.object({
+  days: z.array(weekday).max(7).default([]),
+  from: z.string().regex(/^\d{2}:\d{2}$/).nullable().default(null),
+  to: z.string().regex(/^\d{2}:\d{2}$/).nullable().default(null),
+  phase: z.enum(['any', 'break', 'lesson']).default('any'),
+});
+
 /** Hazır şablonla hazırlanan duyuru: şablon, renk ve alanlara yazılan metinler */
 export const announcementDesignSchema = z.object({
   template: z.enum(DESIGN_TEMPLATE_IDS),
@@ -173,6 +198,9 @@ export const announcementSchema = z
     body: optionalText(600),
     kind: z.enum(['image', 'video', 'text', 'design']),
     design: announcementDesignSchema.nullable().optional(),
+    /** Yalnızca bu panolarda; boş ya da yoksa bütün panolarda */
+    screenIds: z.array(id).max(100).nullable().optional(),
+    schedule: announcementScheduleSchema.nullable().optional(),
     imageUrl: optionalText(500),
     youtubeUrl: optionalText(300),
     /** Boşsa görsel/metin için okul varsayılanı, video için videonun kendi süresi kullanılır. */
@@ -192,9 +220,56 @@ export const announcementSchema = z
     if (v.kind === 'video' && !(v.youtubeUrl && parseYouTubeUrl(v.youtubeUrl))) {
       ctx.addIssue({ code: 'custom', path: ['youtubeUrl'], message: 'Geçerli bir YouTube bağlantısı girin' });
     }
+    if (v.schedule?.from && v.schedule.to && v.schedule.to <= v.schedule.from) {
+      ctx.addIssue({ code: 'custom', path: ['schedule'], message: 'Bitiş saati başlangıçtan sonra olmalı' });
+    }
     endAfterStart(v, ctx);
   });
 export type AnnouncementInput = z.infer<typeof announcementSchema>;
+
+/** Onay akışında reddetme notu */
+export const reviewSchema = z.object({ note: optionalText(200) });
+
+/* ---------- Okul hayatı: başarılar, etkinlik takvimi, haftanın kitabı ---------- */
+
+export const achievementSchema = z
+  .object({
+    /** 'month': Ayın öğrencisi · 'achievement': başarı / derece */
+    kind: z.enum(['month', 'achievement']),
+    name: required('Öğrenci / takım', 80),
+    className: optionalText(30),
+    title: required('Başlık', 100),
+    description: optionalText(200),
+    photoUrl: optionalText(500),
+    startsAt: isoDateTime.nullable().optional(),
+    endsAt: isoDateTime.nullable().optional(),
+    isActive: z.boolean().default(true),
+    sortOrder: z.number().int().default(0),
+  })
+  .superRefine(endAfterStart);
+
+export const schoolEventSchema = z.object({
+  title: required('Etkinlik', 100),
+  /** Düzenleyen kulüp ya da birim */
+  organizer: optionalText(60),
+  date: isoDate,
+  time: optionalText(20),
+  place: optionalText(60),
+  isActive: z.boolean().default(true),
+});
+
+export const bookSchema = z
+  .object({
+    title: required('Kitap adı', 100),
+    author: required('Yazar', 80),
+    coverUrl: optionalText(500),
+    note: optionalText(200),
+    startsAt: isoDateTime.nullable().optional(),
+    endsAt: isoDateTime.nullable().optional(),
+    isActive: z.boolean().default(true),
+    sortOrder: z.number().int().default(0),
+  })
+  .superRefine(endAfterStart);
 
 export const tickerSchema = z
   .object({

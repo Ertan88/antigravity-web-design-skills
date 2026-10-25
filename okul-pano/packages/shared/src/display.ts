@@ -43,6 +43,14 @@ export interface DisplayState {
   ticker: { id: string; text: string; startsAt: string | null; endsAt: string | null }[];
   bellSchedules: BellScheduleLike[];
   timetable: { weekday: number; periodNo: number; className: string; subject: string; teacherName: string | null }[];
+  /** Başarılar ve ayın öğrencisi (yayın aralığındakiler) */
+  achievements?: { id: string; kind: 'month' | 'achievement'; name: string; className: string | null; title: string; description: string | null; photoUrl: string | null; startsAt: string | null; endsAt: string | null }[];
+  /** Bugünden itibaren 30 günlük etkinlik takvimi */
+  events?: { id: string; title: string; organizer: string | null; date: string; time: string | null; place: string | null }[];
+  /** Haftanın kitabı (yayın aralığındakiler; ilki gösterilir) */
+  books?: { id: string; title: string; author: string; coverUrl: string | null; note: string | null; startsAt: string | null; endsAt: string | null }[];
+  /** Kayan yazıya eklenen RSS başlıkları (ör. MEB duyuruları) */
+  rss?: { source: string; title: string }[];
 }
 
 export interface DisplayAnnouncement {
@@ -57,6 +65,32 @@ export interface DisplayAnnouncement {
   durationSec: number | null;
   startsAt: string | null;
   endsAt: string | null;
+  /** Yayın akışı: günler, saat aralığı, zilin durumu (pano yerinde süzer) */
+  schedule?: { days: number[]; from: string | null; to: string | null; phase: 'any' | 'break' | 'lesson' } | null;
+}
+
+/**
+ * Duyuru şu an gösterilsin mi: gün, saat aralığı ve zilin durumu (teneffüs / ders).
+ * Pano yerinde hesaplar; internet kesilse de akış doğru işler.
+ */
+export function announcementOnAir(
+  schedule: DisplayAnnouncement['schedule'],
+  now: { weekday: number; secondsOfDay: number; phase: 'lesson' | 'break' | 'other' },
+): boolean {
+  if (!schedule) return true;
+  if (schedule.days.length && !schedule.days.includes(now.weekday)) return false;
+  const sec = (hm: string) => Number(hm.slice(0, 2)) * 3600 + Number(hm.slice(3, 5)) * 60;
+  if (schedule.from && now.secondsOfDay < sec(schedule.from)) return false;
+  if (schedule.to && now.secondsOfDay >= sec(schedule.to)) return false;
+  if (schedule.phase === 'break' && now.phase !== 'break') return false;
+  if (schedule.phase === 'lesson' && now.phase !== 'lesson') return false;
+  return true;
+}
+
+export interface WeatherAlert {
+  kind: 'snow' | 'heat' | 'cold' | 'storm' | 'thunder' | 'ice';
+  day: 'today' | 'tomorrow';
+  text: string;
 }
 
 export interface WeatherNow {
@@ -67,6 +101,10 @@ export interface WeatherNow {
   low: number | null;
   city: string | null;
   updatedAt: string;
+  /** Bugün ve yarın için uyarılar (yoğun kar, aşırı sıcak, fırtına…) */
+  alerts?: WeatherAlert[];
+  /** Avrupa hava kalitesi indeksi (0–100+); servis yanıt vermezse yok */
+  aqi?: number | null;
 }
 
 /** SSE üzerinden panoya gönderilen olaylar */

@@ -18,6 +18,12 @@ export interface Announcement extends Base {
   title: string;
   /** Hazır şablonla hazırlanan duyuru */
   design: AnnouncementDesign | null;
+  /** Yalnızca bu panolarda (null: bütün panolar) */
+  screenIds: string[] | null;
+  schedule: AnnouncementSchedule | null;
+  approvalStatus: 'approved' | 'pending' | 'rejected';
+  reviewNote: string | null;
+  createdBy: string | null;
   body: string | null;
   imageUrl: string | null;
   youtubeUrl: string | null;
@@ -26,6 +32,12 @@ export interface Announcement extends Base {
   endsAt: string | null;
   isActive: boolean;
   sortOrder: number;
+}
+export interface AnnouncementSchedule {
+  days: number[];
+  from: string | null;
+  to: string | null;
+  phase: 'any' | 'break' | 'lesson';
 }
 export interface TickerItem extends Base {
   text: string;
@@ -191,4 +203,35 @@ export function useResource<T extends { id: string }>(resource: string, label: s
 
 export function nameMap<T extends { id: string }>(rows: T[] | undefined, pick: (r: T) => string): Map<string, string> {
   return new Map((rows ?? []).map((r) => [r.id, pick(r)]));
+}
+
+export interface Achievement extends Base {
+  kind: 'month' | 'achievement';
+  name: string;
+  className: string | null;
+  title: string;
+  description: string | null;
+  photoUrl: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  isActive: boolean;
+  sortOrder: number;
+}
+export interface SchoolEvent extends Base {
+  title: string;
+  organizer: string | null;
+  date: string;
+  time: string | null;
+  place: string | null;
+  isActive: boolean;
+}
+export interface Book extends Base {
+  title: string;
+  author: string;
+  coverUrl: string | null;
+  note: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  isActive: boolean;
+  sortOrder: number;
 }

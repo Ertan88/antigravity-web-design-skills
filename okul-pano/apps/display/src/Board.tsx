@@ -1,5 +1,9 @@
 import {
+  announcementOnAir,
   isSleepTime,
+  quoteOfDay,
+  SPECIAL_THEMES,
+  todayInHistory,
   resolveLayout,
   resolveScreenDisplay,
   specialThemeFor,
@@ -16,7 +20,8 @@ import type { DisplayAuth } from './api.ts';
 import { EmergencyScreen } from './components/Emergency.tsx';
 import { Header } from './components/Header.tsx';
 import { SpecialMark } from './components/SpecialMark.tsx';
-import { BookIcon, CakeIcon, CapIcon, MonitorIcon, UserMinusIcon, WifiOffIcon } from './components/Icons.tsx';
+import { BookIcon, CakeIcon, CalendarIcon, CapIcon, LibraryIcon, MonitorIcon, TrophyIcon, UserMinusIcon, WifiOffIcon } from './components/Icons.tsx';
+import { AchievementsCard, BookCard, EventsCard } from './components/LifeCards.tsx';
 import { BirthdayCard, DutyCard, EmptyCard, ExamCard, LeaveCard } from './components/LeftColumn.tsx';
 import { BellCard, LessonsCard } from './components/RightColumn.tsx';
 import { Screensaver } from './components/Screensaver.tsx';
@@ -63,7 +68,6 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
   const duties = state.duties.filter((d) => d.weekday === today.weekday);
   const leaves = state.leaves.filter((l) => l.startDate <= today.isoDate && l.endDate >= today.isoDate);
   const birthdays = state.birthdays.filter((b) => isBirthdayToday(b.monthDay, today));
-  const ticker = state.ticker.filter((t) => isWithinWindow(nowMs, t.startsAt, t.endsAt)).map((t) => t.text);
 
   const schedule = pickSchedule(state.bellSchedules, today.weekday);
   const bell = schedule ? computeBellStatus(schedule.periods, today.secondsOfDay, s.lunchThresholdMin) : ({ kind: 'off' } as const);
@@ -71,6 +75,25 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
   const lessons = lessonPeriod
     ? state.timetable.filter((e) => e.weekday === today.weekday && e.periodNo === lessonPeriod.no)
     : [];
+
+  // Yayın akışı: duyurunun günü, saat aralığı ve zilin durumu (ör. yalnızca teneffüste)
+  const phase = bell.kind === 'lesson' ? 'lesson' : bell.kind === 'break' ? 'break' : 'other';
+  const onAir = state.announcements.filter((a) => announcementOnAir(a.schedule, { weekday: today.weekday, secondsOfDay: today.secondsOfDay, phase }));
+
+  // Okul hayatı kartları
+  const achievementsNow = (state.achievements ?? []).filter((a) => isWithinWindow(nowMs, a.startsAt, a.endsAt));
+  const book = (state.books ?? []).find((b) => isWithinWindow(nowMs, b.startsAt, b.endsAt)) ?? null;
+  const events = (state.events ?? []).filter((e) => e.date >= today.isoDate);
+
+  // Kayan yazı: okulun metinleri + hava durumu uyarısı, bugün tarihte, günün sözü, RSS başlıkları
+  const quote = quoteOfDay(today.isoDate);
+  const ticker = [
+    ...(s.tickerWeatherAlerts ? (weather?.alerts ?? []).map((a) => `⚠ ${a.text}`) : []),
+    ...state.ticker.filter((t) => isWithinWindow(nowMs, t.startsAt, t.endsAt)).map((t) => t.text),
+    ...(s.tickerHistory ? todayInHistory(today.monthDay).map((x) => `Bugün tarihte · ${x}`) : []),
+    ...(s.tickerQuote ? [`Günün sözü · “${quote.text}” — ${quote.by}`] : []),
+    ...(state.rss ?? []).map((r) => `${r.source} · ${r.title}`),
+  ];
 
   // Kartlar panonun düzenine göre (panoya özel ya da okulun) sol / sağ sütuna yerleşir
   const layout = state.layout ?? resolveLayout(s);
@@ -116,6 +139,20 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         ) : (
           empty(m, <BookIcon size={22} />, 'Şu An Derste', 'Şu an ders yok', 'lessons-card')
         );
+      case 'achievements':
+        return achievementsNow.length ? (
+          <AchievementsCard key={m} items={achievementsNow} />
+        ) : (
+          empty(m, <TrophyIcon size={22} />, 'Başarılarımız', 'Henüz eklenmiş başarı yok', 'achievements-card')
+        );
+      case 'events':
+        return events.length ? (
+          <EventsCard key={m} items={events} todayIso={today.isoDate} />
+        ) : (
+          empty(m, <CalendarIcon size={22} />, 'Etkinlik Takvimi', 'Yaklaşan etkinlik yok', 'events-card')
+        );
+      case 'book':
+        return book ? <BookCard key={m} book={book} /> : empty(m, <LibraryIcon size={22} />, 'Haftanın Kitabı', 'Bu hafta kitap seçilmedi', 'book-card');
     }
   };
   const leftCards = layout.left.map(renderModule).filter(Boolean);
@@ -125,7 +162,9 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
   const silenceMinute = mourning && today.hour === 9 && (today.minute === 5 || today.minute === 6);
 
   // Özel günlerde (millî bayram, 10 Kasım, bayramlar…) hazır tema kendiliğinden uygulanır
-  const special = s.autoSpecialThemes ? specialThemeFor(today.isoDate) : null;
+  // Elle "Şimdi uygula" ile seçilen tema da filigranıyla gelir
+  const special =
+    (s.autoSpecialThemes ? specialThemeFor(today.isoDate) : null) ?? (s.specialTheme ? (SPECIAL_THEMES.find((t) => t.id === s.specialTheme) ?? null) : null);
   const display = resolveScreenDisplay(state.display);
   const portrait = display.orientation === 'portrait';
   const [stageW, stageH] = portrait ? [STAGE_H, STAGE_W] : [STAGE_W, STAGE_H];
@@ -175,7 +214,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
 
   const slideshow = (full: boolean) => (
     <Slideshow
-      announcements={state.announcements}
+      announcements={onAir}
       now={now}
       defaultDurationSec={s.slideDurationSec}
       videoSound={s.videoSound}
@@ -222,6 +261,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         connection={connection}
         lastUpdated={lastUpdated}
         specialId={special?.id}
+        showAirQuality={s.showAirQuality}
       />
       {special && <SpecialMark id={special.id} className="special-mark-bg" />}
 

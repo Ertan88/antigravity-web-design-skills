@@ -233,6 +233,12 @@ export function Settings() {
             label="Taşımalı eğitim (servisle gelen öğrenciler)"
             description="Açıkken menüde Taşımalı Eğitim sayfası çıkar; panoda o günün taşıma ve öğle yemeği nöbetçileri nöbet kartında görünür."
           />
+          <Toggle
+            checked={s.requireApproval}
+            onChange={(x) => setting('requireApproval', x)}
+            label="Duyurular onaydan sonra yayınlansın"
+            description="Açıkken 'Duyuruları onaylama' yetkisi olmayan kullanıcıların (ör. öğretmenler) eklediği ya da değiştirdiği duyurular, okul sahibi, yöneticiler veya bu yetkiyi verdiğiniz kişiler (ör. müdür yardımcısı) onaylayınca panoya çıkar. Yetkiyi Kullanıcılar ve Yetkiler sayfasından verin."
+          />
           <p className="text-sm text-slate-500">
             Panodaki kartların yeri, renkler ve slayt süreleri{' '}
             <Link to="/ekranlar" className="font-semibold text-brand-700 hover:underline">

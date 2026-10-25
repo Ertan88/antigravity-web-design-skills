@@ -8,12 +8,15 @@ import {
   BellRing,
   BookOpen,
   Cake,
+  CalendarDays,
   EyeOff,
   GraduationCap,
   GripVertical,
+  Library,
   Megaphone,
   Plus,
   ShieldCheck,
+  Trophy,
   UserMinus,
   type LucideIcon,
 } from 'lucide-react';
@@ -26,6 +29,9 @@ const ICONS: Record<BoardModule, LucideIcon> = {
   birthdays: Cake,
   bell: BellRing,
   lessons: BookOpen,
+  achievements: Trophy,
+  events: CalendarDays,
+  book: Library,
 };
 
 const HINTS: Partial<Record<BoardModule, string>> = {
@@ -33,6 +39,9 @@ const HINTS: Partial<Record<BoardModule, string>> = {
   birthdays: 'Doğum günü yoksa kısa not',
   exams: 'Sınav yoksa kısa not',
   lessons: 'Ders yoksa kısa not',
+  achievements: 'Panelde Başarılar sayfasından',
+  events: 'Önümüzdeki 30 gün',
+  book: 'Panelde Haftanın Kitabı sayfasından',
 };
 
 type Column = 'left' | 'right';

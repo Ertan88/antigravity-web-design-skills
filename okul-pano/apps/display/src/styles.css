@@ -2315,13 +2315,17 @@ p {
   width: 150px;
   height: 100px;
   transform: translate(-50%, -50%) rotate(-6deg);
-  opacity: 0.3;
+  opacity: 0.85;
+  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.35));
 }
 
 .special-mark-header.special-mark-teachers,
-.special-mark-header.special-mark-newyear {
-  width: 110px;
-  opacity: 0.3;
+.special-mark-header.special-mark-newyear,
+.special-mark-header.special-mark-spring,
+.special-mark-header.special-mark-ramazan,
+.special-mark-header.special-mark-kurban {
+  width: 120px;
+  opacity: 0.7;
 }
 
 .header > :not(.special-mark) {
@@ -2336,11 +2340,11 @@ p {
   width: 760px;
   height: 507px;
   transform: rotate(-10deg);
-  opacity: 0.07;
+  opacity: 0.14;
 }
 
 .theme-light .special-mark-bg {
-  opacity: 0.05;
+  opacity: 0.1;
 }
 
 .stage > .body,
@@ -2355,4 +2359,200 @@ p {
 
 .orientation-portrait .special-mark-header {
   display: none;
+}
+
+/* ---------- Hava durumu uyarısı ve hava kalitesi ---------- */
+.weather-alert {
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #f59e0b 22%, transparent);
+  color: #fbbf24;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.theme-light .weather-alert {
+  color: #b45309;
+}
+
+.aqi-good {
+  color: #34d399;
+}
+
+.aqi-fair {
+  color: #fbbf24;
+}
+
+.aqi-moderate,
+.aqi-poor {
+  color: #f87171;
+}
+
+/* ---------- Okul hayatı kartları ---------- */
+.achievements-card { --hue: #f59e0b; --hue-2: #f59e0b; flex: none; }
+.events-card { --hue: #0ea5e9; --hue-2: #0ea5e9; }
+.book-card { --hue: #10b981; --hue-2: #10b981; flex: none; }
+
+.achievement {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  animation: fade-up 0.6s ease both;
+}
+
+.achievement-photo,
+.book-cover {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--hue) 18%, transparent);
+  color: color-mix(in srgb, var(--hue) 70%, var(--text));
+}
+
+.achievement-photo {
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--hue) 70%, transparent);
+}
+
+.achievement-photo img,
+.book-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.achievement-text,
+.book-text {
+  min-width: 0;
+}
+
+.achievement-name {
+  font-size: 27px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.achievement-class {
+  margin-left: 10px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 17px;
+  font-weight: 800;
+  vertical-align: middle;
+  background: color-mix(in srgb, var(--hue) 18%, transparent);
+  color: color-mix(in srgb, var(--hue) 65%, var(--text));
+}
+
+.achievement-title {
+  margin-top: 4px;
+  font-size: 21px;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--hue) 65%, var(--text));
+}
+
+.achievement-desc,
+.book-note {
+  margin-top: 4px;
+  font-size: 17px;
+  color: var(--muted);
+  line-height: 1.3;
+}
+
+.event-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 66px;
+}
+
+.event-date {
+  flex: none;
+  width: 60px;
+  height: 60px;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--hue) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--hue) 35%, transparent);
+  line-height: 1;
+}
+
+.event-date strong {
+  font-size: 25px;
+  font-weight: 800;
+}
+
+.event-date span {
+  margin-top: 3px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--hue) 65%, var(--text));
+}
+
+.event-date.is-today {
+  background: var(--hue);
+  color: #fff;
+}
+
+.event-date.is-today span {
+  color: #fff;
+}
+
+.event-text {
+  min-width: 0;
+}
+
+.event-title {
+  font-size: 21px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.event-meta {
+  margin-top: 2px;
+  font-size: 15px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.book {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.book-cover {
+  width: 78px;
+  height: 110px;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+}
+
+.book-title {
+  font-size: 25px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.book-author {
+  margin-top: 4px;
+  font-size: 19px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--hue) 65%, var(--text));
 }

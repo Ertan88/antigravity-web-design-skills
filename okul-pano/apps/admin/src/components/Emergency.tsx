@@ -1,4 +1,6 @@
 import { EMERGENCY_INFO, EMERGENCY_TYPES, type EmergencyType } from '@okulpano/shared';
+// Siren tarayıcıya özgü (AudioContext): sunucu tarafı paketlere girmesin diye ayrı giriş noktasından
+import { startWailSiren } from '@okulpano/shared/siren';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { CloudLightning, Flame, Lock, LogOut, OctagonAlert, Siren, TriangleAlert, type LucideIcon } from 'lucide-react';
@@ -25,27 +27,14 @@ const ICONS: Record<EmergencyType, LucideIcon> = {
   custom: OctagonAlert,
 };
 
-/** Panodaki sirenin aynısı, 3,5 sn: bu bilgisayarın hoparlörünü / ses ayarını denemek için */
+/** Panodaki sirenin aynısı, 4,5 sn (bir tam dalga): bu bilgisayarın hoparlörünü / ses ayarını denemek için */
 function playSirenSample() {
   const ctx = new AudioContext();
-  const gain = ctx.createGain();
-  gain.connect(ctx.destination);
-  const osc = ctx.createOscillator();
-  osc.type = 'sawtooth';
-  osc.connect(gain);
-  const t = ctx.currentTime + 0.05;
-  gain.gain.setValueAtTime(0, t);
-  gain.gain.linearRampToValueAtTime(0.18, t + 0.08);
-  for (let i = 0; i < 3; i++) {
-    osc.frequency.setValueAtTime(650, t + i * 1.2);
-    osc.frequency.linearRampToValueAtTime(1350, t + i * 1.2 + 0.6);
-    osc.frequency.linearRampToValueAtTime(650, t + i * 1.2 + 1.2);
-  }
-  gain.gain.setValueAtTime(0.18, t + 3.5);
-  gain.gain.linearRampToValueAtTime(0, t + 3.6);
-  osc.start(t);
-  osc.stop(t + 3.7);
-  osc.onended = () => void ctx.close();
+  const stop = startWailSiren(ctx, 0.25);
+  setTimeout(() => {
+    stop();
+    setTimeout(() => void ctx.close(), 400);
+  }, 4500);
 }
 
 /** Okulun etkin acil durumu; paneldeki herkes görür, sık yoklanır */
@@ -169,7 +158,7 @@ export function EmergencyButton() {
             description="Panoya bağlı hoparlörden siren çalar. Kiosk komutuyla açılan panolarda doğrudan çalar; normal tarayıcı sekmesinde ekrana bir kez dokunmak gerekebilir. Paneldeki küçük önizleme sessizdir."
           />
           <button type="button" onClick={playSirenSample} className="text-sm font-semibold text-red-700 hover:text-red-800">
-            ▶ Sireni dinle (3 sn)
+            ▶ Sireni dinle (5 sn)
           </button>
         </div>
       </Modal>

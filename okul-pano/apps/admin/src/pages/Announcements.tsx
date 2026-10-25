@@ -1,15 +1,23 @@
 import { announcementSchema, designTemplate, designTitle, parseYouTubeUrl, youTubeThumbnail, type AnnouncementDesign } from '@okulpano/shared';
-import { Image as ImageIcon, LayoutTemplate, Megaphone, PlayCircle, Type } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Check, Image as ImageIcon, LayoutTemplate, Megaphone, PlayCircle, Type, X } from 'lucide-react';
+import { useState } from 'react';
 import { CrudPage } from '../components/CrudPage.tsx';
 import { ImageUpload } from '../components/ImageUpload.tsx';
-import { Badge, Field, Input, Segmented, Textarea, Toggle } from '../components/ui.tsx';
-import { useSchool, type Announcement } from '../lib/data.ts';
+import { useToast } from '../components/Toast.tsx';
+import { Alert, Badge, Field, IconButton, Input, Segmented, Textarea, Toggle } from '../components/ui.tsx';
+import { api } from '../lib/api.ts';
+import { useAuth } from '../lib/auth.tsx';
+import { useList, useSchool, useSchoolPath, type Announcement, type AnnouncementSchedule, type Screen } from '../lib/data.ts';
 import { formatDateTime, isoToLocalInput, localInputToIso, publishState } from '../lib/format.ts';
 import { DesignEditor, DesignThumb, emptyDesign } from './announcements/DesignEditor.tsx';
+import { emptySchedule, ScheduleFields, scheduleSummary } from './announcements/ScheduleFields.tsx';
 
 type Form = {
   kind: 'image' | 'video' | 'text' | 'design';
   design: AnnouncementDesign;
+  screenIds: string[];
+  schedule: AnnouncementSchedule;
   title: string;
   body: string;
   imageUrl: string | null;
@@ -23,6 +31,8 @@ type Form = {
 const empty = (): Form => ({
   kind: 'image',
   design: emptyDesign(),
+  screenIds: [],
+  schedule: emptySchedule(),
   title: '',
   body: '',
   imageUrl: null,
@@ -74,9 +84,45 @@ function Thumb({ row }: { row: Announcement }) {
 
 const KIND_LABEL = { image: 'Görsel', video: 'Video', text: 'Metin', design: 'Şablon' };
 
+/** Onay akışı: bekleyen duyuruyu onayla / notla reddet */
+function useReview() {
+  const { schoolId } = useAuth();
+  const path = useSchoolPath('announcements');
+  const qc = useQueryClient();
+  const toast = useToast();
+  return useMutation({
+    mutationFn: ({ id, action, note }: { id: string; action: 'approve' | 'reject'; note?: string }) =>
+      api(`${path}/${id}/${action}`, { method: 'POST', body: { note: note ?? null } }),
+    onSuccess: (_, v) => {
+      void qc.invalidateQueries({ queryKey: [schoolId, 'announcements'] });
+      toast.success(v.action === 'approve' ? 'Duyuru onaylandı, panolarda yayında' : 'Duyuru reddedildi');
+    },
+    onError: (e) => toast.error(e.message),
+  });
+}
+
+export function ApprovalBadge({ row }: { row: Announcement }) {
+  if (row.approvalStatus === 'pending') return <Badge tone="amber">Onay bekliyor</Badge>;
+  if (row.approvalStatus === 'rejected')
+    return (
+      <span className="space-y-0.5">
+        <Badge tone="red">Reddedildi</Badge>
+        {row.reviewNote && <span className="block max-w-[14rem] truncate text-xs text-red-600">{row.reviewNote}</span>}
+      </span>
+    );
+  return null;
+}
+
 export function Announcements() {
   const school = useSchool();
+  const { can } = useAuth();
   const defaultDuration = school.data?.settings.slideDurationSec ?? 10;
+  const screens = useList<Screen>('screens');
+  const all = useList<Announcement>('announcements');
+  const review = useReview();
+  const approver = can('announcements.approve');
+  const pendingCount = (all.data ?? []).filter((a) => a.approvalStatus === 'pending').length;
+  const [filter, setFilter] = useState<'all' | 'pending'>('all');
 
   return (
     <CrudPage<Announcement, Form>
@@ -93,6 +139,49 @@ export function Announcements() {
       reorderable
       modalSize="xl"
       schema={announcementSchema}
+      select={(rows) => (filter === 'pending' ? rows.filter((r) => r.approvalStatus === 'pending') : rows)}
+      tabs={
+        (pendingCount > 0 || school.data?.settings.requireApproval) && (
+          <div className="space-y-3">
+            {pendingCount > 0 && (
+              <Alert tone="amber">
+                {approver
+                  ? `${pendingCount} duyuru onayınızı bekliyor. Onaylanınca panolarda yayına çıkar.`
+                  : `${pendingCount} duyuru onay bekliyor; yetkili kişi onaylayınca panolarda yayına çıkar.`}
+              </Alert>
+            )}
+            <Segmented
+              value={filter}
+              onChange={setFilter}
+              options={[
+                { value: 'all', label: 'Tümü' },
+                { value: 'pending', label: `Onay bekleyenler${pendingCount ? ` (${pendingCount})` : ''}` },
+              ]}
+            />
+          </div>
+        )
+      }
+      rowActions={(r) =>
+        approver && r.approvalStatus !== 'approved' ? (
+          <>
+            <IconButton label="Onayla" className="text-emerald-600 hover:bg-emerald-50" onClick={() => review.mutate({ id: r.id, action: 'approve' })}>
+              <Check className="size-4" />
+            </IconButton>
+            {r.approvalStatus === 'pending' && (
+              <IconButton
+                label="Reddet"
+                className="text-red-600 hover:bg-red-50"
+                onClick={() => {
+                  const note = window.prompt('Reddetme nedeni (öğretmene görünür, isteğe bağlı):') ?? undefined;
+                  review.mutate({ id: r.id, action: 'reject', note });
+                }}
+              >
+                <X className="size-4" />
+              </IconButton>
+            )}
+          </>
+        ) : null
+      }
       columns={[
         {
           header: 'Duyuru',
@@ -102,6 +191,11 @@ export function Announcements() {
               <div className="min-w-0">
                 <div className="max-w-[20rem] truncate font-semibold text-ink">{r.title}</div>
                 {r.body && <div className="max-w-[20rem] truncate text-slate-500">{r.body}</div>}
+                {scheduleSummary(r.screenIds, r.schedule, screens.data) && (
+                  <div className="mt-1 inline-flex max-w-[20rem] truncate rounded-md bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700">
+                    {scheduleSummary(r.screenIds, r.schedule, screens.data)}
+                  </div>
+                )}
               </div>
             </div>
           ),
@@ -115,12 +209,22 @@ export function Announcements() {
             </span>
           ),
         },
-        { header: 'Durum', cell: (r) => <PublishCell row={r} /> },
+        {
+          header: 'Durum',
+          cell: (r) => (
+            <div className="space-y-1">
+              <ApprovalBadge row={r} />
+              {r.approvalStatus === 'approved' && <PublishCell row={r} />}
+            </div>
+          ),
+        },
       ]}
       emptyForm={empty}
       toForm={(r) => ({
         kind: r.kind,
         design: r.design ?? emptyDesign(),
+        screenIds: r.screenIds ?? [],
+        schedule: r.schedule ?? emptySchedule(),
         title: r.title,
         body: r.body ?? '',
         imageUrl: r.imageUrl,
@@ -136,6 +240,8 @@ export function Announcements() {
         title: f.kind === 'design' ? designTitle(f.design) : f.title,
         body: f.kind === 'design' ? designBody(f.design) : f.body || null,
         design: f.kind === 'design' ? f.design : null,
+        screenIds: f.screenIds.length ? f.screenIds : null,
+        schedule: f.schedule,
         imageUrl: f.kind === 'image' ? f.imageUrl : null,
         youtubeUrl: f.kind === 'video' ? f.youtubeUrl : null,
         durationSec: f.durationSec ? Number(f.durationSec) : null,
@@ -199,6 +305,14 @@ export function Announcements() {
                 </Field>
               </>
             )}
+
+            <ScheduleFields
+              screenIds={v.screenIds}
+              schedule={v.schedule}
+              onScreens={(ids) => set('screenIds', ids)}
+              onSchedule={(x) => set('schedule', x)}
+              error={errors.schedule}
+            />
 
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="Gösterim süresi (sn)" error={errors.durationSec}>

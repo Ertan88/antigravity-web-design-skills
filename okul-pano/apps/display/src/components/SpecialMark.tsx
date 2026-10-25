@@ -46,7 +46,19 @@ function Snowflake() {
   );
 }
 
+/** Lale (bahar teması) */
+function Tulip() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 14c-3.3 0-5-2.6-5-6V4l2.5 2L12 3l2.5 3L17 4v4c0 3.4-1.7 6-5 6z" />
+      <path d="M12 14v8" />
+      <path d="M12 19c-2.5 0-4.5-1.5-5-4 2.5 0 4.5 1.5 5 4zm0-1c2.5 0 4.5-1.5 5-4-2.5 0-4.5 1.5-5 4z" />
+    </svg>
+  );
+}
+
 const MARKS: Record<string, () => React.JSX.Element> = {
+  spring: Tulip,
   national: TurkishFlag,
   ataturk: TurkishFlag,
   ramazan: Crescent,

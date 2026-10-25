@@ -113,7 +113,7 @@ export function Appearance({ editable }: { editable: boolean }) {
                   key={p.name}
                   type="button"
                   disabled={!editable}
-                  onClick={() => setS({ ...s, primaryColor: p.primary, accentColor: p.accent })}
+                  onClick={() => setS({ ...s, primaryColor: p.primary, accentColor: p.accent, specialTheme: null })}
                   className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-200 transition hover:ring-slate-300"
                 >
                   <span className="flex">
@@ -131,8 +131,8 @@ export function Appearance({ editable }: { editable: boolean }) {
             <Field key={k} label={k === 'primaryColor' ? 'Ana renk' : 'Vurgu rengi'}>
               {(id) => (
                 <div className="flex items-center gap-2">
-                  <input id={id} type="color" value={s[k]} disabled={!editable} onChange={(e) => set(k, e.target.value)} className="h-10 w-14 cursor-pointer rounded-lg border-0 bg-transparent" />
-                  <Input value={s[k]} disabled={!editable} onChange={(e) => set(k, e.target.value)} className="font-mono" aria-label={`${k} kodu`} />
+                  <input id={id} type="color" value={s[k]} disabled={!editable} onChange={(e) => setS({ ...s, [k]: e.target.value, specialTheme: null })} className="h-10 w-14 cursor-pointer rounded-lg border-0 bg-transparent" />
+                  <Input value={s[k]} disabled={!editable} onChange={(e) => setS({ ...s, [k]: e.target.value, specialTheme: null })} className="font-mono" aria-label={`${k} kodu`} />
                 </div>
               )}
             </Field>
@@ -145,11 +145,11 @@ export function Appearance({ editable }: { editable: boolean }) {
           checked={s.autoSpecialThemes}
           onChange={(x) => set('autoSpecialThemes', x)}
           label="Özel günlerde temayı kendiliğinden uygula"
-          description="O gün bitince pano kendi renklerine döner. Millî bayramlarda üstte bayrak şeridi, 10 Kasım'da yas görünümü de eklenir."
+          description="O gün bitince pano kendi renklerine döner. Üst barın ortasında ve zeminde o güne uygun filigran (Türk bayrağı, hilal, kep…) çıkar; 10 Kasım'da yas görünümü eklenir. 'Şimdi uygula' ile seçtiğiniz tema da filigranıyla gelir."
         />
         <div className="grid gap-2.5 sm:grid-cols-2">
           {SPECIAL_THEMES.map((t) => {
-            const applied = s.primaryColor === t.primary && s.accentColor === t.accent;
+            const applied = s.specialTheme === t.id && s.primaryColor === t.primary && s.accentColor === t.accent;
             return (
               <div key={t.id} className="flex items-center gap-3 rounded-2xl p-3 ring-1 ring-slate-200">
                 <span
@@ -163,7 +163,8 @@ export function Appearance({ editable }: { editable: boolean }) {
                 <button
                   type="button"
                   disabled={!editable || applied}
-                  onClick={() => setS({ ...s, primaryColor: t.primary, accentColor: t.accent })}
+                  // Renklerle birlikte o günün filigranı da (bayrak, hilal…) panoya gelir
+                  onClick={() => setS({ ...s, primaryColor: t.primary, accentColor: t.accent, specialTheme: t.id })}
                   className="shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold text-brand-700 ring-1 ring-brand-200 transition hover:bg-brand-50 disabled:text-slate-400 disabled:ring-slate-200 disabled:hover:bg-transparent"
                 >
                   {applied ? 'Seçili' : 'Şimdi uygula'}
@@ -197,6 +198,12 @@ export function Appearance({ editable }: { editable: boolean }) {
           onChange={(x) => set('showEmptyCards', x)}
           label="Boş kartları da göster"
           description="Düzende olan kart o gün içeriksizse (izinli yok, doğum günü yok…) kısa bir notla görünür. Kapalıyken o gün panoda hiç yer almaz."
+        />
+        <Toggle
+          checked={s.showAirQuality}
+          onChange={(x) => set('showAirQuality', x)}
+          label="Hava kalitesi ve hava durumu uyarısı"
+          description="Üst barda hava durumunun altında hava kalitesi; yoğun kar, aşırı sıcak gibi bir uyarı varsa onun yerine uyarı görünür."
         />
         <Toggle
           checked={s.animations}

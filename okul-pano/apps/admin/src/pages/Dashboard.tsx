@@ -7,7 +7,7 @@ import { BoardPreview } from '../components/BoardPreview.tsx';
 import { Card, Segmented } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
-import { useList, useSchoolPath, type Screen } from '../lib/data.ts';
+import { useList, useSchoolPath, type Announcement, type Screen } from '../lib/data.ts';
 import { timeAgo } from '../lib/format.ts';
 import { TodaySummary } from './dashboard/Today.tsx';
 
@@ -34,6 +34,8 @@ const ACTIONS: Record<string, string> = {
   delete: 'sildi',
   publish: 'yayına aldı',
   unpublish: 'yayından kaldırdı',
+  approve: 'onayladı',
+  reject: 'reddetti',
 };
 
 function greeting() {
@@ -64,6 +66,24 @@ function Stat({ icon, label, value, hint, to }: { icon: ReactNode; label: string
     </Link>
   ) : (
     body
+  );
+}
+
+/** Onay yetkisi olanlara bekleyen duyurular */
+function PendingApprovals() {
+  const { can } = useAuth();
+  const list = useList<Announcement>('announcements');
+  const n = (list.data ?? []).filter((a) => a.approvalStatus === 'pending').length;
+  if (!n || !can('announcements.approve')) return null;
+  return (
+    <Link
+      to="/duyurular"
+      className="flex items-center gap-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 ring-1 ring-amber-200 transition hover:bg-amber-100"
+    >
+      <Megaphone className="size-4" />
+      {n} duyuru onayınızı bekliyor
+      <span className="ml-auto text-amber-700">İncele →</span>
+    </Link>
   );
 }
 
@@ -112,6 +132,8 @@ export function Dashboard() {
         <Stat icon={<Users className="size-5" />} label="Öğretmen" value={s?.teachers ?? '—'} to="/ogretmenler" />
         <Stat icon={<Cake className="size-5" />} label="Öğrenci" value={s?.students ?? '—'} to="/ogrenciler" />
       </div>
+
+      <PendingApprovals />
 
       <TodaySummary />
 

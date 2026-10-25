@@ -1,4 +1,4 @@
-import type { WeatherNow } from '@okulpano/shared';
+import { weatherAlerts, type WeatherNow } from '@okulpano/shared';
 
 /** Open-Meteo: anahtar gerektirmeyen, ücretsiz hava durumu servisi. Okul konumu başına 15 dk önbellek. */
 const TTL_MS = 15 * 60 * 1000;
@@ -7,7 +7,29 @@ const inflight = new Map<string, Promise<WeatherNow | null>>();
 
 interface OpenMeteoResponse {
   current?: { temperature_2m: number; weather_code: number; is_day: number };
-  daily?: { temperature_2m_max?: number[]; temperature_2m_min?: number[] };
+  daily?: {
+    temperature_2m_max?: (number | null)[];
+    temperature_2m_min?: (number | null)[];
+    weather_code?: (number | null)[];
+    snowfall_sum?: (number | null)[];
+    wind_gusts_10m_max?: (number | null)[];
+  };
+}
+
+/** Avrupa hava kalitesi indeksi; servis yanıt vermezse null (hava durumu yine gösterilir) */
+async function fetchAirQuality(lat: number, lon: number): Promise<number | null> {
+  try {
+    const url = new URL('https://air-quality-api.open-meteo.com/v1/air-quality');
+    url.searchParams.set('latitude', String(lat));
+    url.searchParams.set('longitude', String(lon));
+    url.searchParams.set('current', 'european_aqi');
+    const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { current?: { european_aqi?: number | null } };
+    return json.current?.european_aqi != null ? Math.round(json.current.european_aqi) : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function getWeather(lat: number, lon: number, timezone: string, city: string | null): Promise<WeatherNow | null> {
@@ -35,10 +57,11 @@ async function fetchWeather(lat: number, lon: number, timezone: string): Promise
   url.searchParams.set('latitude', String(lat));
   url.searchParams.set('longitude', String(lon));
   url.searchParams.set('current', 'temperature_2m,weather_code,is_day');
-  url.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min');
-  url.searchParams.set('forecast_days', '1');
+  url.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,weather_code,snowfall_sum,wind_gusts_10m_max');
+  // Bugün ve yarın: yarın için uyarı (ör. yoğun kar) bir gün önceden görünür
+  url.searchParams.set('forecast_days', '2');
   url.searchParams.set('timezone', timezone);
-  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  const [res, aqi] = await Promise.all([fetch(url, { signal: AbortSignal.timeout(8000) }), fetchAirQuality(lat, lon)]);
   if (!res.ok) throw new Error(`Hava durumu servisi yanıt vermedi: ${res.status}`);
   const json = (await res.json()) as OpenMeteoResponse;
   if (!json.current) throw new Error('Hava durumu verisi eksik');
@@ -50,6 +73,14 @@ async function fetchWeather(lat: number, lon: number, timezone: string): Promise
     low: json.daily?.temperature_2m_min?.[0] != null ? Math.round(json.daily.temperature_2m_min[0]) : null,
     city: null,
     updatedAt: new Date().toISOString(),
+    alerts: weatherAlerts({
+      weatherCode: json.daily?.weather_code ?? [],
+      tempMax: json.daily?.temperature_2m_max ?? [],
+      tempMin: json.daily?.temperature_2m_min ?? [],
+      snowfall: json.daily?.snowfall_sum ?? [],
+      gustMax: json.daily?.wind_gusts_10m_max ?? [],
+    }),
+    aqi,
   };
 }
 

@@ -1,6 +1,6 @@
-import { splitSchoolName, weatherInfo, type WeatherNow } from '@okulpano/shared/client';
+import { airQualityLevel, splitSchoolName, weatherInfo, type WeatherNow } from '@okulpano/shared/client';
 import type { Connection } from '../hooks.ts';
-import { SchoolIcon, WEATHER_ICONS, WifiOffIcon } from './Icons.tsx';
+import { AlertIcon, SchoolIcon, WEATHER_ICONS, WifiOffIcon } from './Icons.tsx';
 import { SpecialMark } from './SpecialMark.tsx';
 
 const timeFmt = new Map<string, Intl.DateTimeFormat>();
@@ -27,9 +27,11 @@ interface Props {
   lastUpdated: number | null;
   /** O günün özel teması (millî bayram, 10 Kasım…): üst barın ortasında filigran */
   specialId?: string;
+  /** Hava kalitesi ve hava durumu uyarısı */
+  showAirQuality?: boolean;
 }
 
-export function Header({ schoolName, schoolType, logoUrl, timezone, now, weather, city, connection, lastUpdated, specialId }: Props) {
+export function Header({ schoolName, schoolType, logoUrl, timezone, now, weather, city, connection, lastUpdated, specialId, showAirQuality = true }: Props) {
   const hm = fmt(timezone, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }, 'hm').format(now);
   const sec = fmt(timezone, { second: '2-digit' }, 's').format(now).padStart(2, '0');
   const date = fmt(timezone, { day: 'numeric', month: 'long', year: 'numeric' }, 'date').format(now);
@@ -69,7 +71,23 @@ export function Header({ schoolName, schoolType, logoUrl, timezone, now, weather
                     </span>
                   )}
                 </div>
-                {(weather.city ?? city) && <div className="weather-city">{weather.city ?? city}</div>}
+                {showAirQuality && weather.alerts?.[0] ? (
+                  // Hava durumu uyarısı şehir satırının yerine (ör. yarın yoğun kar)
+                  <div className="weather-alert">
+                    <AlertIcon size={15} /> {weather.alerts[0].text}
+                  </div>
+                ) : (
+                  (weather.city ?? city ?? (showAirQuality && weather.aqi != null)) && (
+                    <div className="weather-city">
+                      {weather.city ?? city}
+                      {showAirQuality && weather.aqi != null && (
+                        <span className={`aqi aqi-${airQualityLevel(weather.aqi).tone}`}>
+                          {(weather.city ?? city) && ' · '}Hava kalitesi {airQualityLevel(weather.aqi).label.toLocaleLowerCase('tr-TR')}
+                        </span>
+                      )}
+                    </div>
+                  )
+                )}
               </div>
             </>
           ) : (
