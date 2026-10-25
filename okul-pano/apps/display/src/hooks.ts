@@ -28,6 +28,7 @@ export function useDisplayData(auth: DisplayAuth, onUnauthorized: () => void) {
   const [offsetMs, setOffsetMs] = useState(timeTravelOffset ?? 0);
   const [identifyUntil, setIdentifyUntil] = useState(0);
   const inflight = useRef<Promise<void> | null>(null);
+  const version = useRef<string | null>(null);
 
   const load = useCallback(() => {
     if (inflight.current) return inflight.current;
@@ -37,6 +38,14 @@ export function useDisplayData(auth: DisplayAuth, onUnauthorized: () => void) {
         const rtt = Date.now() - started;
         // Cihaz saati yanlış olsa bile zil ve geri sayımlar sunucu saatine göre çalışır
         if (timeTravelOffset === null) setOffsetMs(Date.parse(s.serverTime) + rtt / 2 - Date.now());
+        // Sunucu güncellendiyse pano yeni kodu almak için kendini yeniler
+        if (!auth.preview && s.appVersion) {
+          if (version.current && version.current !== s.appVersion) {
+            location.reload();
+            return;
+          }
+          version.current = s.appVersion;
+        }
         setState(s);
         setLastUpdated(Date.now());
         setConnection('live');

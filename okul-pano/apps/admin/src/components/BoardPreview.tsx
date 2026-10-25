@@ -41,27 +41,29 @@ export function BoardPreview({ screenId, compact = false, portrait = false }: { 
           <div className="absolute inset-0 animate-pulse bg-slate-800" />
         )}
       </div>
-      {!compact && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <Clock className="size-4" />
-            <span>Zaman makinesi</span>
-          </div>
-          <div className="w-56">
-            <Input type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} className="h-9" aria-label="Önizleme zamanı" />
-          </div>
-          {at && (
-            <button type="button" onClick={() => setAt('')} className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-ink">
-              <RotateCcw className="size-3.5" /> Şimdiye dön
-            </button>
-          )}
-          {src && (
-            <a href={src} target="_blank" rel="noreferrer" className="ml-auto inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:text-brand-700">
-              Tam ekran aç <ExternalLink className="size-3.5" />
-            </a>
-          )}
-        </div>
-      )}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {!compact && (
+          <>
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <Clock className="size-4" />
+              <span>Zaman makinesi</span>
+            </div>
+            <div className="w-56">
+              <Input type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} className="h-9" aria-label="Önizleme zamanı" />
+            </div>
+            {at && (
+              <button type="button" onClick={() => setAt('')} className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-ink">
+                <RotateCcw className="size-3.5" /> Şimdiye dön
+              </button>
+            )}
+          </>
+        )}
+        {src && (
+          <a href={src} target="_blank" rel="noreferrer" className="ml-auto inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:text-brand-700">
+            Tam ekran aç <ExternalLink className="size-3.5" />
+          </a>
+        )}
+      </div>
     </div>
   );
 }

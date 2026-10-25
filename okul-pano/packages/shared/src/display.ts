@@ -10,6 +10,8 @@ import type { SchoolSettings } from './schemas.ts';
  */
 export interface DisplayState {
   serverTime: string;
+  /** Sunucu sürümü: güncelleme yayınlanınca panolar kendini yeniler (eski kodla çalışmaya devam etmesin) */
+  appVersion?: string;
   screen: { id: string; name: string } | null;
   school: {
     id: string;

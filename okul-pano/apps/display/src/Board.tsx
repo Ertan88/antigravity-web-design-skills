@@ -153,7 +153,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
     );
   }
 
-  const slideshow = (synced: boolean) => (
+  const slideshow = (full: boolean) => (
     <Slideshow
       announcements={state.announcements}
       now={now}
@@ -161,7 +161,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
       videoSound={s.videoSound}
       schoolName={school.name}
       logoUrl={school.logoUrl}
-      synced={synced}
+      full={full}
     />
   );
   const overlays = (
@@ -183,24 +183,6 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
       <Stage className={`${classes} mode-slides`} style={themeVars} width={stageW} height={stageH}>
         {slideshow(true)}
         <div className="corner-clock">{new Intl.DateTimeFormat('tr-TR', { hour: '2-digit', minute: '2-digit', timeZone: school.timezone }).format(now)}</div>
-        {overlays}
-      </Stage>
-    );
-  }
-
-  // Video duvarı: bütün duvar tek bir büyük tuval; her TV kendi parçasını gösterir, akış saate bağlı
-  if (display.mode === 'wall') {
-    const k = Math.min(display.wallCols, display.wallRows);
-    const vw = (stageW * display.wallCols) / k;
-    const vh = (stageH * display.wallRows) / k;
-    return (
-      <Stage className={`${classes} mode-wall`} style={themeVars} width={stageW} height={stageH}>
-        <div
-          className="wall-canvas"
-          style={{ width: vw, height: vh, transform: `scale(${k}) translate(${(-display.wallCol * stageW) / k}px, ${(-display.wallRow * stageH) / k}px)` }}
-        >
-          {slideshow(true)}
-        </div>
         {overlays}
       </Stage>
     );

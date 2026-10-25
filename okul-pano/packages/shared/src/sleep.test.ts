@@ -35,6 +35,7 @@ describe('isSleepTime', () => {
 describe('resolveScreenDisplay', () => {
   it('varsayılanlar ve sınırlar', () => {
     expect(resolveScreenDisplay(null).mode).toBe('board');
-    expect(resolveScreenDisplay({ mode: 'wall', wallCols: 2, wallCol: 5 }).wallCol).toBe(1);
+    expect(resolveScreenDisplay({ mode: 'wall' as never }).mode).toBe('board');
+    expect(resolveScreenDisplay({ orientation: 'portrait', mode: 'slides' })).toEqual({ orientation: 'portrait', mode: 'slides' });
   });
 });

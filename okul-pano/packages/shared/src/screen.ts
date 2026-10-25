@@ -1,26 +1,19 @@
 import { sortPeriods, type Period } from './bell.ts';
 
-/**
- * Panonun ekran biçimi: yatay / dikey (portre) TV, yalnızca duyuru gösteren ekran ya da
- * birden çok TV'den oluşan video duvarının bir parçası.
- */
+/** Panonun ekran biçimi: yatay / dikey (portre) TV, tam pano ya da yalnızca duyurular */
 export interface ScreenDisplay {
   orientation: 'landscape' | 'portrait';
-  mode: 'board' | 'slides' | 'wall';
-  /** Video duvarı: kaç sütun × kaç satır TV ve bu TV'nin yeri (0'dan başlar) */
-  wallCols: number;
-  wallRows: number;
-  wallCol: number;
-  wallRow: number;
+  mode: 'board' | 'slides';
 }
 
-export const DEFAULT_SCREEN_DISPLAY: ScreenDisplay = { orientation: 'landscape', mode: 'board', wallCols: 2, wallRows: 1, wallCol: 0, wallRow: 0 };
+export const DEFAULT_SCREEN_DISPLAY: ScreenDisplay = { orientation: 'landscape', mode: 'board' };
 
+/** Kayıtlı değer eksik ya da artık desteklenmiyorsa varsayılana düşer */
 export function resolveScreenDisplay(d: Partial<ScreenDisplay> | null | undefined): ScreenDisplay {
-  const r = { ...DEFAULT_SCREEN_DISPLAY, ...(d ?? {}) };
-  r.wallCol = Math.min(r.wallCol, r.wallCols - 1);
-  r.wallRow = Math.min(r.wallRow, r.wallRows - 1);
-  return r;
+  return {
+    orientation: d?.orientation === 'portrait' ? 'portrait' : 'landscape',
+    mode: d?.mode === 'slides' ? 'slides' : 'board',
+  };
 }
 
 export interface SleepSettings {

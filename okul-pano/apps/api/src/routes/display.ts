@@ -35,6 +35,8 @@ import { holidaysInRange } from './holidays.ts';
 import { DEVICE_TOKEN_PREFIX } from './screens.ts';
 
 const PAIRING_TTL_MS = 10 * 60 * 1000;
+/** Sunucu her başlatıldığında (güncelleme yayınlanınca) değişir; panolar bunu görünce kendini yeniler */
+const APP_VERSION = process.env.APP_VERSION ?? new Date().toISOString();
 
 interface DisplayAuth {
   schoolId: string;
@@ -184,6 +186,7 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
 
   return {
     serverTime: now.toISOString(),
+    appVersion: APP_VERSION,
     screen: auth.screen ? { id: auth.screen.id, name: auth.screen.name } : null,
     school: {
       id,

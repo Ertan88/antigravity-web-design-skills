@@ -1,14 +1,15 @@
+import { resolveScreenDisplay } from '@okulpano/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Cake, GraduationCap, Megaphone, MonitorSmartphone, Plus, ShieldCheck, TextCursorInput, UserMinus, Users } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { BoardPreview } from '../components/BoardPreview.tsx';
-import { Card } from '../components/ui.tsx';
-import { TodaySummary } from './dashboard/Today.tsx';
+import { Card, Segmented } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
-import { useSchoolPath } from '../lib/data.ts';
+import { useList, useSchoolPath, type Screen } from '../lib/data.ts';
 import { timeAgo } from '../lib/format.ts';
+import { TodaySummary } from './dashboard/Today.tsx';
 
 interface Stats {
   activeAnnouncements: number;
@@ -44,18 +45,26 @@ function greeting() {
 
 function Stat({ icon, label, value, hint, to }: { icon: ReactNode; label: string; value: ReactNode; hint?: ReactNode; to?: string }) {
   const body = (
-    <Card className="p-4 transition-shadow hover:shadow-md">
+    <Card className="h-full p-4 transition-shadow hover:shadow-md">
       <div className="flex items-center gap-3">
-        <div className="flex size-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600">{icon}</div>
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600">{icon}</div>
         <div className="min-w-0">
           <div className="text-xs font-medium text-slate-500">{label}</div>
-          <div className="text-xl font-bold tracking-tight">{value}</div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-xl font-bold tracking-tight">{value}</span>
+            {hint && <span className="truncate text-xs font-medium text-amber-600">{hint}</span>}
+          </div>
         </div>
       </div>
-      {hint && <div className="mt-2 text-xs text-slate-500">{hint}</div>}
     </Card>
   );
-  return to ? <Link to={to}>{body}</Link> : body;
+  return to ? (
+    <Link to={to} className="block h-full">
+      {body}
+    </Link>
+  ) : (
+    body
+  );
 }
 
 export function Dashboard() {
@@ -68,6 +77,10 @@ export function Dashboard() {
     enabled: can('users.manage'),
   });
   const s = stats.data;
+  // Önizleme belirli bir panonun gözünden de açılabilir (düzeni, yönü, gösterimi)
+  const screens = useList<Screen>('screens');
+  const [previewId, setPreviewId] = useState('');
+  const previewScreen = screens.data?.find((x) => x.id === previewId) ?? null;
 
   const quick = [
     { to: '/duyurular?yeni=1', label: 'Duyuru ekle', icon: Megaphone, perm: 'announcements.manage' as const },
@@ -93,7 +106,7 @@ export function Dashboard() {
           icon={<MonitorSmartphone className="size-5" />}
           label="Çevrimiçi ekran"
           value={s ? `${s.screensOnline} / ${s.screens}` : '—'}
-          hint={s && s.screens > s.screensOnline ? `${s.screens - s.screensOnline} ekran çevrimdışı` : undefined}
+          hint={s && s.screens > s.screensOnline ? `${s.screens - s.screensOnline} çevrimdışı` : undefined}
           to="/ekranlar"
         />
         <Stat icon={<Users className="size-5" />} label="Öğretmen" value={s?.teachers ?? '—'} to="/ogretmenler" />
@@ -104,13 +117,25 @@ export function Dashboard() {
 
       <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
         <Card className="p-4 sm:p-5">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-semibold">Canlı önizleme</h2>
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600">
-              <span className="size-2 animate-pulse rounded-full bg-emerald-500" /> Ekranlarla aynı anda güncellenir
-            </span>
+            {(screens.data?.length ?? 0) > 0 ? (
+              <Segmented
+                value={previewScreen?.id ?? ''}
+                onChange={setPreviewId}
+                options={[{ value: '', label: 'Okul varsayılanı' }, ...screens.data!.map((x) => ({ value: x.id, label: x.name }))]}
+              />
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+                <span className="size-2 animate-pulse rounded-full bg-emerald-500" /> Ekranlarla aynı anda güncellenir
+              </span>
+            )}
           </div>
-          <BoardPreview />
+          <BoardPreview
+            key={previewScreen?.id ?? 'school'}
+            screenId={previewScreen?.id}
+            portrait={previewScreen ? resolveScreenDisplay(previewScreen.display).orientation === 'portrait' : false}
+          />
         </Card>
 
         <div className="space-y-6">

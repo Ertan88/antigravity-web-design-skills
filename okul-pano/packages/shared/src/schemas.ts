@@ -354,23 +354,17 @@ export const timetableEntrySchema = z.object({
   subject: required('Ders', 60),
 });
 
-export const screenDisplaySchema = z
-  .object({
-    orientation: z.enum(['landscape', 'portrait']).default('landscape'),
-    mode: z.enum(['board', 'slides', 'wall']).default('board'),
-    wallCols: z.number().int().min(1).max(4).default(2),
-    wallRows: z.number().int().min(1).max(4).default(1),
-    wallCol: z.number().int().min(0).max(3).default(0),
-    wallRow: z.number().int().min(0).max(3).default(0),
-  })
-  .refine((d) => d.wallCol < d.wallCols && d.wallRow < d.wallRows, { message: 'TV\'nin yeri duvarın dışında', path: ['wallCol'] });
+export const screenDisplaySchema = z.object({
+  orientation: z.enum(['landscape', 'portrait']).default('landscape'),
+  mode: z.enum(['board', 'slides']).default('board'),
+});
 
 export const screenSchema = z.object({
   name: required('Pano adı', 60),
   location: optionalText(80),
   /** Bu panoya özel düzen; null ise okulun varsayılan düzeni kullanılır */
   layout: boardLayoutSchema.nullable().optional(),
-  /** Ekran biçimi: yatay / dikey, yalnızca duyurular ya da video duvarı */
+  /** Ekran biçimi: yatay / dikey, tam pano ya da yalnızca duyurular */
   display: screenDisplaySchema.optional(),
 });
 

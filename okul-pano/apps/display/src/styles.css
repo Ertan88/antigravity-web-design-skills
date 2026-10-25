@@ -1895,9 +1895,8 @@ p {
   pointer-events: none;
 }
 
-/* ---------- Yalnızca duyurular ve video duvarı ---------- */
-.mode-slides,
-.mode-wall {
+/* ---------- Yalnızca duyurular ---------- */
+.mode-slides {
   background: #000;
 }
 
@@ -1911,22 +1910,9 @@ p {
   height: 100%;
 }
 
-.wall-canvas {
-  position: absolute;
-  left: 0;
-  top: 0;
-  transform-origin: 0 0;
-  display: flex;
-}
-
-.wall-canvas .slideshow-full .slide-dots,
-.wall-canvas .slideshow-full .slide-progress {
-  display: none;
-}
-
 .corner-clock {
   position: absolute;
-  right: 28px;
+  left: 28px;
   top: 24px;
   z-index: 5;
   padding: 8px 18px;
