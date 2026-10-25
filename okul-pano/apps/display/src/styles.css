@@ -1869,21 +1869,54 @@ p {
 }
 
 .screensaver-school {
-  margin-top: 36px;
+  margin-top: 44px;
   display: inline-flex;
   align-items: center;
-  gap: 14px;
-  font-size: 28px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  gap: 18px;
+  text-align: left;
+}
+
+.screensaver-badge {
+  flex: none;
+  width: 76px;
+  height: 76px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   color: #64748b;
 }
 
-.screensaver-school img {
-  height: 44px;
-  width: auto;
-  opacity: 0.7;
+.screensaver-badge img {
+  max-width: 80%;
+  max-height: 80%;
+  object-fit: contain;
+  opacity: 0.75;
+}
+
+.screensaver-title {
+  display: flex;
+  flex-direction: column;
+}
+
+.screensaver-name {
+  font-size: 44px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.22;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.screensaver-type {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.25;
+  text-transform: uppercase;
+  color: #64748b;
 }
 
 /* Karartma: pano görünür kalır ama çok koyu (elektrik ve ekran ömrü için) */

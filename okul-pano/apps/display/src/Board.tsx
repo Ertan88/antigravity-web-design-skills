@@ -148,7 +148,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
   if (sleeping && s.sleepMode === 'screensaver') {
     return (
       <Stage className={classes} style={themeVars} width={stageW} height={stageH}>
-        <Screensaver now={now} timezone={school.timezone} schoolName={school.name} logoUrl={school.logoUrl} />
+        <Screensaver now={now} timezone={school.timezone} schoolName={school.name} schoolType={s.schoolType} logoUrl={school.logoUrl} />
       </Stage>
     );
   }
