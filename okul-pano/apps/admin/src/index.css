@@ -122,3 +122,9 @@
 .animate-toast {
   animation: toast-in 0.2s ease-out both;
 }
+
+/* Öneri listeli (datalist) kutular düz giriş kutusu gibi görünsün: tarayıcının açılır ok simgesi gizlenir,
+   öneriler yazmaya başlayınca çıkar */
+input[list]::-webkit-calendar-picker-indicator {
+  display: none !important;
+}

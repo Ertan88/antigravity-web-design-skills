@@ -189,7 +189,7 @@ export function Settings() {
             help={
               splitSchoolName(v.name).type
                 ? `Boş bırakılırsa addan ayrılır: "${splitSchoolName(v.name).type}". Yalnızca farklı göstermek isterseniz doldurun.`
-                : 'Listeden seçin ya da yazın. Panonun üst barında, ekran koruyucuda ve hazır şablonlarda okul adının altında görünür.'
+                : 'Yazmaya başlayınca öneriler çıkar (ör. "Mes" → Mesleki ve Teknik Anadolu Lisesi). Panonun üst barında, ekran koruyucuda ve hazır şablonlarda okul adının altında görünür.'
             }
             error={!v.settings.schoolType?.trim() && !splitSchoolName(v.name).type ? 'Okul türü boş: panoda okul adının altı boş kalıyor.' : undefined}
           >
