@@ -1,4 +1,5 @@
 import {
+  achievementDesign,
   announcementOnAir,
   isSleepTime,
   quoteOfDay,
@@ -7,7 +8,6 @@ import {
   resolveLayout,
   resolveScreenDisplay,
   specialThemeFor,
-  type AnnouncementDesign,
   type BoardModule,
   type DisplayAnnouncement,
   type LayoutItem,
@@ -106,17 +106,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         durationSec: null,
         startsAt: a.startsAt,
         endsAt: a.endsAt,
-        design: (a.kind === 'month'
-            ? {
-                template: 'monthStudent',
-                palette: 'amber',
-                fields: { name: a.name, class: a.className ?? '', month: monthName(a.startsAt ?? now.toISOString(), school.timezone), note: a.description ?? a.title, photo: a.photoUrl ?? '' },
-              }
-            : {
-                template: 'achievement',
-                palette: 'emerald',
-                fields: { name: a.name + (a.className ? ` · ${a.className}` : ''), achievement: a.title, note: a.description ?? '', photo: a.photoUrl ?? '' },
-              }) as AnnouncementDesign,
+        design: achievementDesign(a, monthName(a.startsAt ?? now.toISOString(), school.timezone)),
       }))
     : [];
   const slides = [...onAir, ...achievementSlides];

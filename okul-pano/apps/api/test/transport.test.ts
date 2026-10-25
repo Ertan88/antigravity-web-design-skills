@@ -148,6 +148,8 @@ describe('taşımalı öğrenci (servis) görevlileri', () => {
   it('çizelge ayın tamamıdır: dosyada olmayan günler temizlenir, resmî tatilde görevli yazılmaz', async () => {
     // 29 Ekim'de (Cumhuriyet Bayramı) önceden kalmış bir kayıt var
     expectStatus(await owner.put(path('transport-duties/2026-10-29'), { teacherIds: [ids['Ali Kaya']] }), 200);
+    // Tatil gününde kayıt olsa da listede görevli gösterilmez
+    expect(((await owner.get(path('transport-duties?month=2026-10'))).json() as Day[]).map((d) => d.date)).not.toContain('2026-10-29');
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Worksheet');
     ws.getCell('A1').value = 'ÖĞRETMEN SERVİS NÖBET ÇİZELGESİ';

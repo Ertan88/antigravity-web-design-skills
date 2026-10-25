@@ -60,22 +60,9 @@ function TransportCell({
     next[i] = id;
     void run(() => onSave(next.filter(Boolean)));
   };
-  // Resmî / dini tatilde görevli olmaz: yalnızca tatilin adı (arife yarım gün, normal gün sayılır)
+  // Resmî / dini tatilde görevli olmaz: kartın ortasında yalnızca tatilin tam adı (arife yarım gün, normal gün)
   if (holiday && !holiday.name.endsWith('Arifesi')) {
-    return (
-      <DayShell day={day} isToday={isToday} tone="amber" aside={<SaveMark state={state} />} holiday={holiday}>
-        {ids.length > 0 && (
-          <div className="space-y-1 text-[11px] text-slate-500">
-            <div>Kayıtlı görevli var; tatil olduğu için panoda gösterilmez.</div>
-            {editable && (
-              <button type="button" className="font-semibold text-rose-700 hover:underline" onClick={() => void run(() => onSave([]))}>
-                Kaydı kaldır
-              </button>
-            )}
-          </div>
-        )}
-      </DayShell>
-    );
+    return <DayShell day={day} isToday={isToday} tone="amber" holiday={holiday} holidayCentered>{null}</DayShell>;
   }
   return (
     <DayShell day={day} isToday={isToday} tone="amber" aside={<SaveMark state={state} />} holiday={holiday}>

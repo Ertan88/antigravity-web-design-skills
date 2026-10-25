@@ -88,7 +88,16 @@ export const schoolSettingsSchema = z.object({
   tickerQuote: z.boolean().default(false),
   tickerWeatherAlerts: z.boolean().default(true),
   rssFeeds: z
-    .array(z.object({ label: z.string().trim().min(1).max(30), url: z.url('Geçerli bir RSS adresi girin').max(500) }))
+    .array(
+      z.object({
+        label: z.string().trim().min(1).max(30),
+        url: z.url('Geçerli bir RSS adresi girin').max(500),
+        /** 'students': yalnızca öğrencileri ilgilendiren başlıklar */
+        audience: z.enum(['all', 'students']).default('all'),
+        /** Virgülle ayrılmış kelimeler: doluysa yalnızca bunları içeren başlıklar */
+        keywords: z.string().trim().max(300).default(''),
+      }),
+    )
     .max(5)
     .default([]),
   /** Üst barda bugünün hava durumu uyarısı (yoğun kar, aşırı sıcak…) */
@@ -172,6 +181,12 @@ export const createMemberSchema = z.object({
   password: z.string().min(8, 'Şifre en az 8 karakter olmalı').max(200).optional(),
   role: z.enum(['admin', 'editor']),
   permissions: permissionList.default([]),
+});
+
+/** Yöneticinin bir kullanıcının şifresini sıfırlaması; şifre verilmezse üretilir */
+export const resetPasswordSchema = z.object({
+  password: z.string().min(8, 'Şifre en az 8 karakter olmalı').max(200).optional(),
+  sendEmail: z.boolean().default(false),
 });
 
 export const updateMemberSchema = z.object({

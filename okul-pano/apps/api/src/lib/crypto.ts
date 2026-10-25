@@ -46,3 +46,13 @@ export function pairingCode(length = 6): string {
   for (let i = 0; i < length; i++) out += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
   return out;
 }
+
+/** Okunaklı geçici şifre: karışan karakterler (0/O, 1/l/I) yok, en az bir rakam */
+export function readablePassword(length = 10): string {
+  const letters = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ';
+  const digits = '23456789';
+  const all = letters + digits;
+  const out = Array.from({ length: length - 1 }, () => all[randomInt(all.length)]!);
+  out.splice(randomInt(length), 0, digits[randomInt(digits.length)]!);
+  return out.join('');
+}

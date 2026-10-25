@@ -1,10 +1,10 @@
 import { quoteOfDay, todayInHistory, type SchoolSettings } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Rss, Trash2 } from 'lucide-react';
+import { Plus, Rss } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { SaveBar } from '../components/SaveBar.tsx';
 import { useToast } from '../components/Toast.tsx';
-import { Card, IconButton, Input, Toggle } from '../components/ui.tsx';
+import { Card, DeleteButton, Input, Segmented, Toggle } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useSchool, useSchoolPath, type School } from '../lib/data.ts';
@@ -55,7 +55,8 @@ export function TickerSources() {
     .replace(/[^a-z]/g, '');
   const presets = [
     { title: 'MEB haberleri', label: 'MEB', url: news('site:meb.gov.tr') },
-    ...(citySlug ? [{ title: `${school.data.city} Millî Eğitim`, label: `${school.data.city} MEM`, url: news(`site:${citySlug}.meb.gov.tr`) }] : []),
+    // Okulun kendi konumundan (Genel Ayarlar › Konum); hiçbir il / ilçe sabit değil
+    ...(citySlug ? [{ title: `Okulun millî eğitim müdürlüğü (${school.data.city})`, label: `${school.data.city} MEM`, url: news(`site:${citySlug}.meb.gov.tr`) }] : []),
   ];
   const setFeed = (i: number, patch: Partial<Sources['rssFeeds'][number]>) =>
     setV({ ...v, rssFeeds: v.rssFeeds.map((f, j) => (j === i ? { ...f, ...patch } : f)) });
@@ -86,7 +87,8 @@ export function TickerSources() {
           </div>
           <p className="mb-3 text-xs text-slate-500">
             RSS adresini bilmiyorsanız sitenin adresini yapıştırın; sayfada RSS bağlantısı varsa kendiliğinden bulunur. Bakanlığın sitesinde RSS yoksa aşağıdaki hazır kaynaklar bakanlık
-            ve il millî eğitim haberlerini Google Haberler üzerinden getirir. Başlıklar 30 dakikada bir yenilenir.
+            ve okulunuzun kayıtlı konumundaki millî eğitim müdürlüğünün haberlerini Google Haberler üzerinden getirir. “Öğrencileri ilgilendirenler” seçiliyken atama, ihale,
+            personel gibi başlıklar atlanır; sınav, tatil, karne, burs gibi başlıklar akar. Başlıklar 30 dakikada bir yenilenir.
           </p>
           {editable && (
             <div className="mb-3 flex flex-wrap gap-1.5">
@@ -97,7 +99,7 @@ export function TickerSources() {
                     key={p.url}
                     type="button"
                     disabled={v.rssFeeds.length >= 5}
-                    onClick={() => setV({ ...v, rssFeeds: [...v.rssFeeds, { label: p.label, url: p.url }] })}
+                    onClick={() => setV({ ...v, rssFeeds: [...v.rssFeeds, { label: p.label, url: p.url, audience: 'students', keywords: '' }] })}
                     className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-orange-700 ring-1 ring-orange-200 transition hover:bg-orange-50 disabled:opacity-50"
                   >
                     <Plus className="size-3.5" /> {p.title}
@@ -105,22 +107,45 @@ export function TickerSources() {
                 ))}
             </div>
           )}
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             {v.rssFeeds.map((f, i) => (
-              <div key={i} className="flex gap-2">
-                <Input className="w-32 shrink-0" value={f.label} maxLength={30} disabled={!editable} placeholder="MEB" onChange={(e) => setFeed(i, { label: e.target.value })} aria-label="Kaynak adı" />
-                <Input value={f.url} disabled={!editable} placeholder="https://…/rss.xml" onChange={(e) => setFeed(i, { url: e.target.value.trim() })} aria-label="RSS adresi" />
-                {editable && (
-                  <IconButton label="Kaldır" onClick={() => setV({ ...v, rssFeeds: v.rssFeeds.filter((_, j) => j !== i) })}>
-                    <Trash2 className="size-4" />
-                  </IconButton>
-                )}
+              <div key={i} className="space-y-2 rounded-xl bg-slate-50/70 p-2.5 ring-1 ring-slate-200">
+                {/* Kaynak adı · adres · sil: tek satırda, taşmadan */}
+                <div className="grid grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)_auto] items-center gap-2">
+                  <Input value={f.label} maxLength={30} disabled={!editable} placeholder="Kaynak adı" onChange={(e) => setFeed(i, { label: e.target.value })} aria-label="Kaynak adı" />
+                  <Input value={f.url} disabled={!editable} placeholder="https://…" onChange={(e) => setFeed(i, { url: e.target.value.trim() })} aria-label="RSS ya da site adresi" />
+                  {editable ? (
+                    <DeleteButton what="Bu kaynak" onConfirm={() => setV({ ...v, rssFeeds: v.rssFeeds.filter((_, j) => j !== i) })} />
+                  ) : (
+                    <span />
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Segmented
+                    value={f.audience}
+                    onChange={(audience) => editable && setFeed(i, { audience })}
+                    options={[
+                      { value: 'students', label: 'Öğrencileri ilgilendirenler' },
+                      { value: 'all', label: 'Bütün başlıklar' },
+                    ]}
+                  />
+                  <div className="min-w-48 flex-1">
+                    <Input
+                      value={f.keywords}
+                      maxLength={300}
+                      disabled={!editable}
+                      placeholder="Yalnızca şu kelimeler (isteğe bağlı): LGS, tatil, karne"
+                      onChange={(e) => setFeed(i, { keywords: e.target.value })}
+                      aria-label="Süzme kelimeleri"
+                    />
+                  </div>
+                </div>
               </div>
             ))}
             {editable && v.rssFeeds.length < 5 && (
               <button
                 type="button"
-                onClick={() => setV({ ...v, rssFeeds: [...v.rssFeeds, { label: v.rssFeeds.length ? '' : 'MEB', url: '' }] })}
+                onClick={() => setV({ ...v, rssFeeds: [...v.rssFeeds, { label: '', url: '', audience: 'students', keywords: '' }] })}
                 className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:text-brand-800"
               >
                 <Plus className="size-4" /> RSS kaynağı ekle

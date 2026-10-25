@@ -1,4 +1,4 @@
-import { achievementSchema, bookSchema, schoolEventSchema } from '@okulpano/shared';
+import { achievementDesign, achievementSchema, bookSchema, schoolEventSchema } from '@okulpano/shared';
 import { CalendarDays, Library, Trophy } from 'lucide-react';
 import { CrudPage } from '../components/CrudPage.tsx';
 import { ImageUpload } from '../components/ImageUpload.tsx';
@@ -26,6 +26,7 @@ const monthOf = (iso: string | null) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
 };
 import { PublishCell } from './Announcements.tsx';
+import { DesignThumb } from './announcements/DesignEditor.tsx';
 
 /* ---------- Başarılar ve ayın öğrencisi ---------- */
 
@@ -191,6 +192,23 @@ export function Achievements() {
             </div>
           )}
           <Toggle checked={v.isActive} onChange={(x) => set('isActive', x)} label="Panoda göster" description="Panodaki Başarılar kartında ve duyuru alanında hazır şablonla döner." />
+          <div>
+            <div className="mb-2 text-sm font-medium text-slate-700">Duyuru alanında böyle görünür</div>
+            <DesignThumb
+              className="overflow-hidden rounded-xl shadow-lg ring-1 ring-slate-200"
+              design={achievementDesign(
+                {
+                  kind: v.kind,
+                  name: v.name || (v.kind === 'month' ? 'Öğrencinin adı' : 'Öğrenci ya da takım'),
+                  className: v.className || null,
+                  title: v.title || (v.kind === 'month' ? 'Ayın öğrencisi' : 'Derece'),
+                  description: v.description || null,
+                  photoUrl: v.photoUrl,
+                },
+                v.month ? monthTitle(v.month) : '',
+              )}
+            />
+          </div>
         </>
       )}
     />

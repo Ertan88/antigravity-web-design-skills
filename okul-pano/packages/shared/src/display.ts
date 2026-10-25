@@ -128,8 +128,8 @@ export type WeatherIcon = 'sun' | 'moon' | 'cloud-sun' | 'cloud-moon' | 'cloud' 
 
 /** WMO hava durumu kodlarını Türkçe açıklamaya ve simgeye çevirir. */
 export function weatherInfo(code: number, isDay: boolean): { label: string; icon: WeatherIcon } {
-  if (code === 0) return { label: 'Açık', icon: isDay ? 'sun' : 'moon' };
-  if (code === 1) return { label: 'Az bulutlu', icon: isDay ? 'cloud-sun' : 'cloud-moon' };
+  if (code === 0) return { label: isDay ? 'Açık ve güneşli' : 'Açık', icon: isDay ? 'sun' : 'moon' };
+  if (code === 1) return { label: isDay ? 'Az bulutlu, güneşli' : 'Az bulutlu', icon: isDay ? 'cloud-sun' : 'cloud-moon' };
   if (code === 2) return { label: 'Parçalı bulutlu', icon: isDay ? 'cloud-sun' : 'cloud-moon' };
   if (code === 3) return { label: 'Kapalı', icon: 'cloud' };
   if (code === 45 || code === 48) return { label: 'Sisli', icon: 'fog' };

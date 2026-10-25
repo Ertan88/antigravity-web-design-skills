@@ -1,7 +1,7 @@
 import { changePasswordSchema } from '@okulpano/shared';
 import { useState } from 'react';
 import { useToast } from '../components/Toast.tsx';
-import { Alert, Button, Card, Field, Input, PageHeader } from '../components/ui.tsx';
+import { Alert, Button, Card, Field, PageHeader, PasswordInput } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useForm } from '../lib/form.ts';
@@ -37,14 +37,16 @@ export function Account() {
         <h2 className="mb-4 font-semibold">Şifre değiştir</h2>
         <form onSubmit={submit} className="space-y-4">
           {form.errors._form && <Alert tone="red">{form.errors._form}</Alert>}
-          <Field label="Mevcut şifre" error={form.errors.currentPassword}>
-            {(id) => <Input id={id} type="password" autoComplete="current-password" value={form.values.currentPassword} onChange={(e) => form.set('currentPassword', e.target.value)} />}
+          {/* Tarayıcı kayıtlı şifreyi doğru hesaba göre doldursun (başka bir hesabın şifresini değil) */}
+          <input type="email" name="username" autoComplete="username" value={me?.user.email ?? ''} readOnly hidden />
+          <Field label="Mevcut şifre" error={form.errors.currentPassword} help="Tarayıcı kutuyu kendiliğinden doldurduysa göz simgesiyle kontrol edin.">
+            {(id) => <PasswordInput id={id} autoComplete="current-password" value={form.values.currentPassword} onChange={(e) => form.set('currentPassword', e.target.value)} />}
           </Field>
           <Field label="Yeni şifre" error={form.errors.newPassword} help="En az 8 karakter">
-            {(id) => <Input id={id} type="password" autoComplete="new-password" value={form.values.newPassword} onChange={(e) => form.set('newPassword', e.target.value)} />}
+            {(id) => <PasswordInput id={id} autoComplete="new-password" value={form.values.newPassword} onChange={(e) => form.set('newPassword', e.target.value)} />}
           </Field>
           <Field label="Yeni şifre (tekrar)" error={form.errors.repeat}>
-            {(id) => <Input id={id} type="password" autoComplete="new-password" value={form.values.repeat} onChange={(e) => form.set('repeat', e.target.value)} />}
+            {(id) => <PasswordInput id={id} autoComplete="new-password" value={form.values.repeat} onChange={(e) => form.set('repeat', e.target.value)} />}
           </Field>
           <Button type="submit" loading={busy}>
             Şifreyi güncelle

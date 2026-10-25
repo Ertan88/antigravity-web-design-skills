@@ -16,3 +16,4 @@ export * from './designs.ts';
 export * from './emergency.ts';
 export * from './weather.ts';
 export * from './tickerContent.ts';
+export * from './headlines.ts';

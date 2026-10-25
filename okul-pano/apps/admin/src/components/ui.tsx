@@ -1,6 +1,6 @@
 import { WEEKDAY_SHORT } from '@okulpano/shared';
 import clsx from 'clsx';
-import { AlertTriangle, Loader2, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Eye, EyeOff, Loader2, Trash2, X } from 'lucide-react';
 import {
   useEffect,
   useId,
@@ -120,6 +120,26 @@ export function Field({
 
 export function Input({ className, invalid, ...rest }: InputHTMLAttributes<HTMLInputElement> & { invalid?: boolean }) {
   return <input className={clsx(control, 'h-10', invalid && 'ring-red-400', className)} {...rest} />;
+}
+
+/** Şifre kutusu: göz düğmesiyle yazılan şifre gösterilip gizlenir (yanlış yazımı görmek için) */
+export function PasswordInput({ className, invalid, ...rest }: Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> & { invalid?: boolean }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="relative">
+      <input type={visible ? 'text' : 'password'} className={clsx(control, 'h-10 pr-11', invalid && 'ring-red-400', className)} {...rest} />
+      <button
+        type="button"
+        tabIndex={-1}
+        onClick={() => setVisible((x) => !x)}
+        aria-label={visible ? 'Şifreyi gizle' : 'Şifreyi göster'}
+        title={visible ? 'Şifreyi gizle' : 'Şifreyi göster'}
+        className="absolute inset-y-0 right-1 my-auto flex size-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-ink"
+      >
+        {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+      </button>
+    </div>
+  );
 }
 
 export function Textarea({ className, invalid, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement> & { invalid?: boolean }) {

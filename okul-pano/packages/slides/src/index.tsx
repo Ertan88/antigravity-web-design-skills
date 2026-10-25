@@ -206,9 +206,10 @@ export function DesignSlide({ design, schoolName, schoolType, logoUrl, sample = 
       {school && (
         <div className="ds-school">
           {logoUrl && <img src={logoUrl} alt="" className="ds-school-logo" />}
-          <span className="ds-school-name">
-            {school.name}
-            {school.type && <span> {school.type}</span>}
+          {/* Panonun üst barındaki gibi: kalın okul adı, altında okul türü */}
+          <span className="ds-school-text">
+            <span className="ds-school-name">{school.name}</span>
+            {school.type && <span className="ds-school-type">{school.type}</span>}
           </span>
         </div>
       )}

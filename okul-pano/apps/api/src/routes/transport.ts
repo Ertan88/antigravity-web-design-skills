@@ -51,8 +51,11 @@ export async function transportRoutes(app: FastifyInstance) {
     const { month } = req.query as { month?: string };
     if (!month || !MONTH_RE.test(month)) throw badRequest('Ay YYYY-AA biçiminde olmalı.');
     const rows = await monthRows(req.ctx.schoolId, month);
+    // Resmî / dini tatillerde görevli olmaz: eskiden kalmış kayıt olsa da listelenmez (arife yarım gün, sayılır)
+    const [from, to] = monthRange(month);
+    const off = new Set((await holidaysInRange(db, req.ctx.schoolId, from, to)).filter((h) => !h.name.endsWith('Arifesi')).map((h) => h.date));
     const byDate = new Map<string, { id: string; fullName: string }[]>();
-    for (const r of rows) byDate.set(r.date, [...(byDate.get(r.date) ?? []), { id: r.teacherId, fullName: r.teacherName }]);
+    for (const r of rows) if (!off.has(r.date)) byDate.set(r.date, [...(byDate.get(r.date) ?? []), { id: r.teacherId, fullName: r.teacherName }]);
     return [...byDate].map(([date, list]) => ({ date, teachers: list }));
   });
 

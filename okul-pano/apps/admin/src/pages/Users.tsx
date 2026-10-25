@@ -7,6 +7,7 @@ import { useToast } from '../components/Toast.tsx';
 import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Spinner, Table, Td } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
+import { CredentialsDialog, ResetPasswordDialog, type Credentials } from './users/Credentials.tsx';
 import { useList, useSchoolPath } from '../lib/data.ts';
 import { useForm } from '../lib/form.ts';
 import { timeAgo } from '../lib/format.ts';
@@ -88,7 +89,8 @@ export function Users() {
   const toast = useToast();
   const list = useList<Member>('members');
   const [mode, setMode] = useState<'add' | Member | null>(null);
-  const [created, setCreated] = useState<{ email: string; password: string } | null>(null);
+  const [created, setCreated] = useState<Credentials | null>(null);
+  const [resetting, setResetting] = useState<Member | null>(null);
   const form = useForm<Form>({ email: '', fullName: '', password: '', role: 'editor', permissions: ['announcements.manage'] });
   const refresh = () => void qc.invalidateQueries({ queryKey: [schoolId, 'members'] });
 
@@ -119,9 +121,14 @@ export function Users() {
       if (mode === 'add') {
         const payload = form.validate(createMemberSchema, { email: v.email, fullName: v.fullName, password: v.password || undefined, role: v.role, permissions: v.permissions });
         if (!payload) return;
-        await save.mutateAsync({ body: payload });
-        setCreated({ email: v.email, password: v.password });
-        toast.success(`${v.fullName} eklendi`);
+        const res = (await save.mutateAsync({ body: payload })) as { existingUser?: boolean };
+        if (res.existingUser) {
+          // E-posta sistemde kayıtlı: girilen şifre kullanılmadı, kullanıcı kendi şifresiyle girer
+          toast.success(`${v.fullName} eklendi. Bu e-posta sistemde zaten kayıtlı olduğu için mevcut şifresi geçerli; gerekirse "Şifreyi sıfırla"yı kullanın.`);
+        } else {
+          setCreated({ email: v.email, fullName: v.fullName, password: v.password });
+          toast.success(`${v.fullName} eklendi`);
+        }
       } else if (mode) {
         const payload = form.validate(updateMemberSchema, { role: v.role, permissions: v.permissions });
         if (!payload) return;
@@ -188,6 +195,9 @@ export function Users() {
                         <IconButton label="Yetkileri düzenle" onClick={() => openEdit(m)}>
                           <Pencil className="size-4" />
                         </IconButton>
+                        <IconButton label="Şifreyi sıfırla" onClick={() => setResetting(m)}>
+                          <KeyRound className="size-4" />
+                        </IconButton>
                         <DeleteButton label="Erişimi kaldır" onConfirm={() => remove.mutate(m.id)} />
                       </div>
                     )}
@@ -250,16 +260,16 @@ export function Users() {
         </form>
       </Modal>
 
-      <Modal open={Boolean(created)} onClose={() => setCreated(null)} title="Giriş bilgileri" footer={<Button onClick={() => setCreated(null)}>Tamam</Button>}>
-        <div className="space-y-3 text-sm">
-          <p>Bu bilgileri kullanıcıya güvenli bir yoldan iletin. Şifre bir daha gösterilmeyecek.</p>
-          <div className="rounded-xl bg-slate-50 p-4 font-mono text-sm ring-1 ring-slate-200">
-            <div>Adres: {location.origin}/admin/</div>
-            <div>E-posta: {created?.email}</div>
-            <div>Şifre: {created?.password}</div>
-          </div>
-        </div>
-      </Modal>
+      <CredentialsDialog value={created} onClose={() => setCreated(null)} />
+      <ResetPasswordDialog
+        member={resetting}
+        onClose={() => setResetting(null)}
+        onDone={(c) => {
+          setResetting(null);
+          setCreated(c);
+          toast.success(c.emailed ? `${c.fullName} kullanıcısının şifresi sıfırlandı ve e-postayla gönderildi` : `${c.fullName} kullanıcısının şifresi sıfırlandı`);
+        }}
+      />
     </>
   );
 }

@@ -58,3 +58,13 @@ describe('birleşik kartlar', () => {
     expect(boardLayoutSchema.safeParse({ left: [['leaves', 'birthdays']], right: ['bell'] }).success).toBe(true);
   });
 });
+
+describe('RSS başlık süzgeci', () => {
+  it('öğrencileri ilgilendirenler: personel ve ihale başlıkları atılır, öğrenci başlıkları kalır', async () => {
+    const { filterHeadlines } = await import('./headlines.ts');
+    const titles = ['2026-2027 eğitim öğretim yılı çalışma takvimi açıklandı', 'Sözleşmeli öğretmen ataması sonuçları', 'Bakan ihale toplantısına katıldı', 'LGS başvuruları başladı', 'Bilim olimpiyatlarında öğrencilerimiz madalya kazandı'];
+    expect(filterHeadlines(titles, { audience: 'students', keywords: '' })).toEqual([titles[0], titles[3], titles[4]]);
+    expect(filterHeadlines(titles, { audience: 'all', keywords: '' })).toEqual(titles);
+    expect(filterHeadlines(titles, { audience: 'all', keywords: 'LGS, takvim' })).toEqual([titles[0], titles[3]]);
+  });
+});

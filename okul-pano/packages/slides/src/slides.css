@@ -239,7 +239,7 @@
 }
 
 .ds-school-logo {
-  height: calc(var(--u) * 3.6);
+  height: calc(var(--u) * 4.2);
   width: auto;
   max-width: calc(var(--u) * 8);
   object-fit: contain;
@@ -248,13 +248,23 @@
   padding: calc(var(--u) * 0.3);
 }
 
-.ds-school-name {
-  opacity: 0.75;
+.ds-school-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
 }
 
-.ds-school-name span {
+.ds-school-name {
+  font-size: calc(var(--u) * 1.9);
+  font-weight: 900;
+  opacity: 0.9;
+}
+
+.ds-school-type {
+  font-size: calc(var(--u) * 1.35);
   font-weight: 600;
-  opacity: 0.85;
+  letter-spacing: 0.1em;
+  opacity: 0.75;
 }
 
 /* Ortalı şablonlar: tebrik, kutlama */
@@ -301,6 +311,10 @@
 
 .ds-center .ds-school {
   justify-content: center;
+}
+
+.ds-center .ds-school-text {
+  align-items: flex-start;
 }
 
 /* Dikey ya da kareye yakın kutu: simge üstte küçülür, metin altında */

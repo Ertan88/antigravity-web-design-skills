@@ -1,9 +1,10 @@
-import { createMemberSchema, effectivePermissions, updateMemberSchema } from '@okulpano/shared';
+import { createMemberSchema, effectivePermissions, resetPasswordSchema, updateMemberSchema } from '@okulpano/shared';
 import { and, asc, eq } from 'drizzle-orm';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { audit, schoolGuard, UUID_RE } from '../context.ts';
-import { memberships, users } from '../db/schema.ts';
-import { hashPassword } from '../lib/crypto.ts';
+import { memberships, sessions, users } from '../db/schema.ts';
+import { hashPassword, readablePassword } from '../lib/crypto.ts';
+import { sendMail } from '../lib/mailer.ts';
 import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
 
 export async function memberRoutes(app: FastifyInstance) {
@@ -48,6 +49,7 @@ export async function memberRoutes(app: FastifyInstance) {
     const body = parse(createMemberSchema, req.body);
     const email = body.email.toLowerCase();
     let [user] = await db.select().from(users).where(eq(users.email, email));
+    const created = !user;
     if (!user) {
       if (!body.password) throw badRequest('Yeni kullanıcı için geçici bir şifre belirleyin.');
       [user] = await db
@@ -71,7 +73,8 @@ export async function memberRoutes(app: FastifyInstance) {
       })
       .returning();
     await audit(req, 'create', 'Kullanıcı', m!.id, `${body.fullName} (${email})`);
-    return reply.status(201).send({ id: m!.id });
+    // E-posta sistemde zaten kayıtlıysa girilen geçici şifre kullanılmaz: panel bunu açıkça söyler
+    return reply.status(201).send({ id: m!.id, existingUser: !created });
   });
 
   app.patch(`${base}/:memberId`, manage, async (req) => {
@@ -82,6 +85,29 @@ export async function memberRoutes(app: FastifyInstance) {
     await db.update(memberships).set({ role, permissions }).where(eq(memberships.id, m.membership.id));
     await audit(req, 'update', 'Kullanıcı yetkisi', m.membership.id, m.fullName);
     return { ok: true };
+  });
+
+  /**
+   * Yönetici bir kullanıcının şifresini sıfırlar (unutulan şifre): yeni şifre verilmezse rastgele
+   * üretilir, kullanıcının bütün oturumları kapanır; istenirse e-postayla gönderilir.
+   */
+  app.post(`${base}/:memberId/password`, manage, async (req) => {
+    const m = await loadMember(req);
+    const body = parse(resetPasswordSchema, req.body ?? {});
+    const password = body.password ?? readablePassword();
+    await db.update(users).set({ passwordHash: await hashPassword(password) }).where(eq(users.id, m.membership.userId));
+    await db.delete(sessions).where(eq(sessions.userId, m.membership.userId));
+    await audit(req, 'update', 'Kullanıcı şifresi', m.membership.id, `${m.fullName} şifresi sıfırlandı`);
+    let emailed = false;
+    if (body.sendEmail) {
+      const url = `${app.deps.env.PUBLIC_URL.replace(/\/$/, '')}/admin/`;
+      emailed = await sendMail(app.deps.env, {
+        to: m.email,
+        subject: `${req.ctx.school.name} · Okul Pano şifreniz`,
+        text: `Merhaba ${m.fullName},\n\nOkul Pano yönetim paneli şifreniz yenilendi.\n\nAdres: ${url}\nE-posta: ${m.email}\nŞifre: ${password}\n\nGiriş yaptıktan sonra Hesabım sayfasından şifrenizi değiştirin.\n`,
+      }).catch(() => false);
+    }
+    return { password, emailed, email: m.email, fullName: m.fullName };
   });
 
   app.delete(`${base}/:memberId`, manage, async (req, reply) => {

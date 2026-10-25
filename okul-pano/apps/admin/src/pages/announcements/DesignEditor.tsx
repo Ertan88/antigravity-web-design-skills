@@ -1,4 +1,4 @@
-import { DESIGN_PALETTE_IDS, DESIGN_PALETTES, DESIGN_TEMPLATES, designFields, designTemplate, type AnnouncementDesign } from '@okulpano/shared';
+import { ANNOUNCEMENT_TEMPLATES, DESIGN_PALETTE_IDS, DESIGN_PALETTES, designFields, designTemplate, type AnnouncementDesign } from '@okulpano/shared';
 import { DesignSlide } from '@okulpano/slides';
 import clsx from 'clsx';
 import { Check } from 'lucide-react';
@@ -30,8 +30,9 @@ export function DesignEditor({ value, onChange }: { value: AnnouncementDesign; o
     <div className="space-y-5">
       <div>
         <div className="mb-2 text-sm font-medium text-slate-700">Şablon</div>
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
-          {DESIGN_TEMPLATES.map((x) => {
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          {/* Ayın öğrencisi ve başarı şablonları Başarılar sayfasında; eski bir duyuruda seçiliyse yine görünür */}
+          {[...ANNOUNCEMENT_TEMPLATES, ...(ANNOUNCEMENT_TEMPLATES.some((t) => t.id === value.template) ? [] : [designTemplate(value.template)])].map((x) => {
             const active = x.id === value.template;
             return (
               <button

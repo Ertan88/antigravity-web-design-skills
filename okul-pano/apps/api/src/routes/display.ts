@@ -1,4 +1,5 @@
 import {
+  filterHeadlines,
   resolveLayout,
   resolveScreenDisplay,
   schoolSettingsSchema,
@@ -212,7 +213,11 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
       .where(and(eq(books.schoolId, id), eq(books.isActive, true), windowed(books.startsAt, books.endsAt)))
       .orderBy(asc(books.sortOrder), desc(books.createdAt))
       .limit(5),
-    Promise.resolve(settingsEarly.rssFeeds.flatMap((f) => feedTitlesNow(f.url).map((title) => ({ source: f.label, title })))),
+    Promise.resolve(
+      settingsEarly.rssFeeds.flatMap((f) =>
+        filterHeadlines(feedTitlesNow(f.url), { audience: f.audience, keywords: f.keywords }).map((title) => ({ source: f.label, title })),
+      ),
+    ),
   ]);
 
   const iso = (d: Date | null) => (d ? d.toISOString() : null);
@@ -238,7 +243,10 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
     dutySupervisors: supervisorRows,
     // Arife günleri yarım gündür (sabah ders var): panoda tatil sayılmaz
     holidays: holidayRows.filter((h) => !(h.source === 'official' && h.name.endsWith('Arifesi'))).map(({ date, name }) => ({ date, name })),
-    transportDuties: settings.hasTransport ? groupTransport(transportRows) : [],
+    // Tatil günlerinde taşımalı görevli gösterilmez (eskiden kalmış kayıt olsa da)
+    transportDuties: settings.hasTransport
+      ? groupTransport(transportRows).filter((d) => !holidayRows.some((h) => h.date === d.date && !(h.source === 'official' && h.name.endsWith('Arifesi'))))
+      : [],
     leaves: leaveRows,
     birthdays: birthdayRows,
     announcements: annRows

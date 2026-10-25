@@ -1,6 +1,6 @@
 import { MonitorSmartphone } from 'lucide-react';
 import { useState } from 'react';
-import { Alert, Button, Field, Input } from '../components/ui.tsx';
+import { Alert, Button, Field, Input, PasswordInput } from '../components/ui.tsx';
 import { useAuth } from '../lib/auth.tsx';
 
 function MiniBoard() {
@@ -96,9 +96,8 @@ export function Login() {
           </Field>
           <Field label="Şifre">
             {(id) => (
-              <Input
+              <PasswordInput
                 id={id}
-                type="password"
                 autoComplete="current-password"
                 required
                 value={password}

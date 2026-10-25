@@ -2687,3 +2687,41 @@ p {
   transform-origin: left center;
   animation: progress linear both;
 }
+
+/* Hava durumu simgesi: gece mavi-gri ay tonu, gündüz sarı; bulutlu / yağışlı simgelerde köşede gece-gündüz rozeti */
+.weather-glyph {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+.weather-glyph.is-night .weather-icon {
+  color: #c7d2fe;
+  filter: drop-shadow(0 2px 10px rgba(199, 210, 254, 0.3));
+}
+
+.weather-daynight {
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--border);
+}
+
+.is-day .weather-daynight {
+  color: #fbbf24;
+}
+
+.is-night .weather-daynight {
+  color: #c7d2fe;
+}
+
+.header-weather .weather-cond {
+  font-size: 21px;
+}

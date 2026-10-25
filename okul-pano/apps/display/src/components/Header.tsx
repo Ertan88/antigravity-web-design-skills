@@ -1,6 +1,6 @@
 import { splitSchoolName, weatherInfo, type WeatherNow } from '@okulpano/shared/client';
 import type { Connection } from '../hooks.ts';
-import { AlertIcon, PinIcon, SchoolIcon, WEATHER_ICONS, WifiOffIcon } from './Icons.tsx';
+import { AlertIcon, MoonIcon, PinIcon, SchoolIcon, SunIcon, WEATHER_ICONS, WifiOffIcon } from './Icons.tsx';
 import { SpecialMark } from './SpecialMark.tsx';
 
 const timeFmt = new Map<string, Intl.DateTimeFormat>();
@@ -67,23 +67,22 @@ export function Header({ schoolName, schoolType, logoUrl, timezone, now, weather
           )}
           {weather && WeatherGlyph && info ? (
             <div className="weather-now">
-              <WeatherGlyph size={52} className="weather-icon" />
+              {/* Simge: güneş / ay ya da bulutlu, yağmurlu… üzerinde gece-gündüz rozeti */}
+              <span className={`weather-glyph ${weather.isDay ? 'is-day' : 'is-night'}`}>
+                <WeatherGlyph size={54} className="weather-icon" />
+                {!['sun', 'moon', 'cloud-sun', 'cloud-moon'].includes(info.icon) && (
+                  <span className="weather-daynight">{weather.isDay ? <SunIcon size={18} /> : <MoonIcon size={18} />}</span>
+                )}
+              </span>
               <div className="weather-temp">
                 {weather.temperature}°<span className="weather-unit">C</span>
               </div>
               <div className="weather-detail">
                 <div className="weather-cond">{info.label}</div>
-                {showWeatherAlert && todayAlert ? (
+                {showWeatherAlert && todayAlert && (
                   <div className="weather-alert">
                     <AlertIcon size={14} /> {capitalize(todayAlert.text.replace(/^Bugün /, ''))}
                   </div>
-                ) : (
-                  weather.high != null &&
-                  weather.low != null && (
-                    <div className="weather-range">
-                      En yüksek {weather.high}° · en düşük {weather.low}°
-                    </div>
-                  )
                 )}
               </div>
             </div>

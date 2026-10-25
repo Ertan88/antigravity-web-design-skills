@@ -15,7 +15,7 @@ export interface TestCtx {
 
 export const SUPER = { email: 'root@test.local', password: 'RootPass123!' };
 
-export async function createTestApp(): Promise<TestCtx> {
+export async function createTestApp(env: Record<string, unknown> = {}): Promise<TestCtx> {
   const database = await openDatabase({ inMemory: true });
   await database.db.insert(users).values({
     email: SUPER.email,
@@ -24,7 +24,7 @@ export async function createTestApp(): Promise<TestCtx> {
     passwordHash: await hashPassword(SUPER.password),
   });
   const uploadDir = mkdtempSync(join(tmpdir(), 'okulpano-test-'));
-  const app = await buildApp({ database, env: { NODE_ENV: 'test', UPLOAD_DIR: uploadDir }, logger: false });
+  const app = await buildApp({ database, env: { NODE_ENV: 'test', UPLOAD_DIR: uploadDir, ...env }, logger: false });
   await app.ready();
   return { app, database, uploadDir };
 }

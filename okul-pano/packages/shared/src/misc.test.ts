@@ -108,7 +108,8 @@ describe('şemalar', () => {
   });
 
   it('hava durumu kodlarını Türkçeleştirir', () => {
-    expect(weatherInfo(0, true)).toEqual({ label: 'Açık', icon: 'sun' });
+    expect(weatherInfo(0, true)).toEqual({ label: 'Açık ve güneşli', icon: 'sun' });
+    expect(weatherInfo(0, false)).toEqual({ label: 'Açık', icon: 'moon' });
     expect(weatherInfo(63, true).label).toBe('Yağmurlu');
   });
 });

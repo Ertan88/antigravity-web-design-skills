@@ -53,6 +53,8 @@ export interface DesignTemplate {
   note?: DesignField;
   /** Fotoğraf alanı (ayın öğrencisi, başarı) */
   photo?: DesignField;
+  /** 'achievements': Başarılar sayfasının kayıtlarından kendiliğinden oluşur, duyuru şablonlarında görünmez */
+  scope?: 'announcements' | 'achievements';
 }
 
 const DATE: DesignField = { key: 'date', label: 'Tarih', placeholder: '14 Kasım 2026 Cuma', icon: 'calendar', max: 40 };
@@ -68,6 +70,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
     name: 'Ayın öğrencisi',
     description: 'Fotoğraf, ad, sınıf ve neden',
     kicker: 'Ayın Öğrencisi',
+    scope: 'achievements',
     icon: 'star',
     palette: 'amber',
     layout: 'center',
@@ -82,6 +85,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
     name: 'Başarı / derece',
     description: 'Fotoğraflı başarı duyurusu',
     kicker: 'Gururla Duyururuz',
+    scope: 'achievements',
     icon: 'trophy',
     palette: 'emerald',
     layout: 'split',
@@ -203,4 +207,25 @@ export function designTitle(d: AnnouncementDesign): string {
   const t = designTemplate(d.template);
   const head = d.fields[t.headline.key]?.trim();
   return head ? (t.layout === 'center' ? `${t.kicker}: ${head}` : head) : t.name;
+}
+
+/** Duyuru şablonu seçicisinde görünen şablonlar (başarı / ayın öğrencisi kendi sayfasında) */
+export const ANNOUNCEMENT_TEMPLATES = DESIGN_TEMPLATES.filter((t) => t.scope !== 'achievements');
+
+/** Başarılar sayfasındaki kayıttan panodaki hazır şablonlu slayt */
+export function achievementDesign(
+  a: { kind: 'month' | 'achievement'; name: string; className: string | null; title: string; description: string | null; photoUrl: string | null },
+  monthLabel: string,
+): AnnouncementDesign {
+  return a.kind === 'month'
+    ? {
+        template: 'monthStudent',
+        palette: 'amber',
+        fields: { name: a.name, class: a.className ?? '', month: monthLabel, note: a.description || a.title, photo: a.photoUrl ?? '' },
+      }
+    : {
+        template: 'achievement',
+        palette: 'emerald',
+        fields: { name: a.name + (a.className ? ` · ${a.className}` : ''), achievement: a.title, note: a.description ?? '', photo: a.photoUrl ?? '' },
+      };
 }

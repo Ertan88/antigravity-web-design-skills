@@ -170,11 +170,15 @@ export function Slideshow({ announcements, now, defaultDurationSec, videoSound, 
   const next = useCallback(() => setCursor((c) => ({ index: count ? (c.index + 1) % count : 0, round: c.round + 1 })), [count]);
 
   const duration = slide ? (slide.durationSec ?? defaultDurationSec) : 0;
+  // Zamanlayıcı slaytın kimliğine bağlıdır: liste her saniye yeniden kurulsa da (ör. başarı slaytları)
+  // geri sayım sıfırlanmaz, slayt süresi dolunca sıradakine geçilir
+  const slideId = slide?.id ?? null;
+  const isVideo = slide?.kind === 'video';
   useEffect(() => {
-    if (!slide || slide.kind === 'video') return;
+    if (!slideId || isVideo) return;
     const t = setTimeout(next, duration * 1000);
     return () => clearTimeout(t);
-  }, [slide, cursor.round, duration, next]);
+  }, [slideId, isVideo, cursor.round, duration, next]);
 
   // Sıradaki görseli önceden yükle: geçişte boş kare görünmesin
   useEffect(() => {

@@ -117,6 +117,7 @@ export function DayShell({
   tone,
   aside,
   holiday,
+  holidayCentered = false,
   children,
 }: {
   day: DayInfo;
@@ -125,6 +126,8 @@ export function DayShell({
   aside?: ReactNode;
   /** O gün tatilse adı gösterilir */
   holiday?: Holiday;
+  /** Tatil adı üstteki küçük etiket yerine kartın ortasında (içeriği olmayan tam gün tatil) */
+  holidayCentered?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -147,11 +150,14 @@ export function DayShell({
         </span>
         {aside && <span className="ml-auto">{aside}</span>}
       </div>
-      {holiday && (
-        <div className="mb-1.5 rounded-lg bg-rose-100 px-2 py-1 text-[11px] leading-tight font-semibold text-rose-700" title={holiday.name}>
-          {holiday.name}
-        </div>
-      )}
+      {holiday &&
+        (holidayCentered ? (
+          <div className="flex min-h-16 items-center justify-center px-1 py-2 text-center text-sm leading-snug font-bold text-rose-700">{holiday.name}</div>
+        ) : (
+          <div className="mb-1.5 rounded-lg bg-rose-100 px-2 py-1 text-[11px] leading-tight font-semibold text-rose-700" title={holiday.name}>
+            {holiday.name}
+          </div>
+        ))}
       {children}
     </li>
   );
