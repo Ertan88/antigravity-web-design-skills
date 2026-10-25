@@ -6,6 +6,9 @@
 .ds {
   container-type: size;
   position: relative;
+  /* İçerik ve alttaki okul adı alt alta: uzun notlarda bile üst üste binmez */
+  display: flex;
+  flex-direction: column;
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -76,16 +79,18 @@
 
 .ds-content,
 .ds-school {
-  --u: min(1.2cqw, 1.9cqh);
+  --u: calc(min(1.2cqw, 1.9cqh) * var(--fit, 1));
 }
 
 .ds-content {
   position: relative;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
-  align-items: center;
+  /* safe: taşan içerik yukarı kaçmaz, ölçülebilir; slayt da kendini küçültür */
+  align-items: safe center;
   gap: calc(var(--u) * 4);
-  padding: calc(var(--u) * 6) calc(var(--u) * 6) calc(var(--u) * 8);
+  padding: calc(var(--u) * 5) calc(var(--u) * 6) calc(var(--u) * 2);
 }
 
 .ds-text {
@@ -221,24 +226,40 @@
 }
 
 .ds-school {
-  position: absolute;
-  left: calc(var(--u) * 6);
-  bottom: calc(var(--u) * 3);
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 1.2);
+  padding: 0 calc(var(--u) * 6) calc(var(--u) * 3);
   font-size: calc(var(--u) * 1.6);
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  opacity: 0.7;
 }
 
-.ds-school span {
+.ds-school-logo {
+  height: calc(var(--u) * 3.6);
+  width: auto;
+  max-width: calc(var(--u) * 8);
+  object-fit: contain;
+  border-radius: calc(var(--u) * 0.6);
+  background: rgba(255, 255, 255, 0.9);
+  padding: calc(var(--u) * 0.3);
+}
+
+.ds-school-name {
+  opacity: 0.75;
+}
+
+.ds-school-name span {
   font-weight: 600;
   opacity: 0.85;
 }
 
 /* Ortalı şablonlar: tebrik, kutlama */
 .ds-center .ds-content {
-  justify-content: center;
+  justify-content: safe center;
   text-align: center;
 }
 
@@ -279,16 +300,14 @@
 }
 
 .ds-center .ds-school {
-  left: 0;
-  right: 0;
-  text-align: center;
+  justify-content: center;
 }
 
 /* Dikey ya da kareye yakın kutu: simge üstte küçülür, metin altında */
 @container (aspect-ratio < 1.15) {
   .ds-split .ds-content {
     flex-direction: column-reverse;
-    justify-content: center;
+    justify-content: safe center;
     align-items: flex-start;
     gap: calc(var(--u) * 5);
   }

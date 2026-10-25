@@ -1,12 +1,15 @@
 import { EMERGENCY_INFO, splitSchoolName, type DisplayEmergency } from '@okulpano/shared/client';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { SchoolIcon } from './Icons.tsx';
 
 /**
  * Siren: iki ton arasında kayan ses, birkaç tur çalıp kısa ara verir (sürekli çalıp uyarının
  * kendisini duyulmaz kılmasın diye). Tarayıcı ilk dokunuşa kadar sesi engellerse ilk tıklamada başlar;
  * kiosk kurulumundaki --autoplay-policy bayrağıyla doğrudan çalar.
  */
-function useSiren(enabled: boolean) {
+function useSiren(enabled: boolean): boolean {
+  // Tarayıcı sesi engellediyse (dokunuş bekliyor) ekranda "dokunun" ipucu gösterilir
+  const [blocked, setBlocked] = useState(false);
   useEffect(() => {
     if (!enabled) return;
     const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -36,14 +39,20 @@ function useSiren(enabled: boolean) {
       gain.gain.setValueAtTime(0.22, t + 3.5);
       gain.gain.linearRampToValueAtTime(0, t + 3.6);
     };
-    const resume = () => void ctx.resume().catch(() => undefined);
+    const sync = () => setBlocked(ctx.state !== 'running');
+    ctx.addEventListener('statechange', sync);
+    const resume = () => void ctx.resume().then(sync, sync);
     resume();
+    // Bazı tarayıcılar ilk resume'u sessizce bekletir: kısa süre sonra durum yeniden okunur
+    const check = setTimeout(sync, 800);
     cycle();
     const timer = setInterval(cycle, 7600);
     window.addEventListener('pointerdown', resume);
     window.addEventListener('keydown', resume);
     return () => {
+      clearTimeout(check);
       clearInterval(timer);
+      setBlocked(false);
       window.removeEventListener('pointerdown', resume);
       window.removeEventListener('keydown', resume);
       try {
@@ -54,6 +63,7 @@ function useSiren(enabled: boolean) {
       void ctx.close();
     };
   }, [enabled]);
+  return blocked;
 }
 
 function WarningIcon({ size }: { size: number }) {
@@ -73,6 +83,7 @@ export function EmergencyScreen({
   timezone,
   schoolName,
   schoolType,
+  logoUrl,
   muted,
 }: {
   emergency: DisplayEmergency;
@@ -80,10 +91,11 @@ export function EmergencyScreen({
   timezone: string;
   schoolName: string;
   schoolType?: string;
+  logoUrl: string | null;
   /** Paneldeki önizlemede ses çalmaz */
   muted: boolean;
 }) {
-  useSiren(emergency.sound && !muted);
+  const blocked = useSiren(emergency.sound && !muted);
   const info = EMERGENCY_INFO[emergency.type];
   const title = splitSchoolName(schoolName, schoolType);
   const time = new Intl.DateTimeFormat('tr-TR', { hour: '2-digit', minute: '2-digit', timeZone: timezone });
@@ -94,6 +106,7 @@ export function EmergencyScreen({
         <span className="emergency-badge">
           <WarningIcon size={30} /> ACİL DURUM
         </span>
+        {blocked && <span className="emergency-sound-hint">Sireni başlatmak için ekrana dokunun</span>}
         <span className="emergency-clock">{time.format(now)}</span>
       </div>
       <div className="emergency-main">
@@ -109,7 +122,8 @@ export function EmergencyScreen({
         </ul>
       </div>
       <div className="emergency-foot">
-        <span>
+        <span className="emergency-school">
+          <span className="emergency-logo">{logoUrl ? <img src={logoUrl} alt="" /> : <SchoolIcon size={30} />}</span>
           {title.name} {title.type}
         </span>
         <span>Başlangıç: {time.format(new Date(emergency.startedAt))}</span>

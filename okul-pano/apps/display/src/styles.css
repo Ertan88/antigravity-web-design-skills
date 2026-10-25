@@ -2236,6 +2236,39 @@ p {
   font-weight: 900;
 }
 
+.emergency-sound-hint {
+  padding: 10px 22px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.35);
+  font-size: 24px;
+  font-weight: 700;
+  animation: fade 1s ease-in-out infinite alternate;
+}
+
+.emergency-school {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.emergency-logo {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  color: #b91c1c;
+  overflow: hidden;
+}
+
+.emergency-logo img {
+  max-width: 86%;
+  max-height: 86%;
+  object-fit: contain;
+}
+
 .emergency-foot {
   font-size: 24px;
   font-weight: 700;
@@ -2259,4 +2292,67 @@ p {
 
 .no-motion .emergency {
   animation: none !important;
+}
+
+/* ---------- Özel gün filigranları ---------- */
+.special-mark {
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+  color: var(--accent);
+}
+
+.special-mark svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Üst barın ortasında: okul adı ile hava durumu arasındaki boşlukta */
+.special-mark-header {
+  left: 50%;
+  top: 50%;
+  width: 150px;
+  height: 100px;
+  transform: translate(-50%, -50%) rotate(-6deg);
+  opacity: 0.3;
+}
+
+.special-mark-header.special-mark-teachers,
+.special-mark-header.special-mark-newyear {
+  width: 110px;
+  opacity: 0.3;
+}
+
+.header > :not(.special-mark) {
+  position: relative;
+  z-index: 1;
+}
+
+/* Zeminde büyük ve çok silik (koyu temada kartların arkasından seçilir) */
+.special-mark-bg {
+  right: -80px;
+  bottom: 40px;
+  width: 760px;
+  height: 507px;
+  transform: rotate(-10deg);
+  opacity: 0.07;
+}
+
+.theme-light .special-mark-bg {
+  opacity: 0.05;
+}
+
+.stage > .body,
+.stage > .footer {
+  position: relative;
+  z-index: 1;
+}
+
+.contrast-high .special-mark {
+  display: none;
+}
+
+.orientation-portrait .special-mark-header {
+  display: none;
 }

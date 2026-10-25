@@ -198,7 +198,7 @@ export function Slideshow({ announcements, now, defaultDurationSec, videoSound, 
       <div className={`slide slide-${slide.kind}`} key={key}>
         {slide.kind === 'design' && slide.design ? (
           <div className="slide-design">
-            <DesignSlide design={slide.design} schoolName={schoolName} schoolType={schoolType} />
+            <DesignSlide design={slide.design} schoolName={schoolName} schoolType={schoolType} logoUrl={logoUrl} />
           </div>
         ) : slide.kind === 'text' || slide.kind === 'design' ? (
           <div className="slide-text">

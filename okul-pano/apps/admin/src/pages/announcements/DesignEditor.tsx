@@ -12,7 +12,7 @@ export function DesignThumb({ design, sample, className }: { design: Announcemen
   const school = useSchool();
   return (
     <div className={clsx('aspect-video overflow-hidden', className)}>
-      <DesignSlide design={design} sample={sample} schoolName={school.data?.name} schoolType={school.data?.settings.schoolType} />
+      <DesignSlide design={design} sample={sample} schoolName={school.data?.name} schoolType={school.data?.settings.schoolType} logoUrl={school.data?.logoUrl} />
     </div>
   );
 }

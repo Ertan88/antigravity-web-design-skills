@@ -15,6 +15,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import type { DisplayAuth } from './api.ts';
 import { EmergencyScreen } from './components/Emergency.tsx';
 import { Header } from './components/Header.tsx';
+import { SpecialMark } from './components/SpecialMark.tsx';
 import { BookIcon, CakeIcon, CapIcon, MonitorIcon, UserMinusIcon, WifiOffIcon } from './components/Icons.tsx';
 import { BirthdayCard, DutyCard, EmptyCard, ExamCard, LeaveCard } from './components/LeftColumn.tsx';
 import { BellCard, LessonsCard } from './components/RightColumn.tsx';
@@ -152,7 +153,9 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
           timezone={school.timezone}
           schoolName={school.name}
           schoolType={s.schoolType}
-          muted={auth.preview}
+          logoUrl={school.logoUrl}
+          // Yalnızca paneldeki küçük önizleme (iframe) sessizdir; "Tam ekran aç" ile açılan sekmede siren çalar
+          muted={window.self !== window.top}
         />
       </Stage>
     );
@@ -218,7 +221,9 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         city={school.city}
         connection={connection}
         lastUpdated={lastUpdated}
+        specialId={special?.id}
       />
+      {special && <SpecialMark id={special.id} className="special-mark-bg" />}
 
       <main className="body">
         {leftCards.length > 0 && <aside className="col col-left">{leftCards}</aside>}

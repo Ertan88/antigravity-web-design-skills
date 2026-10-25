@@ -6,7 +6,7 @@ import {
   type DesignField,
   type DesignIcon,
 } from '@okulpano/shared/client';
-import type { CSSProperties, ReactNode } from 'react';
+import { useLayoutEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
 
 /* Çizgi simgeler (lucide ile aynı 24'lük ızgara): emoji fontu olmayan cihazlarda da aynı görünür */
 const ICONS: Record<DesignIcon, ReactNode> = {
@@ -101,10 +101,37 @@ const CONFETTI = [
   [10, 44, 15], [90, 56, -10],
 ] as const;
 
+/**
+ * Metin uzunsa slayt bütün ölçüleriyle birlikte küçülür (--fit): içerik kutuya sığana kadar
+ * adım adım. Kutu boyutu değişince (panel önizlemesi, dikey pano) yeniden hesaplanır.
+ */
+function useFitContent(root: RefObject<HTMLDivElement | null>, key: string) {
+  useLayoutEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const fit = () => {
+      const content = el.querySelector<HTMLElement>('.ds-content');
+      if (!content) return;
+      let f = 1;
+      el.style.setProperty('--fit', '1');
+      while (f > 0.45 && content.scrollHeight > content.clientHeight + 1) {
+        f -= 0.05;
+        el.style.setProperty('--fit', f.toFixed(2));
+      }
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [root, key]);
+}
+
 interface Props {
   design: AnnouncementDesign;
   schoolName?: string;
   schoolType?: string;
+  /** Okul logosu: altta okul adının yanında */
+  logoUrl?: string | null;
   /** Boş alanlarda örnek metni göster (paneldeki şablon seçicisi için) */
   sample?: boolean;
 }
@@ -113,7 +140,7 @@ interface Props {
  * Hazır şablonlu duyuru slaytı. Bütün ölçüler kutunun boyutuna göredir (container query):
  * panoda tam boy, panelde küçük önizleme olarak aynı görünür; dikey panoda alt alta dizilir.
  */
-export function DesignSlide({ design, schoolName, schoolType, sample = false }: Props) {
+export function DesignSlide({ design, schoolName, schoolType, logoUrl, sample = false }: Props) {
   const t = designTemplate(design.template);
   const p = DESIGN_PALETTES[design.palette] ?? DESIGN_PALETTES[t.palette];
   const val = (f: DesignField | undefined) => (f ? design.fields[f.key]?.trim() || (sample ? f.placeholder : '') : '');
@@ -123,9 +150,11 @@ export function DesignSlide({ design, schoolName, schoolType, sample = false }: 
   const note = val(t.note);
   const school = schoolName ? splitSchoolName(schoolName, schoolType) : null;
   const style = { '--ds-from': p.from, '--ds-to': p.to, '--ds-accent': p.accent } as CSSProperties;
+  const root = useRef<HTMLDivElement>(null);
+  useFitContent(root, JSON.stringify(design.fields) + design.template + (logoUrl ?? '') + (schoolName ?? ''));
 
   return (
-    <div className={`ds ds-${t.layout} ds-t-${t.id}`} style={style}>
+    <div ref={root} className={`ds ds-${t.layout} ds-t-${t.id}`} style={style}>
       <div className="ds-bg" aria-hidden="true">
         <span className="ds-orb ds-orb-1" />
         <span className="ds-orb ds-orb-2" />
@@ -167,8 +196,11 @@ export function DesignSlide({ design, schoolName, schoolType, sample = false }: 
 
       {school && (
         <div className="ds-school">
-          {school.name}
-          {school.type && <span> {school.type}</span>}
+          {logoUrl && <img src={logoUrl} alt="" className="ds-school-logo" />}
+          <span className="ds-school-name">
+            {school.name}
+            {school.type && <span> {school.type}</span>}
+          </span>
         </div>
       )}
     </div>
