@@ -1,13 +1,15 @@
-import { announcementSchema, parseYouTubeUrl, youTubeThumbnail } from '@okulpano/shared';
-import { Image as ImageIcon, Megaphone, PlayCircle, Type } from 'lucide-react';
+import { announcementSchema, designTemplate, designTitle, parseYouTubeUrl, youTubeThumbnail, type AnnouncementDesign } from '@okulpano/shared';
+import { Image as ImageIcon, LayoutTemplate, Megaphone, PlayCircle, Type } from 'lucide-react';
 import { CrudPage } from '../components/CrudPage.tsx';
 import { ImageUpload } from '../components/ImageUpload.tsx';
 import { Badge, Field, Input, Segmented, Textarea, Toggle } from '../components/ui.tsx';
 import { useSchool, type Announcement } from '../lib/data.ts';
 import { formatDateTime, isoToLocalInput, localInputToIso, publishState } from '../lib/format.ts';
+import { DesignEditor, DesignThumb, emptyDesign } from './announcements/DesignEditor.tsx';
 
 type Form = {
-  kind: 'image' | 'video' | 'text';
+  kind: 'image' | 'video' | 'text' | 'design';
+  design: AnnouncementDesign;
   title: string;
   body: string;
   imageUrl: string | null;
@@ -20,6 +22,7 @@ type Form = {
 
 const empty = (): Form => ({
   kind: 'image',
+  design: emptyDesign(),
   title: '',
   body: '',
   imageUrl: null,
@@ -29,6 +32,13 @@ const empty = (): Form => ({
   endsAt: '',
   isActive: true,
 });
+
+/** Şablonun bilgi satırları ve notu listede özet olarak görünür */
+function designBody(d: AnnouncementDesign): string | null {
+  const t = designTemplate(d.template);
+  const parts = [t.subline, ...t.info, t.note].map((f) => (f ? d.fields[f.key]?.trim() : '')).filter(Boolean);
+  return parts.length ? parts.join(' · ').slice(0, 600) : null;
+}
 
 export function StateBadge({ row }: { row: { isActive: boolean; startsAt: string | null; endsAt: string | null } }) {
   const state = publishState(row);
@@ -49,6 +59,9 @@ export function PublishCell({ row }: { row: { isActive: boolean; startsAt: strin
 }
 
 function Thumb({ row }: { row: Announcement }) {
+  if (row.kind === 'design' && row.design) {
+    return <DesignThumb design={row.design} className="w-28 shrink-0 rounded-lg ring-1 ring-slate-200" />;
+  }
   const yt = row.youtubeUrl ? parseYouTubeUrl(row.youtubeUrl) : null;
   const src = row.kind === 'image' ? row.imageUrl : yt ? youTubeThumbnail(yt.id) : null;
   return (
@@ -59,7 +72,7 @@ function Thumb({ row }: { row: Announcement }) {
   );
 }
 
-const KIND_LABEL = { image: 'Görsel', video: 'Video', text: 'Metin' };
+const KIND_LABEL = { image: 'Görsel', video: 'Video', text: 'Metin', design: 'Şablon' };
 
 export function Announcements() {
   const school = useSchool();
@@ -70,7 +83,7 @@ export function Announcements() {
       resource="announcements"
       label="Duyuru"
       title="Duyurular"
-      description="Panonun orta alanında slayt olarak dönen görselli, videolu ve metin duyurular. Sırayı oklarla değiştirebilir, yayın tarihi vererek önceden planlayabilirsiniz."
+      description="Panonun orta alanında slayt olarak dönen görselli, videolu, metin ve hazır şablonlu duyurular. Sırayı oklarla değiştirebilir, yayın tarihi vererek önceden planlayabilirsiniz."
       permission="announcements.manage"
       icon={<Megaphone className="size-6" />}
       emptyTitle="Henüz duyuru yok"
@@ -78,7 +91,7 @@ export function Announcements() {
       addLabel="Yeni duyuru"
       activeToggle
       reorderable
-      modalSize="lg"
+      modalSize="xl"
       schema={announcementSchema}
       columns={[
         {
@@ -93,12 +106,21 @@ export function Announcements() {
             </div>
           ),
         },
-        { header: 'Tür', cell: (r) => <span className="text-slate-600">{KIND_LABEL[r.kind]}</span> },
+        {
+          header: 'Tür',
+          cell: (r) => (
+            <span className="text-slate-600">
+              {KIND_LABEL[r.kind]}
+              {r.kind === 'design' && r.design && <span className="block text-xs text-slate-400">{designTemplate(r.design.template).name}</span>}
+            </span>
+          ),
+        },
         { header: 'Durum', cell: (r) => <PublishCell row={r} /> },
       ]}
       emptyForm={empty}
       toForm={(r) => ({
         kind: r.kind,
+        design: r.design ?? emptyDesign(),
         title: r.title,
         body: r.body ?? '',
         imageUrl: r.imageUrl,
@@ -110,8 +132,10 @@ export function Announcements() {
       })}
       toPayload={(f) => ({
         kind: f.kind,
-        title: f.title,
-        body: f.body || null,
+        // Şablonlu duyuruda başlık ve metin şablondaki alanlardan oluşur (listede ve geçmişte görünür)
+        title: f.kind === 'design' ? designTitle(f.design) : f.title,
+        body: f.kind === 'design' ? designBody(f.design) : f.body || null,
+        design: f.kind === 'design' ? f.design : null,
         imageUrl: f.kind === 'image' ? f.imageUrl : null,
         youtubeUrl: f.kind === 'video' ? f.youtubeUrl : null,
         durationSec: f.durationSec ? Number(f.durationSec) : null,
@@ -130,8 +154,11 @@ export function Announcements() {
                 { value: 'image', label: <span className="flex items-center gap-1.5"><ImageIcon className="size-4" /> Görsel</span> },
                 { value: 'video', label: <span className="flex items-center gap-1.5"><PlayCircle className="size-4" /> YouTube</span> },
                 { value: 'text', label: <span className="flex items-center gap-1.5"><Type className="size-4" /> Metin</span> },
+                { value: 'design', label: <span className="flex items-center gap-1.5"><LayoutTemplate className="size-4" /> Hazır şablon</span> },
               ]}
             />
+
+            {v.kind === 'design' && <DesignEditor value={v.design} onChange={(d) => set('design', d)} />}
 
             {v.kind === 'image' && (
               <div>
@@ -159,15 +186,19 @@ export function Announcements() {
               </Field>
             )}
 
-            <Field label="Başlık" error={errors.title}>
-              {(id) => (
-                <Input id={id} value={v.title} onChange={(e) => set('title', e.target.value)} maxLength={120} placeholder="ör. Bilim Fuarı Başvuruları Başladı" invalid={Boolean(errors.title)} />
-              )}
-            </Field>
+            {v.kind !== 'design' && (
+              <>
+                <Field label="Başlık" error={errors.title}>
+                  {(id) => (
+                    <Input id={id} value={v.title} onChange={(e) => set('title', e.target.value)} maxLength={120} placeholder="ör. Bilim Fuarı Başvuruları Başladı" invalid={Boolean(errors.title)} />
+                  )}
+                </Field>
 
-            <Field label={v.kind === 'text' ? 'Duyuru metni' : 'Açıklama (isteğe bağlı)'} error={errors.body} help={`${v.body.length}/600 · Koridordan okunabilmesi için kısa tutun.`}>
-              {(id) => <Textarea id={id} value={v.body} onChange={(e) => set('body', e.target.value)} maxLength={600} rows={3} />}
-            </Field>
+                <Field label={v.kind === 'text' ? 'Duyuru metni' : 'Açıklama (isteğe bağlı)'} error={errors.body} help={`${v.body.length}/600 · Koridordan okunabilmesi için kısa tutun.`}>
+                  {(id) => <Textarea id={id} value={v.body} onChange={(e) => set('body', e.target.value)} maxLength={600} rows={3} />}
+                </Field>
+              </>
+            )}
 
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="Gösterim süresi (sn)" error={errors.durationSec}>

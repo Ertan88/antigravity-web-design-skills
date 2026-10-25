@@ -6,6 +6,7 @@ import { useAuth } from '../lib/auth.tsx';
 import { useSchool } from '../lib/data.ts';
 import { findNav, NAV } from '../lib/nav.ts';
 import { useTheme } from '../lib/theme.ts';
+import { EmergencyBanner, EmergencyButton } from './Emergency.tsx';
 import { Spinner } from './ui.tsx';
 
 function SchoolSwitcher() {
@@ -176,7 +177,7 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
   const { pathname } = useLocation();
   const nav = findNav(pathname);
   return (
-    <header className="sticky top-0 z-20 border-b border-slate-200/60 bg-surface/75 backdrop-blur-xl">
+    <header className="border-b border-slate-200/60 bg-surface/75 backdrop-blur-xl">
       <div className="mx-auto flex h-14 w-full max-w-[1680px] items-center gap-3 px-4 sm:px-6 lg:h-16 lg:px-8">
         <button type="button" aria-label="Menüyü aç" className="-ml-1 rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 lg:hidden" onClick={onMenu}>
           <Menu className="size-5" />
@@ -191,7 +192,8 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
           )}
           <span className="hidden truncate font-semibold text-slate-800 lg:inline">{nav?.item.label ?? ''}</span>
         </nav>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          <EmergencyButton />
           <ThemeToggle />
         </div>
       </div>
@@ -229,7 +231,11 @@ export function Layout() {
         </div>
       )}
 
-      <TopBar onMenu={() => setOpen(true)} />
+      {/* Acil durum bandı ve üst bar birlikte yapışık kalır */}
+      <div className="sticky top-0 z-20">
+        <EmergencyBanner />
+        <TopBar onMenu={() => setOpen(true)} />
+      </div>
 
       <main className="mx-auto w-full max-w-[1680px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         <Suspense fallback={<Spinner />}>

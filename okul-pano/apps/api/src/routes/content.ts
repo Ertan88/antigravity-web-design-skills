@@ -34,6 +34,7 @@ export async function contentRoutes(app: FastifyInstance) {
       body: i.body || null,
       imageUrl: i.kind === 'image' ? i.imageUrl : (i.imageUrl ?? null),
       youtubeUrl: i.kind === 'video' ? i.youtubeUrl : null,
+      design: i.kind === 'design' ? (i.design ?? null) : null,
       startsAt: toDate(i.startsAt),
       endsAt: toDate(i.endsAt),
       ...(req.method === 'POST' ? { createdBy: req.ctx.userId } : {}),

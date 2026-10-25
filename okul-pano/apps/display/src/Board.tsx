@@ -13,6 +13,7 @@ import {
 } from '@okulpano/shared/client';
 import type { CSSProperties, ReactNode } from 'react';
 import type { DisplayAuth } from './api.ts';
+import { EmergencyScreen } from './components/Emergency.tsx';
 import { Header } from './components/Header.tsx';
 import { BookIcon, CakeIcon, CapIcon, MonitorIcon, UserMinusIcon, WifiOffIcon } from './components/Icons.tsx';
 import { BirthdayCard, DutyCard, EmptyCard, ExamCard, LeaveCard } from './components/LeftColumn.tsx';
@@ -141,6 +142,22 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
     .join(' ');
   const themeVars = { '--primary': special?.primary ?? s.primaryColor, '--accent': special?.accent ?? s.accentColor } as CSSProperties;
 
+  // Acil durum her şeyin önündedir: gece modu, yalnızca duyurular ve tam pano fark etmez
+  if (state.emergency) {
+    return (
+      <Stage className={`${classes} mode-emergency`} style={themeVars} width={stageW} height={stageH}>
+        <EmergencyScreen
+          emergency={state.emergency}
+          now={now}
+          timezone={school.timezone}
+          schoolName={school.name}
+          schoolType={s.schoolType}
+          muted={auth.preview}
+        />
+      </Stage>
+    );
+  }
+
   // Gece / hafta sonu modu: ders dışı saatlerde ekran koruyucu ya da karartma
   const offDay = today.weekday >= 6 || (state.holidays ?? []).some((h) => h.date === today.isoDate);
   const sleeping = !identifying && isSleepTime({ settings: s, periods: schedule?.periods ?? null, secondsOfDay: today.secondsOfDay, offDay });
@@ -160,6 +177,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
       defaultDurationSec={s.slideDurationSec}
       videoSound={s.videoSound}
       schoolName={school.name}
+      schoolType={s.schoolType}
       logoUrl={school.logoUrl}
       full={full}
     />

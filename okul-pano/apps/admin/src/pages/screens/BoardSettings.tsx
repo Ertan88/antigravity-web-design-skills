@@ -7,8 +7,7 @@ import { useToast } from '../../components/Toast.tsx';
 import { Button, Card, Field, Input, Segmented, Select, Spinner, Toggle } from '../../components/ui.tsx';
 import { api } from '../../lib/api.ts';
 import { useAuth } from '../../lib/auth.tsx';
-import { useList, useSchool, useSchoolPath, type School, type Screen } from '../../lib/data.ts';
-import { ScreenLayoutPanel } from './ScreenLayoutDialog.tsx';
+import { useSchool, useSchoolPath, type School } from '../../lib/data.ts';
 
 /** Okulun panolarda kullandığı renk önerileri (kurumsal, sade) */
 const PRESETS: { name: string; primary: string; accent: string }[] = [
@@ -47,48 +46,6 @@ function Section({ title, description, children }: { title: string; description:
   );
 }
 
-/**
- * Pano düzeni sekmesi: üstten hangi düzenin düzenleneceği seçilir — okulun varsayılanı
- * ya da tek tek panolar (her panoya özel düzen verilebilir).
- */
-export function LayoutTab({ editable, screenEditable }: { editable: boolean; screenEditable: boolean }) {
-  const screens = useList<Screen>('screens');
-  const [target, setTarget] = useState<string>('school');
-  const screen = screens.data?.find((x) => x.id === target) ?? null;
-  return (
-    <div className="space-y-4">
-      {(screens.data?.length ?? 0) > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-slate-500">Düzenlenen:</span>
-          <Segmented
-            value={screen ? screen.id : 'school'}
-            onChange={setTarget}
-            options={[
-              { value: 'school', label: 'Okul varsayılanı' },
-              ...screens.data!.map((x) => ({
-                value: x.id,
-                label: (
-                  <span className="inline-flex items-center gap-1.5">
-                    {x.name}
-                    {x.layout && <span className="size-1.5 rounded-full bg-brand-500" title="Özel düzen" />}
-                  </span>
-                ),
-              })),
-            ]}
-          />
-        </div>
-      )}
-      {screen ? (
-        <Card className="p-5 sm:p-6">
-          <ScreenLayoutPanel key={screen.id} screen={screen} editable={screenEditable} />
-        </Card>
-      ) : (
-        <DefaultLayout editable={editable} />
-      )}
-    </div>
-  );
-}
-
 /** Okulun varsayılan pano düzeni: özel düzeni olmayan tüm panolar bunu kullanır */
 export function DefaultLayout({ editable }: { editable: boolean }) {
   const school = useSchool();
@@ -106,7 +63,7 @@ export function DefaultLayout({ editable }: { editable: boolean }) {
         <div>
           <h2 className="text-base font-semibold text-ink">Okulun varsayılan pano düzeni</h2>
           <p className="text-sm text-slate-500">
-            Kartları sürükleyerek sütunlar arasında taşıyın ve sıralayın. Özel düzeni olmayan tüm panolar bunu kullanır; bir panoya özel düzen için yukarıdan panoyu seçin.
+            Kartları sürükleyerek sütunlar arasında taşıyın ve sıralayın. Özel düzeni olmayan tüm panolar bunu kullanır; bir panoya özel düzen vermek için Panolar sekmesinde o panonun kartındaki "Düzenle"yi kullanın.
           </p>
         </div>
       </div>

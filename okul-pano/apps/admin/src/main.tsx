@@ -8,6 +8,7 @@ import { ToastProvider } from './components/Toast.tsx';
 import { ApiError } from './lib/api.ts';
 import { AuthProvider } from './lib/auth.tsx';
 import { applyTheme, currentTheme } from './lib/theme.ts';
+import '@okulpano/slides/slides.css';
 import './index.css';
 
 // Sayfa çizilmeden tema uygulanır (açılışta beyaz parlama olmasın)

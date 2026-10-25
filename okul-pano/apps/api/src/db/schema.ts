@@ -1,4 +1,4 @@
-import type { BoardLayout, Period, SchoolSettings, ScreenDisplay } from '@okulpano/shared';
+import type { AnnouncementDesign, BoardLayout, EmergencyType, Period, SchoolSettings, ScreenDisplay } from '@okulpano/shared';
 import { sql } from 'drizzle-orm';
 import {
   boolean,
@@ -72,6 +72,8 @@ export const schools = pgTable('schools', {
   /** Abonelik altyapısı: plan ve ekran limiti şimdiden şemada */
   plan: text('plan').$type<'trial' | 'basic' | 'pro'>().notNull().default('trial'),
   maxScreens: integer('max_screens').notNull().default(3),
+  /** Etkin acil durum (deprem, yangın…): doluysa bütün panolar tam ekran uyarı gösterir */
+  emergency: jsonb('emergency').$type<{ type: EmergencyType; message: string | null; sound: boolean; startedAt: string; startedBy: string | null }>(),
   isActive: isActive(),
   trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
   createdAt: createdAt(),
@@ -263,11 +265,13 @@ export const announcements = pgTable(
   {
     id: pk(),
     schoolId: schoolId(),
-    kind: text('kind').$type<'image' | 'video' | 'text'>().notNull(),
+    kind: text('kind').$type<'image' | 'video' | 'text' | 'design'>().notNull(),
     title: text('title').notNull(),
     body: text('body'),
     imageUrl: text('image_url'),
     youtubeUrl: text('youtube_url'),
+    /** Hazır şablonla hazırlanan duyuru (şablon, renk, metinler) */
+    design: jsonb('design').$type<AnnouncementDesign>(),
     durationSec: integer('duration_sec'),
     startsAt: timestamp('starts_at', { withTimezone: true }),
     endsAt: timestamp('ends_at', { withTimezone: true }),

@@ -55,6 +55,7 @@ Okullar için **çok okullu (SaaS'a hazır)** dijital pano sistemi: koridordaki 
 ```
 okul-pano/
 ├── packages/shared   Ortak TypeScript: Zod şemaları, yetki modeli, zil motoru, saat dilimi
+├── packages/slides   Hazır duyuru şablonlarının görünümü (pano ve panel önizlemesi aynı bileşen)
 ├── apps/api          Fastify + Drizzle ORM · PostgreSQL (geliştirmede gömülü PGlite)
 ├── apps/admin        Yönetim paneli · React + TanStack Query + Tailwind · /admin/
 └── apps/display      Pano · React, düşük güçlü cihazlar için hafif paket · /display/

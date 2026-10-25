@@ -1,4 +1,6 @@
 import { BOARD_MODULES } from './layout.ts';
+import { DESIGN_PALETTE_IDS, DESIGN_TEMPLATE_IDS } from './designs.ts';
+import { EMERGENCY_TYPES } from './emergency.ts';
 import { z } from 'zod';
 import { validatePeriods } from './bell.ts';
 import { PERMISSION_KEYS } from './permissions.ts';
@@ -158,11 +160,19 @@ export const updateMemberSchema = z.object({
 
 /* ---------- Pano içerikleri ---------- */
 
+/** Hazır şablonla hazırlanan duyuru: şablon, renk ve alanlara yazılan metinler */
+export const announcementDesignSchema = z.object({
+  template: z.enum(DESIGN_TEMPLATE_IDS),
+  palette: z.enum(DESIGN_PALETTE_IDS),
+  fields: z.record(z.string().max(40), z.string().trim().max(300)),
+});
+
 export const announcementSchema = z
   .object({
     title: required('Başlık', 120),
     body: optionalText(600),
-    kind: z.enum(['image', 'video', 'text']),
+    kind: z.enum(['image', 'video', 'text', 'design']),
+    design: announcementDesignSchema.nullable().optional(),
     imageUrl: optionalText(500),
     youtubeUrl: optionalText(300),
     /** Boşsa görsel/metin için okul varsayılanı, video için videonun kendi süresi kullanılır. */
@@ -175,6 +185,9 @@ export const announcementSchema = z
   .superRefine((v, ctx) => {
     if (v.kind === 'image' && !v.imageUrl) {
       ctx.addIssue({ code: 'custom', path: ['imageUrl'], message: 'Görselli duyuru için bir görsel yükleyin' });
+    }
+    if (v.kind === 'design' && !v.design) {
+      ctx.addIssue({ code: 'custom', path: ['design'], message: 'Bir şablon seçin' });
     }
     if (v.kind === 'video' && !(v.youtubeUrl && parseYouTubeUrl(v.youtubeUrl))) {
       ctx.addIssue({ code: 'custom', path: ['youtubeUrl'], message: 'Geçerli bir YouTube bağlantısı girin' });
@@ -381,3 +394,11 @@ export const quickPatchSchema = z.object({
   isActive: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
 });
+
+/** Acil durum başlatma: tür, isteğe bağlı ek mesaj ve sesli uyarı */
+export const emergencySchema = z.object({
+  type: z.enum(EMERGENCY_TYPES),
+  message: optionalText(200),
+  sound: z.boolean().default(true),
+});
+export type EmergencyInput = z.infer<typeof emergencySchema>;

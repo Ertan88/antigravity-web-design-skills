@@ -8,7 +8,7 @@ import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useList, useSchool, useSchoolPath, type Screen } from '../lib/data.ts';
 import { useForm } from '../lib/form.ts';
-import { Appearance, LayoutTab } from './screens/BoardSettings.tsx';
+import { Appearance, DefaultLayout } from './screens/BoardSettings.tsx';
 import { formatLabel, ScreenFormatDialog } from './screens/ScreenFormatDialog.tsx';
 import { ScreenLayoutDialog } from './screens/ScreenLayoutDialog.tsx';
 import { timeAgo } from '../lib/format.ts';
@@ -221,7 +221,7 @@ export function Screens() {
           ]}
         />
       </div>
-      {tab === 'layout' && <LayoutTab editable={canSettings} screenEditable={editable} />}
+      {tab === 'layout' && <DefaultLayout editable={canSettings} />}
       {tab === 'appearance' && <Appearance editable={canSettings} />}
       {tab === 'boards' && (
       <>

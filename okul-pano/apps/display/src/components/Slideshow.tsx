@@ -1,5 +1,6 @@
 import { isWithinWindow, parseYouTubeUrl, youTubeThumbnail, type DisplayAnnouncement } from '@okulpano/shared/client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { DesignSlide } from '@okulpano/slides';
 import { MegaphoneIcon, SchoolIcon } from './Icons.tsx';
 
 /* ---------- YouTube IFrame API ---------- */
@@ -132,12 +133,13 @@ interface Props {
   defaultDurationSec: number;
   videoSound: boolean;
   schoolName: string;
+  schoolType?: string;
   logoUrl: string | null;
   /** Yalnızca duyuru gösteren panoda tam ekran (kenarlıksız) */
   full?: boolean;
 }
 
-export function Slideshow({ announcements, now, defaultDurationSec, videoSound, schoolName, logoUrl, full = false }: Props) {
+export function Slideshow({ announcements, now, defaultDurationSec, videoSound, schoolName, schoolType, logoUrl, full = false }: Props) {
   // Yayın aralığı her 30 saniyede bir yeniden değerlendirilir (her saniye değil)
   const windowKey = Math.floor(now.getTime() / 30_000);
   const slides = useMemo(
@@ -194,7 +196,11 @@ export function Slideshow({ announcements, now, defaultDurationSec, videoSound, 
   return (
     <section className={`card slideshow ${full ? 'slideshow-full' : ''}`}>
       <div className={`slide slide-${slide.kind}`} key={key}>
-        {slide.kind === 'text' ? (
+        {slide.kind === 'design' && slide.design ? (
+          <div className="slide-design">
+            <DesignSlide design={slide.design} schoolName={schoolName} schoolType={schoolType} />
+          </div>
+        ) : slide.kind === 'text' || slide.kind === 'design' ? (
           <div className="slide-text">
             <MegaphoneIcon size={72} className="slide-text-icon" />
             <h2>{slide.title}</h2>

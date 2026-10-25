@@ -1,5 +1,7 @@
 import type { BellScheduleLike } from './bell.ts';
 import type { BoardLayout } from './layout.ts';
+import type { AnnouncementDesign } from './designs.ts';
+import type { DisplayEmergency } from './emergency.ts';
 import type { ScreenDisplay } from './screen.ts';
 import type { SchoolSettings } from './schemas.ts';
 
@@ -23,8 +25,10 @@ export interface DisplayState {
   };
   /** Bu panonun düzeni (panoya özel ya da okulun) */
   layout: BoardLayout;
-  /** Ekran biçimi (yatay / dikey, yalnızca duyurular, video duvarı) */
+  /** Ekran biçimi (yatay / dikey, tam pano ya da yalnızca duyurular) */
   display?: ScreenDisplay;
+  /** Etkin acil durum: bütün panolarda tam ekran uyarı */
+  emergency?: DisplayEmergency | null;
   exams: { id: string; title: string; examAt: string }[];
   duties: { id: string; weekday: number; area: string; teacherName: string }[];
   /** Tarihe bağlı nöbetçi müdür yardımcıları (bugünden itibaren bir hafta) */
@@ -43,8 +47,10 @@ export interface DisplayState {
 
 export interface DisplayAnnouncement {
   id: string;
-  kind: 'image' | 'video' | 'text';
+  kind: 'image' | 'video' | 'text' | 'design';
   title: string;
+  /** Hazır şablonla hazırlanan duyuru */
+  design?: AnnouncementDesign | null;
   body: string | null;
   imageUrl: string | null;
   youtubeUrl: string | null;

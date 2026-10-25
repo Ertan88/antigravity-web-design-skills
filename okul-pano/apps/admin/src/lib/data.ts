@@ -1,4 +1,4 @@
-import type { BoardLayout, Period, SchoolSettings, ScreenDisplay } from '@okulpano/shared';
+import type { AnnouncementDesign, BoardLayout, Period, SchoolSettings, ScreenDisplay } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './api.ts';
 import { useAuth } from './auth.tsx';
@@ -14,8 +14,10 @@ interface Base {
 }
 
 export interface Announcement extends Base {
-  kind: 'image' | 'video' | 'text';
+  kind: 'image' | 'video' | 'text' | 'design';
   title: string;
+  /** Hazır şablonla hazırlanan duyuru */
+  design: AnnouncementDesign | null;
   body: string | null;
   imageUrl: string | null;
   youtubeUrl: string | null;

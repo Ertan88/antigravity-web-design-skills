@@ -5,6 +5,7 @@
  */
 export const PERMISSIONS = {
   'announcements.manage': 'Duyurular',
+  'emergency.manage': 'Acil durum uyarısı',
   'ticker.manage': 'Kayan yazı',
   'exams.manage': 'Sınav sayacı',
   'duties.manage': 'Nöbet çizelgesi',

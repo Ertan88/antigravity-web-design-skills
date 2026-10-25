@@ -12,3 +12,5 @@ export * from './holidays.ts';
 export * from './layout.ts';
 export * from './themes.ts';
 export * from './screen.ts';
+export * from './designs.ts';
+export * from './emergency.ts';

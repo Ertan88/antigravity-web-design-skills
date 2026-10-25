@@ -56,3 +56,35 @@ describe('pano düzeni', () => {
     expect((await owner.put(path(`screens/${screen.id}`), { name: 'Kantin', layout: { left: ['bell'], right: ['bell'] } })).statusCode).toBe(400);
   });
 });
+
+describe('ekran biçimi, şablonlu duyuru ve acil durum', () => {
+  let hallToken = '';
+  it('panoya özel ekran biçimi panoya ulaşır', async () => {
+    const created = await owner.post(path('screens'), { name: 'Koridor' });
+    const { screen, token } = created.json() as { screen: { id: string }; token: string };
+    expect((await state(token)).display).toEqual({ orientation: 'landscape', mode: 'board' });
+    expectStatus(await owner.put(path(`screens/${screen.id}`), { name: 'Koridor', display: { orientation: 'portrait', mode: 'slides' } }), 200);
+    expect((await state(token)).display).toEqual({ orientation: 'portrait', mode: 'slides' });
+  });
+
+  it('şablonlu duyuru kaydedilir ve panoya tasarımıyla gider', async () => {
+    const design = { template: 'parents', palette: 'petrol', fields: { title: 'Veli Toplantısı', date: '14 Kasım' } };
+    expect((await owner.post(path('announcements'), { kind: 'design', title: 'Veli Toplantısı' })).statusCode).toBe(400);
+    expectStatus(await owner.post(path('announcements'), { kind: 'design', title: 'Veli Toplantısı', design }), 201);
+    const { token } = (await owner.post(path('screens'), { name: 'Hol' })).json() as { token: string };
+    hallToken = token;
+    const ann = (await state(token)).announcements.find((a: { kind: string }) => a.kind === 'design');
+    expect(ann.design).toEqual(design);
+  });
+
+  it('acil durum başlatılır, panoya gider ve bitirilir', async () => {
+    // Paket 3 pano ile sınırlı: önceki testin panosu kullanılır
+    const token = hallToken;
+    expect((await state(token)).emergency).toBeNull();
+    expectStatus(await owner.post(path('emergency'), { type: 'earthquake', message: 'Bahçeye çıkmayın', sound: true }), 200);
+    expect((await state(token)).emergency).toMatchObject({ type: 'earthquake', message: 'Bahçeye çıkmayın', sound: true });
+    expect((await owner.get(path('emergency'))).json()).toMatchObject({ type: 'earthquake', startedBy: 'Müdür' });
+    expectStatus(await owner.del(path('emergency')), 200);
+    expect((await state(token)).emergency).toBeNull();
+  });
+});
