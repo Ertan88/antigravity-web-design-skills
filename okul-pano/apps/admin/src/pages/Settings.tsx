@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { MapPin, Search } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ImageUpload } from '../components/ImageUpload.tsx';
+import { SaveBar } from '../components/SaveBar.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Button, Card, Field, Input, PageHeader, Spinner, Toggle } from '../components/ui.tsx';
 import { Link } from 'react-router-dom';
@@ -169,8 +170,9 @@ export function Settings() {
   };
 
   const s = v.settings;
+  const dirty = Boolean(school.data) && JSON.stringify(v) !== JSON.stringify(toForm(school.data!));
   return (
-    <div className="pb-24">
+    <div>
       <PageHeader title="Genel Ayarlar" description="Okul bilgileri, konum ve modüller. Panoların görünümü ve düzeni Panolar sayfasında." />
       {form.errors._form && (
         <div className="mb-4">
@@ -261,18 +263,15 @@ export function Settings() {
             sayfasında.
           </p>
         </Section>
+        {/* Pano düzenindeki gibi: yalnızca değişiklik varsa altta yapışık Kaydet / İptal */}
+        <SaveBar
+          show={dirty}
+          saving={save.isPending}
+          onSave={() => void submit()}
+          onCancel={() => school.data && form.reset(toForm(school.data))}
+        />
       </Card>
 
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-200 bg-surface/90 backdrop-blur lg:left-72">
-        <div className="mx-auto flex w-full max-w-[1680px] justify-end gap-2 px-4 py-3 sm:px-6 lg:px-8">
-          <Button variant="secondary" onClick={() => school.data && form.reset(toForm(school.data))}>
-            Değişiklikleri geri al
-          </Button>
-          <Button loading={save.isPending} onClick={() => void submit()}>
-            Kaydet
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }
