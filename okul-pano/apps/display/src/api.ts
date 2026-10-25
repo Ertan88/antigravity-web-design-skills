@@ -60,7 +60,10 @@ async function getJson<T>(path: string, token: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export const fetchState = (token: string) => getJson<DisplayState>('/api/display/state', token);
+/** Paneldeki önizlemede belirli bir pano seçilebilir (?screen=): o panonun düzeni ve ekran biçimiyle */
+const previewScreen = new URLSearchParams(location.search).get('screen');
+export const fetchState = (token: string) =>
+  getJson<DisplayState>(`/api/display/state${previewScreen ? `?screen=${encodeURIComponent(previewScreen)}` : ''}`, token);
 export const fetchWeather = (token: string) => getJson<WeatherNow | null>('/api/display/weather', token);
 
 export function cacheState(state: DisplayState) {

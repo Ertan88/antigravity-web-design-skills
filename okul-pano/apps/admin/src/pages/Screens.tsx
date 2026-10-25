@@ -1,6 +1,6 @@
 import { pairScreenSchema, screenSchema } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Check, Copy, KeyRound, LayoutTemplate, MonitorSmartphone, Pencil, Plus, RefreshCw, ScanEye } from 'lucide-react';
+import { Check, Copy, KeyRound, LayoutTemplate, MonitorSmartphone, Pencil, Plus, RectangleHorizontal, RectangleVertical, RefreshCw, ScanEye } from 'lucide-react';
 import { useState } from 'react';
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Spinner } from '../components/ui.tsx';
@@ -9,6 +9,7 @@ import { useAuth } from '../lib/auth.tsx';
 import { useList, useSchool, useSchoolPath, type Screen } from '../lib/data.ts';
 import { useForm } from '../lib/form.ts';
 import { Appearance, LayoutTab } from './screens/BoardSettings.tsx';
+import { formatLabel, ScreenFormatDialog } from './screens/ScreenFormatDialog.tsx';
 import { ScreenLayoutDialog } from './screens/ScreenLayoutDialog.tsx';
 import { timeAgo } from '../lib/format.ts';
 
@@ -160,6 +161,7 @@ export function Screens() {
   const [keyUrl, setKeyUrl] = useState<string | null>(null);
   const [tab, setTab] = useState<'boards' | 'layout' | 'appearance'>('boards');
   const [layoutFor, setLayoutFor] = useState<Screen | null>(null);
+  const [formatFor, setFormatFor] = useState<Screen | null>(null);
   const editable = can('screens.manage');
   const canSettings = can('settings.manage');
   const renameForm = useForm({ name: '', location: '' });
@@ -261,16 +263,29 @@ export function Screens() {
               </div>
               <h2 className="mt-4 font-semibold">{s.name}</h2>
               <p className="text-sm text-slate-500">{s.location ?? 'Konum belirtilmemiş'}</p>
-              <button
-                type="button"
-                onClick={() => setLayoutFor(s)}
-                disabled={!editable}
-                className="mt-3 flex items-center gap-2 self-start rounded-lg px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-ink"
-              >
-                <LayoutTemplate className="size-3.5" />
-                {s.layout ? 'Özel düzen' : 'Okulun varsayılan düzeni'}
-                <span className="text-brand-600">· Düzenle</span>
-              </button>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFormatFor(s)}
+                  className="flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-ink"
+                >
+                  {s.display.orientation === 'portrait' ? <RectangleVertical className="size-3.5" /> : <RectangleHorizontal className="size-3.5" />}
+                  {formatLabel(s.display)}
+                  <span className="text-brand-600">· Değiştir</span>
+                </button>
+                {s.display.mode === 'board' && (
+                  <button
+                    type="button"
+                    onClick={() => setLayoutFor(s)}
+                    disabled={!editable}
+                    className="flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-ink"
+                  >
+                    <LayoutTemplate className="size-3.5" />
+                    {s.layout ? 'Özel düzen' : 'Okulun varsayılan düzeni'}
+                    <span className="text-brand-600">· Düzenle</span>
+                  </button>
+                )}
+              </div>
               <div className="mt-5 flex flex-wrap items-center gap-1 border-t border-slate-100 pt-3">
                 <Button size="sm" variant="ghost" icon={<ScanEye className="size-3.5" />} onClick={() => command.mutate({ id: s.id, command: 'identify' })}>
                   Tanımla
@@ -317,6 +332,7 @@ export function Screens() {
 
       <AddScreen open={adding} onClose={() => setAdding(false)} />
       <ScreenLayoutDialog screen={layoutFor} onClose={() => setLayoutFor(null)} />
+      <ScreenFormatDialog screen={formatFor ? (list.data?.find((x) => x.id === formatFor.id) ?? formatFor) : null} onClose={() => setFormatFor(null)} />
 
       <Modal
         open={Boolean(renaming)}

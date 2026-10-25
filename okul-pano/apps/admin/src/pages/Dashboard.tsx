@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { Cake, GraduationCap, Megaphone, MonitorSmartphone, Plus, TextCursorInput, Users } from 'lucide-react';
+import { Cake, GraduationCap, Megaphone, MonitorSmartphone, Plus, ShieldCheck, TextCursorInput, UserMinus, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { BoardPreview } from '../components/BoardPreview.tsx';
 import { Card } from '../components/ui.tsx';
+import { TodaySummary } from './dashboard/Today.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useSchoolPath } from '../lib/data.ts';
@@ -72,6 +73,8 @@ export function Dashboard() {
     { to: '/duyurular?yeni=1', label: 'Duyuru ekle', icon: Megaphone, perm: 'announcements.manage' as const },
     { to: '/kayan-yazi', label: 'Kayan yazı', icon: TextCursorInput, perm: 'ticker.manage' as const },
     { to: '/sinavlar', label: 'Sınav sayacı', icon: GraduationCap, perm: 'exams.manage' as const },
+    { to: '/izinler', label: 'İzinli ekle', icon: UserMinus, perm: 'leaves.manage' as const },
+    { to: '/nobet', label: 'Nöbetler', icon: ShieldCheck, perm: 'duties.manage' as const },
     { to: '/ekranlar', label: 'Ekran ekle', icon: MonitorSmartphone, perm: 'screens.manage' as const },
   ].filter((q) => can(q.perm));
 
@@ -96,6 +99,8 @@ export function Dashboard() {
         <Stat icon={<Users className="size-5" />} label="Öğretmen" value={s?.teachers ?? '—'} to="/ogretmenler" />
         <Stat icon={<Cake className="size-5" />} label="Öğrenci" value={s?.students ?? '—'} to="/ogrenciler" />
       </div>
+
+      <TodaySummary />
 
       <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
         <Card className="p-4 sm:p-5">

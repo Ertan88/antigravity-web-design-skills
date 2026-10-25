@@ -168,14 +168,16 @@ p {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  gap: 4px;
+  gap: 0;
 }
 
 .school-name {
   font-size: 58px;
   font-weight: 900;
   letter-spacing: -0.02em;
-  line-height: 1;
+  /* Büyük harf Türkçe karakterlerin (Ö, Ü, İ, Ç, Ş) noktaları ve çengelleri kesilmesin */
+  line-height: 1.22;
+  padding-bottom: 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -186,7 +188,7 @@ p {
   font-size: 26px;
   font-weight: 600;
   letter-spacing: 0.06em;
-  line-height: 1.1;
+  line-height: 1.25;
   text-transform: uppercase;
   color: color-mix(in srgb, var(--text) 62%, var(--primary));
   white-space: nowrap;
@@ -1782,4 +1784,311 @@ p {
   font-size: 18px;
   font-weight: 600;
   color: var(--muted);
+}
+
+/* ---------- Geçiş animasyonları ---------- */
+/* Kartlar sırayla yumuşakça belirir */
+.motion .col > .card {
+  animation: fade-up 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.motion .col > .card:nth-child(2) { animation-delay: 0.08s; }
+.motion .col > .card:nth-child(3) { animation-delay: 0.16s; }
+.motion .col > .card:nth-child(4) { animation-delay: 0.24s; }
+.motion .col > .card:nth-child(5) { animation-delay: 0.32s; }
+
+/* Zil çalmadan önceki son dakika: kart ve sayaç nabız gibi atar */
+.motion .bell-card.urgent {
+  animation: bell-pulse 1s ease-in-out infinite;
+}
+.motion .bell-card.urgent .bell-countdown {
+  animation: count-beat 1s ease-in-out infinite;
+}
+
+@keyframes bell-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--accent) 6%, transparent), 0 0 40px color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+}
+
+@keyframes count-beat {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+.bell-card .bell-countdown {
+  transform-origin: left center;
+}
+
+/* Animasyonlar kapalı (düşük güçlü cihazlar) */
+.no-motion *,
+.no-motion *::before,
+.no-motion *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* ---------- Gece / hafta sonu modu ---------- */
+.screensaver {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  color: #cbd5e1;
+}
+
+.screensaver-box {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  transition: left 2s ease, top 2s ease;
+  white-space: nowrap;
+}
+
+.screensaver-time {
+  font-size: 220px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: #e2e8f0;
+}
+
+.screensaver-date {
+  margin-top: 12px;
+  font-size: 40px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.screensaver-school {
+  margin-top: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.screensaver-school img {
+  height: 44px;
+  width: auto;
+  opacity: 0.7;
+}
+
+/* Karartma: pano görünür kalır ama çok koyu (elektrik ve ekran ömrü için) */
+.sleep-dim {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.82);
+  pointer-events: none;
+}
+
+/* ---------- Yalnızca duyurular ve video duvarı ---------- */
+.mode-slides,
+.mode-wall {
+  background: #000;
+}
+
+.slideshow.slideshow-full {
+  flex: 1;
+  border-radius: 0;
+  border: 0;
+}
+
+.mode-slides .slideshow.slideshow-full {
+  height: 100%;
+}
+
+.wall-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  display: flex;
+}
+
+.wall-canvas .slideshow-full .slide-dots,
+.wall-canvas .slideshow-full .slide-progress {
+  display: none;
+}
+
+.corner-clock {
+  position: absolute;
+  right: 28px;
+  top: 24px;
+  z-index: 5;
+  padding: 8px 18px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 34px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Dikey (portre) pano: 1080x1920 ---------- */
+.orientation-portrait {
+  --col-w: auto;
+  --header-h: 150px;
+}
+
+.orientation-portrait .header {
+  padding: 0 28px;
+  gap: 20px;
+}
+
+.orientation-portrait .school-badge {
+  width: 80px;
+  height: 80px;
+}
+
+.orientation-portrait .school-name {
+  font-size: 46px;
+}
+
+.orientation-portrait .school-type {
+  font-size: 21px;
+}
+
+.orientation-portrait .header-right {
+  gap: 18px;
+}
+
+.orientation-portrait .header-weather {
+  padding-right: 18px;
+  max-width: 230px;
+}
+
+.orientation-portrait .weather-meta,
+.orientation-portrait .weather-city {
+  display: none;
+}
+
+.orientation-portrait .clock-hm {
+  font-size: 56px;
+}
+
+.orientation-portrait .body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: 780px minmax(0, 1fr);
+  padding: 4px 24px 20px;
+}
+
+.orientation-portrait .body > .slideshow {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+
+.orientation-portrait .body > .col-left {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.orientation-portrait .body > .col-right {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.orientation-portrait .body > .col:only-of-type {
+  grid-column: 1 / -1;
+}
+
+.orientation-portrait .col {
+  width: auto;
+}
+
+/* ---------- Erişilebilirlik: yüksek kontrast ---------- */
+.contrast-high.theme-dark {
+  --bg: #000;
+  --bg-glow-1: transparent;
+  --bg-glow-2: transparent;
+  --panel: #0a0a0a;
+  --panel-strong: #111;
+  --border: rgba(255, 255, 255, 0.55);
+  --text: #fff;
+  --muted: #e2e8f0;
+  --faint: #cbd5e1;
+}
+
+.contrast-high.theme-light {
+  --bg: #fff;
+  --bg-glow-1: transparent;
+  --bg-glow-2: transparent;
+  --panel: #fff;
+  --panel-strong: #f1f5f9;
+  --border: rgba(0, 0, 0, 0.6);
+  --text: #000;
+  --muted: #1e293b;
+  --faint: #334155;
+}
+
+.contrast-high .card {
+  border-width: 2px;
+  background: var(--panel);
+}
+
+.contrast-high .card-watermark {
+  display: none;
+}
+
+.contrast-high .card[class*='-card'] .card-label,
+.contrast-high .card[class*='-card'] .card-label svg {
+  color: var(--text);
+}
+
+/* ---------- Erişilebilirlik: büyük yazı (uzaktan okunabilirlik) ---------- */
+.text-large .card-label {
+  font-size: 20px;
+}
+
+.text-large .person-name,
+.text-large .lesson-subject,
+.text-large .lesson-teacher {
+  font-size: 26px;
+}
+
+.text-large .duty-card .duty-teacher {
+  font-size: 26px;
+}
+
+.text-large .duty-card .duty-area {
+  font-size: 15px;
+}
+
+.text-large .lesson-class {
+  font-size: 25px;
+}
+
+.text-large .empty-card-text {
+  font-size: 21px;
+}
+
+.text-large .bell-card .bell-caption,
+.text-large .bell-card .bell-range {
+  font-size: 21px;
+}
+
+.text-large .slide-caption h2 {
+  font-size: 44px;
+}
+
+.text-large .slide-caption p {
+  font-size: 28px;
+}
+
+.text-large .ticker-item {
+  font-size: 34px;
 }

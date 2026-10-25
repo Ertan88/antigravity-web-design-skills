@@ -241,7 +241,69 @@ export function Appearance({ editable }: { editable: boolean }) {
           label="Boş kartları da göster"
           description="Düzende olan kart o gün içeriksizse (izinli yok, doğum günü yok…) kısa bir notla görünür. Kapalıyken o gün panoda hiç yer almaz."
         />
+        <Toggle
+          checked={s.animations}
+          onChange={(x) => set('animations', x)}
+          label="Geçiş animasyonları"
+          description="Kartlar yumuşakça belirir, zil çalmadan önceki son dakikada sayaç nabız gibi atar. Eski / yavaş cihazlarda kapatabilirsiniz."
+        />
         <Toggle checked={s.videoSound} onChange={(x) => set('videoSound', x)} label="Videoları sesli oynat" description="Tarayıcıda otomatik oynatma izni gerekir (aşağıdaki kiosk komutu)." />
+      </Section>
+
+      <Section title="Gece ve hafta sonu modu" description="Ders dışı saatlerde pano kararır ya da ekran koruyucuya geçer: elektrik tasarrufu, daha uzun ekran ömrü.">
+        <Field label="Ders dışı saatlerde">
+          {() => (
+            <Segmented
+              value={s.sleepMode}
+              onChange={(x) => set('sleepMode', x)}
+              options={[
+                { value: 'off', label: 'Pano açık kalsın' },
+                { value: 'screensaver', label: 'Ekran koruyucu' },
+                { value: 'dim', label: 'Karart' },
+              ]}
+            />
+          )}
+        </Field>
+        {s.sleepMode !== 'off' && (
+          <>
+            <p className="text-sm text-slate-500">
+              {s.sleepMode === 'screensaver'
+                ? 'Siyah zeminde büyük saat, tarih ve okul adı görünür; ekranda iz kalmasın diye her dakika yer değiştirir.'
+                : 'Pano görünmeye devam eder ama çok koyulaşır.'}{' '}
+              Saatler o günün zil çizelgesinden hesaplanır; zil çizelgesi olmayan iş günlerinde pano hiç uyumaz.
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="İlk dersten kaç dakika önce açılsın">
+                {(id) => <Input id={id} type="number" min={0} max={240} disabled={!editable} value={s.sleepBeforeMin} onChange={(e) => set('sleepBeforeMin', Number(e.target.value))} />}
+              </Field>
+              <Field label="Son dersten kaç dakika sonra uyusun">
+                {(id) => <Input id={id} type="number" min={0} max={240} disabled={!editable} value={s.sleepAfterMin} onChange={(e) => set('sleepAfterMin', Number(e.target.value))} />}
+              </Field>
+            </div>
+            <Toggle checked={s.sleepOffDays} onChange={(x) => set('sleepOffDays', x)} label="Hafta sonu ve tatil günlerinde gün boyu uyusun" />
+          </>
+        )}
+      </Section>
+
+      <Section title="Erişilebilirlik" description="Uzaktan ve zayıf görenler için daha kolay okunan pano.">
+        <Field label="Yazı boyutu">
+          {() => (
+            <Segmented
+              value={s.textSize}
+              onChange={(x) => set('textSize', x)}
+              options={[
+                { value: 'normal', label: 'Normal' },
+                { value: 'large', label: 'Büyük' },
+              ]}
+            />
+          )}
+        </Field>
+        <Toggle
+          checked={s.highContrast}
+          onChange={(x) => set('highContrast', x)}
+          label="Yüksek kontrast"
+          description="Düz siyah (ya da beyaz) zemin, keskin kenarlıklar, filigran ve renk geçişleri yok."
+        />
       </Section>
 
       <Section title="Doğum günleri" description="Panoda öğrenci adlarının gösterimi.">

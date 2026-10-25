@@ -126,6 +126,21 @@ function VideoSlide({ url, sound, maxSec, onEnd }: { url: string; sound: boolean
 
 /* ---------- Slayt gösterisi ---------- */
 
+const noop = () => {};
+
+/** Saate bağlı akışta şu anki slayt, slaytın kaçıncı saniyesinde olunduğu ve tur numarası */
+function syncedPosition(lengths: number[], nowSec: number): { index: number; elapsed: number; cycle: number } | null {
+  const total = lengths.reduce((a, b) => a + b, 0);
+  if (!total) return null;
+  let t = nowSec % total;
+  const cycle = Math.floor(nowSec / total);
+  for (let i = 0; i < lengths.length; i++) {
+    if (t < lengths[i]!) return { index: i, elapsed: t, cycle };
+    t -= lengths[i]!;
+  }
+  return { index: 0, elapsed: 0, cycle };
+}
+
 interface Props {
   announcements: DisplayAnnouncement[];
   now: Date;
@@ -133,9 +148,17 @@ interface Props {
   videoSound: boolean;
   schoolName: string;
   logoUrl: string | null;
+  /**
+   * Saate bağlı akış (video duvarı): hangi slaytın gösterileceği sunucu saatinden hesaplanır,
+   * böylece duvardaki bütün TV'ler aynı anda aynı slayttadır.
+   */
+  synced?: boolean;
 }
 
-export function Slideshow({ announcements, now, defaultDurationSec, videoSound, schoolName, logoUrl }: Props) {
+/** Saate bağlı akışta videoların süresi bilinmediği için girilmemişse bu kadar gösterilir */
+const SYNCED_VIDEO_SEC = 60;
+
+export function Slideshow({ announcements, now, defaultDurationSec, videoSound, schoolName, logoUrl, synced = false }: Props) {
   // Yayın aralığı her 30 saniyede bir yeniden değerlendirilir (her saniye değil)
   const windowKey = Math.floor(now.getTime() / 30_000);
   const slides = useMemo(
@@ -160,17 +183,20 @@ export function Slideshow({ announcements, now, defaultDurationSec, videoSound, 
   useEffect(() => {
     if (hasVideo) loadYouTube().catch(() => undefined);
   }, [hasVideo]);
-  const index = count ? cursor.index % count : 0;
+  const lengthOf = (x: DisplayAnnouncement) => x.durationSec ?? (x.kind === 'video' && synced ? SYNCED_VIDEO_SEC : defaultDurationSec);
+  const clock = synced ? syncedPosition(slides.map(lengthOf), Math.floor(now.getTime() / 1000)) : null;
+  const index = clock ? clock.index : count ? cursor.index % count : 0;
   const slide = slides[index] ?? null;
 
   const next = useCallback(() => setCursor((c) => ({ index: count ? (c.index + 1) % count : 0, round: c.round + 1 })), [count]);
+  const onVideoEnd = synced ? noop : next;
 
-  const duration = slide ? (slide.durationSec ?? defaultDurationSec) : 0;
+  const duration = slide ? lengthOf(slide) : 0;
   useEffect(() => {
-    if (!slide || slide.kind === 'video') return;
+    if (synced || !slide || slide.kind === 'video') return;
     const t = setTimeout(next, duration * 1000);
     return () => clearTimeout(t);
-  }, [slide, cursor.round, duration, next]);
+  }, [synced, slide, cursor.round, duration, next]);
 
   // Sıradaki görseli önceden yükle: geçişte boş kare görünmesin
   useEffect(() => {
@@ -188,9 +214,9 @@ export function Slideshow({ announcements, now, defaultDurationSec, videoSound, 
     );
   }
 
-  const key = `${slide.id}-${cursor.round}`;
+  const key = clock ? `${slide.id}-${clock.cycle}` : `${slide.id}-${cursor.round}`;
   return (
-    <section className="card slideshow">
+    <section className={`card slideshow ${synced ? 'slideshow-full' : ''}`}>
       <div className={`slide slide-${slide.kind}`} key={key}>
         {slide.kind === 'text' ? (
           <div className="slide-text">
@@ -208,7 +234,7 @@ export function Slideshow({ announcements, now, defaultDurationSec, videoSound, 
                 </>
               )}
               {slide.kind === 'video' && slide.youtubeUrl && (
-                <VideoSlide url={slide.youtubeUrl} sound={videoSound} maxSec={slide.durationSec} onEnd={next} />
+                <VideoSlide url={slide.youtubeUrl} sound={videoSound} maxSec={slide.durationSec} onEnd={onVideoEnd} />
               )}
             </div>
             <div className="slide-caption">
@@ -227,7 +253,7 @@ export function Slideshow({ announcements, now, defaultDurationSec, videoSound, 
       )}
       {slide.kind !== 'video' && (
         <div className="slide-progress" aria-hidden="true">
-          <div key={key} style={{ animationDuration: `${duration}s` }} />
+          <div key={key} style={{ animationDuration: `${duration}s`, animationDelay: clock ? `-${clock.elapsed}s` : undefined }} />
         </div>
       )}
     </section>

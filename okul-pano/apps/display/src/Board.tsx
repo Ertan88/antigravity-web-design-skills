@@ -1,5 +1,7 @@
 import {
+  isSleepTime,
   resolveLayout,
+  resolveScreenDisplay,
   specialThemeFor,
   type BoardModule,
   computeBellStatus,
@@ -15,8 +17,9 @@ import { Header } from './components/Header.tsx';
 import { BookIcon, CakeIcon, CapIcon, MonitorIcon, UserMinusIcon, WifiOffIcon } from './components/Icons.tsx';
 import { BirthdayCard, DutyCard, EmptyCard, ExamCard, LeaveCard } from './components/LeftColumn.tsx';
 import { BellCard, LessonsCard } from './components/RightColumn.tsx';
+import { Screensaver } from './components/Screensaver.tsx';
 import { Slideshow } from './components/Slideshow.tsx';
-import { Stage } from './components/Stage.tsx';
+import { Stage, STAGE_H, STAGE_W } from './components/Stage.tsx';
 import { Ticker } from './components/Ticker.tsx';
 import { useClock, useDisplayData, useNightlyReload, useWeather } from './hooks.ts';
 
@@ -121,8 +124,15 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
 
   // Özel günlerde (millî bayram, 10 Kasım, bayramlar…) hazır tema kendiliğinden uygulanır
   const special = s.autoSpecialThemes ? specialThemeFor(today.isoDate) : null;
+  const display = resolveScreenDisplay(state.display);
+  const portrait = display.orientation === 'portrait';
+  const [stageW, stageH] = portrait ? [STAGE_H, STAGE_W] : [STAGE_W, STAGE_H];
   const classes = [
     'theme-' + s.theme,
+    portrait ? 'orientation-portrait' : '',
+    s.highContrast ? 'contrast-high' : '',
+    s.textSize === 'large' ? 'text-large' : '',
+    s.animations ? 'motion' : 'no-motion',
     NATIONAL_DAYS.has(today.monthDay) ? 'day-national' : '',
     mourning ? 'day-mourning' : '',
     special?.decor === 'festive' ? 'day-festive' : '',
@@ -131,8 +141,73 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
     .join(' ');
   const themeVars = { '--primary': special?.primary ?? s.primaryColor, '--accent': special?.accent ?? s.accentColor } as CSSProperties;
 
+  // Gece / hafta sonu modu: ders dışı saatlerde ekran koruyucu ya da karartma
+  const offDay = today.weekday >= 6 || (state.holidays ?? []).some((h) => h.date === today.isoDate);
+  const sleeping = !identifying && isSleepTime({ settings: s, periods: schedule?.periods ?? null, secondsOfDay: today.secondsOfDay, offDay });
+
+  if (sleeping && s.sleepMode === 'screensaver') {
+    return (
+      <Stage className={classes} style={themeVars} width={stageW} height={stageH}>
+        <Screensaver now={now} timezone={school.timezone} schoolName={school.name} logoUrl={school.logoUrl} />
+      </Stage>
+    );
+  }
+
+  const slideshow = (synced: boolean) => (
+    <Slideshow
+      announcements={state.announcements}
+      now={now}
+      defaultDurationSec={s.slideDurationSec}
+      videoSound={s.videoSound}
+      schoolName={school.name}
+      logoUrl={school.logoUrl}
+      synced={synced}
+    />
+  );
+  const overlays = (
+    <>
+      {sleeping && <div className="sleep-dim" />}
+      {identifying && (
+        <div className="identify">
+          <MonitorIcon size={120} />
+          <div className="identify-name">{state.screen?.name ?? 'Önizleme'}</div>
+          <div className="identify-sub">Bu ekran panelden tanımlandı</div>
+        </div>
+      )}
+    </>
+  );
+
+  // Yalnızca duyurular: ek TV'ler için tam ekran slayt, köşede küçük saat
+  if (display.mode === 'slides') {
+    return (
+      <Stage className={`${classes} mode-slides`} style={themeVars} width={stageW} height={stageH}>
+        {slideshow(true)}
+        <div className="corner-clock">{new Intl.DateTimeFormat('tr-TR', { hour: '2-digit', minute: '2-digit', timeZone: school.timezone }).format(now)}</div>
+        {overlays}
+      </Stage>
+    );
+  }
+
+  // Video duvarı: bütün duvar tek bir büyük tuval; her TV kendi parçasını gösterir, akış saate bağlı
+  if (display.mode === 'wall') {
+    const k = Math.min(display.wallCols, display.wallRows);
+    const vw = (stageW * display.wallCols) / k;
+    const vh = (stageH * display.wallRows) / k;
+    return (
+      <Stage className={`${classes} mode-wall`} style={themeVars} width={stageW} height={stageH}>
+        <div
+          className="wall-canvas"
+          style={{ width: vw, height: vh, transform: `scale(${k}) translate(${(-display.wallCol * stageW) / k}px, ${(-display.wallRow * stageH) / k}px)` }}
+        >
+          {slideshow(true)}
+        </div>
+        {overlays}
+      </Stage>
+    );
+  }
+
   return (
-    <Stage className={classes} style={themeVars}>
+    <Stage className={classes} style={themeVars} width={stageW} height={stageH}>
       <Header
         schoolName={school.name}
         schoolType={s.schoolType}
@@ -148,27 +223,14 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
       <main className="body">
         {leftCards.length > 0 && <aside className="col col-left">{leftCards}</aside>}
 
-        <Slideshow
-          announcements={state.announcements}
-          now={now}
-          defaultDurationSec={s.slideDurationSec}
-          videoSound={s.videoSound}
-          schoolName={school.name}
-          logoUrl={school.logoUrl}
-        />
+        {slideshow(false)}
 
         {rightCards.length > 0 && <aside className="col col-right">{rightCards}</aside>}
       </main>
 
       <Ticker items={ticker.length ? ticker : [`${school.name} · İyi dersler dileriz`]} speed={s.tickerSpeed} />
 
-      {identifying && (
-        <div className="identify">
-          <MonitorIcon size={120} />
-          <div className="identify-name">{state.screen?.name ?? 'Önizleme'}</div>
-          <div className="identify-sub">Bu ekran panelden tanımlandı</div>
-        </div>
-      )}
+      {overlays}
 
       {silenceMinute && (
         <div className="silence">

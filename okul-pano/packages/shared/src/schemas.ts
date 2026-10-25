@@ -60,6 +60,16 @@ export const schoolSettingsSchema = z.object({
   autoSpecialThemes: z.boolean().default(true),
   /** Düzende olan ama o gün içeriği olmayan kartlar (izinli, doğum günü…) kısa bir notla görünür */
   showEmptyCards: z.boolean().default(true),
+  /** Kart girişleri, slayt geçişleri, zil sayacının son dakikadaki nabzı */
+  animations: z.boolean().default(true),
+  /** Erişilebilirlik: yüksek kontrast ve uzaktan okunabilirlik için büyük yazı */
+  highContrast: z.boolean().default(false),
+  textSize: z.enum(['normal', 'large']).default('normal'),
+  /** Gece ve hafta sonu modu: ders dışı saatlerde karartma ya da ekran koruyucu */
+  sleepMode: z.enum(['off', 'dim', 'screensaver']).default('off'),
+  sleepAfterMin: z.number().int().min(0).max(240).default(30),
+  sleepBeforeMin: z.number().int().min(0).max(240).default(30),
+  sleepOffDays: z.boolean().default(true),
   showExams: z.boolean().default(true),
   showDuties: z.boolean().default(true),
   showLeaves: z.boolean().default(true),
@@ -344,11 +354,24 @@ export const timetableEntrySchema = z.object({
   subject: required('Ders', 60),
 });
 
+export const screenDisplaySchema = z
+  .object({
+    orientation: z.enum(['landscape', 'portrait']).default('landscape'),
+    mode: z.enum(['board', 'slides', 'wall']).default('board'),
+    wallCols: z.number().int().min(1).max(4).default(2),
+    wallRows: z.number().int().min(1).max(4).default(1),
+    wallCol: z.number().int().min(0).max(3).default(0),
+    wallRow: z.number().int().min(0).max(3).default(0),
+  })
+  .refine((d) => d.wallCol < d.wallCols && d.wallRow < d.wallRows, { message: 'TV\'nin yeri duvarın dışında', path: ['wallCol'] });
+
 export const screenSchema = z.object({
   name: required('Pano adı', 60),
   location: optionalText(80),
   /** Bu panoya özel düzen; null ise okulun varsayılan düzeni kullanılır */
   layout: boardLayoutSchema.nullable().optional(),
+  /** Ekran biçimi: yatay / dikey, yalnızca duyurular ya da video duvarı */
+  display: screenDisplaySchema.optional(),
 });
 
 export const pairScreenSchema = screenSchema.extend({

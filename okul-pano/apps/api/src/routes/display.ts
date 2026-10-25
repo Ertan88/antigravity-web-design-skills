@@ -1,5 +1,6 @@
 import {
   resolveLayout,
+  resolveScreenDisplay,
   schoolSettingsSchema,
   upcomingMonthDays,
   zonedParts,
@@ -38,6 +39,8 @@ const PAIRING_TTL_MS = 10 * 60 * 1000;
 interface DisplayAuth {
   schoolId: string;
   screen: typeof screens.$inferSelect | null;
+  /** Önizlemede ekran seçilmiş olsa bile cihaz sayılmaz (son görülme güncellenmez) */
+  preview?: boolean;
 }
 
 /** Ekranlar cihaz anahtarıyla, paneldeki önizleme kısa ömürlü JWT ile kimlik doğrular. */
@@ -56,7 +59,18 @@ async function resolveDisplay(app: FastifyInstance, req: FastifyRequest, queryTo
   }
   try {
     const payload = app.jwt.verify<{ typ?: string; sch?: string }>(token);
-    if (payload.typ === 'preview' && payload.sch) return { schoolId: payload.sch, screen: null };
+    if (payload.typ === 'preview' && payload.sch) {
+      // Panelde belirli bir panonun önizlemesi (?screen=): o panonun düzeni ve ekran biçimiyle
+      const screenId = (req.query as { screen?: string } | undefined)?.screen;
+      if (screenId && UUID_RE.test(screenId)) {
+        const [screen] = await app.deps.db
+          .select()
+          .from(screens)
+          .where(and(eq(screens.id, screenId), eq(screens.schoolId, payload.sch)));
+        if (screen) return { schoolId: payload.sch, screen, preview: true };
+      }
+      return { schoolId: payload.sch, screen: null };
+    }
   } catch {
     /* geçersiz */
   }
@@ -180,6 +194,7 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
       settings,
     },
     layout: resolveLayout(settings, auth.screen?.layout ?? null),
+    display: resolveScreenDisplay(auth.screen?.display),
     exams: examRows.map((e) => ({ ...e, examAt: e.examAt.toISOString() })),
     duties: dutyRows,
     dutySupervisors: supervisorRows,
@@ -260,7 +275,7 @@ export async function displayRoutes(app: FastifyInstance) {
   app.get('/api/display/stream', async (req, reply) => {
     const { token } = req.query as { token?: string };
     const auth = await resolveDisplay(app, req, token);
-    const screenId = auth.screen?.id ?? null;
+    const screenId = auth.preview ? null : (auth.screen?.id ?? null);
 
     reply.hijack();
     const raw = reply.raw;

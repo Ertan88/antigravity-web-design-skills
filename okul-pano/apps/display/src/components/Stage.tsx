@@ -16,16 +16,29 @@ const SHIFTS = [
  * Pano 1920x1080 sabit tuvalde tasarlanır ve her ekrana orantılı ölçeklenir:
  * 720p TV'de de 4K TV'de de aynı yerleşim, aynı okunabilirlik.
  */
-export function Stage({ children, className, style }: { children: ReactNode; className?: string; style?: CSSProperties }) {
+export function Stage({
+  children,
+  className,
+  style,
+  width = STAGE_W,
+  height = STAGE_H,
+}: {
+  children: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+  /** Dikey (portre) TV için 1080x1920 */
+  width?: number;
+  height?: number;
+}) {
   const [scale, setScale] = useState(1);
   const [shift, setShift] = useState(0);
 
   useEffect(() => {
-    const fit = () => setScale(Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H));
+    const fit = () => setScale(Math.min(window.innerWidth / width, window.innerHeight / height));
     fit();
     window.addEventListener('resize', fit);
     return () => window.removeEventListener('resize', fit);
-  }, []);
+  }, [width, height]);
 
   useEffect(() => {
     const timer = setInterval(() => setShift((s) => (s + 1) % SHIFTS.length), 4 * 60 * 1000);
@@ -39,8 +52,8 @@ export function Stage({ children, className, style }: { children: ReactNode; cla
         className={`stage ${className ?? ''}`}
         style={{
           ...style,
-          width: STAGE_W,
-          height: STAGE_H,
+          width,
+          height,
           transform: `translate(-50%, -50%) scale(${scale}) translate(${dx}px, ${dy}px)`,
         }}
       >

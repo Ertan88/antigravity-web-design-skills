@@ -1,5 +1,6 @@
 import type { BellScheduleLike } from './bell.ts';
 import type { BoardLayout } from './layout.ts';
+import type { ScreenDisplay } from './screen.ts';
 import type { SchoolSettings } from './schemas.ts';
 
 /**
@@ -20,6 +21,8 @@ export interface DisplayState {
   };
   /** Bu panonun düzeni (panoya özel ya da okulun) */
   layout: BoardLayout;
+  /** Ekran biçimi (yatay / dikey, yalnızca duyurular, video duvarı) */
+  display?: ScreenDisplay;
   exams: { id: string; title: string; examAt: string }[];
   duties: { id: string; weekday: number; area: string; teacherName: string }[];
   /** Tarihe bağlı nöbetçi müdür yardımcıları (bugünden itibaren bir hafta) */

@@ -50,6 +50,13 @@
       "when": 1792880025209,
       "tag": "0006_screen_layout",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792886026253,
+      "tag": "0007_screen_display",
+      "breakpoints": true
     }
   ]
 }
