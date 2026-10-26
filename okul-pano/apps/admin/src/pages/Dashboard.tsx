@@ -10,6 +10,7 @@ import { useAuth } from '../lib/auth.tsx';
 import { useList, useSchoolPath, type Announcement, type Screen } from '../lib/data.ts';
 import { timeAgo } from '../lib/format.ts';
 import { TodaySummary } from './dashboard/Today.tsx';
+import { ActiveBoardNotices } from './dashboard/ActiveBoardNotices.tsx';
 
 interface Stats {
   activeAnnouncements: number;
@@ -132,6 +133,8 @@ export function Dashboard() {
         <Stat icon={<Users className="size-5" />} label="Öğretmen" value={s?.teachers ?? '—'} to="/ogretmenler" />
         <Stat icon={<Cake className="size-5" />} label="Öğrenci" value={s?.students ?? '—'} to="/ogrenciler" />
       </div>
+
+      <ActiveBoardNotices />
 
       <PendingApprovals />
 
