@@ -1,7 +1,7 @@
 import { BOARD_MODULES } from './layout.ts';
 import { DESIGN_PALETTE_IDS, DESIGN_TEMPLATE_IDS } from './designs.ts';
 import { EMERGENCY_TYPES } from './emergency.ts';
-import { DAY_MODES, FLASH_STYLES, FLASH_TONES, SCREEN_COMMANDS } from './control.ts';
+import { SCREEN_COMMANDS } from './control.ts';
 import { z } from 'zod';
 import { validatePeriods } from './bell.ts';
 import { PERMISSION_KEYS } from './permissions.ts';
@@ -518,38 +518,7 @@ export const emergencySchema = z.object({
 });
 export type EmergencyInput = z.infer<typeof emergencySchema>;
 
-/* ---------- Uzaktan yönetim: anlık mesaj, günün modu, komutlar ---------- */
-
-/** Panoya anlık mesaj: onaya takılmaz, `endsAt` gelince kendiliğinden kalkar */
-export const flashSchema = z
-  .object({
-    text: required('Mesaj', 200, 2),
-    style: z.enum(FLASH_STYLES).default('banner'),
-    tone: z.enum(FLASH_TONES).default('info'),
-    /** Boşsa bütün panolarda */
-    screenIds: z.array(id).max(50).nullable().optional(),
-    endsAt: isoDateTime,
-  })
-  .refine((v) => Date.parse(v.endsAt) > Date.now(), { path: ['endsAt'], message: 'Bitiş zamanı gelecekte olmalı' })
-  .refine((v) => Date.parse(v.endsAt) - Date.now() <= 7 * 86400_000, { path: ['endsAt'], message: 'Anlık mesaj en fazla 7 gün sürebilir' });
-
-/** Günün modu: kayıt yalnızca o tarih için geçerlidir */
-export const dayPlanSchema = z.object({
-  date: isoDate.optional(),
-  mode: z.enum(DAY_MODES),
-  lessonMin: z.number().int().min(10).max(60).nullable().optional(),
-  note: optionalText(80),
-});
-
-/** Zil kaydırma: şu andan sonraki zil saatleri ileri ya da geri kayar */
-export const bellShiftSchema = z.object({
-  minutes: z
-    .number()
-    .int()
-    .min(-30)
-    .max(60)
-    .refine((m) => m !== 0, 'Kaydırma 0 dakika olamaz'),
-});
+/* ---------- Uzaktan komutlar ---------- */
 
 export const screenCommandSchema = z.object({ command: z.enum(SCREEN_COMMANDS) });
 

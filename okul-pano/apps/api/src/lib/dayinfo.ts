@@ -1,7 +1,7 @@
-import { trCompare, type DayPlan } from '@okulpano/shared';
+import { trCompare } from '@okulpano/shared';
 import { and, asc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import type { DB } from '../db/client.ts';
-import { dayPlans, duties, dutySubstitutions, dutySupervisors, teacherLeaves, teachers } from '../db/schema.ts';
+import { duties, dutySubstitutions, dutySupervisors, teacherLeaves, teachers } from '../db/schema.ts';
 import { holidaysInRange } from '../routes/holidays.ts';
 
 /** ISO hafta günü (1 = Pazartesi) */
@@ -17,25 +17,10 @@ export function dutyMonthSql(schoolId: string, month: string) {
 /** Arife günleri yarım gündür: panoda ve nöbette tatil sayılmaz */
 const realHoliday = (h: { source: 'official' | 'school'; name: string }) => !(h.source === 'official' && h.name.endsWith('Arifesi'));
 
-export function toDayPlan(row: typeof dayPlans.$inferSelect): DayPlan {
-  return { date: row.date, mode: row.mode, lessonMin: row.lessonMin, shifts: row.shifts ?? [], note: row.note };
-}
-
-export async function dayPlansInRange(db: DB, schoolId: string, from: string, to: string): Promise<DayPlan[]> {
-  const rows = await db
-    .select()
-    .from(dayPlans)
-    .where(and(eq(dayPlans.schoolId, schoolId), gte(dayPlans.date, from), lte(dayPlans.date, to)))
-    .orderBy(asc(dayPlans.date));
-  return rows.map(toDayPlan);
-}
-
-/** Tatiller: resmi / okulun tatilleri + "Okul tatil" yapılan günler (kar tatili vb.) */
+/** Tatiller: resmi / dini tatiller ve okulun eklediği tatiller (arife yarım gün, sayılmaz) */
 export async function effectiveHolidays(db: DB, schoolId: string, from: string, to: string) {
-  const [list, plans] = await Promise.all([holidaysInRange(db, schoolId, from, to), dayPlansInRange(db, schoolId, from, to)]);
-  const out = new Map(list.filter(realHoliday).map((h) => [h.date, h.name]));
-  for (const p of plans) if (p.mode === 'holiday') out.set(p.date, p.note?.trim() || 'Okul tatil');
-  return [...out].map(([date, name]) => ({ date, name })).sort((a, b) => a.date.localeCompare(b.date));
+  const list = await holidaysInRange(db, schoolId, from, to);
+  return list.filter(realHoliday).map((h) => ({ date: h.date, name: h.name }));
 }
 
 export interface DutyDayEntry {

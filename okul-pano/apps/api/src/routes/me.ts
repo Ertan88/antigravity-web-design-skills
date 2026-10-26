@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { accessUser, audit, schoolGuard } from '../context.ts';
 import { bellSchedules, classGroups, pushTokens, teacherLeaves, teachers, timetableEntries } from '../db/schema.ts';
-import { addDays, dayPlansInRange, dutyDay, effectiveHolidays } from '../lib/dayinfo.ts';
+import { addDays, dutyDay, effectiveHolidays } from '../lib/dayinfo.ts';
 import { badRequest, parse } from '../lib/errors.ts';
 import { notifyUsers, usersWithPermission } from '../lib/push.ts';
 
@@ -27,9 +27,8 @@ export async function meRoutes(app: FastifyInstance) {
       : [];
     const dates = Array.from({ length: 8 }, (_, i) => addDays(today, i));
 
-    const [bells, plans, holidays, lessons, leaves, days] = await Promise.all([
+    const [bells, holidays, lessons, leaves, days] = await Promise.all([
       db.select().from(bellSchedules).where(eq(bellSchedules.schoolId, schoolId)).orderBy(asc(bellSchedules.sortOrder)),
-      dayPlansInRange(db, schoolId, today, until),
       effectiveHolidays(db, schoolId, today, until),
       teacher
         ? db
@@ -80,7 +79,6 @@ export async function meRoutes(app: FastifyInstance) {
       timezone: school.timezone,
       lunchThresholdMin: settings.lunchThresholdMin,
       bellSchedules: bells.map((b) => ({ id: b.id, name: b.name, weekdays: b.weekdays, periods: b.periods, sortOrder: b.sortOrder })),
-      dayPlans: plans,
       holidays,
       lessons,
       leaves: leaves.map((l) => ({ id: l.id, startDate: l.startDate, endDate: l.endDate, note: l.note, status: l.approvalStatus })),

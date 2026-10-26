@@ -99,6 +99,13 @@
       "when": 1793100000000,
       "tag": "0013_hide_empty_cards",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793200000000,
+      "tag": "0014_remove_flash_day_plans",
+      "breakpoints": true
     }
   ]
 }

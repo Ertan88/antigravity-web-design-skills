@@ -1,4 +1,4 @@
-import type { AnnouncementDesign, BellShift, BoardLayout, DayMode, EmergencyType, FlashStyle, FlashTone, Period, SchoolSettings, ScreenDisplay } from '@okulpano/shared';
+import type { AnnouncementDesign, BoardLayout, EmergencyType, Period, SchoolSettings, ScreenDisplay } from '@okulpano/shared';
 import { sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
@@ -445,43 +445,6 @@ export const screens = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [index('screens_school_idx').on(t.schoolId)],
-);
-
-/** Panoya anlık mesaj: onaya takılmaz, bitiş zamanı gelince kendiliğinden kalkar */
-export const flashMessages = pgTable(
-  'flash_messages',
-  {
-    id: pk(),
-    schoolId: schoolId(),
-    text: text('text').notNull(),
-    style: text('style').$type<FlashStyle>().notNull().default('banner'),
-    tone: text('tone').$type<FlashTone>().notNull().default('info'),
-    /** Yalnızca bu panolarda (boşsa bütün panolarda) */
-    screenIds: jsonb('screen_ids').$type<string[]>(),
-    startsAt: timestamp('starts_at', { withTimezone: true }).notNull().defaultNow(),
-    endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
-    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
-    createdAt: createdAt(),
-  },
-  (t) => [index('flash_messages_school_idx').on(t.schoolId, t.endsAt)],
-);
-
-/** Günün modu (kısaltılmış gün, sınav, tören, tatil) ve zil kaydırmaları: yalnızca o tarih için */
-export const dayPlans = pgTable(
-  'day_plans',
-  {
-    id: pk(),
-    schoolId: schoolId(),
-    date: date('date', { mode: 'string' }).notNull(),
-    mode: text('mode').$type<DayMode>().notNull().default('normal'),
-    lessonMin: integer('lesson_min'),
-    shifts: jsonb('shifts').$type<BellShift[]>().notNull().default(sql`'[]'::jsonb`),
-    note: text('note'),
-    updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
-  },
-  (t) => [uniqueIndex('day_plans_school_date_uq').on(t.schoolId, t.date)],
 );
 
 const bytea = customType<{ data: Buffer; driverData: Buffer | Uint8Array }>({

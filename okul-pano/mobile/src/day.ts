@@ -1,5 +1,4 @@
-import { computeBellStatus, periodLabel, pickSchedule, type BellStatus, type Period } from '@okulpano/shared/bell';
-import { applyDayPlan, dayPlanFor } from '@okulpano/shared/control';
+import { computeBellStatus, periodLabel, pickSchedule, sortPeriods, type BellStatus, type Period } from '@okulpano/shared/bell';
 import { zonedParts, type ZonedParts } from '@okulpano/shared/time';
 import type { MeToday } from './data.ts';
 
@@ -15,12 +14,12 @@ export interface TeacherDay {
   lessons: { period: Period; className: string; subject: string; state: 'past' | 'now' | 'next' | 'later' }[];
 }
 
-/** Öğretmenin bugünü: günün modu ve zil kaydırmaları uygulanmış zil durumu ve dersleri (panoyla aynı hesap) */
+/** Öğretmenin bugünü: zil durumu ve dersleri (panoyla aynı hesap) */
 export function teacherDay(data: MeToday, date: Date): TeacherDay {
   const now = zonedParts(date, data.timezone);
   const holiday = data.holidays.find((h) => h.date === now.isoDate)?.name ?? null;
   const schedule = pickSchedule(data.bellSchedules, now.weekday);
-  const periods = schedule && !holiday ? applyDayPlan(schedule.periods, dayPlanFor(data.dayPlans, now.isoDate)) : [];
+  const periods = schedule && !holiday ? sortPeriods(schedule.periods) : [];
   const bell: BellStatus = periods.length ? computeBellStatus(periods, now.secondsOfDay, data.lunchThresholdMin) : { kind: 'off' };
   const currentNo = bell.kind === 'lesson' ? bell.period.no : null;
   const nextNo = bell.kind === 'lesson' ? (bell.next?.no ?? null) : bell.kind === 'break' || bell.kind === 'before' ? bell.next.no : null;

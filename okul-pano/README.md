@@ -47,9 +47,7 @@ Expo (React Native) ile yazılmış tek uygulama; ekranlar kişinin yetkisine g�
 | **Bugün:** şu anki ders, teneffüse kalan süre, bugünkü nöbeti ve ders programı | **Kontrol merkezi:** çevrimiçi pano, onay bekleyen, yayındaki içerik; boş nöbet, kapalı pano gibi ilgilenilmesi gerekenler |
 | **Nöbetlerim:** haftalık şerit (tatiller soluk), birlikte nöbet tutanlar, nöbet günü sabah hatırlatma | **Onaylar:** duyuru ve izin bildirimleri tek dokunuşla onay / geri gönder |
 | **Hızlı duyuru:** hazır şablon ya da telefonla çekilen fotoğraf, canlı önizleme, onaya gönderme | **Pano uzaktan kumanda:** canlı önizleme, sonraki / önceki / bu içerikte durdur, ekran modu, uyut / uyandır |
-| **İzin bildirimi:** onaylanınca panoda izinli görünür | **Panoya hemen yaz:** onaya takılmayan, süresi bitince kalkan mesaj (üst şerit, tam ekran, kayan yazı) |
-| | **Bugünün modu:** kısaltılmış gün, sınav, tören, okul tatil; zili ±dakika kaydırma. Yarın kendiliğinden normale döner |
-| | **Boş nöbet:** izinli öğretmenin nöbeti için öneriler (o gün nöbeti olmayan, bu ay en az nöbet tutan); "Ata" ile bildirim gider |
+| **İzin bildirimi:** onaylanınca panoda izinli görünür | **Boş nöbet:** izinli öğretmenin nöbeti için öneriler (o gün nöbeti olmayan, bu ay en az nöbet tutan); "Ata" ile bildirim gider |
 | | **Acil durum:** 3 saniye basılı tutunca bütün panolarda uyarı ve herkesin telefonuna bildirim |
 
 Telefon bildirimleri (Expo push): onaya düşen duyuru ve izin, onay sonucu, acil durum, nöbet görevlendirmesi, 10 dakikadır kapalı pano. Aynı uygulamanın web sürümü sunucunun `/app/` adresinden açılır; uygulama kurmayan öğretmenler tarayıcıdan kullanır.
@@ -143,6 +141,6 @@ Panel `https://alanadiniz/admin/`, pano `https://alanadiniz/display/`, mobil uyg
 
 ## Yol haritası
 
-1. **Bu sürüm:** pano, yönetim paneli, yetkiler, ekran eşleştirme, canlı güncelleme, onay akışı, acil durum, tatil takvimi, panoya özel içerik, mobil uygulama (öğretmen + yönetici), uzaktan kumanda, günün modu, nöbet yerine görevlendirme, telefon bildirimleri.
+1. **Bu sürüm:** pano, yönetim paneli, yetkiler, ekran eşleştirme, canlı güncelleme, onay akışı, acil durum, tatil takvimi, panoya özel içerik, mobil uygulama (öğretmen + yönetici), uzaktan kumanda, nöbet yerine görevlendirme, telefon bildirimleri.
 2. **Sıradaki:** nöbet değişimi isteği (öğretmenler arası), telefon ana ekranı bileşeni ("Teneffüse 12 dk · Nöbet: Bahçe"), veli / öğrenci için salt okunur sürüm.
 3. **Abonelik:** iyzico/Stripe ile ödeme, paket limitlerinin otomatik uygulanması, okulların kendi kendine kaydı.

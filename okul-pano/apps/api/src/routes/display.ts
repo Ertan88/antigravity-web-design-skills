@@ -24,7 +24,6 @@ import {
   duties,
   dutySubstitutions,
   dutySupervisors,
-  flashMessages,
   exams,
   schools,
   screens,
@@ -37,7 +36,6 @@ import {
 } from '../db/schema.ts';
 import { pairingCode, randomToken, sha256 } from '../lib/crypto.ts';
 import { forbidden, notFound, parse, unauthorized } from '../lib/errors.ts';
-import { dayPlansInRange } from '../lib/dayinfo.ts';
 import { feedTitlesNow } from '../lib/rss.ts';
 import { getWeather } from '../lib/weather.ts';
 import { holidaysInRange } from './holidays.ts';
@@ -114,7 +112,7 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
   const monthAheadDate = zonedParts(new Date(now.getTime() + 30 * 86400_000), tz).isoDate;
   const settingsEarly = schoolSettingsSchema.parse(school.settings ?? {});
 
-  const [examRows, dutyRows, holidayRows, supervisorRows, transportRows, leaveRows, birthdayRows, annRows, tickerRows, bellRows, ttRows, achievementRows, eventRows, bookRows, rssRows, flashRows, planRows, subRows] = await Promise.all([
+  const [examRows, dutyRows, holidayRows, supervisorRows, transportRows, leaveRows, birthdayRows, annRows, tickerRows, bellRows, ttRows, achievementRows, eventRows, bookRows, rssRows, subRows] = await Promise.all([
     db
       .select({ id: exams.id, title: exams.title, examAt: exams.examAt })
       .from(exams)
@@ -231,13 +229,6 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
       ),
     ),
     db
-      .select()
-      .from(flashMessages)
-      .where(and(eq(flashMessages.schoolId, id), gt(flashMessages.endsAt, now), lte(flashMessages.startsAt, weekAhead)))
-      .orderBy(desc(flashMessages.createdAt))
-      .limit(10),
-    dayPlansInRange(db, id, today, weekAheadDate),
-    db
       .select({ date: dutySubstitutions.date, dutyId: dutySubstitutions.dutyId, teacherName: teachers.fullName })
       .from(dutySubstitutions)
       .innerJoin(teachers, eq(teachers.id, dutySubstitutions.teacherId))
@@ -246,11 +237,10 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
 
   const iso = (d: Date | null) => (d ? d.toISOString() : null);
   const settings = schoolSettingsSchema.parse(school.settings ?? {});
-  // Arife günleri yarım gündür (sabah ders var): panoda tatil sayılmaz. "Okul tatil" yapılan günler (kar tatili…) tatildir.
+  // Arife günleri yarım gündür (sabah ders var): panoda tatil sayılmaz
   const holidays = new Map(
     holidayRows.filter((h) => !(h.source === 'official' && h.name.endsWith('Arifesi'))).map((h) => [h.date, h.name] as const),
   );
-  for (const p of planRows) if (p.mode === 'holiday') holidays.set(p.date, p.note?.trim() || 'Okul tatil');
 
   return {
     serverTime: now.toISOString(),
@@ -308,10 +298,6 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
     events: eventRows.map((e) => ({ id: e.id, title: e.title, organizer: e.organizer, date: e.date, time: e.time, place: e.place })),
     books: bookRows.map((b) => ({ id: b.id, title: b.title, author: b.author, coverUrl: b.coverUrl, note: b.note, startsAt: iso(b.startsAt), endsAt: iso(b.endsAt) })),
     rss: rssRows,
-    flash: flashRows
-      .filter((f) => !f.screenIds?.length || !auth.screen || f.screenIds.includes(auth.screen.id))
-      .map((f) => ({ id: f.id, text: f.text, style: f.style, tone: f.tone, startsAt: f.startsAt.toISOString(), endsAt: f.endsAt.toISOString() })),
-    dayPlans: planRows,
     dutySubstitutions: subRows,
   };
 }

@@ -1,10 +1,9 @@
 import {
-  applyDayPlan,
   computeBellStatus,
-  dayPlanFor,
   countdown,
   formatPersonName,
   isBirthdayToday,
+  isHalfDayHoliday,
   periodLabel,
   pickSchedule,
   zonedParts,
@@ -101,14 +100,15 @@ export function TodaySummary() {
   const s = st.school.settings;
   const today = zonedParts(now, st.school.timezone);
   const holiday = (st.holidays ?? []).find((h) => h.date === today.isoDate)?.name ?? null;
-  // Panodaki gibi: nöbet yerine görevlendirilen öğretmenin adı, günün modu ve zil kaydırmaları
+  // Panodaki gibi: nöbet yerine görevlendirilen öğretmenin adı
   const subs = new Map((st.dutySubstitutions ?? []).filter((x) => x.date === today.isoDate).map((x) => [x.dutyId, x.teacherName]));
   const duties = st.duties.filter((d) => d.weekday === today.weekday).map((d) => ({ ...d, teacherName: subs.get(d.id) ?? d.teacherName }));
   const supervisor = (st.dutySupervisors ?? []).find((x) => x.date === today.isoDate)?.name ?? null;
   const leaves = st.leaves.filter((l) => l.startDate <= today.isoDate && l.endDate >= today.isoDate);
   const birthdays = st.birthdays.filter((b) => isBirthdayToday(b.monthDay, today));
   const schedule = pickSchedule(st.bellSchedules, today.weekday);
-  const periods = schedule ? applyDayPlan(schedule.periods, dayPlanFor(st.dayPlans, today.isoDate)) : null;
+  // Resmî / dini tatilde zil çalmaz (arife yarım gün)
+  const periods = schedule && !(holiday && !isHalfDayHoliday(holiday)) ? schedule.periods : null;
   const bell = bellText(periods ? computeBellStatus(periods, today.secondsOfDay, s.lunchThresholdMin) : { kind: 'off' });
 
   return (

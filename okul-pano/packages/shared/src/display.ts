@@ -3,7 +3,7 @@ import type { BoardLayout } from './layout.ts';
 import type { AnnouncementDesign } from './designs.ts';
 import type { DisplayEmergency } from './emergency.ts';
 import type { ScreenDisplay } from './screen.ts';
-import type { DayPlan, DisplayFlash, ScreenCommand } from './control.ts';
+import type { ScreenCommand } from './control.ts';
 import type { SchoolSettings } from './schemas.ts';
 
 /**
@@ -52,10 +52,6 @@ export interface DisplayState {
   books?: { id: string; title: string; author: string; coverUrl: string | null; note: string | null; startsAt: string | null; endsAt: string | null }[];
   /** Kayan yazıya eklenen RSS başlıkları (ör. MEB duyuruları) */
   rss?: { source: string; title: string }[];
-  /** Panoya anlık mesajlar (süresi bitince pano kendisi kaldırır) */
-  flash?: DisplayFlash[];
-  /** Günün modu ve zil kaydırmaları (bugünden itibaren bir hafta) */
-  dayPlans?: DayPlan[];
   /** Nöbet yerine görevlendirme: o tarihte nöbeti başka öğretmen tutar */
   dutySubstitutions?: { date: string; dutyId: string; teacherName: string }[];
 }

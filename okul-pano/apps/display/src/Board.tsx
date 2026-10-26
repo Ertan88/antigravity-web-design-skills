@@ -1,10 +1,7 @@
 import {
   achievementDesign,
   announcementOnAir,
-  applyDayPlan,
   isHalfDayHoliday,
-  dayPlanFor,
-  dayPlanLabel,
   isSleepTime,
   quoteOfDay,
   SPECIAL_THEMES,
@@ -28,7 +25,7 @@ import type { DisplayAuth } from './api.ts';
 import { EmergencyScreen } from './components/Emergency.tsx';
 import { GroupCard } from './components/GroupCard.tsx';
 import { Header } from './components/Header.tsx';
-import { ClockScreen, FlashBanner, FlashFullscreen } from './components/Remote.tsx';
+import { ClockScreen } from './components/Remote.tsx';
 import { SpecialMark } from './components/SpecialMark.tsx';
 import { BookIcon, CakeIcon, CalendarIcon, CapIcon, LibraryIcon, MonitorIcon, ShieldIcon, TrophyIcon, UserMinusIcon, WifiOffIcon } from './components/Icons.tsx';
 import { AchievementsCard, BookCard, EventsCard } from './components/LifeCards.tsx';
@@ -91,11 +88,9 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
   const birthdays = state.birthdays.filter((b) => isBirthdayToday(b.monthDay, today));
 
   const schedule = pickSchedule(state.bellSchedules, today.weekday);
-  // Günün modu (kısaltılmış gün) ve zil kaydırmaları zil saatlerini değiştirir
-  const dayPlan = dayPlanFor(state.dayPlans, today.isoDate);
   // Resmî / dini tatilde (arife yarım gün hariç) zil ve dersler çalışmaz
   const fullHoliday = (state.holidays ?? []).some((h) => h.date === today.isoDate && !isHalfDayHoliday(h.name));
-  const periods = schedule && !fullHoliday ? applyDayPlan(schedule.periods, dayPlan) : null;
+  const periods = schedule && !fullHoliday ? schedule.periods : null;
   const bell = periods ? computeBellStatus(periods, today.secondsOfDay, s.lunchThresholdMin) : ({ kind: 'off' } as const);
   const lessonPeriod = bell.kind === 'lesson' ? bell.period : bell.kind === 'break' || bell.kind === 'before' ? bell.next : null;
   const lessons = lessonPeriod
@@ -128,16 +123,10 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
     : [];
   const slides = [...onAir, ...achievementSlides];
 
-  // Panoya anlık mesaj: süresi dolanlar pano tarafında da hemen kalkar
-  const flashNow = (state.flash ?? []).filter((f) => isWithinWindow(nowMs, f.startsAt, f.endsAt));
-  const flashFull = flashNow.find((f) => f.style === 'fullscreen') ?? null;
-  const flashBanners = flashNow.filter((f) => f.style === 'banner');
-
   // Kayan yazı: okulun metinleri + hava durumu uyarısı, bugün tarihte, günün sözü, RSS başlıkları
   const quote = quoteOfDay(today.isoDate);
   const ticker: TickerEntry[] = [
     ...(s.tickerWeatherAlerts ? (weather?.alerts ?? []).map((a) => ({ kind: 'weather' as const, tag: 'Hava uyarısı', text: a.text })) : []),
-    ...flashNow.filter((f) => f.style === 'ticker').map((f) => ({ kind: 'flash' as const, tag: 'Duyuru', text: f.text })),
     ...state.ticker.filter((t) => isWithinWindow(nowMs, t.startsAt, t.endsAt)).map((t) => t.text),
     ...(s.tickerHistory ? todayInHistory(today.monthDay).map((x) => ({ kind: 'history' as const, tag: 'Bugün tarihte', text: x })) : []),
     ...(s.tickerQuote ? [{ kind: 'quote' as const, tag: 'Günün sözü', text: `“${quote.text}” — ${quote.by}` }] : []),
@@ -244,11 +233,8 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         return true;
     }
   };
-  // Sınav gününde sınav sayacı bulunduğu sütunun en üstüne çıkar
-  const examFirst = (items: LayoutItem[]) =>
-    dayPlan?.mode === 'exam' ? [...items].sort((a, b) => Number([b].flat().includes('exams')) - Number([a].flat().includes('exams'))) : items;
-  const leftCards = examFirst(layout.left).map(renderItem).filter(Boolean);
-  const rightCards = examFirst(layout.right).map(renderItem).filter(Boolean);
+  const leftCards = layout.left.map(renderItem).filter(Boolean);
+  const rightCards = layout.right.map(renderItem).filter(Boolean);
 
   const mourning = today.monthDay === '11-10';
   const silenceMinute = mourning && today.hour === 9 && (today.minute === 5 || today.minute === 6);
@@ -338,11 +324,9 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
     />
   );
   const time = new Intl.DateTimeFormat('tr-TR', { hour: '2-digit', minute: '2-digit', timeZone: school.timezone }).format(now);
-  const dayLabel = dayPlanLabel(dayPlan);
   const overlays = (
     <>
       {remote.paused && <div className="paused-badge">Duraklatıldı</div>}
-      {flashFull && <FlashFullscreen flash={flashFull} time={time} />}
       {sleeping && <div className="sleep-dim" />}
       {identifying && (
         <div className="identify">
@@ -359,8 +343,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
     return (
       <Stage className={`${classes} mode-clock`} style={themeVars} width={stageW} height={stageH}>
         {reporter}
-        <ClockScreen now={now} timezone={school.timezone} bell={bell} schoolName={school.name} schoolType={s.schoolType} logoUrl={school.logoUrl} dayLabel={dayLabel} />
-        <FlashBanner items={flashBanners} />
+        <ClockScreen now={now} timezone={school.timezone} bell={bell} schoolName={school.name} schoolType={s.schoolType} logoUrl={school.logoUrl} />
         {overlays}
       </Stage>
     );
@@ -373,7 +356,6 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         {reporter}
         {slideshow(true)}
         <div className="corner-clock">{time}</div>
-        <FlashBanner items={flashBanners} />
         {overlays}
       </Stage>
     );
@@ -395,7 +377,6 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         specialId={special?.id}
         showWeatherAlert={s.showWeatherAlert}
       />
-      <FlashBanner items={flashBanners} day={[dayLabel, dayPlan?.note].filter(Boolean).join(' · ') || null} />
       {special && <SpecialMark id={special.id} className="special-mark-bg" />}
 
       <main className="body">

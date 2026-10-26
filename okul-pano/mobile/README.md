@@ -65,8 +65,6 @@ Notlar:
 app/                 Ekranlar (expo-router: dosya adı = adres)
   (tabs)/            Alt menü: index (Bugün / Merkez), nobet, onaylar, duyurular, panolar, acil, profil
   pano/[id].tsx      Pano uzaktan kumanda
-  anlik-mesaj.tsx    Panoya hemen yaz
-  gun-modu.tsx       Bugünün modu ve zil kaydırma
   yayin-akisi.tsx    Yayın akışı
   duyuru-yeni.tsx    Hızlı duyuru (şablon / fotoğraf)
   izin.tsx           İzin bildirimi
@@ -74,5 +72,5 @@ app/                 Ekranlar (expo-router: dosya adı = adres)
 src/                 Oturum, API, veri sorguları, ortak bileşenler
 ```
 
-Zil hesabı, günün modu, şablonlar ve tipler `../packages/shared` paketinden olduğu gibi kullanılır (pano ve panelle
+Zil hesabı, şablonlar ve tipler `../packages/shared` paketinden olduğu gibi kullanılır (pano ve panelle
 aynı kod). Bu klasörün bağımlılıkları ayrıdır; ana `npm install` mobil paketleri kurmaz.

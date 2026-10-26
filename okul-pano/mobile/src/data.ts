@@ -1,5 +1,5 @@
 import type { BellScheduleLike } from '@okulpano/shared/bell';
-import type { DayPlan, FlashStyle, FlashTone, ScreenLiveStatus } from '@okulpano/shared/control';
+import type { ScreenLiveStatus } from '@okulpano/shared/control';
 import type { AnnouncementDesign } from '@okulpano/shared/designs';
 import type { EmergencyType } from '@okulpano/shared/emergency';
 import { useQuery } from '@tanstack/react-query';
@@ -23,7 +23,6 @@ export interface MeToday {
   timezone: string;
   lunchThresholdMin: number;
   bellSchedules: BellScheduleLike[];
-  dayPlans: DayPlan[];
   holidays: { date: string; name: string }[];
   lessons: { weekday: number; periodNo: number; className: string; subject: string }[];
   leaves: { id: string; startDate: string; endDate: string; note: string | null; status: 'approved' | 'pending' | 'rejected' }[];
@@ -39,25 +38,12 @@ export interface MeToday {
 export interface ControlCenter {
   today: string;
   emergency: { type: EmergencyType; message: string | null; startedAt: string; startedBy: string | null } | null;
-  dayPlan: DayPlan;
   screens: { total: number; online: number; offline: { id: string; name: string; lastSeenAt: string | null }[] };
   pending: { announcements: number; leaves: number };
   onAir: number;
   endingToday: { id: string; title: string; endsAt: string }[];
   dutyGaps: { dutyId: string; area: string; teacherName: string }[];
   holiday: string | null;
-  flash: Flash[];
-}
-
-export interface Flash {
-  id: string;
-  text: string;
-  style: FlashStyle;
-  tone: FlashTone;
-  screenIds: string[] | null;
-  startsAt: string;
-  endsAt: string;
-  createdByName?: string | null;
 }
 
 export interface Screen {
@@ -145,8 +131,6 @@ export const useSchoolInfo = () => useSchoolQuery<SchoolInfo>('');
 export const useMeToday = () => useSchoolQuery<MeToday>('me/today', { refetchInterval: 5 * 60_000 });
 export const useControlCenter = (enabled = true) => useSchoolQuery<ControlCenter>('control-center', { refetchInterval: 30_000, enabled });
 export const useScreens = (fast = false) => useSchoolQuery<Screen[]>('screens', { refetchInterval: fast ? 3000 : 30_000 });
-export const useFlash = () => useSchoolQuery<{ active: Flash[]; presets: string[] }>('flash', { refetchInterval: 30_000 });
-export const useDayPlan = () => useSchoolQuery<DayPlan>('day-plan');
 export const useAnnouncements = () => useSchoolQuery<Announcement[]>('announcements', { refetchInterval: 60_000 });
 export const useLeaves = (enabled = true) => useSchoolQuery<Leave[]>('leaves', { enabled });
 export const useMyLeaves = () => useSchoolQuery<Leave[]>('me/leaves');

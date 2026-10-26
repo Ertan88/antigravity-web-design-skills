@@ -76,61 +76,6 @@ afterAll(async () => {
 const pushesTo = (token: string) => sentPushes.filter((p) => p.to.includes(token)).map((p) => p.message.title);
 const flushPushes = () => new Promise((r) => setTimeout(r, 30));
 
-describe('panoya anlık mesaj', () => {
-  it('yayınlanır, panoda görünür ve kaldırılabilir', async () => {
-    const endsAt = new Date(Date.now() + 30 * 60_000).toISOString();
-    const res = await owner.post(path('flash'), { text: '10-B konferans salonuna', style: 'banner', endsAt });
-    expectStatus(res, 201);
-    const flash = (await state()).flash as { id: string; text: string; style: string }[];
-    expect(flash.map((f) => f.text)).toEqual(['10-B konferans salonuna']);
-
-    const list = (await owner.get(path('flash'))).json();
-    expect(list.active).toHaveLength(1);
-    expect(list.presets).toContain('10-B konferans salonuna');
-
-    expectStatus(await owner.del(path(`flash/${res.json().id}`)), 204);
-    expect((await state()).flash).toEqual([]);
-    // Geçmişteki metin hazır mesaj olarak kalır
-    expect((await owner.get(path('flash'))).json().presets).toContain('10-B konferans salonuna');
-  });
-
-  it('geçmiş bir bitiş zamanı ve yetkisiz kullanıcı reddedilir', async () => {
-    expectStatus(await owner.post(path('flash'), { text: 'Eski', endsAt: new Date(Date.now() - 1000).toISOString() }), 400);
-    expectStatus(await plain.post(path('flash'), { text: 'Yetkisiz', endsAt: new Date(Date.now() + 60_000).toISOString() }), 403);
-  });
-});
-
-describe('günün modu ve zil kaydırma', () => {
-  it('kısaltılmış gün ve zil kaydırma panoya gider, normale dönülebilir', async () => {
-    const put = await owner.put(path('day-plan'), { mode: 'short', lessonMin: 30, note: 'Veli toplantısı' });
-    expectStatus(put, 200);
-    expect(put.json()).toMatchObject({ date: today.isoDate, mode: 'short', lessonMin: 30 });
-
-    const shift = await owner.post(path('day-plan/shift'), { minutes: 10 });
-    expectStatus(shift, 200);
-    expect(shift.json().shifts).toHaveLength(1);
-    expect(shift.json().mode).toBe('short');
-
-    const plans = (await state()).dayPlans as { date: string; mode: string; shifts: unknown[] }[];
-    expect(plans.find((p) => p.date === today.isoDate)).toMatchObject({ mode: 'short' });
-
-    expectStatus(await owner.del(path('day-plan')), 200);
-    expect((await owner.get(path('day-plan'))).json()).toMatchObject({ mode: 'normal', shifts: [] });
-  });
-
-  it('okul tatil yapılınca pano o günü tatil sayar', async () => {
-    const tomorrow = new Date(Date.parse(`${today.isoDate}T12:00:00Z`) + 86400_000).toISOString().slice(0, 10);
-    expectStatus(await owner.put(path('day-plan'), { date: tomorrow, mode: 'holiday', note: 'Kar tatili' }), 200);
-    expect((await state()).holidays).toContainEqual({ date: tomorrow, name: 'Kar tatili' });
-    expectStatus(await owner.del(path(`day-plan?date=${tomorrow}`)), 200);
-  });
-
-  it('zil kaydırma 0 dakika olamaz, yetki gerekir', async () => {
-    expectStatus(await owner.post(path('day-plan/shift'), { minutes: 0 }), 400);
-    expectStatus(await plain.post(path('day-plan/shift'), { minutes: 5 }), 403);
-  });
-});
-
 describe.skipIf(holidayToday)('izin bildirimi ve boş nöbet', () => {
   let leaveId = '';
 

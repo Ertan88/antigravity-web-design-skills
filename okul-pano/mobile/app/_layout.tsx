@@ -47,7 +47,6 @@ function Gate() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="login" />
       <Stack.Screen name="duyuru-yeni" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="anlik-mesaj" options={{ presentation: 'modal' }} />
       <Stack.Screen name="izin" options={{ presentation: 'modal' }} />
     </Stack>
   );

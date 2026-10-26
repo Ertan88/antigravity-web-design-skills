@@ -1,33 +1,6 @@
-import { formatDuration, splitSchoolName, type BellStatus, type DisplayFlash } from '@okulpano/shared/client';
+import { formatDuration, splitSchoolName, type BellStatus } from '@okulpano/shared/client';
 import { describeBell } from './RightColumn.tsx';
 import { AlertIcon, MegaphoneIcon, SchoolIcon } from './Icons.tsx';
-
-/** Panoya anlık mesaj: üst şerit (gövdenin üstünde). Günün modu (kısaltılmış gün, sınav, zil kaydırma) da burada ince bir satırdır. */
-export function FlashBanner({ items, day = null }: { items: DisplayFlash[]; day?: string | null }) {
-  if (!items.length && !day) return null;
-  return (
-    <div className="flash-banner-stack" role="status">
-      {day && <div className="day-strip">{day}</div>}
-      {items.map((f) => (
-        <div key={f.id} className={`flash-banner tone-${f.tone}`}>
-          {f.tone === 'warning' ? <AlertIcon size={34} /> : <MegaphoneIcon size={34} />}
-          <span>{f.text}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/** Panoya anlık mesaj: tam ekran (en yenisi); okul adı ve saat köşede */
-export function FlashFullscreen({ flash, time }: { flash: DisplayFlash; time: string }) {
-  return (
-    <div className={`flash-full tone-${flash.tone}`} role="alert">
-      <div className="flash-full-icon">{flash.tone === 'warning' ? <AlertIcon size={120} /> : <MegaphoneIcon size={120} />}</div>
-      <div className="flash-full-text">{flash.text}</div>
-      <div className="flash-full-time">{time}</div>
-    </div>
-  );
-}
 
 /** Tam ekran saat modu: büyük saat, tarih, zil durumu ve okul */
 export function ClockScreen({
@@ -37,7 +10,6 @@ export function ClockScreen({
   schoolName,
   schoolType,
   logoUrl,
-  dayLabel,
 }: {
   now: Date;
   timezone: string;
@@ -45,7 +17,6 @@ export function ClockScreen({
   schoolName: string;
   schoolType?: string;
   logoUrl: string | null;
-  dayLabel: string | null;
 }) {
   const title = splitSchoolName(schoolName, schoolType);
   const time = new Intl.DateTimeFormat('tr-TR', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: timezone }).format(now);
@@ -70,7 +41,6 @@ export function ClockScreen({
           </span>
         )}
       </div>
-      {dayLabel && <div className="clock-screen-day">{dayLabel}</div>}
     </div>
   );
 }

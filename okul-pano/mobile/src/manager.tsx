@@ -1,5 +1,4 @@
 import { EMERGENCY_INFO } from '@okulpano/shared/emergency';
-import { dayPlanLabel } from '@okulpano/shared/control';
 import { router } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 import { useAuth } from './auth.tsx';
@@ -50,7 +49,6 @@ export function ManagerHome() {
   const center = useControlCenter();
   const me = useMeToday();
   const c = center.data;
-  const dayLabel = c ? dayPlanLabel(c.dayPlan) : null;
 
   const attention = c
     ? [
@@ -101,9 +99,7 @@ export function ManagerHome() {
     : [];
 
   const actions = [
-    can('board.control') && { label: 'Panoya hemen yaz', to: '/anlik-mesaj', primary: true },
-    can('schedule.manage') && { label: 'Bugünün modu', to: '/gun-modu' },
-    can('announcements.manage') && { label: 'Duyuru ekle', to: '/duyuru-yeni' },
+    can('announcements.manage') && { label: 'Duyuru ekle', to: '/duyuru-yeni', primary: true },
     can('announcements.manage') && { label: 'Yayın akışı', to: '/yayin-akisi' },
   ].filter(Boolean) as { label: string; to: string; primary?: boolean }[];
 
@@ -118,7 +114,7 @@ export function ManagerHome() {
             Kontrol merkezi
           </T>
           <T size={13} color={colors.muted} lines={1}>
-            {c?.holiday ? `Tatil · ${c.holiday}` : (dayLabel ?? 'Normal gün')}
+            {c?.holiday ? `Tatil · ${c.holiday}` : 'Normal gün'}
           </T>
         </View>
         <NotificationsButton />
@@ -133,17 +129,6 @@ export function ManagerHome() {
             <Stat value={c.pending.announcements + c.pending.leaves} label="onay bekliyor" to="/onaylar" />
             <Stat value={c.onAir} label="içerik yayında" to="/yayin-akisi" />
           </View>
-
-          {c.flash.length > 0 && (
-            <Card tone="primary" style={{ gap: 6 }}>
-              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700', opacity: 0.9 }}>PANOLARDA ŞU AN</Text>
-              {c.flash.map((f) => (
-                <Text key={f.id} style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>
-                  {f.text} <Text style={{ fontWeight: '400', opacity: 0.85 }}>· {clock(f.endsAt)}'e kadar</Text>
-                </Text>
-              ))}
-            </Card>
-          )}
 
           <SectionTitle>İlgilenmeniz gerekenler</SectionTitle>
           <Card style={{ paddingVertical: 4 }}>
