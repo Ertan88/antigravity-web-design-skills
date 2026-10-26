@@ -1,9 +1,9 @@
 import { sortPeriods, type Period } from './bell.ts';
 
-/** Panonun ekran biçimi: yatay / dikey (portre) TV, tam pano ya da yalnızca duyurular */
+/** Panonun ekran biçimi: yatay / dikey (portre) TV, tam pano, yalnızca duyurular ya da tam ekran saat */
 export interface ScreenDisplay {
   orientation: 'landscape' | 'portrait';
-  mode: 'board' | 'slides';
+  mode: 'board' | 'slides' | 'clock';
 }
 
 export const DEFAULT_SCREEN_DISPLAY: ScreenDisplay = { orientation: 'landscape', mode: 'board' };
@@ -12,7 +12,7 @@ export const DEFAULT_SCREEN_DISPLAY: ScreenDisplay = { orientation: 'landscape',
 export function resolveScreenDisplay(d: Partial<ScreenDisplay> | null | undefined): ScreenDisplay {
   return {
     orientation: d?.orientation === 'portrait' ? 'portrait' : 'landscape',
-    mode: d?.mode === 'slides' ? 'slides' : 'board',
+    mode: d?.mode === 'slides' || d?.mode === 'clock' ? d.mode : 'board',
   };
 }
 

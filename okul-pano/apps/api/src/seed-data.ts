@@ -140,6 +140,24 @@ export async function seedDemo(
       })),
     )
     .returning();
+  // Mobil uygulama denemesi için öğretmen hesabı: kadrodaki ilk öğretmene bağlı (kendi nöbetleri ve programı)
+  {
+    const email = 'ogretmen@okulpano.local';
+    const password = 'Ogretmen2026!';
+    let [u] = await db.select().from(users).where(eq(users.email, email));
+    if (!u) {
+      [u] = await db
+        .insert(users)
+        .values({ email, fullName: teacherRows[0]!.fullName, passwordHash: await hashPassword(password) })
+        .returning();
+    }
+    await db
+      .insert(memberships)
+      .values({ userId: u!.id, schoolId, role: 'editor', permissions: ['announcements.manage'], teacherId: teacherRows[0]!.id })
+      .onConflictDoNothing();
+    accounts.push({ role: 'Öğretmen (mobil uygulama)', email, password });
+  }
+
   const classRows = await db
     .insert(classGroups)
     .values(CLASSES.map((name, i) => ({ schoolId, name, sortOrder: i })))

@@ -3,6 +3,7 @@ import {
   resolveLayout,
   resolveScreenDisplay,
   schoolSettingsSchema,
+  screenLiveStatusSchema,
   upcomingMonthDays,
   zonedParts,
   type DisplayState,
@@ -21,7 +22,9 @@ import {
   classGroups,
   displayPairings,
   duties,
+  dutySubstitutions,
   dutySupervisors,
+  flashMessages,
   exams,
   schools,
   screens,
@@ -33,7 +36,8 @@ import {
   transportDuties,
 } from '../db/schema.ts';
 import { pairingCode, randomToken, sha256 } from '../lib/crypto.ts';
-import { forbidden, notFound, unauthorized } from '../lib/errors.ts';
+import { forbidden, notFound, parse, unauthorized } from '../lib/errors.ts';
+import { dayPlansInRange } from '../lib/dayinfo.ts';
 import { feedTitlesNow } from '../lib/rss.ts';
 import { getWeather } from '../lib/weather.ts';
 import { holidaysInRange } from './holidays.ts';
@@ -110,7 +114,7 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
   const monthAheadDate = zonedParts(new Date(now.getTime() + 30 * 86400_000), tz).isoDate;
   const settingsEarly = schoolSettingsSchema.parse(school.settings ?? {});
 
-  const [examRows, dutyRows, holidayRows, supervisorRows, transportRows, leaveRows, birthdayRows, annRows, tickerRows, bellRows, ttRows, achievementRows, eventRows, bookRows, rssRows] = await Promise.all([
+  const [examRows, dutyRows, holidayRows, supervisorRows, transportRows, leaveRows, birthdayRows, annRows, tickerRows, bellRows, ttRows, achievementRows, eventRows, bookRows, rssRows, flashRows, planRows, subRows] = await Promise.all([
     db
       .select({ id: exams.id, title: exams.title, examAt: exams.examAt })
       .from(exams)
@@ -148,7 +152,15 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
       .select({ id: teacherLeaves.id, teacherName: teachers.fullName, startDate: teacherLeaves.startDate, endDate: teacherLeaves.endDate })
       .from(teacherLeaves)
       .innerJoin(teachers, eq(teachers.id, teacherLeaves.teacherId))
-      .where(and(eq(teacherLeaves.schoolId, id), gte(teacherLeaves.endDate, today), lte(teacherLeaves.startDate, weekAheadDate)))
+      // Onay bekleyen izin bildirimleri panoda görünmez
+      .where(
+        and(
+          eq(teacherLeaves.schoolId, id),
+          eq(teacherLeaves.approvalStatus, 'approved'),
+          gte(teacherLeaves.endDate, today),
+          lte(teacherLeaves.startDate, weekAheadDate),
+        ),
+      )
       .orderBy(asc(teachers.fullName)),
     db
       .select({
@@ -218,10 +230,27 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
         filterHeadlines(feedTitlesNow(f.url), { audience: f.audience, keywords: f.keywords }).map((title) => ({ source: f.label, title })),
       ),
     ),
+    db
+      .select()
+      .from(flashMessages)
+      .where(and(eq(flashMessages.schoolId, id), gt(flashMessages.endsAt, now), lte(flashMessages.startsAt, weekAhead)))
+      .orderBy(desc(flashMessages.createdAt))
+      .limit(10),
+    dayPlansInRange(db, id, today, weekAheadDate),
+    db
+      .select({ date: dutySubstitutions.date, dutyId: dutySubstitutions.dutyId, teacherName: teachers.fullName })
+      .from(dutySubstitutions)
+      .innerJoin(teachers, eq(teachers.id, dutySubstitutions.teacherId))
+      .where(and(eq(dutySubstitutions.schoolId, id), gte(dutySubstitutions.date, today), lte(dutySubstitutions.date, weekAheadDate))),
   ]);
 
   const iso = (d: Date | null) => (d ? d.toISOString() : null);
   const settings = schoolSettingsSchema.parse(school.settings ?? {});
+  // Arife günleri yarım gündür (sabah ders var): panoda tatil sayılmaz. "Okul tatil" yapılan günler (kar tatili…) tatildir.
+  const holidays = new Map(
+    holidayRows.filter((h) => !(h.source === 'official' && h.name.endsWith('Arifesi'))).map((h) => [h.date, h.name] as const),
+  );
+  for (const p of planRows) if (p.mode === 'holiday') holidays.set(p.date, p.note?.trim() || 'Okul tatil');
 
   return {
     serverTime: now.toISOString(),
@@ -241,12 +270,9 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
     exams: examRows.map((e) => ({ ...e, examAt: e.examAt.toISOString() })),
     duties: dutyRows,
     dutySupervisors: supervisorRows,
-    // Arife günleri yarım gündür (sabah ders var): panoda tatil sayılmaz
-    holidays: holidayRows.filter((h) => !(h.source === 'official' && h.name.endsWith('Arifesi'))).map(({ date, name }) => ({ date, name })),
+    holidays: [...holidays].map(([date, name]) => ({ date, name })).sort((a, b) => a.date.localeCompare(b.date)),
     // Tatil günlerinde taşımalı görevli gösterilmez (eskiden kalmış kayıt olsa da)
-    transportDuties: settings.hasTransport
-      ? groupTransport(transportRows).filter((d) => !holidayRows.some((h) => h.date === d.date && !(h.source === 'official' && h.name.endsWith('Arifesi'))))
-      : [],
+    transportDuties: settings.hasTransport ? groupTransport(transportRows).filter((d) => !holidays.has(d.date)) : [],
     leaves: leaveRows,
     birthdays: birthdayRows,
     announcements: annRows
@@ -282,6 +308,11 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
     events: eventRows.map((e) => ({ id: e.id, title: e.title, organizer: e.organizer, date: e.date, time: e.time, place: e.place })),
     books: bookRows.map((b) => ({ id: b.id, title: b.title, author: b.author, coverUrl: b.coverUrl, note: b.note, startsAt: iso(b.startsAt), endsAt: iso(b.endsAt) })),
     rss: rssRows,
+    flash: flashRows
+      .filter((f) => !f.screenIds?.length || !auth.screen || f.screenIds.includes(auth.screen.id))
+      .map((f) => ({ id: f.id, text: f.text, style: f.style, tone: f.tone, startsAt: f.startsAt.toISOString(), endsAt: f.endsAt.toISOString() })),
+    dayPlans: planRows,
+    dutySubstitutions: subRows,
   };
 }
 
@@ -334,6 +365,13 @@ export async function displayRoutes(app: FastifyInstance) {
     const [school] = await db.select().from(schools).where(eq(schools.id, auth.schoolId));
     if (!school || school.latitude == null || school.longitude == null) return null;
     return getWeather(school.latitude, school.longitude, school.timezone, school.city);
+  });
+
+  /** Pano anlık durumunu bildirir (gösterilen içerik, duraklatma, uyku): mobil uzaktan kumandada görünür */
+  app.post('/api/display/status', { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (req, reply) => {
+    const auth = await resolveDisplay(app, req);
+    if (auth.screen && !auth.preview) bus.setLiveStatus(auth.screen.id, parse(screenLiveStatusSchema, req.body));
+    return reply.status(204).send();
   });
 
   /** Canlı yayın (Server-Sent Events): içerik değişince ve uzaktan komutlarda ekran anında haberdar olur. */

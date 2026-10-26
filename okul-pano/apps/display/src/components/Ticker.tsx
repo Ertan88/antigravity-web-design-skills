@@ -6,7 +6,7 @@ import { MegaphoneIcon } from './Icons.tsx';
  * İki özdeş kopya yan yana dizilir ve %50 kaydırılır, böylece döngü dikişsizdir.
  */
 /** Kayan yazı öğesi: okulun metni ya da etiketli ek kaynak (hava uyarısı, bugün tarihte, günün sözü, RSS) */
-export type TickerEntry = string | { text: string; kind: 'weather' | 'history' | 'quote' | 'rss'; tag: string };
+export type TickerEntry = string | { text: string; kind: 'weather' | 'history' | 'quote' | 'rss' | 'flash'; tag: string };
 
 const textOf = (e: TickerEntry) => (typeof e === 'string' ? e : `${e.tag}${e.text}`);
 

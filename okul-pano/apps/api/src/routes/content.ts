@@ -29,6 +29,7 @@ import {
   users,
 } from '../db/schema.ts';
 import { badRequest, notFound, parse } from '../lib/errors.ts';
+import { notifyUsers, usersWithPermission } from '../lib/push.ts';
 import { registerResource } from './crud.ts';
 
 /** Onay akışı açıksa onay yetkisi olmayanın eklediği / değiştirdiği duyuru onay bekler */
@@ -81,6 +82,17 @@ export async function contentRoutes(app: FastifyInstance) {
         .where(and(inArray(screens.id, ids), eq(screens.schoolId, req.ctx.schoolId)));
       if (found.length !== ids.length) throw badRequest('Seçilen panolardan biri bu okula ait değil.');
     },
+    // Onaya düşen duyuru: onay yetkisi olanların telefonuna bildirim
+    afterWrite: async (req, row) => {
+      if (row.approvalStatus !== 'pending') return;
+      const [u] = await app.deps.db.select({ fullName: users.fullName }).from(users).where(eq(users.id, req.ctx.userId));
+      const approvers = (await usersWithPermission(app.deps, req.ctx.schoolId, 'announcements.approve')).filter((id) => id !== req.ctx.userId);
+      notifyUsers(app.deps, approvers, {
+        title: 'Onay bekleyen duyuru',
+        body: `${u?.fullName ?? 'Bir kullanıcı'} “${String(row.title)}” duyurusunu onaya gönderdi.`,
+        url: '/onaylar',
+      });
+    },
   });
 
   // Onay akışı: onay yetkisi olanlar bekleyen duyuruyu onaylar ya da notla reddeder
@@ -99,6 +111,15 @@ export async function contentRoutes(app: FastifyInstance) {
     if (!updated) throw notFound();
     await audit(req, status === 'approved' ? 'approve' : 'reject', 'Duyuru', id, updated.title);
     app.deps.bus.contentChanged(req.ctx.schoolId);
+    if (updated.createdBy && updated.createdBy !== req.ctx.userId) {
+      notifyUsers(
+        app.deps,
+        [updated.createdBy],
+        status === 'approved'
+          ? { title: 'Duyurunuz onaylandı', body: `“${updated.title}” panolarda yayında.`, url: '/duyurular' }
+          : { title: 'Düzeltme istendi', body: `“${updated.title}”: ${updated.reviewNote ?? ''}`, url: '/duyurular' },
+      );
+    }
     return updated;
   };
   app.post('/api/schools/:schoolId/announcements/:id/approve', review, reviewAnnouncement('approved'));
@@ -171,6 +192,33 @@ export async function contentRoutes(app: FastifyInstance) {
     refs: { teacherId: teachers },
     summary: (r) => `${r.startDate} – ${r.endDate}`,
   });
+
+  // Öğretmenin mobil uygulamadan bildirdiği izin: izin yetkisi olan onaylar ya da notla reddeder
+  const leaveReview = { preHandler: [app.authenticate, schoolGuard('leaves.manage')] };
+  const reviewLeave = (status: 'approved' | 'rejected') => async (req: FastifyRequest) => {
+    const { id } = req.params as { id: string };
+    if (!UUID_RE.test(id)) throw notFound();
+    const { note } = parse(reviewSchema, req.body ?? {});
+    const [updated] = await app.deps.db
+      .update(teacherLeaves)
+      .set({ approvalStatus: status })
+      .where(and(eq(teacherLeaves.id, id), eq(teacherLeaves.schoolId, req.ctx.schoolId)))
+      .returning();
+    if (!updated) throw notFound();
+    await audit(req, status === 'approved' ? 'approve' : 'reject', 'İzin', id, `${updated.startDate} – ${updated.endDate}`);
+    app.deps.bus.contentChanged(req.ctx.schoolId);
+    if (updated.requestedBy && updated.requestedBy !== req.ctx.userId) {
+      const range = updated.startDate === updated.endDate ? updated.startDate : `${updated.startDate} – ${updated.endDate}`;
+      notifyUsers(app.deps, [updated.requestedBy], {
+        title: status === 'approved' ? 'İzniniz onaylandı' : 'İzin talebiniz onaylanmadı',
+        body: status === 'approved' ? `${range} izniniz onaylandı.` : `${range}${note?.trim() ? `: ${note.trim()}` : ''}`,
+        url: '/izin',
+      });
+    }
+    return updated;
+  };
+  app.post('/api/schools/:schoolId/leaves/:id/approve', leaveReview, reviewLeave('approved'));
+  app.post('/api/schools/:schoolId/leaves/:id/reject', leaveReview, reviewLeave('rejected'));
 
   registerResource(app, {
     path: 'bell-schedules',

@@ -2,12 +2,13 @@ import { zonedParts } from '@okulpano/shared';
 import { and, desc, eq, gte, lte, or, isNull } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { schoolGuard } from '../context.ts';
-import { achievements, announcements, users } from '../db/schema.ts';
+import { achievements, announcements, teacherLeaves, teachers, users } from '../db/schema.ts';
+import { dutyDay, dutyGaps } from '../lib/dayinfo.ts';
 
 export interface PanelNotification {
   /** Okundu bilgisi için kalıcı anahtar */
   key: string;
-  kind: 'approval' | 'returned' | 'approved' | 'month-student';
+  kind: 'approval' | 'returned' | 'approved' | 'month-student' | 'leave-request' | 'duty-gap';
   title: string;
   body: string;
   at: string;
@@ -83,6 +84,43 @@ export async function notificationRoutes(app: FastifyInstance) {
               to: '/duyurular',
             },
       );
+    }
+
+    // Öğretmenlerin mobil uygulamadan bildirdiği izinler
+    if (permissions.includes('leaves.manage')) {
+      const pendingLeaves = await db
+        .select({ id: teacherLeaves.id, startDate: teacherLeaves.startDate, endDate: teacherLeaves.endDate, createdAt: teacherLeaves.createdAt, name: teachers.fullName })
+        .from(teacherLeaves)
+        .innerJoin(teachers, eq(teachers.id, teacherLeaves.teacherId))
+        .where(and(eq(teacherLeaves.schoolId, schoolId), eq(teacherLeaves.approvalStatus, 'pending')))
+        .orderBy(desc(teacherLeaves.createdAt))
+        .limit(30);
+      for (const l of pendingLeaves) {
+        out.push({
+          key: `leave-request:${l.id}`,
+          kind: 'leave-request',
+          title: 'İzin bildirimi',
+          body: `${l.name} ${l.startDate === l.endDate ? l.startDate : `${l.startDate} – ${l.endDate}`} için izin bildirdi.`,
+          at: l.createdAt.toISOString(),
+          to: '/izinler',
+        });
+      }
+    }
+
+    // Bugün boş kalan nöbet yerleri (öğretmen izinli, yerine kimse yok)
+    if (permissions.includes('duties.manage')) {
+      const today = zonedParts(new Date(), school.timezone).isoDate;
+      const gaps = dutyGaps(await dutyDay(db, schoolId, today));
+      if (gaps.length) {
+        out.push({
+          key: `duty-gap:${today}:${gaps.map((g) => g.dutyId).join(',')}`,
+          kind: 'duty-gap',
+          title: 'Boş nöbet yeri',
+          body: `${gaps.map((g) => `${g.area} (${g.teacherName} izinli)`).join(', ')}: yerine görevlendirme yapın.`,
+          at: new Date(`${today}T05:00:00Z`).toISOString(),
+          to: '/nobet',
+        });
+      }
     }
 
     // Ayın ilk 10 günü: bu ayın öğrencisi girilmemişse hatırlat

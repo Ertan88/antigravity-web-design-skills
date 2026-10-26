@@ -1,8 +1,9 @@
 import { createMemberSchema, effectivePermissions, resetPasswordSchema, updateMemberSchema } from '@okulpano/shared';
 import { and, asc, eq } from 'drizzle-orm';
+import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { audit, schoolGuard, UUID_RE } from '../context.ts';
-import { memberships, sessions, users } from '../db/schema.ts';
+import { memberships, sessions, teachers, users } from '../db/schema.ts';
 import { hashPassword, readablePassword } from '../lib/crypto.ts';
 import { sendMail } from '../lib/mailer.ts';
 import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
@@ -11,6 +12,16 @@ export async function memberRoutes(app: FastifyInstance) {
   const { db } = app.deps;
   const base = '/api/schools/:schoolId/members';
   const manage = { preHandler: [app.authenticate, schoolGuard('users.manage')] };
+
+  /** Bağlanacak öğretmen bu okula ait olmalı */
+  async function checkTeacher(req: FastifyRequest, teacherId: string | null | undefined) {
+    if (!teacherId) return;
+    const [t] = await db
+      .select({ id: teachers.id })
+      .from(teachers)
+      .where(and(eq(teachers.id, teacherId), eq(teachers.schoolId, req.ctx.schoolId)));
+    if (!t) throw badRequest('Seçilen öğretmen bu okula ait değil.');
+  }
 
   async function loadMember(req: FastifyRequest) {
     const { memberId } = req.params as { memberId: string };
@@ -35,11 +46,14 @@ export async function memberRoutes(app: FastifyInstance) {
         fullName: users.fullName,
         role: memberships.role,
         permissions: memberships.permissions,
+        teacherId: memberships.teacherId,
+        teacherName: teachers.fullName,
         lastLoginAt: users.lastLoginAt,
         createdAt: memberships.createdAt,
       })
       .from(memberships)
       .innerJoin(users, eq(users.id, memberships.userId))
+      .leftJoin(teachers, eq(teachers.id, memberships.teacherId))
       .where(eq(memberships.schoolId, req.ctx.schoolId))
       .orderBy(asc(users.fullName));
     return rows.map((r) => ({ ...r, effectivePermissions: effectivePermissions(r.role, r.permissions) }));
@@ -47,6 +61,7 @@ export async function memberRoutes(app: FastifyInstance) {
 
   app.post(base, manage, async (req, reply) => {
     const body = parse(createMemberSchema, req.body);
+    await checkTeacher(req, body.teacherId);
     const email = body.email.toLowerCase();
     let [user] = await db.select().from(users).where(eq(users.email, email));
     const created = !user;
@@ -70,6 +85,7 @@ export async function memberRoutes(app: FastifyInstance) {
         schoolId: req.ctx.schoolId,
         role: body.role,
         permissions: body.role === 'editor' ? effectivePermissions('editor', body.permissions) : [],
+        teacherId: body.teacherId ?? null,
       })
       .returning();
     await audit(req, 'create', 'Kullanıcı', m!.id, `${body.fullName} (${email})`);
@@ -82,8 +98,31 @@ export async function memberRoutes(app: FastifyInstance) {
     const body = parse(updateMemberSchema, req.body);
     const role = body.role ?? m.membership.role;
     const permissions = role === 'editor' ? effectivePermissions('editor', body.permissions ?? m.membership.permissions) : [];
-    await db.update(memberships).set({ role, permissions }).where(eq(memberships.id, m.membership.id));
+    await checkTeacher(req, body.teacherId);
+    await db
+      .update(memberships)
+      .set({ role, permissions, ...(body.teacherId !== undefined ? { teacherId: body.teacherId } : {}) })
+      .where(eq(memberships.id, m.membership.id));
     await audit(req, 'update', 'Kullanıcı yetkisi', m.membership.id, m.fullName);
+    return { ok: true };
+  });
+
+  /**
+   * Kullanıcıyı öğretmen kaydıyla eşleştirir (mobilde kendi nöbetleri ve ders programı). Yetki değişikliği
+   * olmadığı için okul sahibine ve kişinin kendisine de uygulanabilir (ör. ders veren müdür yardımcısı).
+   */
+  app.put(`${base}/:memberId/teacher`, manage, async (req) => {
+    const { memberId } = req.params as { memberId: string };
+    if (!UUID_RE.test(memberId)) throw notFound();
+    const { teacherId } = parse(z.object({ teacherId: z.uuid().nullable() }), req.body);
+    await checkTeacher(req, teacherId);
+    const [m] = await db
+      .update(memberships)
+      .set({ teacherId })
+      .where(and(eq(memberships.id, memberId), eq(memberships.schoolId, req.ctx.schoolId)))
+      .returning();
+    if (!m) throw notFound('Kullanıcı bulunamadı.');
+    await audit(req, 'update', 'Kullanıcı öğretmen eşleşmesi', m.id, teacherId ? 'eşleştirildi' : 'eşleşme kaldırıldı');
     return { ok: true };
   });
 

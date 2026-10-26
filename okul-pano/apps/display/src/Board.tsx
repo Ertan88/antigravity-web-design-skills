@@ -1,6 +1,9 @@
 import {
   achievementDesign,
   announcementOnAir,
+  applyDayPlan,
+  dayPlanFor,
+  dayPlanLabel,
   isSleepTime,
   quoteOfDay,
   SPECIAL_THEMES,
@@ -11,6 +14,7 @@ import {
   type BoardModule,
   type DisplayAnnouncement,
   type LayoutItem,
+  type ScreenLiveStatus,
   computeBellStatus,
   isBirthdayToday,
   isWithinWindow,
@@ -23,6 +27,7 @@ import type { DisplayAuth } from './api.ts';
 import { EmergencyScreen } from './components/Emergency.tsx';
 import { GroupCard } from './components/GroupCard.tsx';
 import { Header } from './components/Header.tsx';
+import { ClockScreen, FlashBanner, FlashFullscreen } from './components/Remote.tsx';
 import { SpecialMark } from './components/SpecialMark.tsx';
 import { BookIcon, CakeIcon, CalendarIcon, CapIcon, LibraryIcon, MonitorIcon, TrophyIcon, UserMinusIcon, WifiOffIcon } from './components/Icons.tsx';
 import { AchievementsCard, BookCard, EventsCard } from './components/LifeCards.tsx';
@@ -32,7 +37,8 @@ import { Screensaver } from './components/Screensaver.tsx';
 import { Slideshow } from './components/Slideshow.tsx';
 import { Stage, STAGE_H, STAGE_W } from './components/Stage.tsx';
 import { Ticker, type TickerEntry } from './components/Ticker.tsx';
-import { useClock, useDisplayData, useNightlyReload, useWeather } from './hooks.ts';
+import { useClock, useDisplayData, useNightlyReload, useStatusReport, useWeather } from './hooks.ts';
+import { useCallback, useState } from 'react';
 
 const NATIONAL_DAYS = new Set(['10-29', '04-23', '05-19', '08-30']);
 /** "Ekim 2026" */
@@ -42,10 +48,13 @@ const monthName = (iso: string, timeZone: string) => new Intl.DateTimeFormat('tr
 const GROW = new Set<BoardModule>(['duties', 'lessons', 'events']);
 
 export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthorized: () => void }) {
-  const { state, connection, lastUpdated, offsetMs, identifying } = useDisplayData(auth, onUnauthorized);
+  const { state, connection, lastUpdated, offsetMs, identifying, remote, power } = useDisplayData(auth, onUnauthorized);
   const now = useClock(offsetMs);
   const weather = useWeather(auth.token);
   useNightlyReload(!auth.preview);
+  // Mobil uzaktan kumanda için: şu an gösterilen slayt ve panonun durumu sunucuya bildirilir
+  const [shown, setShown] = useState<{ index: number; count: number; title: string | null }>({ index: 0, count: 0, title: null });
+  const onShow = useCallback((v: { index: number; count: number; title: string | null }) => setShown(v), []);
 
   if (!state) {
     return (
@@ -74,12 +83,17 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
   const today = zonedParts(now, school.timezone);
   const nowMs = now.getTime();
 
-  const duties = state.duties.filter((d) => d.weekday === today.weekday);
+  // Nöbet yerine görevlendirme: o gün nöbeti başka öğretmen tutuyorsa onun adı görünür
+  const substitutes = new Map((state.dutySubstitutions ?? []).filter((x) => x.date === today.isoDate).map((x) => [x.dutyId, x.teacherName]));
+  const duties = state.duties.filter((d) => d.weekday === today.weekday).map((d) => (substitutes.has(d.id) ? { ...d, teacherName: substitutes.get(d.id)! } : d));
   const leaves = state.leaves.filter((l) => l.startDate <= today.isoDate && l.endDate >= today.isoDate);
   const birthdays = state.birthdays.filter((b) => isBirthdayToday(b.monthDay, today));
 
   const schedule = pickSchedule(state.bellSchedules, today.weekday);
-  const bell = schedule ? computeBellStatus(schedule.periods, today.secondsOfDay, s.lunchThresholdMin) : ({ kind: 'off' } as const);
+  // Günün modu (kısaltılmış gün) ve zil kaydırmaları zil saatlerini değiştirir
+  const dayPlan = dayPlanFor(state.dayPlans, today.isoDate);
+  const periods = schedule ? applyDayPlan(schedule.periods, dayPlan) : null;
+  const bell = periods ? computeBellStatus(periods, today.secondsOfDay, s.lunchThresholdMin) : ({ kind: 'off' } as const);
   const lessonPeriod = bell.kind === 'lesson' ? bell.period : bell.kind === 'break' || bell.kind === 'before' ? bell.next : null;
   const lessons = lessonPeriod
     ? state.timetable.filter((e) => e.weekday === today.weekday && e.periodNo === lessonPeriod.no)
@@ -111,10 +125,16 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
     : [];
   const slides = [...onAir, ...achievementSlides];
 
+  // Panoya anlık mesaj: süresi dolanlar pano tarafında da hemen kalkar
+  const flashNow = (state.flash ?? []).filter((f) => isWithinWindow(nowMs, f.startsAt, f.endsAt));
+  const flashFull = flashNow.find((f) => f.style === 'fullscreen') ?? null;
+  const flashBanners = flashNow.filter((f) => f.style === 'banner');
+
   // Kayan yazı: okulun metinleri + hava durumu uyarısı, bugün tarihte, günün sözü, RSS başlıkları
   const quote = quoteOfDay(today.isoDate);
   const ticker: TickerEntry[] = [
     ...(s.tickerWeatherAlerts ? (weather?.alerts ?? []).map((a) => ({ kind: 'weather' as const, tag: 'Hava uyarısı', text: a.text })) : []),
+    ...flashNow.filter((f) => f.style === 'ticker').map((f) => ({ kind: 'flash' as const, tag: 'Duyuru', text: f.text })),
     ...state.ticker.filter((t) => isWithinWindow(nowMs, t.startsAt, t.endsAt)).map((t) => t.text),
     ...(s.tickerHistory ? todayInHistory(today.monthDay).map((x) => ({ kind: 'history' as const, tag: 'Bugün tarihte', text: x })) : []),
     ...(s.tickerQuote ? [{ kind: 'quote' as const, tag: 'Günün sözü', text: `“${quote.text}” — ${quote.by}` }] : []),
@@ -210,8 +230,11 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         return true;
     }
   };
-  const leftCards = layout.left.map(renderItem).filter(Boolean);
-  const rightCards = layout.right.map(renderItem).filter(Boolean);
+  // Sınav gününde sınav sayacı bulunduğu sütunun en üstüne çıkar
+  const examFirst = (items: LayoutItem[]) =>
+    dayPlan?.mode === 'exam' ? [...items].sort((a, b) => Number([b].flat().includes('exams')) - Number([a].flat().includes('exams'))) : items;
+  const leftCards = examFirst(layout.left).map(renderItem).filter(Boolean);
+  const rightCards = examFirst(layout.right).map(renderItem).filter(Boolean);
 
   const mourning = today.monthDay === '11-10';
   const silenceMinute = mourning && today.hour === 9 && (today.minute === 5 || today.minute === 6);
@@ -237,10 +260,31 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
     .join(' ');
   const themeVars = { '--primary': special?.primary ?? s.primaryColor, '--accent': special?.accent ?? s.accentColor } as CSSProperties;
 
+  // Gece / hafta sonu modu: ders dışı saatlerde ekran koruyucu ya da karartma. Uzaktan "Uyut" her zaman
+  // ekran koruyucuya geçirir; "Uyandır" uyku saatinde de panoyu açık tutar.
+  const offDay = today.weekday >= 6 || (state.holidays ?? []).some((h) => h.date === today.isoDate);
+  const scheduledSleep = !identifying && isSleepTime({ settings: s, periods, secondsOfDay: today.secondsOfDay, offDay });
+  const forcedSleep = power === 'sleep' && !identifying;
+  const sleeping = forcedSleep || (scheduledSleep && power !== 'wake');
+  const reporter = (
+    <StatusReporter
+      auth={auth}
+      status={{
+        slideIndex: shown.index,
+        slideCount: shown.count,
+        slideTitle: shown.title,
+        paused: remote.paused,
+        sleeping,
+        mode: state.emergency ? 'emergency' : display.mode,
+      }}
+    />
+  );
+
   // Acil durum her şeyin önündedir: gece modu, yalnızca duyurular ve tam pano fark etmez
   if (state.emergency) {
     return (
       <Stage className={`${classes} mode-emergency`} style={themeVars} width={stageW} height={stageH}>
+        {reporter}
         <EmergencyScreen
           emergency={state.emergency}
           now={now}
@@ -255,13 +299,10 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
     );
   }
 
-  // Gece / hafta sonu modu: ders dışı saatlerde ekran koruyucu ya da karartma
-  const offDay = today.weekday >= 6 || (state.holidays ?? []).some((h) => h.date === today.isoDate);
-  const sleeping = !identifying && isSleepTime({ settings: s, periods: schedule?.periods ?? null, secondsOfDay: today.secondsOfDay, offDay });
-
-  if (sleeping && s.sleepMode === 'screensaver') {
+  if (sleeping && (s.sleepMode === 'screensaver' || forcedSleep)) {
     return (
       <Stage className={classes} style={themeVars} width={stageW} height={stageH}>
+        {reporter}
         <Screensaver now={now} timezone={school.timezone} schoolName={school.name} schoolType={s.schoolType} logoUrl={school.logoUrl} />
       </Stage>
     );
@@ -277,10 +318,17 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
       schoolType={s.schoolType}
       logoUrl={school.logoUrl}
       full={full}
+      nav={remote.nav}
+      paused={remote.paused}
+      onShow={onShow}
     />
   );
+  const time = new Intl.DateTimeFormat('tr-TR', { hour: '2-digit', minute: '2-digit', timeZone: school.timezone }).format(now);
+  const dayLabel = dayPlanLabel(dayPlan);
   const overlays = (
     <>
+      {remote.paused && <div className="paused-badge">Duraklatıldı</div>}
+      {flashFull && <FlashFullscreen flash={flashFull} time={time} />}
       {sleeping && <div className="sleep-dim" />}
       {identifying && (
         <div className="identify">
@@ -292,12 +340,26 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
     </>
   );
 
+  // Tam ekran saat: büyük saat, tarih ve zil durumu (ör. spor salonu, konferans salonu girişi)
+  if (display.mode === 'clock') {
+    return (
+      <Stage className={`${classes} mode-clock`} style={themeVars} width={stageW} height={stageH}>
+        {reporter}
+        <ClockScreen now={now} timezone={school.timezone} bell={bell} schoolName={school.name} schoolType={s.schoolType} logoUrl={school.logoUrl} dayLabel={dayLabel} />
+        <FlashBanner items={flashBanners} />
+        {overlays}
+      </Stage>
+    );
+  }
+
   // Yalnızca duyurular: ek TV'ler için tam ekran slayt, köşede küçük saat
   if (display.mode === 'slides') {
     return (
       <Stage className={`${classes} mode-slides`} style={themeVars} width={stageW} height={stageH}>
+        {reporter}
         {slideshow(true)}
-        <div className="corner-clock">{new Intl.DateTimeFormat('tr-TR', { hour: '2-digit', minute: '2-digit', timeZone: school.timezone }).format(now)}</div>
+        <div className="corner-clock">{time}</div>
+        <FlashBanner items={flashBanners} />
         {overlays}
       </Stage>
     );
@@ -305,6 +367,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
 
   return (
     <Stage className={classes} style={themeVars} width={stageW} height={stageH}>
+      {reporter}
       <Header
         schoolName={school.name}
         schoolType={s.schoolType}
@@ -318,6 +381,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         specialId={special?.id}
         showWeatherAlert={s.showWeatherAlert}
       />
+      <FlashBanner items={flashBanners} day={[dayLabel, dayPlan?.note].filter(Boolean).join(' · ') || null} />
       {special && <SpecialMark id={special.id} className="special-mark-bg" />}
 
       <main className="body">
@@ -344,4 +408,10 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
       )}
     </Stage>
   );
+}
+
+/** Panonun anlık durumunu bildiren görünmez bileşen (her görünümde aynı kanca çalışsın diye) */
+function StatusReporter({ auth, status }: { auth: DisplayAuth; status: Omit<ScreenLiveStatus, 'at'> }) {
+  useStatusReport(auth, status);
+  return null;
 }

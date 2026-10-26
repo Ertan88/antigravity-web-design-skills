@@ -1,10 +1,21 @@
-import type { DisplayEvent, DisplayState, WeatherNow } from '@okulpano/shared/client';
+import type { DisplayEvent, DisplayState, ScreenLiveStatus, WeatherNow } from '@okulpano/shared/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AuthError, cachedState, cacheState, fetchState, fetchWeather, type DisplayAuth } from './api.ts';
+import { AuthError, cachedState, cacheState, fetchState, fetchWeather, postStatus, type DisplayAuth } from './api.ts';
 
 export type Connection = 'loading' | 'live' | 'offline' | 'unauthorized';
 
 const REFRESH_MS = 5 * 60 * 1000;
+/** "Uyandır" komutu panoyu bu kadar süre uyku saatine rağmen açık tutar */
+const WAKE_MS = 2 * 3600 * 1000;
+
+/** Mobil uzaktan kumandadan gelen anlık kontroller (sayfa yenilenince sıfırlanır) */
+export interface RemoteControl {
+  /** Her "sonraki / önceki" komutunda artar */
+  nav: { seq: number; step: 1 | -1 };
+  paused: boolean;
+  /** 'sleep': elle uyutuldu; 'wake': uyku saatinde elle uyandırıldı (süreli) */
+  power: { state: 'sleep' | 'wake'; until: number } | null;
+}
 
 /**
  * Zaman makinesi: ?at=2026-11-02T10:45:00+03:00 ile pano o andan itibaren akıyormuş gibi gösterilir.
@@ -27,6 +38,7 @@ export function useDisplayData(auth: DisplayAuth, onUnauthorized: () => void) {
   const [lastUpdated, setLastUpdated] = useState<number | null>(cached?.savedAt ?? null);
   const [offsetMs, setOffsetMs] = useState(timeTravelOffset ?? 0);
   const [identifyUntil, setIdentifyUntil] = useState(0);
+  const [remote, setRemote] = useState<RemoteControl>({ nav: { seq: 0, step: 1 }, paused: false, power: null });
   const inflight = useRef<Promise<void> | null>(null);
   const version = useRef<string | null>(null);
 
@@ -91,6 +103,14 @@ export function useDisplayData(auth: DisplayAuth, onUnauthorized: () => void) {
         if (event.type !== 'command') return;
         if (event.command === 'reload' && !auth.preview) location.reload();
         if (event.command === 'identify') setIdentifyUntil(Date.now() + 15_000);
+        if (event.command === 'next' || event.command === 'prev') {
+          const step = event.command === 'next' ? 1 : -1;
+          setRemote((r) => ({ ...r, nav: { seq: r.nav.seq + 1, step } }));
+        }
+        if (event.command === 'pause' || event.command === 'resume') setRemote((r) => ({ ...r, paused: event.command === 'pause' }));
+        // Elle uyutma ertesi sabaha kadar (gece yenilemesine), uyandırma iki saat sürer
+        if (event.command === 'sleep') setRemote((r) => ({ ...r, power: { state: 'sleep', until: Number.POSITIVE_INFINITY } }));
+        if (event.command === 'wake') setRemote((r) => ({ ...r, power: { state: 'wake', until: Date.now() + WAKE_MS } }));
       });
       source.onerror = () => {
         source?.close();
@@ -109,7 +129,28 @@ export function useDisplayData(auth: DisplayAuth, onUnauthorized: () => void) {
     };
   }, [auth.token, auth.preview, load]);
 
-  return { state, connection, lastUpdated, offsetMs, identifying: identifyUntil > Date.now(), reload: load };
+  const power = remote.power && remote.power.until > Date.now() ? remote.power.state : null;
+  return { state, connection, lastUpdated, offsetMs, identifying: identifyUntil > Date.now(), reload: load, remote, power };
+}
+
+/**
+ * Panonun anlık durumunu sunucuya bildirir (mobil uzaktan kumanda "şu an gösterilen" bilgisini buradan alır).
+ * Yalnızca değişince ve en sık 2 saniyede bir gönderilir; önizlemede gönderilmez.
+ */
+export function useStatusReport(auth: DisplayAuth, status: Omit<ScreenLiveStatus, 'at'> | null) {
+  const key = status ? JSON.stringify(status) : '';
+  // Sunucu yeniden başlarsa bellekteki durum silinir: değişmese de dakikada bir yeniden bildirilir
+  const [beat, setBeat] = useState(0);
+  useEffect(() => {
+    if (auth.preview) return;
+    const t = setInterval(() => setBeat((b) => b + 1), 60_000);
+    return () => clearInterval(t);
+  }, [auth.preview]);
+  useEffect(() => {
+    if (auth.preview || !key) return;
+    const t = setTimeout(() => postStatus(auth.token, JSON.parse(key)).catch(() => undefined), 1500);
+    return () => clearTimeout(t);
+  }, [key, beat, auth.preview, auth.token]);
 }
 
 /** Sunucu saatine göre düzeltilmiş saat; her saniye güncellenir. */

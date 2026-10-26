@@ -34,6 +34,8 @@ export interface SchoolCtx {
   permissions: Permission[];
   userId: string;
   isSuperAdmin: boolean;
+  /** Kullanıcı bu okulda bir öğretmen kaydına bağlıysa */
+  teacherId: string | null;
 }
 
 declare module 'fastify' {
@@ -77,6 +79,7 @@ export function schoolGuard(permission?: Permission) {
 
     let role: Role = 'owner';
     let granted: string[] = [];
+    let teacherId: string | null = null;
     if (!user.sa) {
       const [m] = await db
         .select()
@@ -86,10 +89,11 @@ export function schoolGuard(permission?: Permission) {
       if (!school.isActive) throw forbidden('Okul hesabı askıya alınmış. Lütfen destek ile iletişime geçin.');
       role = m.role;
       granted = m.permissions;
+      teacherId = m.teacherId;
     }
     const perms = effectivePermissions(role, granted);
     if (permission && !perms.includes(permission)) throw forbidden();
-    req.ctx = { schoolId, school, role, permissions: perms, userId: user.sub, isSuperAdmin: user.sa };
+    req.ctx = { schoolId, school, role, permissions: perms, userId: user.sub, isSuperAdmin: user.sa, teacherId };
   };
 }
 

@@ -85,6 +85,8 @@ export interface Leave extends Base {
   startDate: string;
   endDate: string;
   note: string | null;
+  /** Öğretmenin mobil uygulamadan bildirdiği izin onay bekler */
+  approvalStatus: 'approved' | 'pending' | 'rejected';
 }
 export interface Student extends Base {
   fullName: string;
@@ -115,6 +117,8 @@ export interface Screen {
   layout: BoardLayout | null;
   /** Ekran biçimi: yatay / dikey, yalnızca duyurular, video duvarı */
   display: ScreenDisplay;
+  /** Panonun bildirdiği anlık durum (gösterilen içerik, duraklatma, uyku) */
+  live?: { slideIndex: number; slideCount: number; slideTitle: string | null; paused: boolean; sleeping: boolean; mode: string } | null;
   createdAt: string;
 }
 export interface School {

@@ -1,4 +1,4 @@
-import { pairScreenSchema, resolveScreenDisplay, screenSchema } from '@okulpano/shared';
+import { pairScreenSchema, resolveScreenDisplay, screenCommandSchema, screenSchema } from '@okulpano/shared';
 import { and, asc, count, eq, gt, isNull } from 'drizzle-orm';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
@@ -14,6 +14,16 @@ export async function screenRoutes(app: FastifyInstance) {
   const { db, bus } = app.deps;
   const base = '/api/schools/:schoolId/screens';
   const manage = { preHandler: [app.authenticate, schoolGuard('screens.manage')] };
+  // Uzaktan kumanda: pano yönetimi ya da ekranlar yetkisi yeterli
+  const remote = {
+    preHandler: [
+      app.authenticate,
+      schoolGuard(),
+      async (req: FastifyRequest) => {
+        if (!req.ctx.permissions.some((p) => p === 'board.control' || p === 'screens.manage')) throw forbidden();
+      },
+    ],
+  };
 
   const toPublic = (s: typeof screens.$inferSelect) => ({
     id: s.id,
@@ -21,6 +31,8 @@ export async function screenRoutes(app: FastifyInstance) {
     location: s.location,
     lastSeenAt: s.lastSeenAt,
     online: bus.isOnline(s.id),
+    /** Panonun bildirdiği anlık durum: gösterilen içerik, duraklatma, uyku */
+    live: bus.liveStatus(s.id),
     hasKey: Boolean(s.tokenHash),
     layout: s.layout ?? null,
     display: resolveScreenDisplay(s.display),
@@ -111,11 +123,26 @@ export async function screenRoutes(app: FastifyInstance) {
     return { token };
   });
 
-  app.post(`${base}/:id/command`, manage, async (req) => {
+  app.post(`${base}/:id/command`, remote, async (req) => {
     const s = await loadScreen(req);
-    const { command } = parse(z.object({ command: z.enum(['reload', 'identify']) }), req.body);
+    const { command } = parse(screenCommandSchema, req.body);
     bus.publish(req.ctx.schoolId, { type: 'command', command, screenId: s.id });
+    if (command !== 'identify' && command !== 'next' && command !== 'prev') await audit(req, 'update', 'Pano komutu', s.id, `${s.name} · ${command}`);
     return { ok: true, delivered: bus.isOnline(s.id) };
+  });
+
+  /** Ekran modu (normal pano / yalnızca duyurular / tam ekran saat): kalıcıdır, uzaktan kumandadan değişir */
+  app.post(`${base}/:id/mode`, remote, async (req) => {
+    const s = await loadScreen(req);
+    const { mode } = parse(z.object({ mode: z.enum(['board', 'slides', 'clock']) }), req.body);
+    const [updated] = await db
+      .update(screens)
+      .set({ display: { ...resolveScreenDisplay(s.display), mode } })
+      .where(eq(screens.id, s.id))
+      .returning();
+    await audit(req, 'update', 'Ekran modu', s.id, `${s.name} · ${mode}`);
+    bus.contentChanged(req.ctx.schoolId);
+    return toPublic(updated!);
   });
 
   app.delete(`${base}/:id`, manage, async (req, reply) => {

@@ -22,3 +22,4 @@ export * from './weather.ts';
 export * from './tickerContent.ts';
 export * from './siren.ts';
 export * from './headlines.ts';
+export * from './control.ts';

@@ -22,6 +22,11 @@ import { displayRoutes } from './routes/display.ts';
 import { emergencyRoutes } from './routes/emergency.ts';
 import { notificationRoutes } from './routes/notifications.ts';
 import { memberRoutes } from './routes/members.ts';
+import { controlRoutes } from './routes/control.ts';
+import { meRoutes } from './routes/me.ts';
+import { notifyUsers, usersWithPermission } from './lib/push.ts';
+import { screens } from './db/schema.ts';
+import { eq } from 'drizzle-orm';
 import { schoolRoutes } from './routes/schools.ts';
 import { screenRoutes } from './routes/screens.ts';
 import { studentRoutes } from './routes/students.ts';
@@ -98,6 +103,21 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   await app.register(displayRoutes);
   await app.register(emergencyRoutes);
   await app.register(notificationRoutes);
+  await app.register(controlRoutes);
+  await app.register(meRoutes);
+
+  // Pano 10 dakikadan uzun süre bağlantısız kalırsa ekranları yönetenlerin telefonuna bildirim
+  deps.bus.onLongOffline = (screenId) => {
+    void (async () => {
+      const [screen] = await deps.db.select({ name: screens.name, schoolId: screens.schoolId }).from(screens).where(eq(screens.id, screenId));
+      if (!screen) return;
+      notifyUsers(deps, await usersWithPermission(deps, screen.schoolId, 'screens.manage'), {
+        title: 'Pano bağlantısı koptu',
+        body: `${screen.name} panosu 10 dakikadır çevrimdışı. Elektrik ya da internet bağlantısını kontrol edin.`,
+        url: '/panolar',
+      });
+    })().catch(() => {});
+  };
 
   /* ---------- Statik dosyalar: yüklenen görseller ve derlenmiş ön yüzler ---------- */
   await app.register(fastifyStatic, {

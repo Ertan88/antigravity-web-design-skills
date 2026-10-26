@@ -1,6 +1,7 @@
-import type { AnnouncementDesign, BoardLayout, EmergencyType, Period, SchoolSettings, ScreenDisplay } from '@okulpano/shared';
+import type { AnnouncementDesign, BellShift, BoardLayout, DayMode, EmergencyType, FlashStyle, FlashTone, Period, SchoolSettings, ScreenDisplay } from '@okulpano/shared';
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   boolean,
   date,
   doublePrecision,
@@ -90,6 +91,8 @@ export const memberships = pgTable(
     schoolId: schoolId(),
     role: text('role').$type<'owner' | 'admin' | 'editor'>().notNull(),
     permissions: jsonb('permissions').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    /** Kullanıcı bu okulda öğretmense: mobil uygulamada kendi nöbetleri ve ders programı */
+    teacherId: uuid('teacher_id').references((): AnyPgColumn => teachers.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex('memberships_user_school_uq').on(t.userId, t.schoolId), index('memberships_school_idx').on(t.schoolId)],
@@ -225,10 +228,32 @@ export const teacherLeaves = pgTable(
     startDate: date('start_date', { mode: 'string' }).notNull(),
     endDate: date('end_date', { mode: 'string' }).notNull(),
     note: text('note'),
+    /** Öğretmenin mobil uygulamadan bildirdiği izin onay bekler; panoda yalnızca onaylananlar görünür */
+    approvalStatus: text('approval_status').$type<'approved' | 'pending' | 'rejected'>().notNull().default('approved'),
+    requestedBy: uuid('requested_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [index('teacher_leaves_school_idx').on(t.schoolId, t.endDate)],
+);
+
+/** Nöbet yerine görevlendirme: o tarihte (ör. izinli öğretmenin) nöbetini başka öğretmen tutar */
+export const dutySubstitutions = pgTable(
+  'duty_substitutions',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    date: date('date', { mode: 'string' }).notNull(),
+    dutyId: uuid('duty_id')
+      .notNull()
+      .references(() => duties.id, { onDelete: 'cascade' }),
+    teacherId: uuid('teacher_id')
+      .notNull()
+      .references(() => teachers.id, { onDelete: 'cascade' }),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('duty_substitutions_school_date_duty_uq').on(t.schoolId, t.date, t.dutyId)],
 );
 
 export const students = pgTable(
@@ -419,6 +444,59 @@ export const screens = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [index('screens_school_idx').on(t.schoolId)],
+);
+
+/** Panoya anlık mesaj: onaya takılmaz, bitiş zamanı gelince kendiliğinden kalkar */
+export const flashMessages = pgTable(
+  'flash_messages',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    text: text('text').notNull(),
+    style: text('style').$type<FlashStyle>().notNull().default('banner'),
+    tone: text('tone').$type<FlashTone>().notNull().default('info'),
+    /** Yalnızca bu panolarda (boşsa bütün panolarda) */
+    screenIds: jsonb('screen_ids').$type<string[]>(),
+    startsAt: timestamp('starts_at', { withTimezone: true }).notNull().defaultNow(),
+    endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+  },
+  (t) => [index('flash_messages_school_idx').on(t.schoolId, t.endsAt)],
+);
+
+/** Günün modu (kısaltılmış gün, sınav, tören, tatil) ve zil kaydırmaları: yalnızca o tarih için */
+export const dayPlans = pgTable(
+  'day_plans',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    date: date('date', { mode: 'string' }).notNull(),
+    mode: text('mode').$type<DayMode>().notNull().default('normal'),
+    lessonMin: integer('lesson_min'),
+    shifts: jsonb('shifts').$type<BellShift[]>().notNull().default(sql`'[]'::jsonb`),
+    note: text('note'),
+    updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex('day_plans_school_date_uq').on(t.schoolId, t.date)],
+);
+
+/** Telefon bildirimleri: kullanıcının mobil cihazlarının Expo push anahtarları */
+export const pushTokens = pgTable(
+  'push_tokens',
+  {
+    id: pk(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    token: text('token').notNull().unique(),
+    platform: text('platform').notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index('push_tokens_user_idx').on(t.userId)],
 );
 
 /** Ekranda gösterilen 6 haneli kodla cihaz eşleştirme (TV'lerde klavye gerekmez). */

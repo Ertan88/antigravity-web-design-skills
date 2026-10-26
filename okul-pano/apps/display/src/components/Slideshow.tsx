@@ -137,9 +137,15 @@ interface Props {
   logoUrl: string | null;
   /** Yalnızca duyuru gösteren panoda tam ekran (kenarlıksız) */
   full?: boolean;
+  /** Uzaktan kumanda: her "sonraki / önceki" komutunda `seq` artar */
+  nav?: { seq: number; step: 1 | -1 };
+  /** Uzaktan kumanda: gösterilen slaytta kal */
+  paused?: boolean;
+  /** Gösterilen slayt değişince (mobil uzaktan kumandada "şu an gösterilen") */
+  onShow?: (s: { index: number; count: number; title: string | null }) => void;
 }
 
-export function Slideshow({ announcements, now, defaultDurationSec, videoSound, schoolName, schoolType, logoUrl, full = false }: Props) {
+export function Slideshow({ announcements, now, defaultDurationSec, videoSound, schoolName, schoolType, logoUrl, full = false, nav, paused = false, onShow }: Props) {
   // Yayın aralığı her 30 saniyede bir yeniden değerlendirilir (her saniye değil)
   const windowKey = Math.floor(now.getTime() / 30_000);
   const slides = useMemo(
@@ -169,16 +175,31 @@ export function Slideshow({ announcements, now, defaultDurationSec, videoSound, 
 
   const next = useCallback(() => setCursor((c) => ({ index: count ? (c.index + 1) % count : 0, round: c.round + 1 })), [count]);
 
+  // Uzaktan "sonraki / önceki": komut her geldiğinde bir adım
+  const navSeq = useRef(nav?.seq ?? 0);
+  useEffect(() => {
+    if (!nav || nav.seq === navSeq.current) return;
+    navSeq.current = nav.seq;
+    setCursor((c) => ({ index: count ? (((c.index % count) + nav.step) % count + count) % count : 0, round: c.round + 1 }));
+  }, [nav, count]);
+
+  const showRef = useRef(onShow);
+  showRef.current = onShow;
+  const shownTitle = slides[index]?.title ?? null;
+  useEffect(() => {
+    showRef.current?.({ index, count, title: shownTitle });
+  }, [index, count, shownTitle]);
+
   const duration = slide ? (slide.durationSec ?? defaultDurationSec) : 0;
   // Zamanlayıcı slaytın kimliğine bağlıdır: liste her saniye yeniden kurulsa da (ör. başarı slaytları)
   // geri sayım sıfırlanmaz, slayt süresi dolunca sıradakine geçilir
   const slideId = slide?.id ?? null;
   const isVideo = slide?.kind === 'video';
   useEffect(() => {
-    if (!slideId || isVideo) return;
+    if (!slideId || isVideo || paused) return;
     const t = setTimeout(next, duration * 1000);
     return () => clearTimeout(t);
-  }, [slideId, isVideo, cursor.round, duration, next]);
+  }, [slideId, isVideo, cursor.round, duration, next, paused]);
 
   // Sıradaki görseli önceden yükle: geçişte boş kare görünmesin
   useEffect(() => {
@@ -220,7 +241,7 @@ export function Slideshow({ announcements, now, defaultDurationSec, videoSound, 
                 </>
               )}
               {slide.kind === 'video' && slide.youtubeUrl && (
-                <VideoSlide url={slide.youtubeUrl} sound={videoSound} maxSec={slide.durationSec} onEnd={next} />
+                <VideoSlide url={slide.youtubeUrl} sound={videoSound} maxSec={slide.durationSec} onEnd={paused ? () => undefined : next} />
               )}
             </div>
             <div className="slide-caption">
@@ -237,7 +258,7 @@ export function Slideshow({ announcements, now, defaultDurationSec, videoSound, 
           ))}
         </div>
       )}
-      {slide.kind !== 'video' && (
+      {slide.kind !== 'video' && !paused && (
         <div className="slide-progress" aria-hidden="true">
           <div key={key} style={{ animationDuration: `${duration}s` }} />
         </div>

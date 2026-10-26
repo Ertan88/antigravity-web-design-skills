@@ -29,6 +29,8 @@ export interface ResourceConfig<S extends ZodType> {
   affectsDisplay?: boolean;
   /** Ek doğrulama (ör. büyük/küçük harf duyarsız tekillik); güncellemede id verilir */
   validate?: (req: FastifyRequest, row: Record<string, unknown>, id: string | null) => Promise<void>;
+  /** Ekleme / güncelleme sonrası (ör. onay bekleyen duyuru için bildirim) */
+  afterWrite?: (req: FastifyRequest, row: Record<string, unknown>, action: 'create' | 'update') => Promise<void>;
 }
 
 const idParam = (req: FastifyRequest) => {
@@ -90,6 +92,7 @@ export function registerResource<S extends ZodType>(app: FastifyInstance, cfg: R
       .returning()) as Record<string, unknown>[];
     await audit(req, 'create', cfg.entity, String(created!.id), summarize(created!));
     changed(req);
+    await cfg.afterWrite?.(req, created!, 'create');
     return reply.status(201).send(created);
   });
 
@@ -106,6 +109,7 @@ export function registerResource<S extends ZodType>(app: FastifyInstance, cfg: R
     if (!updated) throw notFound();
     await audit(req, 'update', cfg.entity, id, summarize(updated));
     changed(req);
+    await cfg.afterWrite?.(req, updated, 'update');
     return updated;
   });
 

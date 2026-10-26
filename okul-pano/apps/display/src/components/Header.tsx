@@ -33,7 +33,19 @@ interface Props {
   showWeatherAlert?: boolean;
 }
 
-export function Header({ schoolName, schoolType, logoUrl, timezone, now, weather, city, connection, lastUpdated, specialId, showWeatherAlert = true }: Props) {
+export function Header({
+  schoolName,
+  schoolType,
+  logoUrl,
+  timezone,
+  now,
+  weather,
+  city,
+  connection,
+  lastUpdated,
+  specialId,
+  showWeatherAlert = true,
+}: Props) {
   const todayAlert = weather?.alerts?.find((a) => a.day === 'today') ?? null;
   const hm = fmt(timezone, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }, 'hm').format(now);
   const sec = fmt(timezone, { second: '2-digit' }, 's').format(now).padStart(2, '0');
@@ -101,17 +113,19 @@ export function Header({ schoolName, schoolType, logoUrl, timezone, now, weather
             <span className="date-day">{date}</span>
             <span className="date-weekday">{weekday}</span>
           </div>
-          {connection === 'offline' && (
-            <div className="offline-chip" title="Sunucuya ulaşılamıyor; son kayıtlı veri gösteriliyor">
-              <WifiOffIcon size={18} />
-              Çevrimdışı
-              {lastUpdated && (
-                <span>
-                  · {fmt(timezone, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }, 'hm').format(new Date(lastUpdated))}
-                </span>
-              )}
-            </div>
-          )}
+          <div className="header-chips">
+            {connection === 'offline' && (
+              <div className="offline-chip" title="Sunucuya ulaşılamıyor; son kayıtlı veri gösteriliyor">
+                <WifiOffIcon size={18} />
+                Çevrimdışı
+                {lastUpdated && (
+                  <span>
+                    · {fmt(timezone, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }, 'hm').format(new Date(lastUpdated))}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </header>

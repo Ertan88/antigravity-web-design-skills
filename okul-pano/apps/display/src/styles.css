@@ -304,10 +304,33 @@ p {
   font-weight: 800;
 }
 
-.offline-chip {
+.header-chips {
   position: absolute;
   right: 0;
   top: calc(100% + 4px);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+/* Günün modu: başlığın altında ince satır (ör. "Kısaltılmış gün · Öğleden sonra veli toplantısı") */
+.day-strip {
+  align-self: flex-end;
+  margin-top: -2px;
+  padding: 4px 16px;
+  border-radius: 999px;
+  background: var(--chip-bg);
+  color: var(--chip-text);
+  font-size: 19px;
+  font-weight: 800;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.offline-chip {
   display: inline-flex;
   gap: 6px;
   align-items: center;
@@ -2744,4 +2767,176 @@ p {
   font-size: 18px;
   font-weight: 700;
   color: var(--muted);
+}
+
+
+/* ---------- Uzaktan yönetim: anlık mesaj, tam ekran saat, duraklatma ---------- */
+.flash-banner-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 32px 12px;
+}
+
+.mode-slides .flash-banner-stack,
+.mode-clock .flash-banner-stack {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 24px;
+  z-index: 6;
+}
+
+.flash-banner {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 26px;
+  border-radius: 18px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 38px;
+  font-weight: 800;
+  line-height: 1.2;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+}
+
+.flash-banner svg {
+  flex: none;
+}
+
+.flash-banner.tone-warning {
+  background: #b45309;
+}
+
+.motion .flash-banner {
+  animation: flash-in 0.6s ease both;
+}
+
+@keyframes flash-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.flash-full {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+  padding: 80px 120px;
+  text-align: center;
+  color: #fff;
+  background: color-mix(in srgb, var(--primary) 85%, black);
+}
+
+.flash-full.tone-warning {
+  background: #92400e;
+}
+
+.flash-full-text {
+  font-size: 96px;
+  font-weight: 850;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  max-width: 1600px;
+}
+
+.flash-full-time {
+  position: absolute;
+  right: 48px;
+  top: 36px;
+  font-size: 44px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+.paused-badge {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--footer-h) + 16px);
+  transform: translateX(-50%);
+  z-index: 8;
+  padding: 6px 18px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.clock-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  text-align: center;
+}
+
+.clock-screen-school {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.clock-screen-time {
+  font-size: 300px;
+  font-weight: 850;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.clock-screen-date {
+  font-size: 48px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.clock-screen-bell {
+  margin-top: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 40px;
+  color: var(--muted);
+}
+
+.clock-screen-bell b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.clock-screen-bell-title {
+  font-size: 56px;
+  font-weight: 800;
+  color: var(--chip-text);
+}
+
+.clock-screen-day {
+  margin-top: 16px;
+  padding: 8px 22px;
+  border-radius: 999px;
+  background: var(--chip-bg);
+  color: var(--chip-text);
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.ticker-flash .ticker-tag {
+  background: var(--accent);
+  color: #111;
 }

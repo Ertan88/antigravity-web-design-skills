@@ -1,4 +1,4 @@
-import type { DisplayState, WeatherNow } from '@okulpano/shared/client';
+import type { DisplayState, ScreenLiveStatus, WeatherNow } from '@okulpano/shared/client';
 
 const TOKEN_KEY = 'okulpano.deviceToken';
 const STATE_KEY = 'okulpano.lastState';
@@ -65,6 +65,15 @@ const previewScreen = new URLSearchParams(location.search).get('screen');
 export const fetchState = (token: string) =>
   getJson<DisplayState>(`/api/display/state${previewScreen ? `?screen=${encodeURIComponent(previewScreen)}` : ''}`, token);
 export const fetchWeather = (token: string) => getJson<WeatherNow | null>('/api/display/weather', token);
+
+export async function postStatus(token: string, status: Omit<ScreenLiveStatus, 'at'>) {
+  const res = await fetch('/api/display/status', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify(status),
+  });
+  if (!res.ok) throw new Error(`Durum gönderilemedi: ${res.status}`);
+}
 
 export function cacheState(state: DisplayState) {
   safeSet(STATE_KEY, JSON.stringify({ savedAt: Date.now(), state }));

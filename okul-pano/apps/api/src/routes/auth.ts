@@ -102,9 +102,10 @@ export async function authRoutes(app: FastifyInstance) {
           school,
           role: 'owner' as const,
           permissions: [] as string[],
+          teacherId: null as string | null,
         }))
       : await db
-          .select({ school: schools, role: memberships.role, permissions: memberships.permissions })
+          .select({ school: schools, role: memberships.role, permissions: memberships.permissions, teacherId: memberships.teacherId })
           .from(memberships)
           .innerJoin(schools, eq(schools.id, memberships.schoolId))
           .where(eq(memberships.userId, sub))
@@ -120,6 +121,7 @@ export async function authRoutes(app: FastifyInstance) {
         isActive: r.school.isActive,
         role: r.role,
         permissions: effectivePermissions(r.role, r.permissions),
+        teacherId: r.teacherId,
       })),
     };
   });

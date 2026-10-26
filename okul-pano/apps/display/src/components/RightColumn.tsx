@@ -3,7 +3,7 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import { AutoPager } from './AutoPager.tsx';
 import { BellIcon, BellWatermarkIcon, BookIcon, CoffeeIcon, UtensilsIcon } from './Icons.tsx';
 
-function describe(status: BellStatus) {
+export function describeBell(status: BellStatus) {
   switch (status.kind) {
     case 'lesson':
       return {
@@ -51,7 +51,7 @@ function describe(status: BellStatus) {
 }
 
 export function BellCard({ status }: { status: BellStatus }) {
-  const d = describe(status);
+  const d = describeBell(status);
   const urgent = d.remaining != null && d.remaining <= 60 && (status.kind === 'lesson' || status.kind === 'break');
   const Glyph = d.tone === 'lunch' ? UtensilsIcon : d.tone === 'break' ? CoffeeIcon : BellIcon;
 

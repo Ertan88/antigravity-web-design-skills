@@ -18,6 +18,13 @@ const schema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().default('Okul Pano <bildirim@okulpano.local>'),
+  /**
+   * Mobil uygulamaya telefon bildirimi (Expo push servisi). 'off': gönderilmez;
+   * 'memory': testler için yalnızca bellekte tutulur.
+   */
+  PUSH_URL: z.string().default('https://exp.host/--/api/v2/push/send'),
+  /** Expo hesabında "push güvenliği" açıksa erişim anahtarı */
+  PUSH_ACCESS_TOKEN: z.string().optional().transform((v) => v || undefined),
 });
 
 export type Env = z.infer<typeof schema>;

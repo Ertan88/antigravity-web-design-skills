@@ -1,7 +1,7 @@
 import { resolveScreenDisplay, type ScreenDisplay } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Images, LayoutDashboard, RectangleHorizontal, RectangleVertical, type LucideIcon } from 'lucide-react';
+import { Clock, Images, LayoutDashboard, RectangleHorizontal, RectangleVertical, type LucideIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { BoardPreview } from '../../components/BoardPreview.tsx';
 import { useToast } from '../../components/Toast.tsx';
@@ -13,12 +13,14 @@ import { useSchoolPath, type Screen } from '../../lib/data.ts';
 const MODES: { value: ScreenDisplay['mode']; label: string; description: string; icon: LucideIcon }[] = [
   { value: 'board', label: 'Tam pano', description: 'Duyurular, nöbet, zil, dersler…', icon: LayoutDashboard },
   { value: 'slides', label: 'Yalnızca duyurular', description: 'Tam ekran slayt, köşede saat', icon: Images },
+  { value: 'clock', label: 'Tam ekran saat', description: 'Büyük saat, tarih ve zil durumu', icon: Clock },
 ];
 
 /** Ekran biçimi özeti (pano kartında) */
 export function formatLabel(d: ScreenDisplay): string {
   const o = d.orientation === 'portrait' ? 'Dikey' : 'Yatay';
   if (d.mode === 'slides') return `${o} · Yalnızca duyurular`;
+  if (d.mode === 'clock') return `${o} · Tam ekran saat`;
   return `${o} · Tam pano`;
 }
 

@@ -1,14 +1,14 @@
-import { ADMIN_ONLY_PERMISSIONS, createMemberSchema, PERMISSION_KEYS, PERMISSIONS, updateMemberSchema, type Permission, type Role } from '@okulpano/shared';
+import { ADMIN_ONLY_PERMISSIONS, createMemberSchema, normalizeName, PERMISSION_KEYS, PERMISSIONS, updateMemberSchema, type Permission, type Role } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { KeyRound, Pencil, Plus, UserCog } from 'lucide-react';
 import { useState } from 'react';
 import { useToast } from '../components/Toast.tsx';
-import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Spinner, Table, Td } from '../components/ui.tsx';
+import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Select, Spinner, Table, Td } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { CredentialsDialog, ResetPasswordDialog, type Credentials } from './users/Credentials.tsx';
-import { useList, useSchoolPath } from '../lib/data.ts';
+import { useList, useSchoolPath, type Teacher } from '../lib/data.ts';
 import { useForm } from '../lib/form.ts';
 import { timeAgo } from '../lib/format.ts';
 
@@ -20,6 +20,9 @@ interface Member {
   role: Role;
   permissions: string[];
   effectivePermissions: Permission[];
+  /** Bağlı öğretmen kaydı: mobil uygulamada kendi nöbetleri ve ders programı görünür */
+  teacherId: string | null;
+  teacherName: string | null;
   lastLoginAt: string | null;
 }
 
@@ -35,7 +38,21 @@ function tempPassword() {
   return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('');
 }
 
-type Form = { email: string; fullName: string; password: string; role: 'admin' | 'editor'; permissions: Permission[] };
+type Form = { email: string; fullName: string; password: string; role: 'admin' | 'editor'; permissions: Permission[]; teacherId: string };
+
+/** Kullanıcının bağlı olduğu öğretmen kaydı (mobil uygulama: "Bugün" ve "Nöbetlerim") */
+function TeacherSelect({ value, onChange, teachers, id }: { value: string; onChange: (v: string) => void; teachers: Teacher[]; id?: string }) {
+  return (
+    <Select id={id} value={value} onChange={(e) => onChange(e.target.value)} aria-label="Öğretmen kaydı">
+      <option value="">Öğretmen değil</option>
+      {teachers.map((t) => (
+        <option key={t.id} value={t.id}>
+          {t.fullName}
+        </option>
+      ))}
+    </Select>
+  );
+}
 
 function RoleAndPermissions({ form }: { form: ReturnType<typeof useForm<Form>> }) {
   const { values: v, set } = form;
@@ -88,10 +105,20 @@ export function Users() {
   const qc = useQueryClient();
   const toast = useToast();
   const list = useList<Member>('members');
+  const teachers = useList<Teacher>('teachers');
+  const teacherList = (teachers.data ?? []).filter((t) => t.isActive !== false);
+  const linkTeacher = useMutation({
+    mutationFn: ({ id, teacherId }: { id: string; teacherId: string | null }) => api(`${path}/${id}/teacher`, { method: 'PUT', body: { teacherId } }),
+    onSuccess: (_d, v) => {
+      refresh();
+      toast.success(v.teacherId ? 'Öğretmen kaydı eşleştirildi: mobil uygulamada kendi nöbetleri ve programı görünür' : 'Öğretmen eşleşmesi kaldırıldı');
+    },
+    onError: (e) => toast.error(e.message),
+  });
   const [mode, setMode] = useState<'add' | Member | null>(null);
   const [created, setCreated] = useState<Credentials | null>(null);
   const [resetting, setResetting] = useState<Member | null>(null);
-  const form = useForm<Form>({ email: '', fullName: '', password: '', role: 'editor', permissions: ['announcements.manage'] });
+  const form = useForm<Form>({ email: '', fullName: '', password: '', role: 'editor', permissions: ['announcements.manage'], teacherId: '' });
   const refresh = () => void qc.invalidateQueries({ queryKey: [schoolId, 'members'] });
 
   const save = useMutation({
@@ -107,11 +134,11 @@ export function Users() {
   });
 
   const openAdd = () => {
-    form.reset({ email: '', fullName: '', password: tempPassword(), role: 'editor', permissions: ['announcements.manage'] });
+    form.reset({ email: '', fullName: '', password: tempPassword(), role: 'editor', permissions: ['announcements.manage'], teacherId: '' });
     setMode('add');
   };
   const openEdit = (m: Member) => {
-    form.reset({ email: m.email, fullName: m.fullName, password: '', role: m.role === 'admin' ? 'admin' : 'editor', permissions: m.permissions as Permission[] });
+    form.reset({ email: m.email, fullName: m.fullName, password: '', role: m.role === 'admin' ? 'admin' : 'editor', permissions: m.permissions as Permission[], teacherId: m.teacherId ?? '' });
     setMode(m);
   };
 
@@ -119,7 +146,14 @@ export function Users() {
     const v = form.values;
     try {
       if (mode === 'add') {
-        const payload = form.validate(createMemberSchema, { email: v.email, fullName: v.fullName, password: v.password || undefined, role: v.role, permissions: v.permissions });
+        const payload = form.validate(createMemberSchema, {
+          email: v.email,
+          fullName: v.fullName,
+          password: v.password || undefined,
+          role: v.role,
+          permissions: v.permissions,
+          teacherId: v.teacherId || null,
+        });
         if (!payload) return;
         const res = (await save.mutateAsync({ body: payload })) as { existingUser?: boolean };
         if (res.existingUser) {
@@ -159,7 +193,7 @@ export function Users() {
         ) : !list.data?.length ? (
           <EmptyState icon={<UserCog className="size-6" />} title="Kullanıcı yok" />
         ) : (
-          <Table head={['Kullanıcı', 'Rol', 'Yetkiler', 'Son giriş', '']}>
+          <Table head={['Kullanıcı', 'Rol', 'Yetkiler', 'Öğretmen kaydı', 'Son giriş', '']}>
             {list.data.map((m) => {
               const locked = m.role === 'owner' || m.userId === me?.user.id;
               return (
@@ -187,6 +221,13 @@ export function Users() {
                     ) : (
                       <span className="text-slate-500">Tüm yetkiler</span>
                     )}
+                  </Td>
+                  <Td className="min-w-44">
+                    <TeacherSelect
+                      value={m.teacherId ?? ''}
+                      teachers={teacherList}
+                      onChange={(teacherId) => linkTeacher.mutate({ id: m.id, teacherId: teacherId || null })}
+                    />
                   </Td>
                   <Td className="whitespace-nowrap text-slate-500">{timeAgo(m.lastLoginAt)}</Td>
                   <Td className="w-px text-right">
@@ -237,7 +278,18 @@ export function Users() {
             <>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Ad soyad" error={form.errors.fullName}>
-                  {(id) => <Input id={id} value={form.values.fullName} onChange={(e) => form.set('fullName', e.target.value)} />}
+                  {(id) => (
+                    <Input
+                      id={id}
+                      value={form.values.fullName}
+                      onChange={(e) => {
+                        form.set('fullName', e.target.value);
+                        // Adı kadrodaki bir öğretmenle aynıysa öğretmen kaydı kendiliğinden seçilir
+                        const match = teacherList.find((t) => normalizeName(t.fullName) === normalizeName(e.target.value));
+                        if (match && !form.values.teacherId) form.set('teacherId', match.id);
+                      }}
+                    />
+                  )}
                 </Field>
                 <Field label="E-posta" error={form.errors.email}>
                   {(id) => <Input id={id} type="email" value={form.values.email} onChange={(e) => form.set('email', e.target.value)} />}
@@ -252,6 +304,9 @@ export function Users() {
                     </Button>
                   </div>
                 )}
+              </Field>
+              <Field label="Öğretmen kaydı" help="Öğretmense seçin: mobil uygulamada kendi ders programını ve nöbetlerini görür, izin bildirebilir.">
+                {(id) => <TeacherSelect id={id} value={form.values.teacherId} teachers={teacherList} onChange={(t) => form.set('teacherId', t)} />}
               </Field>
             </>
           )}
