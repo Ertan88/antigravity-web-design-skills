@@ -1,0 +1,73 @@
+# Okul Pano mobil uygulamasının Android deneme sürümü (APK).
+# Elle çalıştırılabilir (Actions › "Okul Pano · Android APK" › Run workflow) ya da mobil kod değişince kendiliğinden çalışır.
+# Çıkan APK, deponun Releases sayfasındaki "okul-pano-android" sürümüne yüklenir: telefondan indirilip kurulabilir.
+name: Okul Pano · Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/okul-dijital-pano-4oao0y]
+    paths:
+      - okul-pano/mobile/**
+      - okul-pano/packages/shared/**
+      - .github/workflows/okul-pano-apk.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: okul-pano-apk
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    defaults:
+      run:
+        working-directory: okul-pano/mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: okul-pano/mobile/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Bağımlılıklar
+        run: npm ci
+
+      - name: Android projesini oluştur
+        run: npx expo prebuild --platform android --no-install
+
+      - name: APK derle
+        working-directory: okul-pano/mobile/android
+        run: |
+          sed -i 's/-Xmx[0-9]*m/-Xmx4096m/' gradle.properties
+          ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
+
+      - name: APK'yı adlandır
+        run: cp android/app/build/outputs/apk/release/app-release.apk okul-pano.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: okul-pano-apk
+          path: okul-pano/mobile/okul-pano.apk
+
+      - name: Sürüm sayfasına yükle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=okul-pano-android
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --prerelease --target "$GITHUB_SHA" \
+              --title "Okul Pano · Android deneme sürümü" \
+              --notes "Telefona indirip kurun (bilinmeyen kaynaklardan yüklemeye izin verin). Girişte sunucu adresini yazın, ör. http://192.168.1.20:3000"
+          fi
+          gh release upload "$TAG" okul-pano.apk --clobber

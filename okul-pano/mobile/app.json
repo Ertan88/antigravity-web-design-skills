@@ -25,7 +25,8 @@
       "permissions": [
         "CAMERA",
         "POST_NOTIFICATIONS"
-      ]
+      ],
+      "versionCode": 1
     },
     "web": {
       "bundler": "metro",
@@ -49,6 +50,14 @@
         "expo-notifications",
         {
           "color": "#0e6a85"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
         }
       ]
     ],
