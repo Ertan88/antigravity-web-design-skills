@@ -85,7 +85,6 @@ get_image() {
 }
 
 wait_healthy() {
-  say "Uygulamanın açılması bekleniyor"
   for _ in $(seq 1 90); do
     if docker compose exec -T app wget -qO- http://127.0.0.1:3000/api/health >/dev/null 2>&1; then
       return 0
@@ -94,6 +93,17 @@ wait_healthy() {
   done
   docker compose logs --tail 50 app
   die "Uygulama açılmadı (yukarıdaki kayıtlara bakın)."
+}
+
+# Caddy sertifikayı alıp HTTPS'i açana kadar bekler. Alan adı henüz bu sunucuyu göstermiyorsa uyarır; kurulum geçerlidir.
+wait_https() {
+  for _ in $(seq 1 45); do
+    if curl -fsk --max-time 5 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/api/health" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+  warn "HTTPS henüz açılmadı. DNS kaydı bu sunucuyu gösterince sertifika kendiliğinden alınır; durum: cd $DIR && docker compose logs caddy"
 }
 
 write_files() {
@@ -273,11 +283,15 @@ write_files
 
 say "Başlatılıyor"
 docker compose up -d
+say "Uygulamanın açılması bekleniyor"
 wait_healthy
 
-# İlk yönetici oluşturuldu: şifre artık sunucuda düz metin olarak durmasın
+# İlk yönetici oluşturuldu: şifre artık sunucuda düz metin olarak durmasın (uygulama yeni ayarla yeniden açılır)
 sed -i '/^SEED_SUPERADMIN_PASSWORD=/d' "$DIR/.env"
 docker compose up -d app >/dev/null 2>&1
+wait_healthy
+say "HTTPS bekleniyor"
+wait_https
 
 cat >/etc/cron.d/okul-pano <<CRON
 # Okul Pano: her gece veritabanı yedeği
