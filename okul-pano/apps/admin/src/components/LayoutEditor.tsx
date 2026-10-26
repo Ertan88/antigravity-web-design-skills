@@ -38,10 +38,10 @@ const ICONS: Record<BoardModule, LucideIcon> = {
 };
 
 const HINTS: Partial<Record<BoardModule, string>> = {
-  leaves: 'İzinli yoksa kısa not',
-  birthdays: 'Doğum günü yoksa kısa not',
-  exams: 'Sınav yoksa kısa not',
-  lessons: 'Ders yoksa kısa not',
+  leaves: 'İzinli yoksa görünmez',
+  birthdays: 'Doğum günü yoksa görünmez',
+  exams: 'Sınav yoksa görünmez',
+  lessons: 'Ders yoksa görünmez',
   achievements: 'Panelde Başarılar sayfasından',
   events: 'Önümüzdeki 30 gün',
   book: 'Panelde Haftanın Kitabı sayfasından',
@@ -195,7 +195,7 @@ export function LayoutEditor({ value, onChange, disabled }: { value: BoardLayout
                 // Birleşik kart: içindekiler panoda aynı yerde sırayla döner
                 <div className="rounded-2xl bg-brand-50/60 p-1.5 ring-1 ring-brand-200">
                   <div className="flex items-center gap-1.5 px-1.5 pt-0.5 pb-1.5 text-[11px] font-semibold text-brand-700">
-                    <Layers className="size-3.5" /> Birleşik kart · panoda sırayla döner
+                    <Layers className="size-3.5" /> <span title="İçeriği olan kartlar panoda aynı yerde sırayla döner">Birleşik kart</span>
                     {!disabled && <span className="ml-auto flex">{common}</span>}
                   </div>
                   <div className="space-y-1.5">
@@ -236,7 +236,7 @@ export function LayoutEditor({ value, onChange, disabled }: { value: BoardLayout
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-[minmax(0,1.25fr)_minmax(0,0.8fr)_minmax(0,1.25fr)]">
+      <div className="grid gap-3 md:grid-cols-[minmax(13rem,1fr)_minmax(0,2fr)_minmax(13rem,1fr)]">
         {columnView('left')}
         <div className="hidden flex-col items-center justify-center gap-2 rounded-2xl bg-[repeating-linear-gradient(135deg,transparent_0_10px,rgba(100,116,139,0.06)_10px_20px)] p-4 text-center ring-1 ring-slate-200 ring-dashed md:flex">
           <Megaphone className="size-6 text-slate-400" />

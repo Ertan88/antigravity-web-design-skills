@@ -92,6 +92,13 @@
       "when": 1793017895665,
       "tag": "0012_stored_files",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793100000000,
+      "tag": "0013_hide_empty_cards",
+      "breakpoints": true
     }
   ]
 }

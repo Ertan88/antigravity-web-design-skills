@@ -29,7 +29,7 @@ import { GroupCard } from './components/GroupCard.tsx';
 import { Header } from './components/Header.tsx';
 import { ClockScreen, FlashBanner, FlashFullscreen } from './components/Remote.tsx';
 import { SpecialMark } from './components/SpecialMark.tsx';
-import { BookIcon, CakeIcon, CalendarIcon, CapIcon, LibraryIcon, MonitorIcon, TrophyIcon, UserMinusIcon, WifiOffIcon } from './components/Icons.tsx';
+import { BookIcon, CakeIcon, CalendarIcon, CapIcon, LibraryIcon, MonitorIcon, ShieldIcon, TrophyIcon, UserMinusIcon, WifiOffIcon } from './components/Icons.tsx';
 import { AchievementsCard, BookCard, EventsCard } from './components/LifeCards.tsx';
 import { BirthdayCard, DutyCard, EmptyCard, ExamCard, LeaveCard } from './components/LeftColumn.tsx';
 import { BellCard, LessonsCard } from './components/RightColumn.tsx';
@@ -155,7 +155,9 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
           empty(m, <CapIcon size={22} />, 'Sınav Sayacı', 'Yaklaşan sınav yok', 'exam-card')
         );
       case 'duties':
-        return (
+        return !hasContent(m) ? (
+          empty(m, <ShieldIcon size={22} />, 'Nöbetçi Öğretmenler', 'Bugün nöbet çizelgesi yok', 'duty-card')
+        ) : (
           <DutyCard
             key={m}
             duties={duties}
@@ -214,6 +216,13 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
     switch (m) {
       case 'exams':
         return state.exams.length > 0;
+      case 'duties':
+        return (
+          duties.length > 0 ||
+          (state.dutySupervisors ?? []).some((x) => x.date === today.isoDate) ||
+          (state.transportDuties ?? []).some((x) => x.date === today.isoDate && x.teacherNames.length > 0) ||
+          (state.holidays ?? []).some((x) => x.date === today.isoDate)
+        );
       case 'leaves':
         return leaves.length > 0;
       case 'birthdays':

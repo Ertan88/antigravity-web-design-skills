@@ -67,7 +67,7 @@ export const schoolSettingsSchema = z.object({
   /** Özel günlerde (millî bayram, 10 Kasım, bayramlar…) hazır temayı kendiliğinden uygula */
   autoSpecialThemes: z.boolean().default(true),
   /** Düzende olan ama o gün içeriği olmayan kartlar (izinli, doğum günü…) kısa bir notla görünür */
-  showEmptyCards: z.boolean().default(true),
+  showEmptyCards: z.boolean().default(false),
   /** Kart girişleri, slayt geçişleri, zil sayacının son dakikadaki nabzı */
   animations: z.boolean().default(true),
   /** Erişilebilirlik: yüksek kontrast ve uzaktan okunabilirlik için büyük yazı */
