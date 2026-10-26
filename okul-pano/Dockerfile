@@ -23,6 +23,8 @@ COPY . .
 RUN npm run build
 
 FROM node:22-alpine
+LABEL org.opencontainers.image.source=https://github.com/Ertan88/antigravity-web-design-skills
+LABEL org.opencontainers.image.description="Okul Pano: okullar için dijital pano, yönetim paneli ve mobil uygulama"
 ENV NODE_ENV=production
 WORKDIR /app
 COPY package.json package-lock.json ./

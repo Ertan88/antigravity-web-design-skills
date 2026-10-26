@@ -111,7 +111,14 @@ npm run build     # üretim derlemesi
 **Ücretsiz deneme yayını (kredi kartı gerekmez):** Render + Neon ile birkaç adımda; ayrıntılı rehber
 [docs/ucretsiz-yayin.md](docs/ucretsiz-yayin.md).
 
-**Kendi sunucunuz (VPS):**
+**Türkiye'deki bir sunucu (VPS, KVKK için önerilen):** tek komutla kurulum, otomatik HTTPS ve gece yedeği;
+rehber [docs/vps-kurulum.md](docs/vps-kurulum.md).
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Ertan88/antigravity-web-design-skills/claude/okul-dijital-pano-4oao0y/okul-pano/deploy/kurulum.sh | sudo bash
+```
+
+**Kaynaktan derleyerek (docker compose):**
 
 ```bash
 cp deploy/.env.example deploy/.env      # alan adı ve gizli anahtarlar
