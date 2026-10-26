@@ -13,6 +13,7 @@ export default defineConfig({
     proxy: {
       '/api': { target: api, changeOrigin: true },
       '/uploads': { target: api, changeOrigin: true },
+      '/aydinlatma': { target: api, changeOrigin: true },
       // Geliştirmede panel ve pano ayrı portlarda; tek adres gibi davranmaları için birbirine yönlendirilir
       '/display': { target: 'http://localhost:5174', changeOrigin: true },
     },

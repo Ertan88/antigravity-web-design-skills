@@ -10,6 +10,8 @@ const schema = z.object({
   UPLOAD_DIR: z.string().default('./uploads'),
   /** Yüklenen görseller: 'local' sunucunun diskinde, 'db' veritabanında (kalıcı diski olmayan ücretsiz barındırmalar) */
   FILE_STORAGE: z.enum(['local', 'db']).default('local'),
+  /** Verilerin saklandığı yer: aydınlatma metni şablonunda yazar (ör. "Türkiye", "Almanya (Frankfurt)") */
+  DATA_REGION: z.string().default('Türkiye'),
   /** Panelin dış adresi (e-postadaki bağlantılar). Render gibi ortamlar kendi adresini RENDER_EXTERNAL_URL ile verir. */
   PUBLIC_URL: z.string().default(process.env.RENDER_EXTERNAL_URL ?? 'http://localhost:5173'),
   /** Derlenmiş panel ve pano dosyaları (varsa) API ile aynı adresten sunulur: /admin/ ve /display/ */

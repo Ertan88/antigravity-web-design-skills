@@ -136,8 +136,12 @@ export function Leaves() {
               {(id) => <Input id={id} type="date" value={v.endDate} min={v.startDate} onChange={(e) => set('endDate', e.target.value)} invalid={Boolean(errors.endDate)} />}
             </Field>
           </div>
-          <Field label="Not (yalnızca panelde görünür)" error={errors.note}>
-            {(id) => <Input id={id} value={v.note} maxLength={120} onChange={(e) => set('note', e.target.value)} placeholder="ör. Sağlık raporu" />}
+          <Field
+            label="Not (yalnızca panelde görünür)"
+            error={errors.note}
+            help="Hastalık, tanı ya da rapor içeriği gibi sağlık bilgisi yazmayın: KVKK'da özel nitelikli veridir."
+          >
+            {(id) => <Input id={id} value={v.note} maxLength={120} onChange={(e) => set('note', e.target.value)} placeholder="ör. Yıllık izin, görevlendirme" />}
           </Field>
         </>
       )}

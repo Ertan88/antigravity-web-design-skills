@@ -1,9 +1,10 @@
 import { createSchoolSchema, PLANS, type Plan } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Building2, Plus } from 'lucide-react';
+import { Building2, Download, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useToast } from '../components/Toast.tsx';
-import { Alert, Badge, Button, Card, EmptyState, Field, Input, Modal, PageHeader, Select, Spinner, Table, Td, Toggle } from '../components/ui.tsx';
+import { Alert, Badge, Button, Card, EmptyState, Field, IconButton, Input, Modal, PageHeader, Select, Spinner, Table, Td, Toggle } from '../components/ui.tsx';
+import { downloadJson } from '../lib/download.ts';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import type { School } from '../lib/data.ts';
@@ -22,6 +23,8 @@ export function Platform() {
   const toast = useToast();
   const list = useQuery({ queryKey: ['platform', 'schools'], queryFn: () => api<Row[]>('/api/platform/schools') });
   const [open, setOpen] = useState(false);
+  const [deleting, setDeleting] = useState<Row | null>(null);
+  const [confirmSlug, setConfirmSlug] = useState('');
   const form = useForm<Form>(empty);
   const v = form.values;
 
@@ -32,6 +35,25 @@ export function Platform() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['platform', 'schools'] }),
     onError: (e) => toast.error(e.message),
   });
+
+  // KVKK: abonelik bitince okul bütün verileriyle silinir (önce dışa aktarılıp okula teslim edilebilir)
+  const remove = useMutation({
+    mutationFn: (s: Row) => api<{ removedUsers: number }>(`/api/platform/schools/${s.id}`, { method: 'DELETE', body: { confirmSlug } }),
+    onSuccess: async (r, s) => {
+      toast.success(`${s.name} ve bütün verileri silindi${r.removedUsers ? ` · ${r.removedUsers} kullanıcı hesabı da kaldırıldı` : ''}`);
+      setDeleting(null);
+      await qc.invalidateQueries({ queryKey: ['platform', 'schools'] });
+      await reloadMe();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const exportSchool = async (s: Row) => {
+    try {
+      downloadJson(await api(`/api/schools/${s.id}/export`), `okul-pano-${s.slug}-${new Date().toISOString().slice(0, 10)}.json`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Dışa aktarılamadı');
+    }
+  };
 
   const submit = async () => {
     const payload = form.validate(createSchoolSchema, { ...v, ownerPassword: v.ownerPassword || undefined });
@@ -51,7 +73,7 @@ export function Platform() {
     <>
       <PageHeader
         title="Okullar ve Abonelikler"
-        description="Platformdaki tüm okullar. Paket ve ekran limitini buradan yönetin; ödeme altyapısı (iyzico / Stripe) bu alanların üzerine eklenecek."
+        description="Platformdaki tüm okullar. Paket ve ekran limitini buradan yönetin; abonelik bitince okulun verilerini dışa aktarıp kalıcı olarak silebilirsiniz (KVKK)."
         actions={
           <Button
             icon={<Plus className="size-4" />}
@@ -70,7 +92,7 @@ export function Platform() {
         ) : !list.data?.length ? (
           <EmptyState icon={<Building2 className="size-6" />} title="Henüz okul yok" />
         ) : (
-          <Table head={['Okul', 'Paket', 'Ekran', 'Deneme bitişi', 'Aktif']}>
+          <Table head={['Okul', 'Paket', 'Ekran', 'Deneme bitişi', 'Aktif', '']}>
             {list.data.map((s) => (
               <tr key={s.id}>
                 <Td>
@@ -105,11 +127,51 @@ export function Platform() {
                 <Td>
                   <Toggle checked={s.isActive} onChange={(x) => patch.mutate({ id: s.id, body: { isActive: x } })} />
                 </Td>
+                <Td className="w-px">
+                  <div className="flex justify-end">
+                    <IconButton label="Verileri dışa aktar (JSON)" onClick={() => void exportSchool(s)}>
+                      <Download className="size-4" />
+                    </IconButton>
+                    <IconButton
+                      label="Okulu ve bütün verilerini sil"
+                      onClick={() => {
+                        setConfirmSlug('');
+                        setDeleting(s);
+                      }}
+                    >
+                      <Trash2 className="size-4 text-red-600" />
+                    </IconButton>
+                  </div>
+                </Td>
               </tr>
             ))}
           </Table>
         )}
       </Card>
+
+      <Modal
+        open={deleting !== null}
+        onClose={() => setDeleting(null)}
+        title={`${deleting?.name ?? ''} silinsin mi?`}
+        description="Okul, bütün kayıtları (öğretmenler, öğrenciler, duyurular, görseller, etkinlik geçmişi) ve başka okulda üyeliği olmayan kullanıcı hesapları kalıcı olarak silinir. Geri alınamaz."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDeleting(null)}>
+              Vazgeç
+            </Button>
+            <Button variant="danger" loading={remove.isPending} disabled={confirmSlug !== deleting?.slug} onClick={() => deleting && remove.mutate(deleting)}>
+              Kalıcı olarak sil
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Alert tone="amber">Silmeden önce verileri dışa aktarıp (indirme düğmesi) okula teslim etmeniz önerilir.</Alert>
+          <Field label={`Onaylamak için okulun kısa adını yazın: ${deleting?.slug ?? ''}`}>
+            {(id) => <Input id={id} value={confirmSlug} onChange={(e) => setConfirmSlug(e.target.value)} className="font-mono" autoComplete="off" />}
+          </Field>
+        </div>
+      </Modal>
 
       <Modal
         open={open}

@@ -127,6 +127,20 @@ docker compose --env-file deploy/.env up -d --build
 
 Panel `https://alanadiniz/admin/`, pano `https://alanadiniz/display/`, mobil uygulamanın web sürümü `https://alanadiniz/app/` adresinde açılır. TV tarafında Chromium'u kiosk modunda çalıştırmanız yeterli; komut paneldeki **Ekranlar** sayfasında yazar.
 
+## KVKK
+
+- **Aydınlatma metni:** her okul kendi metnini **Okul Ayarları › Kişisel veriler (KVKK)** bölümünde yazar
+  ("Şablondan doldur" okulun adıyla genel bir taslak getirir; adres ve iletişim bilgisi okulca tamamlanır).
+  Metin `https://alanadiniz/aydinlatma/<okul-kısa-adı>` adresinde herkese açık yayınlanır.
+- **Verileri dışa aktarma:** okul sahibi ya da platform yöneticisi okulun bütün verisini (görseller dahil) tek
+  JSON dosyası olarak indirir. Şifre özetleri ve pano anahtarları dosyaya girmez.
+- **Okulu tamamen silme:** platform yöneticisi **Okullar ve Abonelikler** sayfasından, okulun kısa adını yazarak onaylar; okulun
+  bütün kayıtları, görselleri ve yalnızca o okula bağlı kullanıcı hesapları silinir.
+- **Sağlık verisi tutulmaz:** izin notu alanı "sağlık bilgisi yazmayın" uyarısı taşır.
+- Şablondaki "verilerin saklandığı yer" sunucunun `DATA_REGION` ayarından gelir (varsayılan `Türkiye`).
+
+Şablon yol gösterir; satıştan önce metnin bir hukukçuya okutulması önerilir.
+
 ## Yol haritası
 
 1. **Bu sürüm:** pano, yönetim paneli, yetkiler, ekran eşleştirme, canlı güncelleme, onay akışı, acil durum, tatil takvimi, panoya özel içerik, mobil uygulama (öğretmen + yönetici), uzaktan kumanda, günün modu, nöbet yerine görevlendirme, telefon bildirimleri.

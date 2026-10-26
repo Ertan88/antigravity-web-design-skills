@@ -43,7 +43,7 @@ jobs:
             okul-pano:ci
           for i in $(seq 1 60); do curl -fs localhost:3000/api/health && break; sleep 2; done
           echo
-          for p in /admin/ /display/ /app/; do curl -fs -o /dev/null "localhost:3000$p" && echo "$p tamam"; done
+          for p in /admin/ /display/ /app/; do curl -fs -o /dev/null "localhost:3000$p"; echo "$p tamam"; done
           docker logs app | grep "İlk açılış"
           T=$(curl -fs -X POST localhost:3000/api/auth/login -H 'content-type: application/json' \
             -d '{"email":"mudur@okulpano.local","password":"Ci-Deneme-2026"}' | python3 -c 'import json,sys;print(json.load(sys.stdin)["accessToken"])')
@@ -53,7 +53,8 @@ jobs:
           curl -fs -o /dev/null -w "görsel %{http_code} %{content_type} %{size_download} bayt\n" "localhost:3000$IMG"
           # Bilinen geliştirme şifresi internete açık kurulumda çalışmamalı
           test "$(curl -s -o /dev/null -w '%{http_code}' -X POST localhost:3000/api/auth/login -H 'content-type: application/json' \
-            -d '{"email":"mudur@okulpano.local","password":"Mudur2026!"}')" = 401 && echo "eski şifre reddedildi"
+            -d '{"email":"mudur@okulpano.local","password":"Mudur2026!"}')" = 401
+          echo "eski şifre reddedildi"
       - name: Sunucu kaydı
         if: always()
         run: docker logs app 2>&1 | grep -v '"level":30' | tail -40 || true
@@ -63,25 +64,35 @@ jobs:
           docker rm -f app
           sudo OKULPANO_IMAGE=okul-pano:ci DOMAIN=localhost ADMIN_EMAIL=ci@ornek.com \
             ADMIN_PASSWORD=Ci-Deneme-2026-uzun SEED_DEMO=evet bash okul-pano/deploy/kurulum.sh
-          curl -fsk https://localhost/api/health && echo
-          curl -fsk -o /dev/null https://localhost/admin/ && echo "HTTPS panel tamam"
+          curl -fsk https://localhost/api/health
+          curl -fsk -o /dev/null https://localhost/admin/
+          echo " · HTTPS panel tamam"
           # İlk açılıştan sonra yönetici şifresi sunucuda düz metin olarak kalmamalı
-          ! sudo grep -q SEED_SUPERADMIN_PASSWORD /opt/okul-pano/.env && echo "şifre .env'den silindi"
+          if sudo grep -q SEED_SUPERADMIN_PASSWORD /opt/okul-pano/.env; then echo "HATA: şifre .env'de kaldı"; exit 1; fi
+          echo "şifre .env'den silindi"
           curl -fsk -X POST https://localhost/api/auth/login -H 'content-type: application/json' \
-            -d '{"email":"ci@ornek.com","password":"Ci-Deneme-2026-uzun"}' -o /dev/null && echo "yönetici girişi tamam"
-          ls -la /opt/okul-pano/yedekler
-          test -f /etc/cron.d/okul-pano && echo "gece yedeği zamanlandı"
+            -d '{"email":"ci@ornek.com","password":"Ci-Deneme-2026-uzun"}' -o /dev/null
+          echo "yönetici girişi tamam"
+          sudo ls -la /opt/okul-pano/yedekler
+          test -f /etc/cron.d/okul-pano
+          echo "gece yedeği zamanlandı"
           # Geri yükleme: veriyi sil, yedeği yükle, geri geldiğini gör
           f=$(sudo ls /opt/okul-pano/yedekler | head -1)
           cd /opt/okul-pano
+          count() { sudo docker compose exec -T db psql -U okulpano -d okulpano -tAc 'select count(*) from announcements'; }
+          before=$(count)
           sudo docker compose exec -T db psql -U okulpano -d okulpano -c 'delete from announcements'
+          test "$(count)" = 0
           sudo ONAY=evet ./geri-yukle.sh "yedekler/$f"
-          sudo docker compose exec -T db psql -U okulpano -d okulpano -tAc 'select count(*) from announcements' | grep -qv '^0$' && echo "geri yükleme tamam"
+          after=$(count)
+          if [ "$after" != "$before" ] || [ "$after" = 0 ]; then echo "HATA: geri yükleme ($before → $after)"; exit 1; fi
+          echo "geri yükleme tamam ($after duyuru)"
           # Betik ikinci kez çalışınca güncelleme yapar, kurulumu bozmaz
           cd "$GITHUB_WORKSPACE"
           sudo OKULPANO_IMAGE=okul-pano:ci bash okul-pano/deploy/kurulum.sh
           for i in $(seq 1 60); do curl -fsk https://localhost/api/health >/dev/null && break; sleep 2; done
-          curl -fsk https://localhost/api/health && echo " · güncelleme sonrası açık"
+          curl -fsk https://localhost/api/health
+          echo " · güncelleme sonrası açık"
 
       - name: GitHub Container Registry'ye gönder
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'

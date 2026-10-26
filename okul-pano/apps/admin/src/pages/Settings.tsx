@@ -1,11 +1,12 @@
 import { SCHOOL_TYPES, splitSchoolName, updateSchoolSchema, type SchoolSettings } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { MapPin, Search } from 'lucide-react';
+import { Copy, Download, ExternalLink, FileText, MapPin, Search } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ImageUpload } from '../components/ImageUpload.tsx';
 import { SaveBar } from '../components/SaveBar.tsx';
 import { useToast } from '../components/Toast.tsx';
-import { Alert, Button, Card, Field, Input, PageHeader, Spinner, Toggle } from '../components/ui.tsx';
+import { Alert, Button, Card, Field, Input, PageHeader, Spinner, Textarea, Toggle } from '../components/ui.tsx';
+import { downloadJson } from '../lib/download.ts';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
@@ -117,6 +118,86 @@ function CitySearch({ onPick }: { onPick: (r: GeoResult) => void }) {
         </ul>
       )}
     </div>
+  );
+}
+
+/**
+ * KVKK: okulun aydınlatma metni (herkese açık /aydinlatma/<okul> adresinde yayınlanır) ve okul sahibi için
+ * bütün verileri dışa aktarma.
+ */
+function PrivacySection({ value, onChange, slug }: { value: string; onChange: (v: string) => void; slug: string }) {
+  const { school: access, me } = useAuth();
+  const canExport = access?.role === 'owner' || Boolean(me?.user.isSuperAdmin);
+  const path = useSchoolPath();
+  const toast = useToast();
+  const [busy, setBusy] = useState<'template' | 'export' | null>(null);
+  const publicUrl = `${location.origin}/aydinlatma/${slug}`;
+
+  const fillTemplate = async () => {
+    if (value.trim() && !confirm('Mevcut metin şablonla değiştirilsin mi?')) return;
+    setBusy('template');
+    try {
+      const { text } = await api<{ text: string }>(`${path}/privacy-template`);
+      onChange(text);
+      toast.success('Şablon dolduruldu: köşeli parantezli yerleri okulunuzun bilgileriyle değiştirip kaydedin');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Şablon alınamadı');
+    } finally {
+      setBusy(null);
+    }
+  };
+  const exportData = async () => {
+    setBusy('export');
+    try {
+      const data = await api(`${path}/export`);
+      downloadJson(data, `okul-pano-${slug}-${new Date().toISOString().slice(0, 10)}.json`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Dışa aktarılamadı');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Section
+      title="Kişisel veriler (KVKK)"
+      description="Veri sorumlusu okulunuzdur. Aydınlatma metnini yayınlayın, bağlantısını velilere ve personele iletin (okul sitesi, veli grubu, QR kod)."
+    >
+      <Field
+        label="Aydınlatma metni"
+        help='Satır başındaki "# " başlık, "- " madde olur. Şablon genel bir başlangıçtır; okulunuzun bilgileriyle tamamlayıp bir hukukçuya kontrol ettirmeniz önerilir.'
+      >
+        {(id) => <Textarea id={id} value={value} onChange={(e) => onChange(e.target.value)} className="min-h-48 font-mono text-xs" maxLength={20000} />}
+      </Field>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="secondary" icon={<FileText className="size-4" />} loading={busy === 'template'} onClick={() => void fillTemplate()}>
+          Şablondan doldur
+        </Button>
+        <Button
+          variant="secondary"
+          icon={<Copy className="size-4" />}
+          onClick={() => void navigator.clipboard?.writeText(publicUrl).then(() => toast.success('Bağlantı kopyalandı'))}
+        >
+          Bağlantıyı kopyala
+        </Button>
+        <a href={`/aydinlatma/${slug}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-2 text-sm font-semibold text-brand-700 hover:underline">
+          <ExternalLink className="size-4" /> Yayındaki metni aç
+        </a>
+      </div>
+      <p className="text-xs text-slate-500">Herkese açık adres: {publicUrl} · Değişiklik kaydedilince yayına girer.</p>
+      {canExport && (
+        <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
+          <div className="text-sm font-semibold">Verileri dışa aktar</div>
+          <p className="mt-1 text-sm text-slate-500">
+            Okulunuzun bütün kayıtları (öğretmenler, öğrenciler, nöbetler, duyurular, görseller, etkinlik geçmişi) tek dosyada iner. Şifreler ve
+            pano anahtarları dosyada yer almaz. Dosyayı güvenli saklayın; kişisel veri içerir.
+          </p>
+          <Button className="mt-3" variant="secondary" icon={<Download className="size-4" />} loading={busy === 'export'} onClick={() => void exportData()}>
+            Verileri indir (JSON)
+          </Button>
+        </div>
+      )}
+    </Section>
   );
 }
 
@@ -263,6 +344,7 @@ export function Settings() {
             sayfasında.
           </p>
         </Section>
+        <PrivacySection value={s.privacyNotice ?? ''} onChange={(x) => setting('privacyNotice', x)} slug={school.data!.slug} />
         {/* Pano düzenindeki gibi: yalnızca değişiklik varsa altta yapışık Kaydet / İptal */}
         <SaveBar
           show={dirty}

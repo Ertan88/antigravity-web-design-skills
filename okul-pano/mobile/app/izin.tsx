@@ -114,7 +114,7 @@ export default function Izin() {
       ) : (
         <T weight="700">{dayTitle(preset === 'today' ? base : addDays(base, 1))}</T>
       )}
-      <Field label="Not (isteğe bağlı)" value={note} onChangeText={setNote} maxLength={120} placeholder="ör. Sağlık raporu" />
+      <Field label="Not (isteğe bağlı)" value={note} onChangeText={setNote} maxLength={120} placeholder="ör. Yıllık izin, görevlendirme" help="Hastalık, tanı ya da rapor içeriği gibi sağlık bilgisi yazmayın." />
 
       <SectionTitle>Bildirdiğim izinler</SectionTitle>
       {(mine.data ?? []).length ? (

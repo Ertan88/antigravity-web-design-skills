@@ -25,6 +25,7 @@ import { notificationRoutes } from './routes/notifications.ts';
 import { memberRoutes } from './routes/members.ts';
 import { controlRoutes } from './routes/control.ts';
 import { meRoutes } from './routes/me.ts';
+import { privacyRoutes } from './routes/privacy.ts';
 import { notifyUsers, usersWithPermission } from './lib/push.ts';
 import { screens } from './db/schema.ts';
 import { eq } from 'drizzle-orm';
@@ -107,6 +108,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   await app.register(notificationRoutes);
   await app.register(controlRoutes);
   await app.register(meRoutes);
+  await app.register(privacyRoutes);
 
   // Pano 10 dakikadan uzun süre bağlantısız kalırsa ekranları yönetenlerin telefonuna bildirim
   deps.bus.onLongOffline = (screenId) => {

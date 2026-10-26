@@ -33,3 +33,6 @@ services:
       # Tanıtım için örnek okul (örnek hesapların şifresi yöneticinin şifresiyle aynıdır). İstemiyorsanız false yapın.
       - key: SEED_DEMO
         value: "true"
+      # Aydınlatma metni şablonunda "verilerin saklandığı yer" olarak yazılır. Kendi sunucunuza geçince değiştirin.
+      - key: DATA_REGION
+        value: Almanya (Frankfurt)

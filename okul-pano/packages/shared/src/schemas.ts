@@ -117,6 +117,8 @@ export const schoolSettingsSchema = z.object({
   lunchThresholdMin: z.number().int().min(10).max(180).default(30),
   /** Okulun varsayılan pano düzeni; yoksa eski göster/gizle ayarlarından türetilir */
   layout: boardLayoutSchema.nullable().default(null),
+  /** KVKK aydınlatma metni: okulun kendi metni, herkese açık /aydinlatma/<okul> adresinde yayınlanır */
+  privacyNotice: z.string().max(20000).default(''),
 });
 export type SchoolSettings = z.infer<typeof schoolSettingsSchema>;
 export const defaultSchoolSettings: SchoolSettings = schoolSettingsSchema.parse({});
@@ -575,3 +577,6 @@ export const pushTokenSchema = z.object({
     .regex(/^(ExponentPushToken|ExpoPushToken)\[[^\]]+\]$/, 'Geçersiz bildirim anahtarı'),
   platform: z.enum(['ios', 'android', 'web']).default('android'),
 });
+
+/** Okulun silinmesi: yanlışlıkla silinmesin diye okulun kısa adı yazılarak onaylanır */
+export const deleteSchoolSchema = z.object({ confirmSlug: z.string().trim().min(1, 'Onay için okulun kısa adını yazın') });
