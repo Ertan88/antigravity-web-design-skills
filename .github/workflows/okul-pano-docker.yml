@@ -1,4 +1,5 @@
-# Okul Pano Docker imajının (Render ve VPS kurulumu) derlendiğini doğrular; imaj bir yere gönderilmez.
+# Okul Pano Docker imajının (Render ve VPS kurulumu) derlendiğini ve PostgreSQL ile açıldığını doğrular;
+# imaj bir yere gönderilmez.
 name: Okul Pano · Docker imajı
 
 on:
@@ -15,17 +16,40 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: okulpano
+          POSTGRES_PASSWORD: okulpano
+          POSTGRES_DB: okulpano
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U okulpano" --health-interval 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - name: İmajı derle
         run: docker build -t okul-pano:ci okul-pano
-      - name: Açılışı dene (veritabanı boş, örnek okul kurulur)
+      - name: Açılışı dene (boş PostgreSQL, görseller veritabanında, örnek okul kurulur)
         run: |
-          docker run -d --name app -p 3000:3000 \
+          docker run -d --name app --network host \
+            -e DATABASE_URL=postgres://okulpano:okulpano@localhost:5432/okulpano \
             -e JWT_SECRET=ci-denemesi-icin-en-az-otuz-iki-karakterlik-anahtar \
             -e FILE_STORAGE=db -e SEED_DEMO=true \
             -e SEED_SUPERADMIN_EMAIL=ci@ornek.com -e SEED_SUPERADMIN_PASSWORD=Ci-Deneme-2026 \
             okul-pano:ci
           for i in $(seq 1 60); do curl -fs localhost:3000/api/health && break; sleep 2; done
+          echo
           for p in /admin/ /display/ /app/; do curl -fs -o /dev/null "localhost:3000$p" && echo "$p tamam"; done
           docker logs app | grep "İlk açılış"
+          T=$(curl -fs -X POST localhost:3000/api/auth/login -H 'content-type: application/json' \
+            -d '{"email":"mudur@okulpano.local","password":"Ci-Deneme-2026"}' | python3 -c 'import json,sys;print(json.load(sys.stdin)["accessToken"])')
+          SID=$(curl -fs localhost:3000/api/me -H "authorization: Bearer $T" | python3 -c 'import json,sys;print(json.load(sys.stdin)["schools"][0]["id"])')
+          IMG=$(curl -fs "localhost:3000/api/schools/$SID/announcements" -H "authorization: Bearer $T" \
+            | python3 -c 'import json,sys;print([a["imageUrl"] for a in json.load(sys.stdin) if a.get("imageUrl")][0])')
+          curl -fs -o /dev/null -w "görsel %{http_code} %{content_type} %{size_download} bayt\n" "localhost:3000$IMG"
+          # Bilinen geliştirme şifresi internete açık kurulumda çalışmamalı
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST localhost:3000/api/auth/login -H 'content-type: application/json' \
+            -d '{"email":"mudur@okulpano.local","password":"Mudur2026!"}')" = 401 && echo "eski şifre reddedildi"
+      - name: Sunucu kaydı
+        if: always()
+        run: docker logs app 2>&1 | grep -v '"level":30' | tail -40 || true
