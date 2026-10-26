@@ -114,3 +114,18 @@ export function monthFromText(text: string): { month: number; year: number | nul
   }
   return null;
 }
+
+const MONTH_NAMES = ['', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+
+/**
+ * Tatilin resmî tam adı: sabit tarihli millî bayram ve günler tarihleriyle anılır
+ * ("Cumhuriyet Bayramı" -> "29 Ekim Cumhuriyet Bayramı"). Dini bayramlar ve okulun kendi tatilleri olduğu gibi kalır.
+ */
+export function holidayFullName(iso: string, name: string): string {
+  const mmdd = iso.slice(5);
+  if (FIXED[mmdd] !== name || mmdd === '01-01' || name.endsWith('Arifesi')) return name;
+  return `${Number(iso.slice(8))} ${MONTH_NAMES[Number(iso.slice(5, 7))]} ${name}`;
+}
+
+/** Arife: yarım gün tatil (öğleden sonra); o gün nöbet ve görevler sürer */
+export const isHalfDayHoliday = (name: string) => name.endsWith('Arifesi');

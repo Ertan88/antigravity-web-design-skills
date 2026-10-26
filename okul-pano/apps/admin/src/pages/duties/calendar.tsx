@@ -1,4 +1,4 @@
-import { WEEKDAY_NAMES, WEEKDAY_SHORT } from '@okulpano/shared';
+import { holidayFullName, isHalfDayHoliday, WEEKDAY_NAMES, WEEKDAY_SHORT } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { Check, ChevronLeft, ChevronRight, Eraser, Loader2 } from 'lucide-react';
@@ -130,11 +130,15 @@ export function DayShell({
   holidayCentered?: boolean;
   children: ReactNode;
 }) {
+  // Arife yarım gündür: görevler sürer, adı kartı büyütmemek için tarihin yanına yazılır
+  const halfDay = holiday && isHalfDayHoliday(holiday.name) ? holiday : undefined;
+  const fullDay = holiday && !halfDay ? holiday : undefined;
+  const fullName = fullDay ? holidayFullName(fullDay.date, fullDay.name) : '';
   return (
     <li
       className={clsx(
         'relative rounded-2xl p-2.5 ring-1 transition',
-        holiday
+        fullDay
           ? 'bg-rose-50 ring-rose-100'
           : isToday
             ? tone === 'teal'
@@ -148,15 +152,14 @@ export function DayShell({
         <span className={clsx('text-xs font-medium', isToday ? (tone === 'teal' ? 'text-teal-700' : 'text-amber-700') : 'text-slate-500')}>
           {isToday ? 'Bugün' : WEEKDAY_SHORT[day.weekday]}
         </span>
+        {halfDay && <span className="min-w-0 text-[11px] leading-tight font-semibold text-rose-600">{halfDay.name}</span>}
         {aside && <span className="ml-auto">{aside}</span>}
       </div>
-      {holiday &&
+      {fullDay &&
         (holidayCentered ? (
-          <div className="flex min-h-16 items-center justify-center px-1 py-2 text-center text-sm leading-snug font-bold text-rose-700">{holiday.name}</div>
+          <div className="flex min-h-16 items-center justify-center px-1 py-2 text-center text-sm leading-snug font-bold text-rose-700">{fullName}</div>
         ) : (
-          <div className="mb-1.5 rounded-lg bg-rose-100 px-2 py-1 text-[11px] leading-tight font-semibold text-rose-700" title={holiday.name}>
-            {holiday.name}
-          </div>
+          <div className="mb-1.5 rounded-lg bg-rose-100 px-2 py-1 text-[11px] leading-tight font-semibold text-rose-700">{fullName}</div>
         ))}
       {children}
     </li>
@@ -227,6 +230,10 @@ function SupervisorCell({
       }),
     );
   };
+  // Resmî / dini tatilde nöbet olmaz: kartın tamamında tatilin tam adı (arife yarım gün, normal gün)
+  if (holiday && !isHalfDayHoliday(holiday.name) && !current) {
+    return <DayShell day={day} isToday={isToday} tone="teal" holiday={holiday} holidayCentered>{null}</DayShell>;
+  }
   return (
     <DayShell day={day} isToday={isToday} tone="teal" holiday={holiday}>
       <div className="relative">

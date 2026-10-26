@@ -1,3 +1,4 @@
+import { isHalfDayHoliday } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { Bus, Settings2, Sunrise, Sunset, Utensils } from 'lucide-react';
@@ -61,7 +62,7 @@ function TransportCell({
     void run(() => onSave(next.filter(Boolean)));
   };
   // Resmî / dini tatilde görevli olmaz: kartın ortasında yalnızca tatilin tam adı (arife yarım gün, normal gün)
-  if (holiday && !holiday.name.endsWith('Arifesi')) {
+  if (holiday && !isHalfDayHoliday(holiday.name)) {
     return <DayShell day={day} isToday={isToday} tone="amber" holiday={holiday} holidayCentered>{null}</DayShell>;
   }
   return (

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectHolidayText, holidayDatesInMonth, monthFromText, officialHolidayOn } from './holidays.ts';
+import { detectHolidayText, holidayDatesInMonth, holidayFullName, monthFromText, officialHolidayOn } from './holidays.ts';
 
 describe('tatiller', () => {
   it('resmi ve dini tatilleri bilir', () => {
@@ -29,5 +29,16 @@ describe('tatiller', () => {
     expect(monthFromText('Kasım 2026 Nöbet Çizelgesi')).toEqual({ month: 11, year: 2026 });
     expect(monthFromText('AİT OLDUĞU AY: AĞUSTOS')).toEqual({ month: 8, year: null });
     expect(monthFromText('ÖĞRETMEN NÖBET ÇİZELGESİ')).toBeNull();
+  });
+});
+
+describe('holidayFullName', () => {
+  it('sabit tarihli bayramları tarihiyle, diğerlerini olduğu gibi yazar', () => {
+    expect(holidayFullName('2026-10-29', 'Cumhuriyet Bayramı')).toBe('29 Ekim Cumhuriyet Bayramı');
+    expect(holidayFullName('2026-04-23', 'Ulusal Egemenlik ve Çocuk Bayramı')).toBe('23 Nisan Ulusal Egemenlik ve Çocuk Bayramı');
+    expect(holidayFullName('2026-10-28', 'Cumhuriyet Bayramı Arifesi')).toBe('Cumhuriyet Bayramı Arifesi');
+    expect(holidayFullName('2026-05-28', 'Kurban Bayramı 2. Gün')).toBe('Kurban Bayramı 2. Gün');
+    expect(holidayFullName('2026-01-01', 'Yılbaşı')).toBe('Yılbaşı');
+    expect(holidayFullName('2026-11-10', 'Ara tatil')).toBe('Ara tatil');
   });
 });
