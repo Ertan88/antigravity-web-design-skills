@@ -1,5 +1,14 @@
-# Okul Pano: API + yönetim paneli + pano tek kapsayıcıda
+# Okul Pano: API + yönetim paneli + pano + mobil uygulamanın web sürümü tek kapsayıcıda
 # Derleme: docker build -t okul-pano .
+
+# Mobil uygulamanın web sürümü (/app/): telefona uygulama kurmayan öğretmenler tarayıcıdan kullanır
+FROM node:22-alpine AS mobile
+WORKDIR /app/mobile
+COPY mobile/package.json mobile/package-lock.json ./
+RUN npm ci
+COPY packages/shared /app/packages/shared
+COPY mobile ./
+RUN npx expo export --platform web --output-dir dist
 
 FROM node:22-alpine AS build
 WORKDIR /app
@@ -28,6 +37,7 @@ COPY --from=build /app/apps/api/drizzle apps/api/drizzle
 COPY --from=build /app/apps/api/seed-assets apps/api/seed-assets
 COPY --from=build /app/apps/admin/dist apps/admin/dist
 COPY --from=build /app/apps/display/dist apps/display/dist
+COPY --from=mobile /app/mobile/dist mobile/dist
 
 WORKDIR /app/apps/api
 RUN mkdir -p uploads data && chown -R node:node uploads data

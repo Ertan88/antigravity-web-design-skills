@@ -368,7 +368,8 @@ export async function displayRoutes(app: FastifyInstance) {
   });
 
   /** Pano anlık durumunu bildirir (gösterilen içerik, duraklatma, uyku): mobil uzaktan kumandada görünür */
-  app.post('/api/display/status', { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (req, reply) => {
+  // Okuldaki bütün panolar aynı IP'den gelebilir: sınır pano başına değil, adres başınadır
+  app.post('/api/display/status', { config: { rateLimit: { max: 600, timeWindow: '1 minute' } } }, async (req, reply) => {
     const auth = await resolveDisplay(app, req);
     if (auth.screen && !auth.preview) bus.setLiveStatus(auth.screen.id, parse(screenLiveStatusSchema, req.body));
     return reply.status(204).send();

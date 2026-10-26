@@ -183,8 +183,11 @@ export async function controlRoutes(app: FastifyInstance) {
     const { date } = parse(dateQuery, req.query);
     const day = await dutyDay(db, req.ctx.schoolId, date ?? todayOf(req).isoDate);
     const canAssign = req.ctx.permissions.includes('duties.manage');
+    // Onay bekleyen izin talepleri yalnızca izin ya da nöbet yetkisi olanlara görünür
+    const seesRequests = canAssign || req.ctx.permissions.includes('leaves.manage');
     return {
       ...day,
+      entries: seesRequests ? day.entries : day.entries.map((e) => ({ ...e, leavePending: false })),
       gaps: dutyGaps(day).map((g) => g.dutyId),
       // Öneriler yalnızca görevlendirme yapabilenlere (ve boş yer varken) hesaplanır
       candidates: canAssign && dutyGaps(day).length ? await substituteCandidates(db, req.ctx.schoolId, day) : [],

@@ -1,6 +1,6 @@
 # Okul Pano
 
-Okullar için **çok okullu (SaaS'a hazır)** dijital pano sistemi: koridordaki TV'ler, uzaktan erişilen bir yönetim paneli ve ileride mobil uygulamanın da kullanacağı tek bir API.
+Okullar için **çok okullu (SaaS'a hazır)** dijital pano sistemi: koridordaki TV'ler, uzaktan erişilen bir yönetim paneli, öğretmen ve yöneticiler için mobil uygulama ve hepsinin kullandığı tek bir API.
 
 ![Pano: ders sırasında](docs/pano-ders.png)
 
@@ -38,6 +38,22 @@ Okullar için **çok okullu (SaaS'a hazır)** dijital pano sistemi: koridordaki 
 - **Öğrenciler:** Ad Soyad, Sınıf, Doğum Tarihi. e-Okul listeleri olduğu gibi okunur: "Adı / Soyadı" ya da "Sınıfı / Şubesi" ayrı sütunlarda olabilir, okul numarası yok sayılır. Sınıf "9/A", "9A", "9. Sınıf A Şubesi" yazılsa da "9-A" olur; listede olmayan sınıf oluşturulur. Tarih Excel tarihi, "14.03.2010" ya da "2010-03-14" olabilir; 31 Şubat gibi geçersiz tarihler satır numarasıyla bildirilir. Öğrenci "ad soyad + doğum tarihi" ile tanınır: yeniden yüklemek çift kayıt açmaz, yeni dönemde sınıfı güncellenir; aynı isimli iki öğrenci karışmaz.
 - **Nöbet çizelgesi:** Okulların kâğıtta kullandığı biçimde, satırlarda nöbet yerleri ve sütunlarda günler. Hücrelerde kadrodaki öğretmenler açılır listede; bir yerde birden fazla öğretmen virgülle yazılır. Dışa aktarılan dosya yatay A4'e sığacak şekilde ayarlıdır, yazdırılıp asılabilir. Yüklerken "Çizelgeyi değiştir" (dosyadaki günler yenilenir, hafta sonu gibi dosyada olmayan günlere dokunulmaz) ya da "Mevcut çizelgeye ekle" seçilir; kaldırılacak nöbetler önceden listelenir. Kadroda olmayan isim atlanır ve benzer isim önerilir ("Hasan Ozturk" → "Hasan Öztürk mi?"). "Gün | Nöbet Yeri | Öğretmen" sütunlu uzun listeler de okunur.
 
+## Mobil uygulama ve uzaktan yönetim
+
+Expo (React Native) ile yazılmış tek uygulama; ekranlar kişinin yetkisine göre değişir. Ayrıntılar: [mobile/README.md](mobile/README.md).
+
+| Öğretmen | Yönetici |
+|---|---|
+| **Bugün:** şu anki ders, teneffüse kalan süre, bugünkü nöbeti ve ders programı | **Kontrol merkezi:** çevrimiçi pano, onay bekleyen, yayındaki içerik; boş nöbet, kapalı pano gibi ilgilenilmesi gerekenler |
+| **Nöbetlerim:** haftalık şerit (tatiller soluk), birlikte nöbet tutanlar, nöbet günü sabah hatırlatma | **Onaylar:** duyuru ve izin bildirimleri tek dokunuşla onay / geri gönder |
+| **Hızlı duyuru:** hazır şablon ya da telefonla çekilen fotoğraf, canlı önizleme, onaya gönderme | **Pano uzaktan kumanda:** canlı önizleme, sonraki / önceki / bu içerikte durdur, ekran modu, uyut / uyandır |
+| **İzin bildirimi:** onaylanınca panoda izinli görünür | **Panoya hemen yaz:** onaya takılmayan, süresi bitince kalkan mesaj (üst şerit, tam ekran, kayan yazı) |
+| | **Bugünün modu:** kısaltılmış gün, sınav, tören, okul tatil; zili ±dakika kaydırma. Yarın kendiliğinden normale döner |
+| | **Boş nöbet:** izinli öğretmenin nöbeti için öneriler (o gün nöbeti olmayan, bu ay en az nöbet tutan); "Ata" ile bildirim gider |
+| | **Acil durum:** 3 saniye basılı tutunca bütün panolarda uyarı ve herkesin telefonuna bildirim |
+
+Telefon bildirimleri (Expo push): onaya düşen duyuru ve izin, onay sonucu, acil durum, nöbet görevlendirmesi, 10 dakikadır kapalı pano. Aynı uygulamanın web sürümü sunucunun `/app/` adresinden açılır; uygulama kurmayan öğretmenler tarayıcıdan kullanır. Panoya anlık mesaj ve günün modu web panelinin Genel Bakış sayfasında da var.
+
 ## Öne çıkan teknik kararlar
 
 - **Gerçek zamanlı:** Panelde yapılan her değişiklik ekranlara Server-Sent Events ile yaklaşık bir saniyede ulaşır. Ekranlar uzaktan yenilenebilir ya da "Tanımla" ile adını gösterebilir.
@@ -58,7 +74,8 @@ okul-pano/
 ├── packages/slides   Hazır duyuru şablonlarının görünümü (pano ve panel önizlemesi aynı bileşen)
 ├── apps/api          Fastify + Drizzle ORM · PostgreSQL (geliştirmede gömülü PGlite)
 ├── apps/admin        Yönetim paneli · React + TanStack Query + Tailwind · /admin/
-└── apps/display      Pano · React, düşük güçlü cihazlar için hafif paket · /display/
+├── apps/display      Pano · React, düşük güçlü cihazlar için hafif paket · /display/
+└── mobile            Mobil uygulama · Expo (React Native) · web sürümü /app/ (ayrı npm kurulumu)
 ```
 
 Üretimde tek bir Node süreci API'yi, paneli ve panoyu aynı adresten sunar; önüne otomatik HTTPS veren Caddy konur.
@@ -79,11 +96,12 @@ npm run dev       # API :3000, panel :5173/admin/, pano :5174/display/
 | Platform yöneticisi | admin@okulpano.local | Pano2026! |
 | Okul sahibi | mudur@okulpano.local | Mudur2026! |
 | Editör (duyuru + kayan yazı) | editor@okulpano.local | Editor2026! |
+| Öğretmen (mobil uygulama) | ogretmen@okulpano.local | Ogretmen2026! |
 
 `npm run seed` çıktısındaki bağlantı örnek ekranı doğrudan açar. Belirli bir anı denemek için panoya `&at=2026-10-28T09:42:00+03:00` ekleyin.
 
 ```bash
-npm test          # 36 birim + 49 entegrasyon testi
+npm test          # 70 birim + 86 entegrasyon testi
 npm run typecheck
 npm run build     # üretim derlemesi
 ```
@@ -95,11 +113,10 @@ cp deploy/.env.example deploy/.env      # alan adı ve gizli anahtarlar
 docker compose --env-file deploy/.env up -d --build
 ```
 
-Panel `https://alanadiniz/admin/`, pano `https://alanadiniz/display/` adresinde açılır. TV tarafında Chromium'u kiosk modunda çalıştırmanız yeterli; komut paneldeki **Ekranlar** sayfasında yazar.
+Panel `https://alanadiniz/admin/`, pano `https://alanadiniz/display/`, mobil uygulamanın web sürümü `https://alanadiniz/app/` adresinde açılır. TV tarafında Chromium'u kiosk modunda çalıştırmanız yeterli; komut paneldeki **Ekranlar** sayfasında yazar.
 
 ## Yol haritası
 
-1. **Şimdi (bu sürüm):** 5 alanlı pano, yönetim paneli, yetkiler, ekran eşleştirme, canlı güncelleme.
-2. **Sıradaki:** e-posta ile davet ve şifre sıfırlama, duyuru onay akışı (editör hazırlar, müdür onaylar), acil durum modu (tek tuşla deprem/yangın tahliye ekranı), tatil günleri takvimi, ekran başına farklı içerik.
+1. **Bu sürüm:** pano, yönetim paneli, yetkiler, ekran eşleştirme, canlı güncelleme, onay akışı, acil durum, tatil takvimi, panoya özel içerik, mobil uygulama (öğretmen + yönetici), uzaktan kumanda, günün modu, nöbet yerine görevlendirme, telefon bildirimleri.
+2. **Sıradaki:** nöbet değişimi isteği (öğretmenler arası), telefon ana ekranı bileşeni ("Teneffüse 12 dk · Nöbet: Bahçe"), veli / öğrenci için salt okunur sürüm.
 3. **Abonelik:** iyzico/Stripe ile ödeme, paket limitlerinin otomatik uygulanması, okulların kendi kendine kaydı.
-4. **Mobil uygulama:** Expo (React Native). `packages/shared` olduğu gibi kullanılır; anlık bildirimle "duyurunuz yayında" ve "ekran çevrimdışı" uyarıları.

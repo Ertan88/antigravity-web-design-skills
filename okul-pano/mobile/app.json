@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "Okul Pano",
+    "slug": "okul-pano",
+    "scheme": "okulpano",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#f3f6f8",
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "ios": {
+      "bundleIdentifier": "com.okulpano.app",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Duyuru ve başarı fotoğrafı çekmek için kamera kullanılır.",
+        "NSPhotoLibraryUsageDescription": "Duyuru ve başarı fotoğrafı seçmek için galeri kullanılır."
+      }
+    },
+    "android": {
+      "package": "com.okulpano.app",
+      "permissions": [
+        "CAMERA",
+        "POST_NOTIFICATIONS"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "name": "Okul Pano",
+      "shortName": "Okul Pano",
+      "themeColor": "#0e6a85",
+      "backgroundColor": "#f3f6f8"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Duyuru ve başarı fotoğrafı çekmek için kamera kullanılır.",
+          "photosPermission": "Duyuru ve başarı fotoğrafı seçmek için galeri kullanılır."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#0e6a85"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false,
+      "baseUrl": "/app"
+    }
+  }
+}

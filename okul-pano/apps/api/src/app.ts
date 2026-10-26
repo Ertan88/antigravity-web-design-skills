@@ -131,6 +131,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   const spas = [
     { prefix: '/admin/', dir: env.ADMIN_DIST },
     { prefix: '/display/', dir: env.DISPLAY_DIST },
+    { prefix: '/app/', dir: env.MOBILE_DIST },
   ].filter((s): s is { prefix: string; dir: string } => Boolean(s.dir && existsSync(resolve(s.dir, 'index.html'))));
 
   for (const spa of spas) {

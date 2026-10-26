@@ -12,6 +12,8 @@ const schema = z.object({
   /** Derlenmiş panel ve pano dosyaları (varsa) API ile aynı adresten sunulur: /admin/ ve /display/ */
   ADMIN_DIST: z.string().default('../admin/dist'),
   DISPLAY_DIST: z.string().default('../display/dist'),
+  /** Mobil uygulamanın web sürümü (varsa): /app/ — uygulamayı yüklemeyen öğretmenler tarayıcıdan kullanır */
+  MOBILE_DIST: z.string().default('../../mobile/dist'),
   /** E-posta (şifre gönderimi). SMTP_HOST boşsa e-posta gönderilmez; panel e-posta programını açar. */
   SMTP_HOST: z.string().optional().transform((v) => v || undefined),
   SMTP_PORT: z.coerce.number().int().default(587),
