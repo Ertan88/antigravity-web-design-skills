@@ -1,4 +1,4 @@
-import { officialHolidays, tidyName } from '@okulpano/shared';
+import { holidayFullName, officialHolidays, tidyName } from '@okulpano/shared';
 import { and, asc, eq, gte, lte, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -35,7 +35,8 @@ export async function holidaysInRange(db: DB, schoolId: string, from: string, to
   }
   // Okulun yazdığı ad öncelikli (ör. "29 Ekim Cumhuriyet Bayramı Töreni")
   for (const h of own) out.set(h.date, { ...h, source: 'school' });
-  return [...out.values()].sort((a, b) => a.date.localeCompare(b.date));
+  // Sabit tarihli millî bayramlar tam adıyla gider ("29 Ekim Cumhuriyet Bayramı"): pano, panel ve mobil aynı adı gösterir
+  return [...out.values()].map((h) => ({ ...h, name: holidayFullName(h.date, h.name) })).sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export async function holidayRoutes(app: FastifyInstance) {

@@ -1,4 +1,4 @@
-import { dutySchema, WEEKDAY_NAMES, WEEKDAY_SHORT } from '@okulpano/shared';
+import { dutySchema, holidayFullName, WEEKDAY_NAMES, WEEKDAY_SHORT } from '@okulpano/shared';
 import clsx from 'clsx';
 import { CalendarDays, CopyPlus, ShieldCheck, UserCog } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -191,7 +191,7 @@ function DutyExcelImport({ file, onClose, onSaved }: { file: File | null; onClos
               <ul className="mt-1.5 space-y-0.5">
                 {p.holidays.map((h) => (
                   <li key={h.date}>
-                    <span className="tabular-nums">{trDate(h.date)}</span> · {h.name}
+                    <span className="tabular-nums">{trDate(h.date)}</span> · {holidayFullName(h.date, h.name)}
                   </li>
                 ))}
                 {p.undatedHolidays.map((h) => (

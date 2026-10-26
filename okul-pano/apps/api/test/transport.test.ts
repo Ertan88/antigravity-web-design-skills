@@ -170,13 +170,13 @@ describe('taşımalı öğrenci (servis) görevlileri', () => {
     ws.getRow(5).values = ['30.10.2026', 'CUMA', 'Ali Kaya', null];
     const body = (await upload(Buffer.from(await wb.xlsx.writeBuffer()))).json();
     const oct29 = body.rows.find((r: { date: string }) => r.date === '2026-10-29');
-    expect(oct29).toMatchObject({ cleared: true, missing: true, holiday: 'Cumhuriyet Bayramı', teachers: [] });
+    expect(oct29).toMatchObject({ cleared: true, missing: true, holiday: '29 Ekim Cumhuriyet Bayramı', teachers: [] });
 
     // Dosyada tatil gününe isim yazılmışsa alınmaz, uyarı verilir
     ws.getRow(6).values = ['29.10.2026', 'PERŞEMBE', 'Ayşe Demir', null];
     const again = (await upload(Buffer.from(await wb.xlsx.writeBuffer()))).json();
     expect(again.rows.find((r: { date: string }) => r.date === '2026-10-29')).toMatchObject({ cleared: true, teachers: [] });
-    expect(again.issues).toEqual([{ row: 6, message: '29.10.2026 tatil (Cumhuriyet Bayramı); görevli yazılmadı' }]);
+    expect(again.issues).toEqual([{ row: 6, message: '29.10.2026 tatil (29 Ekim Cumhuriyet Bayramı); görevli yazılmadı' }]);
 
     const saved = await owner.post(path('transport-duties/import'), {
       days: again.rows.map((r: { date: string; teachers: { id: string }[] }) => ({ date: r.date, teacherIds: r.teachers.map((x) => x.id) })),

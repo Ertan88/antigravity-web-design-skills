@@ -126,8 +126,11 @@ export function DayShell({
   aside?: ReactNode;
   /** O gün tatilse adı gösterilir */
   holiday?: Holiday;
-  /** Tatil adı üstteki küçük etiket yerine kartın ortasında (içeriği olmayan tam gün tatil) */
-  holidayCentered?: boolean;
+  /**
+   * Tatil adı üstteki küçük etiket yerine kartın ortasında (içeriği olmayan tam gün tatil). "compact": kartın
+   * içeriği tek satırlık olduğunda (müdür yardımcısı) aynı yükseklikte kalır, takvim düzeni bozulmaz.
+   */
+  holidayCentered?: boolean | 'compact';
   children: ReactNode;
 }) {
   // Arife yarım gündür: görevler sürer, adı kartı büyütmemek için tarihin yanına yazılır
@@ -157,7 +160,16 @@ export function DayShell({
       </div>
       {fullDay &&
         (holidayCentered ? (
-          <div className="flex min-h-16 items-center justify-center px-1 py-2 text-center text-sm leading-snug font-bold text-rose-700">{fullName}</div>
+          <div
+            className={clsx(
+              'flex items-center justify-center px-1 text-center font-bold text-rose-700',
+              holidayCentered === 'compact' ? 'h-9 text-xs leading-tight' : 'min-h-16 py-2 text-sm leading-snug',
+            )}
+          >
+            <span className={clsx(holidayCentered === 'compact' && 'line-clamp-2')} title={fullName}>
+              {fullName}
+            </span>
+          </div>
         ) : (
           <div className="mb-1.5 rounded-lg bg-rose-100 px-2 py-1 text-[11px] leading-tight font-semibold text-rose-700">{fullName}</div>
         ))}
@@ -232,7 +244,7 @@ function SupervisorCell({
   };
   // Resmî / dini tatilde nöbet olmaz: kartın tamamında tatilin tam adı (arife yarım gün, normal gün)
   if (holiday && !isHalfDayHoliday(holiday.name) && !current) {
-    return <DayShell day={day} isToday={isToday} tone="teal" holiday={holiday} holidayCentered>{null}</DayShell>;
+    return <DayShell day={day} isToday={isToday} tone="teal" holiday={holiday} holidayCentered="compact">{null}</DayShell>;
   }
   return (
     <DayShell day={day} isToday={isToday} tone="teal" holiday={holiday}>

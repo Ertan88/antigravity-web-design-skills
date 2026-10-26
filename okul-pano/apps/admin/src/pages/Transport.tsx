@@ -1,4 +1,4 @@
-import { isHalfDayHoliday } from '@okulpano/shared';
+import { holidayFullName, isHalfDayHoliday } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { Bus, Settings2, Sunrise, Sunset, Utensils } from 'lucide-react';
@@ -146,7 +146,7 @@ function TransportImport({ file, onClose, onSaved }: { file: File | null; onClos
             <ul className="mt-1.5 space-y-0.5">
               {p.holidays.map((h) => (
                 <li key={h.date}>
-                  <span className="tabular-nums">{trDate(h.date)}</span> · {h.name}
+                  <span className="tabular-nums">{trDate(h.date)}</span> · {holidayFullName(h.date, h.name)}
                 </li>
               ))}
             </ul>
@@ -169,7 +169,7 @@ function TransportImport({ file, onClose, onSaved }: { file: File | null; onClos
           cell: (r) =>
             r.holiday ? (
               <span className="font-medium text-rose-600">
-                {r.holiday}
+                {holidayFullName(r.date, r.holiday)}
                 {r.cleared && r.status !== 'unchanged' && <span className="ml-2 text-xs font-normal text-slate-400">· kayıtlı görevli silinecek</span>}
               </span>
             ) : r.missing ? (
