@@ -2,6 +2,7 @@ import {
   achievementDesign,
   announcementOnAir,
   applyDayPlan,
+  isHalfDayHoliday,
   dayPlanFor,
   dayPlanLabel,
   isSleepTime,
@@ -92,7 +93,9 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
   const schedule = pickSchedule(state.bellSchedules, today.weekday);
   // Günün modu (kısaltılmış gün) ve zil kaydırmaları zil saatlerini değiştirir
   const dayPlan = dayPlanFor(state.dayPlans, today.isoDate);
-  const periods = schedule ? applyDayPlan(schedule.periods, dayPlan) : null;
+  // Resmî / dini tatilde (arife yarım gün hariç) zil ve dersler çalışmaz
+  const fullHoliday = (state.holidays ?? []).some((h) => h.date === today.isoDate && !isHalfDayHoliday(h.name));
+  const periods = schedule && !fullHoliday ? applyDayPlan(schedule.periods, dayPlan) : null;
   const bell = periods ? computeBellStatus(periods, today.secondsOfDay, s.lunchThresholdMin) : ({ kind: 'off' } as const);
   const lessonPeriod = bell.kind === 'lesson' ? bell.period : bell.kind === 'break' || bell.kind === 'before' ? bell.next : null;
   const lessons = lessonPeriod
@@ -175,7 +178,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
           empty(m, <CakeIcon size={22} />, 'Doğum Günleri', 'Bugün doğum günü olan yok', 'birthday-card')
         );
       case 'bell':
-        return <BellCard key={m} status={bell} />;
+        return fullHoliday ? null : <BellCard key={m} status={bell} />;
       case 'lessons':
         return lessonPeriod ? (
           <LessonsCard
@@ -227,6 +230,8 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         return leaves.length > 0;
       case 'birthdays':
         return birthdays.length > 0;
+      case 'bell':
+        return !fullHoliday;
       case 'lessons':
         return Boolean(lessonPeriod);
       case 'achievements':

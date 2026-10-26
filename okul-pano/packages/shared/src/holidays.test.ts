@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectHolidayText, holidayDatesInMonth, holidayFullName, monthFromText, officialHolidayOn } from './holidays.ts';
+import { canonicalHolidayName, detectHolidayText, holidayDatesInMonth, holidayFullName, monthFromText, officialHolidayOn } from './holidays.ts';
 
 describe('tatiller', () => {
   it('resmi ve dini tatilleri bilir', () => {
@@ -40,5 +40,16 @@ describe('holidayFullName', () => {
     expect(holidayFullName('2026-05-28', 'Kurban Bayramı 2. Gün')).toBe('Kurban Bayramı 2. Gün');
     expect(holidayFullName('2026-01-01', 'Yılbaşı')).toBe('Yılbaşı');
     expect(holidayFullName('2026-11-10', 'Ara tatil')).toBe('Ara tatil');
+  });
+});
+
+describe('canonicalHolidayName', () => {
+  it('Excel yazımını resmî ada çevirir, farklı yazıyı korur', () => {
+    expect(holidayFullName('2026-10-29', 'Cumhurıyet Bayramı')).toBe('29 Ekim Cumhuriyet Bayramı');
+    expect(holidayFullName('2026-10-29', '29 EKİM CUMHURİYET BAYRAMI')).toBe('29 Ekim Cumhuriyet Bayramı');
+    expect(canonicalHolidayName('2026-10-28', 'CUMHURIYET BAYRAMI ARIFESI')).toBe('Cumhuriyet Bayramı Arifesi');
+    expect(canonicalHolidayName('2026-05-28', 'kurban bayramı 2. gün')).toBe('Kurban Bayramı 2. Gün');
+    expect(canonicalHolidayName('2026-10-29', 'Cumhuriyet Bayramı Töreni')).toBe('Cumhuriyet Bayramı Töreni');
+    expect(canonicalHolidayName('2026-11-10', 'Ara Tatil')).toBe('Ara Tatil');
   });
 });

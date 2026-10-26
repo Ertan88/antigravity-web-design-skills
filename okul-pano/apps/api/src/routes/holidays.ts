@@ -1,4 +1,4 @@
-import { holidayFullName, officialHolidays, tidyName } from '@okulpano/shared';
+import { canonicalHolidayName, holidayFullName, officialHolidays, tidyName } from '@okulpano/shared';
 import { and, asc, eq, gte, lte, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -13,7 +13,8 @@ type Tx = Parameters<Parameters<DB['transaction']>[0]>[0];
 /** Excel'den tanınan tatilleri kaydeder; aynı tarihte kayıt varsa adı güncellenir */
 export async function saveHolidays(tx: DB | Tx, schoolId: string, list: { date: string; name: string }[]): Promise<number> {
   if (!list.length) return 0;
-  const byDate = new Map(list.map((h) => [h.date, tidyName(h.name)]));
+  // Excel'deki yazım ("CUMHURIYET BAYRAMI") o günün resmî tatiliyse resmî adıyla saklanır
+  const byDate = new Map(list.map((h) => [h.date, canonicalHolidayName(h.date, tidyName(h.name))]));
   const rows = await tx
     .insert(schoolHolidays)
     .values([...byDate].map(([date, name]) => ({ schoolId, date, name })))

@@ -122,6 +122,7 @@ const MONTH_NAMES = ['', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
  * ("Cumhuriyet Bayramı" -> "29 Ekim Cumhuriyet Bayramı"). Dini bayramlar ve okulun kendi tatilleri olduğu gibi kalır.
  */
 export function holidayFullName(iso: string, name: string): string {
+  name = canonicalHolidayName(iso, name);
   const mmdd = iso.slice(5);
   if (FIXED[mmdd] !== name || mmdd === '01-01' || name.endsWith('Arifesi')) return name;
   return `${Number(iso.slice(8))} ${MONTH_NAMES[Number(iso.slice(5, 7))]} ${name}`;
@@ -129,3 +130,33 @@ export function holidayFullName(iso: string, name: string): string {
 
 /** Arife: yarım gün tatil (öğleden sonra); o gün nöbet ve görevler sürer */
 export const isHalfDayHoliday = (name: string) => name.endsWith('Arifesi');
+
+/** Türkçe karakter ve büyük harf farkını yok sayar: "CUMHURIYET BAYRAMI" (Excel) = "Cumhuriyet Bayramı" */
+const fold = (s: string) =>
+  lower(s)
+    .replace(/i̇/g, 'i')
+    .replace(/ı/g, 'i')
+    .replace(/ş/g, 's')
+    .replace(/ğ/g, 'g')
+    .replace(/ü/g, 'u')
+    .replace(/ö/g, 'o')
+    .replace(/ç/g, 'c')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+/**
+ * O tarih resmî / dini tatilse ve yazılan ad aynı tatili anlatıyorsa (Excel'de "29 EKİM CUMHURIYET BAYRAMI",
+ * "Kurban bayramı 2.gün"…) resmî ad kullanılır. Okulun kendi tatili ya da farklı bir yazı ("… Töreni") korunur.
+ */
+export function canonicalHolidayName(iso: string, name: string): string {
+  const official = officialHolidayOn(iso);
+  if (!official) return name;
+  const base = fold(official.replace(/ Arifesi$/, '').replace(/ \d+\. Gün$/, ''));
+  const written = fold(name)
+    .replace(/^\d+\s+(ocak|subat|mart|nisan|mayis|haziran|temmuz|agustos|eylul|ekim|kasim|aralik)\s+/, '')
+    .replace(/\b\d+\s*gun(u)?\b/, '')
+    .replace(/\b(arifesi|arife|resmi tatil|tatili|tatil)\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return written === base ? official : name;
+}
