@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
   boolean,
+  customType,
   date,
   doublePrecision,
   index,
@@ -481,6 +482,28 @@ export const dayPlans = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [uniqueIndex('day_plans_school_date_uq').on(t.schoolId, t.date)],
+);
+
+const bytea = customType<{ data: Buffer; driverData: Buffer | Uint8Array }>({
+  dataType: () => 'bytea',
+  fromDriver: (v) => (Buffer.isBuffer(v) ? v : Buffer.from(v)),
+});
+
+/**
+ * Yüklenen görseller veritabanında (FILE_STORAGE=db): kalıcı diski olmayan ücretsiz barındırmalarda
+ * (Render vb.) görseller yeniden başlatmada kaybolmasın diye. Adres yerel diskle aynıdır: /uploads/<okul>/<ad>
+ */
+export const storedFiles = pgTable(
+  'stored_files',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    name: text('name').notNull(),
+    contentType: text('content_type').notNull(),
+    data: bytea('data').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('stored_files_school_name_uq').on(t.schoolId, t.name)],
 );
 
 /** Telefon bildirimleri: kullanıcının mobil cihazlarının Expo push anahtarları */

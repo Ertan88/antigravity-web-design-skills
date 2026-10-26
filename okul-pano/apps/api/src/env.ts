@@ -8,7 +8,10 @@ const schema = z.object({
   DATABASE_URL: z.string().optional().transform((v) => v || undefined),
   PGLITE_DIR: z.string().default('./data/pglite'),
   UPLOAD_DIR: z.string().default('./uploads'),
-  PUBLIC_URL: z.string().default('http://localhost:5173'),
+  /** Yüklenen görseller: 'local' sunucunun diskinde, 'db' veritabanında (kalıcı diski olmayan ücretsiz barındırmalar) */
+  FILE_STORAGE: z.enum(['local', 'db']).default('local'),
+  /** Panelin dış adresi (e-postadaki bağlantılar). Render gibi ortamlar kendi adresini RENDER_EXTERNAL_URL ile verir. */
+  PUBLIC_URL: z.string().default(process.env.RENDER_EXTERNAL_URL ?? 'http://localhost:5173'),
   /** Derlenmiş panel ve pano dosyaları (varsa) API ile aynı adresten sunulur: /admin/ ve /display/ */
   ADMIN_DIST: z.string().default('../admin/dist'),
   DISPLAY_DIST: z.string().default('../display/dist'),

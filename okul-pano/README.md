@@ -108,6 +108,11 @@ npm run build     # üretim derlemesi
 
 ## Sunucuya kurulum
 
+**Ücretsiz deneme yayını (kredi kartı gerekmez):** Render + Neon ile birkaç adımda; ayrıntılı rehber
+[docs/ucretsiz-yayin.md](docs/ucretsiz-yayin.md).
+
+**Kendi sunucunuz (VPS):**
+
 ```bash
 cp deploy/.env.example deploy/.env      # alan adı ve gizli anahtarlar
 docker compose --env-file deploy/.env up -d --build

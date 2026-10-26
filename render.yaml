@@ -1,0 +1,35 @@
+# Okul Pano'yu Render'da ücretsiz yayına alma (Blueprint). Adımlar: okul-pano/docs/ucretsiz-yayin.md
+# Veritabanı Neon'da (ücretsiz PostgreSQL); görseller de veritabanında saklanır (FILE_STORAGE=db),
+# çünkü Render'ın ücretsiz sunucusunda kalıcı disk yoktur.
+services:
+  - type: web
+    name: okul-pano
+    runtime: docker
+    plan: free
+    region: frankfurt
+    branch: claude/okul-dijital-pano-4oao0y
+    dockerfilePath: ./okul-pano/Dockerfile
+    dockerContext: ./okul-pano
+    healthCheckPath: /api/health
+    autoDeploy: true
+    buildFilter:
+      paths:
+        - okul-pano/**
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: FILE_STORAGE
+        value: db
+      - key: JWT_SECRET
+        generateValue: true
+      # Neon'daki veritabanının bağlantı adresi (postgresql://...): kurulumda sorulur
+      - key: DATABASE_URL
+        sync: false
+      # İlk açılışta oluşturulacak platform yöneticisi: kurulumda sorulur
+      - key: SEED_SUPERADMIN_EMAIL
+        sync: false
+      - key: SEED_SUPERADMIN_PASSWORD
+        sync: false
+      # Tanıtım için örnek okul (örnek hesapların şifresi yöneticinin şifresiyle aynıdır). İstemiyorsanız false yapın.
+      - key: SEED_DEMO
+        value: "true"

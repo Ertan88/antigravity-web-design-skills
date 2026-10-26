@@ -12,7 +12,8 @@ import { openDatabase, type Database } from './db/client.ts';
 import { loadEnv, type Env } from './env.ts';
 import { errorHandler, unauthorized } from './lib/errors.ts';
 import { DisplayBus } from './lib/events.ts';
-import { LocalStorage, type FileStorage } from './lib/storage.ts';
+import { DbStorage, LocalStorage, type FileStorage } from './lib/storage.ts';
+import { UUID_RE } from './context.ts';
 import { authRoutes } from './routes/auth.ts';
 import { contentRoutes } from './routes/content.ts';
 import { dutyRoutes } from './routes/duties.ts';
@@ -44,10 +45,11 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   const env = loadEnv(opts.env);
   const database = opts.database ?? (await openDatabase({ databaseUrl: env.DATABASE_URL, pgliteDir: env.PGLITE_DIR }));
   const localStorage = new LocalStorage(env.UPLOAD_DIR);
+  const dbStorage = env.FILE_STORAGE === 'db' ? new DbStorage(database.db) : null;
   const deps: AppDeps = {
     db: database.db,
     bus: new DisplayBus(),
-    storage: opts.storage ?? localStorage,
+    storage: opts.storage ?? dbStorage ?? localStorage,
     env,
   };
 
@@ -126,7 +128,19 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     decorateReply: true,
     maxAge: '30d',
     immutable: true,
+    // Görseller veritabanındaysa bu adresleri aşağıdaki rota sunar
+    serve: !dbStorage,
   });
+  if (dbStorage) {
+    app.get('/uploads/:schoolId/:name', async (req, reply) => {
+      const { schoolId, name } = req.params as { schoolId: string; name: string };
+      if (!UUID_RE.test(schoolId) || !/^[0-9a-f-]{36}\.(png|jpg|gif|webp)$/.test(name)) return reply.status(404).send({ error: 'not_found', message: 'Dosya bulunamadı.' });
+      const file = await dbStorage.read(schoolId, name);
+      if (!file) return reply.status(404).send({ error: 'not_found', message: 'Dosya bulunamadı.' });
+      // Adlar rastgele ve dosyalar değişmez: uzun süre önbelleğe alınabilir
+      return reply.header('Cache-Control', 'public, max-age=2592000, immutable').type(file.contentType).send(file.data);
+    });
+  }
 
   const spas = [
     { prefix: '/admin/', dir: env.ADMIN_DIST },

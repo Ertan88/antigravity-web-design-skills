@@ -1,6 +1,6 @@
 import { openDatabase } from './db/client.ts';
 import { loadEnv } from './env.ts';
-import { LocalStorage } from './lib/storage.ts';
+import { DbStorage, LocalStorage } from './lib/storage.ts';
 import { seedDemo } from './seed-data.ts';
 
 const env = loadEnv();
@@ -25,7 +25,7 @@ function fail(step: string, err: unknown): never {
 const database = await openDatabase({ databaseUrl: env.DATABASE_URL, pgliteDir: env.PGLITE_DIR }).catch((e) => fail('veritabanı açılamadı', e));
 
 const result = await seedDemo(database.db, {
-  storage: new LocalStorage(env.UPLOAD_DIR),
+  storage: env.FILE_STORAGE === 'db' ? new DbStorage(database.db) : new LocalStorage(env.UPLOAD_DIR),
   // Tanıtım için "bugün"ü değiştirmek isterseniz: SEED_NOW=2026-10-28T09:00:00+03:00
   now: process.env.SEED_NOW ? new Date(process.env.SEED_NOW) : undefined,
   superAdmin: {

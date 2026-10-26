@@ -67,7 +67,13 @@ function seedAssetsDir(): string | null {
 /** Tanıtım ve geliştirme için gerçekçi örnek okul verisi oluşturur. */
 export async function seedDemo(
   db: DB,
-  opts: { storage?: FileStorage; superAdmin?: { email: string; password: string }; now?: Date } = {},
+  opts: {
+    storage?: FileStorage;
+    superAdmin?: { email: string; password: string };
+    now?: Date;
+    /** İnternete açık tanıtım kurulumunda örnek hesapların ortak şifresi (bilinen geliştirme şifreleri kullanılmaz) */
+    demoPassword?: string;
+  } = {},
 ): Promise<SeedResult> {
   const now = opts.now ?? new Date();
   const tz = 'Europe/Istanbul';
@@ -105,12 +111,12 @@ export async function seedDemo(
   const schoolId = school!.id;
 
   const people = [
-    { role: 'owner' as const, email: 'mudur@okulpano.local', name: 'Okul Müdürü', password: 'Mudur2026!', permissions: [] },
+    { role: 'owner' as const, email: 'mudur@okulpano.local', name: 'Okul Müdürü', password: opts.demoPassword ?? 'Mudur2026!', permissions: [] },
     {
       role: 'editor' as const,
       email: 'editor@okulpano.local',
       name: 'Duyuru Editörü',
-      password: 'Editor2026!',
+      password: opts.demoPassword ?? 'Editor2026!',
       permissions: ['announcements.manage', 'ticker.manage'],
     },
   ];
@@ -143,7 +149,7 @@ export async function seedDemo(
   // Mobil uygulama denemesi için öğretmen hesabı: kadrodaki ilk öğretmene bağlı (kendi nöbetleri ve programı)
   {
     const email = 'ogretmen@okulpano.local';
-    const password = 'Ogretmen2026!';
+    const password = opts.demoPassword ?? 'Ogretmen2026!';
     let [u] = await db.select().from(users).where(eq(users.email, email));
     if (!u) {
       [u] = await db

@@ -1,0 +1,31 @@
+# Okul Pano Docker imajının (Render ve VPS kurulumu) derlendiğini doğrular; imaj bir yere gönderilmez.
+name: Okul Pano · Docker imajı
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/okul-dijital-pano-4oao0y]
+    paths:
+      - okul-pano/**
+      - '!okul-pano/docs/**'
+      - '!okul-pano/**/*.md'
+      - .github/workflows/okul-pano-docker.yml
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: İmajı derle
+        run: docker build -t okul-pano:ci okul-pano
+      - name: Açılışı dene (veritabanı boş, örnek okul kurulur)
+        run: |
+          docker run -d --name app -p 3000:3000 \
+            -e JWT_SECRET=ci-denemesi-icin-en-az-otuz-iki-karakterlik-anahtar \
+            -e FILE_STORAGE=db -e SEED_DEMO=true \
+            -e SEED_SUPERADMIN_EMAIL=ci@ornek.com -e SEED_SUPERADMIN_PASSWORD=Ci-Deneme-2026 \
+            okul-pano:ci
+          for i in $(seq 1 60); do curl -fs localhost:3000/api/health && break; sleep 2; done
+          for p in /admin/ /display/ /app/; do curl -fs -o /dev/null "localhost:3000$p" && echo "$p tamam"; done
+          docker logs app | grep "İlk açılış"
