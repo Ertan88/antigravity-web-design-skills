@@ -1,7 +1,7 @@
 import { holidayFullName, isHalfDayHoliday } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Bus, Settings2, Sunrise, Sunset, Utensils } from 'lucide-react';
+import { Bus, Settings2, Sunrise, Sunset, Utensils, Wand2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ExcelButtons } from '../components/ExcelButtons.tsx';
@@ -27,6 +27,7 @@ import {
   type Holiday,
 } from './duties/calendar.tsx';
 import { MonthChoice, type MonthResolution } from './duties/MonthChoice.tsx';
+import { AutoFillDialog, BalanceCard, useTransportStats } from './transport/Balance.tsx';
 
 type TeacherOption = { id: string; fullName: string };
 type TransportDay = { date: string; teachers: TeacherOption[] };
@@ -40,6 +41,7 @@ function TransportCell({
   editable,
   dutyTeachers,
   otherTeachers,
+  counts,
   holiday,
   onSave,
 }: {
@@ -50,6 +52,8 @@ function TransportCell({
   /** O günün nöbetçileri; listede önce bunlar gelir */
   dutyTeachers: TeacherOption[];
   otherTeachers: TeacherOption[];
+  /** Eğitim yılında tutulan servis nöbeti sayısı: adil dağıtım için listede adın yanında */
+  counts: Map<string, number>;
   holiday?: Holiday;
   onSave: (ids: string[]) => Promise<void>;
 }) {
@@ -83,15 +87,15 @@ function TransportCell({
               <optgroup label="O günün nöbetçileri">
                 {dutyTeachers.map((t) => (
                   <option key={t.id} value={t.id} disabled={ids.includes(t.id) && ids[i] !== t.id}>
-                    {t.fullName}
+                    {t.fullName} · {counts.get(t.id) ?? 0}
                   </option>
                 ))}
               </optgroup>
             )}
-            <optgroup label="Diğer öğretmenler">
+            <optgroup label="Diğer öğretmenler · yıl içinde en az tutan üstte">
               {otherTeachers.map((t) => (
                 <option key={t.id} value={t.id} disabled={ids.includes(t.id) && ids[i] !== t.id}>
-                  {t.fullName}
+                  {t.fullName} · {counts.get(t.id) ?? 0}
                 </option>
               ))}
             </optgroup>
@@ -237,6 +241,8 @@ export function Transport() {
   const teachers = useList<Teacher>('teachers');
   const duties = useList<Duty>('duties');
   const holidays = useHolidays(month);
+  const stats = useTransportStats(month);
+  const [autoFill, setAutoFill] = useState(false);
   const list = useQuery({
     queryKey: [schoolId, 'transport-duties', month],
     queryFn: () => api<TransportDay[]>(`${path}?month=${month}`),
@@ -269,6 +275,8 @@ export function Transport() {
   const byDate = new Map((list.data ?? []).map((d) => [d.date, d.teachers]));
   const active = (teachers.data ?? []).filter((t) => t.isActive).sort((a, b) => a.fullName.localeCompare(b.fullName, 'tr'));
   const byId = new Map((teachers.data ?? []).map((t) => [t.id, t]));
+  const counts = new Map((stats.data?.teachers ?? []).map((t) => [t.id, t.total]));
+  const byCount = [...active].sort((a, b) => (counts.get(a.id) ?? 0) - (counts.get(b.id) ?? 0) || a.fullName.localeCompare(b.fullName, 'tr'));
   const dutyByWeekday = new Map<number, TeacherOption[]>();
   for (const d of [...(duties.data ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)) {
     const t = byId.get(d.teacherId);
@@ -337,11 +345,16 @@ export function Transport() {
             <div>
               <h2 className="text-sm font-semibold text-ink">{monthLabel(month)} · Servis nöbetçileri</h2>
               <p className="text-xs text-slate-500">
-                {filledCount(month, byDate.keys())} gün dolu · listede önce o günün nöbetçi öğretmenleri gelir
+                {filledCount(month, byDate.keys())} gün dolu · listede önce o günün nöbetçileri, sonra yıl içinde en az nöbet tutanlar gelir
               </p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {editable && (
+              <Button size="sm" variant="secondary" icon={<Wand2 className="size-4" />} onClick={() => setAutoFill(true)}>
+                Adil dağıt
+              </Button>
+            )}
             {editable && byDate.size > 0 && (
               <ClearMonthButton
                 month={month}
@@ -370,7 +383,8 @@ export function Transport() {
                   assigned={byDate.get(d.iso) ?? []}
                   editable={editable}
                   dutyTeachers={dutyTeachers}
-                  otherTeachers={active.filter((t) => !dutyTeachers.some((x) => x.id === t.id))}
+                  otherTeachers={byCount.filter((t) => !dutyTeachers.some((x) => x.id === t.id))}
+                  counts={counts}
                   holiday={holidays.get(d.iso)}
                   onSave={(ids) => save(d.iso, ids)}
                 />
@@ -379,6 +393,16 @@ export function Transport() {
           </MonthGrid>
         )}
       </Card>
+      <BalanceCard month={month} stats={stats.data} />
+      <AutoFillDialog
+        open={autoFill}
+        onClose={() => setAutoFill(false)}
+        month={month}
+        stats={stats.data}
+        teachers={active}
+        assigned={new Map([...byDate].map(([d, l]) => [d, l.length]))}
+        holidays={holidays}
+      />
       <TransportImport file={file} onClose={() => setFile(null)} onSaved={setMonth} />
     </>
   );

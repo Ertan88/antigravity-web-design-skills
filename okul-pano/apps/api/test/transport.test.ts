@@ -202,4 +202,35 @@ describe('taşımalı öğrenci (servis) görevlileri', () => {
     expect((await owner.get(path('transport-duties?month=2026-1'))).statusCode).toBe(400);
     expect((await owner.put(path('transport-duties/2026-11-05'), { teacherIds: ['6f1c1f3e-0000-4000-8000-000000000000'] })).statusCode).toBe(400);
   });
+
+  it('nöbet dengesi eğitim yılı toplamını sayar; adil dağıtım boş günleri en az tutandan başlayarak doldurur', async () => {
+    type Stat = { fullName: string; month: number; total: number };
+    // 2027-28 eğitim yılı: Ayşe eylülde 2 nöbet tuttu; ekimde 5'inde başka biri görevli
+    for (const date of ['2027-09-14', '2027-09-15']) expectStatus(await owner.put(path(`transport-duties/${date}`), { teacherIds: [ids['Ayşe Demir']] }), 200);
+    expectStatus(await owner.put(path('transport-duties/2027-10-05'), { teacherIds: [ids['Zeynep Arslan']] }), 200);
+
+    const before = (await owner.get(path('transport-duties/stats?month=2027-10'))).json();
+    expect(before.from).toBe('2027-09-01');
+    expect(before.teachers.map((x: Stat) => `${x.fullName} ${x.month}/${x.total}`)).toEqual(['Zeynep Arslan 1/1', 'Ayşe Demir 0/2']);
+
+    const pool = [ids['Ayşe Demir'], ids['Ali Kaya'], ids['Fatma Aydın']];
+    const res = await owner.post(path('transport-duties/auto-fill'), { month: '2027-10', perDay: 1, teacherIds: pool });
+    expectStatus(res, 200);
+    // Ekim 2027: 21 iş günü, 29 Ekim tatil, 5 Ekim dolu -> 19 gün
+    expect(res.json()).toEqual({ days: 19, assignments: 19 });
+
+    const after = (await owner.get(path('transport-duties/stats?month=2027-10'))).json();
+    const total = Object.fromEntries(after.teachers.map((x: Stat) => [x.fullName, x.total]));
+    expect(total).toEqual({ 'Ayşe Demir': 7, 'Ali Kaya': 7, 'Fatma Aydın': 7, 'Zeynep Arslan': 1 });
+
+    const days = (await owner.get(path('transport-duties?month=2027-10'))).json() as Day[];
+    expect(days.find((d) => d.date === '2027-10-29')).toBeUndefined();
+    expect(days.find((d) => d.date === '2027-10-05')!.teachers.map((x) => x.fullName)).toEqual(['Zeynep Arslan']);
+    // Önce hiç nöbet tutmamış olanlar: ilk iki iş günü Ayşe'ye gitmez
+    expect(days.slice(0, 2).flatMap((d) => d.teachers.map((x) => x.fullName))).not.toContain('Ayşe Demir');
+
+    // Dolu ay tekrar dağıtılırsa değişiklik olmaz; yetersiz havuz reddedilir
+    expect((await owner.post(path('transport-duties/auto-fill'), { month: '2027-10', perDay: 1, teacherIds: pool })).json()).toEqual({ days: 0, assignments: 0 });
+    expectStatus(await owner.post(path('transport-duties/auto-fill'), { month: '2027-11', perDay: 2, teacherIds: [ids['Ali Kaya']] }), 400);
+  });
 });

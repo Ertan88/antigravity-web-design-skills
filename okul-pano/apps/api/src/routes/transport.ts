@@ -1,12 +1,13 @@
-import { clearMonthSchema, normalizeName, tidyName, transportDaySchema, transportImportSchema, trCompare, WEEKDAY_NAMES, zonedParts } from '@okulpano/shared';
+import { clearMonthSchema, normalizeName, tidyName, transportAutoFillSchema, transportDaySchema, transportImportSchema, trCompare, WEEKDAY_NAMES, zonedParts } from '@okulpano/shared';
 import { and, asc, eq, gte, inArray, lte } from 'drizzle-orm';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { audit, schoolGuard } from '../context.ts';
-import { teachers, transportDuties } from '../db/schema.ts';
+import { duties, teachers, transportDuties } from '../db/schema.ts';
 import { badRequest, parse } from '../lib/errors.ts';
 import { exportFileName, readXlsxUpload, sendXlsx } from '../lib/excel.ts';
 import { monthRange, remapDate, resolveMonth } from '../lib/months.ts';
 import { addTeachersToRoster, isNewTeacher, loadRoster } from '../lib/roster.ts';
+import { dutyMonthSql } from '../lib/dayinfo.ts';
 import { holidaysInRange, saveHolidays } from './holidays.ts';
 import { trDate } from '../lib/sheets/duties.ts';
 import { buildTransportWorkbook, parseTransportWorkbook } from '../lib/sheets/transport.ts';
@@ -23,6 +24,12 @@ function monthDays(month: string): { date: string; weekday: number }[] {
     date: `${month}-${pad(i + 1)}`,
     weekday: ((new Date(Date.UTC(y, m - 1, i + 1)).getUTCDay() + 6) % 7) + 1,
   }));
+}
+
+/** Eğitim yılı eylülde başlar: 2027-03 -> 2026-09 */
+export function schoolYearStart(month: string): string {
+  const [y, m] = month.split('-').map(Number) as [number, number];
+  return `${m >= 9 ? y : y - 1}-09`;
 }
 
 /**
@@ -226,6 +233,116 @@ export async function transportRoutes(app: FastifyInstance) {
     );
     bus.contentChanged(schoolId);
     return { days: dayCount, teachersAdded };
+  });
+
+  /* ---------- Nöbet dengesi: eğitim yılı boyunca kim kaç servis nöbeti tuttu ---------- */
+
+  /** Eğitim yılı başından ayın sonuna kadar öğretmen başına nöbet sayısı; tatile düşen eski kayıtlar sayılmaz */
+  async function yearCounts(schoolId: string, month: string) {
+    const [from] = monthRange(schoolYearStart(month));
+    const [, to] = monthRange(month);
+    const [rows, holidays] = await Promise.all([
+      db
+        .select({ date: transportDuties.date, teacherId: transportDuties.teacherId, fullName: teachers.fullName, isActive: teachers.isActive })
+        .from(transportDuties)
+        .innerJoin(teachers, eq(teachers.id, transportDuties.teacherId))
+        .where(and(eq(transportDuties.schoolId, schoolId), gte(transportDuties.date, from), lte(transportDuties.date, to))),
+      holidaysInRange(db, schoolId, from, to),
+    ]);
+    const off = new Set(holidays.filter((h) => !h.name.endsWith('Arifesi')).map((h) => h.date));
+    const byTeacher = new Map<string, { id: string; fullName: string; isActive: boolean; month: number; total: number; last: string | null }>();
+    for (const r of rows) {
+      if (off.has(r.date)) continue;
+      const t = byTeacher.get(r.teacherId) ?? { id: r.teacherId, fullName: r.fullName, isActive: r.isActive, month: 0, total: 0, last: null };
+      t.total++;
+      if (r.date.startsWith(month)) t.month++;
+      if (!t.last || r.date > t.last) t.last = r.date;
+      byTeacher.set(r.teacherId, t);
+    }
+    return { from, to, off, teachers: [...byTeacher.values()] };
+  }
+
+  /** ?month=YYYY-AA → eğitim yılı başından o ayın sonuna kadar öğretmen başına nöbet sayısı */
+  app.get(`${base}/stats`, read, async (req) => {
+    const { month } = req.query as { month?: string };
+    if (!month || !MONTH_RE.test(month)) throw badRequest('Ay YYYY-AA biçiminde olmalı.');
+    const { from, to, teachers: list } = await yearCounts(req.ctx.schoolId, month);
+    const sorted = list.sort((a, b) => a.total - b.total || trCompare(a.fullName, b.fullName));
+    const totals = sorted.filter((t) => t.isActive).map((t) => t.total);
+    return {
+      from,
+      to,
+      teachers: sorted,
+      average: totals.length ? totals.reduce((x, y) => x + y, 0) / totals.length : 0,
+      min: totals.length ? Math.min(...totals) : 0,
+      max: totals.length ? Math.max(...totals) : 0,
+    };
+  });
+
+  /**
+   * Adil dağıtım: ayın boş (ya da eksik) iş günleri sırayla doldurulur. Her gün için eğitim yılında en az nöbet
+   * tutan seçilir; eşitlikte o günün nöbetçi öğretmeni, sonra bir önceki iş günü görev almamış olan öne geçer.
+   * Dolu günlere ve tatillere dokunulmaz.
+   */
+  app.post(`${base}/auto-fill`, write, async (req) => {
+    const body = parse(transportAutoFillSchema, req.body);
+    const schoolId = req.ctx.schoolId;
+    const pool = await db
+      .select({ id: teachers.id, fullName: teachers.fullName })
+      .from(teachers)
+      .where(and(eq(teachers.schoolId, schoolId), eq(teachers.isActive, true), inArray(teachers.id, [...new Set(body.teacherIds)])));
+    if (!pool.length) throw badRequest('Seçilen öğretmenler bulunamadı.');
+    if (pool.length < body.perDay) throw badRequest(`Günde ${body.perDay} görevli için en az ${body.perDay} öğretmen seçin.`);
+
+    const [{ off, teachers: counted }, existing, dutyRows] = await Promise.all([
+      yearCounts(schoolId, body.month),
+      monthRows(schoolId, body.month),
+      db
+        .select({ weekday: duties.weekday, teacherId: duties.teacherId })
+        .from(duties)
+        .where(and(eq(duties.schoolId, schoolId), eq(duties.month, dutyMonthSql(schoolId, body.month)))),
+    ]);
+    const count = new Map(pool.map((t) => [t.id, counted.find((c) => c.id === t.id)?.total ?? 0]));
+    const assigned = new Map<string, string[]>();
+    for (const r of existing) if (!off.has(r.date)) assigned.set(r.date, [...(assigned.get(r.date) ?? []), r.teacherId]);
+    const dutyOn = new Map<number, Set<string>>();
+    for (const d of dutyRows) dutyOn.set(d.weekday, (dutyOn.get(d.weekday) ?? new Set()).add(d.teacherId));
+    const names = new Map(pool.map((t) => [t.id, t.fullName]));
+
+    const workdays = monthDays(body.month).filter((d) => d.weekday <= 5 && !off.has(d.date));
+    const filled: { date: string; teacherIds: string[] }[] = [];
+    let previous: string[] = [];
+    for (const d of workdays) {
+      const current = assigned.get(d.date) ?? [];
+      const need = body.perDay - current.length;
+      if (need > 0) {
+        const picks = [...count.keys()]
+          .filter((id) => !current.includes(id))
+          .sort(
+            (a, b) =>
+              count.get(a)! - count.get(b)! ||
+              Number(dutyOn.get(d.weekday)?.has(b) ?? false) - Number(dutyOn.get(d.weekday)?.has(a) ?? false) ||
+              Number(previous.includes(a)) - Number(previous.includes(b)) ||
+              trCompare(names.get(a)!, names.get(b)!),
+          )
+          .slice(0, need);
+        for (const id of picks) count.set(id, count.get(id)! + 1);
+        if (picks.length) filled.push({ date: d.date, teacherIds: [...current, ...picks] });
+        previous = [...current, ...picks];
+      } else {
+        previous = current;
+      }
+    }
+
+    if (filled.length) {
+      await db.transaction(async (tx) => {
+        await tx.delete(transportDuties).where(and(eq(transportDuties.schoolId, schoolId), inArray(transportDuties.date, filled.map((f) => f.date))));
+        await tx.insert(transportDuties).values(filled.flatMap((f) => f.teacherIds.map((teacherId, i) => ({ schoolId, date: f.date, teacherId, sortOrder: i }))));
+      });
+      await audit(req, 'update', 'Taşımalı öğrenci görevlisi', null, `${body.month} adil dağıtım: ${filled.length} gün dolduruldu`);
+      bus.contentChanged(schoolId);
+    }
+    return { days: filled.length, assignments: filled.reduce((n, f) => n + f.teacherIds.length - (assigned.get(f.date)?.length ?? 0), 0) };
   });
 
   /** Bir ayın tüm servis nöbetlerini siler */

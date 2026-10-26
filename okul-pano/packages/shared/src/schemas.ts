@@ -372,6 +372,15 @@ export const transportDaySchema = z.object({
   teacherIds: z.array(id).max(4, 'Bir güne en fazla 4 görevli atanabilir'),
 });
 
+/** Servis nöbetlerini adil dağıtma: ayın boş iş günleri, eğitim yılında en az nöbet tutandan başlanarak doldurulur */
+export const transportAutoFillSchema = z.object({
+  month: monthSchema,
+  /** Bir günde kaç görevli */
+  perDay: z.number().int().min(1).max(4).default(2),
+  /** Dağıtıma katılacak öğretmenler */
+  teacherIds: z.array(id).min(1, 'En az bir öğretmen seçin').max(300),
+});
+
 /** Excel'den servis (taşımalı eğitim) nöbet çizelgesi: dosyadaki tarihlerin görevlileri yenilenir */
 export const transportImportSchema = z.object({
   days: z
