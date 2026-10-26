@@ -21,7 +21,7 @@ import { exportFileName, readXlsxUpload, sendXlsx } from '../lib/excel.ts';
 import { buildDutiesWorkbook, parseDutiesWorkbook, trDate } from '../lib/sheets/duties.ts';
 import { registerResource } from './crud.ts';
 import { MONTH_RE, monthRange, remapDate, resolveMonth } from '../lib/months.ts';
-import { loadRoster } from '../lib/roster.ts';
+import { addTeachersToRoster, isNewTeacher, loadRoster } from '../lib/roster.ts';
 import { saveHolidays } from './holidays.ts';
 
 const dutyKey = (weekday: number, area: string, teacherId: string) => `${weekday}|${normalizeName(area)}|${teacherId}`;
@@ -173,8 +173,21 @@ export async function dutyRoutes(app: FastifyInstance) {
     const newAreas = new Map<string, string>();
     const fileKeys = new Set<string>();
 
+    const newTeachers = new Map<string, string>();
     const rows = parsed.entries.flatMap((e) => {
       const teacher = roster.find(e.teacherName);
+      // Kadroda hiç benzeri olmayan isim: kaydederken kadroya eklenebilir (önizlemede ayrıca gösterilir)
+      if (!teacher && isNewTeacher(roster, e.teacherName)) {
+        const name = tidyName(e.teacherName);
+        const key = dutyKey(e.weekday, e.area, `yeni:${normalizeName(name)}`);
+        if (fileKeys.has(key)) return [];
+        fileKeys.add(key);
+        if (!newTeachers.has(normalizeName(name))) newTeachers.set(normalizeName(name), name);
+        if (!knownAreas.has(normalizeName(e.area))) newAreas.set(normalizeName(e.area), e.area);
+        return [
+          { row: e.row, weekday: e.weekday, day: WEEKDAY_NAMES[e.weekday], area: e.area, teacherName: name, teacherInactive: false, teacherNew: true, status: 'new' as const },
+        ];
+      }
       if (!teacher) {
         const hint = roster.suggest(e.teacherName);
         issues.push({
@@ -195,6 +208,7 @@ export async function dutyRoutes(app: FastifyInstance) {
           area: e.area,
           teacherName: teacher.fullName,
           teacherInactive: !teacher.isActive,
+          teacherNew: false,
           status: existingKeys.has(key) ? ('unchanged' as const) : ('new' as const),
         },
       ];
@@ -213,6 +227,7 @@ export async function dutyRoutes(app: FastifyInstance) {
       weekdays: parsed.weekdays,
       rows,
       issues,
+      newTeachers: [...newTeachers.values()],
       removed,
       supervisors,
       holidays: [...holidayMap.values()].sort((a, b) => a.date.localeCompare(b.date)),
@@ -232,9 +247,11 @@ export async function dutyRoutes(app: FastifyInstance) {
   app.post(`${base}/import`, write, async (req) => {
     const body = parse(dutyImportSchema, req.body);
     const schoolId = req.ctx.schoolId;
-    const roster = await loadRoster(db, schoolId);
-
     const result = await db.transaction(async (tx) => {
+      // İstenirse kadroda olmayan öğretmenler önce kadroya eklenir
+      const { roster, added: teachersAdded } = body.addTeachers
+        ? await addTeachersToRoster(tx, schoolId, await loadRoster(tx, schoolId), body.rows.map((r) => r.teacherName))
+        : { roster: await loadRoster(tx, schoolId), added: 0 };
       let removed = 0;
       if (body.mode === 'replace' && body.weekdays.length) {
         const del = await tx
@@ -304,7 +321,7 @@ export async function dutyRoutes(app: FastifyInstance) {
         supervisors = written.length;
       }
       const holidays = await saveHolidays(tx, schoolId, body.holidays);
-      return { created: inserts.length, removed, unchanged, skipped, supervisors, holidays };
+      return { created: inserts.length, removed, unchanged, skipped, supervisors, holidays, teachersAdded };
     });
 
     await audit(
@@ -312,7 +329,7 @@ export async function dutyRoutes(app: FastifyInstance) {
       'update',
       'Nöbet',
       null,
-      `Excel'den ${body.month} nöbet çizelgesi (${body.mode === 'replace' ? 'değiştir' : 'ekle'}): ${result.created} eklendi, ${result.removed} kaldırıldı`,
+      `Excel'den ${body.month} nöbet çizelgesi (${body.mode === 'replace' ? 'değiştir' : 'ekle'}): ${result.created} eklendi, ${result.removed} kaldırıldı${result.teachersAdded ? `, kadroya ${result.teachersAdded} öğretmen eklendi` : ''}`,
     );
     bus.contentChanged(schoolId);
     return result;

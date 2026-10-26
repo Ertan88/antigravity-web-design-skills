@@ -4,9 +4,9 @@ import { Bus, Settings2, Sunrise, Sunset, Utensils } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ExcelButtons } from '../components/ExcelButtons.tsx';
-import { ExcelImportDialog, type ImportPreview } from '../components/ExcelImportDialog.tsx';
+import { ExcelImportDialog, NewTeachersOption, type ImportPreview } from '../components/ExcelImportDialog.tsx';
 import { useToast } from '../components/Toast.tsx';
-import { Alert, Button, Card, EmptyState, PageHeader, Spinner } from '../components/ui.tsx';
+import { Alert, Badge, Button, Card, EmptyState, PageHeader, Spinner } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useList, useSchool, useSchoolPath, type Duty, type Teacher } from '../lib/data.ts';
@@ -106,27 +106,37 @@ type ImportRow = {
   from: string | null;
   day: string;
   teachers: (TeacherOption & { written: string })[];
+  /** Kadroda olmayan, kaydederken kadroya eklenebilecek öğretmenler (position: dosyadaki sırası) */
+  newTeachers: { name: string; position: number }[];
   cleared: boolean;
   holiday: string | null;
   /** Dosyada yoktu: ayın listesi dosyadan ibaret olduğu için silinecek */
   missing?: boolean;
 };
-type Preview = ImportPreview<ImportRow> & { month: MonthResolution; holidays: { date: string; name: string }[] };
+type Preview = ImportPreview<ImportRow> & { month: MonthResolution; holidays: { date: string; name: string }[]; newTeachers: string[] };
+type ImportOptions = { month: string | null; addTeachers: boolean };
+/** Yalnızca kadroya eklenmeyecek öğretmenleri olan gün atlanır (günü boşaltmamak için) */
+const transportRowSkipped = (r: ImportRow, o: ImportOptions) => !o.addTeachers && !r.teachers.length && r.newTeachers.length > 0;
+const transportDaysToSave = (p: Preview, o: ImportOptions) => p.rows.filter((r) => r.status !== 'unchanged' && !transportRowSkipped(r, o));
 
 const trDate = (iso: string) => iso.split('-').reverse().join('.');
 
 function TransportImport({ file, onClose, onSaved }: { file: File | null; onClose: () => void; onSaved: (month: string) => void }) {
   const basePath = useSchoolPath('transport-duties');
   return (
-    <ExcelImportDialog<ImportRow, Preview, { month: string | null }>
+    <ExcelImportDialog<ImportRow, Preview, ImportOptions>
       file={file}
       onClose={onClose}
       basePath={basePath}
-      invalidate={['transport-duties', 'holidays']}
-      initialOptions={{ month: null }}
+      invalidate={['transport-duties', 'holidays', 'teachers']}
+      initialOptions={{ month: null, addTeachers: true }}
+      rowStatus={(r, o) => (transportRowSkipped(r, o) ? 'skip' : r.status)}
       previewQuery={(o) => (o.month ? `?month=${o.month}` : '')}
       renderOptions={(p, o, set) => (
-        <MonthChoice resolution={p.month} onChoose={(month) => set({ ...o, month })} movedCount={p.rows.filter((r) => r.from).length} />
+        <div className="space-y-3">
+          <MonthChoice resolution={p.month} onChoose={(month) => set({ ...o, month })} movedCount={p.rows.filter((r) => r.from).length} />
+          <NewTeachersOption names={p.newTeachers} checked={o.addTeachers} onChange={(addTeachers) => set({ ...o, addTeachers })} />
+        </div>
       )}
       renderExtra={(p) =>
         p.holidays.length > 0 && (
@@ -173,25 +183,38 @@ function TransportImport({ file, onClose, onSaved }: { file: File | null; onClos
                     {t.written.toLocaleLowerCase('tr-TR') !== t.fullName.toLocaleLowerCase('tr-TR') && <span className="ml-1 text-[11px] text-slate-400">({t.written})</span>}
                   </span>
                 ))}
+                {r.newTeachers.map((n) => (
+                  <span key={n.name} className="mr-3 inline-flex items-center gap-1.5">
+                    {n.name} <Badge tone="blue">kadroda yok</Badge>
+                  </span>
+                ))}
               </span>
             ),
         },
       ]}
-      stats={(p) => [
-        { label: 'Yeni gün', value: p.totals.new, tone: 'green' },
-        { label: 'Güncellenecek', value: p.totals.update, tone: 'blue' },
-        { label: 'Değişiklik yok', value: p.totals.unchanged, tone: 'slate' },
-        { label: 'Atlanacak', value: p.totals.skipped, tone: p.totals.skipped ? 'amber' : 'slate' },
-      ]}
-      commitCount={(p) => p.totals.new + p.totals.update + p.holidays.length}
+      stats={(p, o) => {
+        const save = transportDaysToSave(p, o);
+        const skipped = p.totals.skipped + p.rows.filter((r) => transportRowSkipped(r, o)).length;
+        return [
+          { label: 'Yeni gün', value: save.filter((r) => r.status === 'new').length, tone: 'green' },
+          { label: 'Güncellenecek', value: save.filter((r) => r.status === 'update').length, tone: 'blue' },
+          { label: 'Değişiklik yok', value: p.totals.unchanged, tone: 'slate' },
+          { label: 'Atlanacak', value: skipped, tone: skipped ? 'amber' : 'slate' },
+        ];
+      }}
+      commitCount={(p, o) => transportDaysToSave(p, o).length + p.holidays.length}
       commitLabel={() => 'Çizelgeyi kaydet'}
-      commitBody={(p) => ({
-        days: p.rows.filter((r) => r.status !== 'unchanged').map((r) => ({ date: r.date, teacherIds: r.teachers.map((t) => t.id) })),
+      commitBody={(p, o) => ({
+        days: transportDaysToSave(p, o).map((r) => ({
+          date: r.date,
+          teacherIds: r.teachers.map((t) => t.id),
+          newTeachers: o.addTeachers ? r.newTeachers : [],
+        })),
         holidays: p.holidays,
       })}
-      successMessage={(res: { days: number }, p) => {
+      successMessage={(res: { days: number; teachersAdded: number }, p) => {
         onSaved(p.month.month);
-        return `${monthLabel(p.month.month)} servis nöbet çizelgesi kaydedildi: ${res.days} gün`;
+        return `${monthLabel(p.month.month)} servis nöbet çizelgesi kaydedildi: ${res.days} gün` + (res.teachersAdded ? ` · kadroya ${res.teachersAdded} öğretmen eklendi` : '');
       }}
     />
   );

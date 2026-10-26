@@ -1,4 +1,4 @@
-import { clearMonthSchema, transportDaySchema, transportImportSchema, trCompare, WEEKDAY_NAMES, zonedParts } from '@okulpano/shared';
+import { clearMonthSchema, normalizeName, tidyName, transportDaySchema, transportImportSchema, trCompare, WEEKDAY_NAMES, zonedParts } from '@okulpano/shared';
 import { and, asc, eq, gte, inArray, lte } from 'drizzle-orm';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { audit, schoolGuard } from '../context.ts';
@@ -6,7 +6,7 @@ import { teachers, transportDuties } from '../db/schema.ts';
 import { badRequest, parse } from '../lib/errors.ts';
 import { exportFileName, readXlsxUpload, sendXlsx } from '../lib/excel.ts';
 import { monthRange, remapDate, resolveMonth } from '../lib/months.ts';
-import { loadRoster } from '../lib/roster.ts';
+import { addTeachersToRoster, isNewTeacher, loadRoster } from '../lib/roster.ts';
 import { holidaysInRange, saveHolidays } from './holidays.ts';
 import { trDate } from '../lib/sheets/duties.ts';
 import { buildTransportWorkbook, parseTransportWorkbook } from '../lib/sheets/transport.ts';
@@ -130,9 +130,14 @@ export async function transportRoutes(app: FastifyInstance) {
 
     const rows = [...entries.values()].flatMap((e) => {
       const teachersFound: { id: string; fullName: string; written: string }[] = [];
+      /** Kadroda olmayan, kaydederken kadroya eklenebilecek öğretmenler; position: dosyadaki sırası */
+      const newTeachers: { name: string; position: number }[] = [];
       for (const name of e.names) {
         const t = roster.find(name);
-        if (!t) {
+        if (!t && isNewTeacher(roster, name)) {
+          if (!newTeachers.some((n) => normalizeName(n.name) === normalizeName(name)))
+            newTeachers.push({ name: tidyName(name), position: teachersFound.length + newTeachers.length });
+        } else if (!t) {
           const hint = roster.suggest(name);
           issues.push({ row: e.row, message: `"${name}" kadroda yok${hint ? ` (${hint} mi?)` : "; önce Öğretmen Kadrosu'na ekleyin"}` });
         } else if (!teachersFound.some((x) => x.id === t.id)) {
@@ -142,9 +147,9 @@ export async function transportRoutes(app: FastifyInstance) {
       const before = current.get(e.date) ?? [];
       const after = teachersFound.map((t) => t.id);
       // İsimlerin hiçbiri eşleşmediyse günü boşaltmak yerine atla
-      if (e.names.length && !after.length) return [];
-      if (!after.length && !before.length) return [];
-      const status = !before.length ? 'new' : before.join() === after.join() ? 'unchanged' : 'update';
+      if (e.names.length && !after.length && !newTeachers.length) return [];
+      if (!after.length && !before.length && !newTeachers.length) return [];
+      const status = !before.length ? 'new' : before.join() === after.join() && !newTeachers.length ? 'unchanged' : 'update';
       return [
         {
           row: e.row,
@@ -152,7 +157,8 @@ export async function transportRoutes(app: FastifyInstance) {
           from: e.from,
           day: WEEKDAY_NAMES[weekdayOfDate(e.date)],
           teachers: teachersFound,
-          cleared: !after.length,
+          newTeachers,
+          cleared: !after.length && !newTeachers.length,
           holiday: e.holiday,
           /** Dosyada yoktu; ayın listesi dosyadan ibaret olduğu için silinecek */
           missing: e.row === 0,
@@ -168,6 +174,7 @@ export async function transportRoutes(app: FastifyInstance) {
       rows,
       holidays,
       issues,
+      newTeachers: [...new Map(rows.flatMap((r) => r.newTeachers).map((n) => [normalizeName(n.name), n.name])).values()],
       totals: {
         new: rows.filter((r) => r.status === 'new').length,
         update: rows.filter((r) => r.status === 'update').length,
@@ -186,17 +193,39 @@ export async function transportRoutes(app: FastifyInstance) {
       const found = await db.select({ id: teachers.id }).from(teachers).where(and(eq(teachers.schoolId, schoolId), inArray(teachers.id, ids)));
       if (found.length !== ids.length) throw badRequest('Öğretmen bulunamadı.');
     }
-    const days = new Map(body.days.map((d) => [d.date, [...new Set(d.teacherIds)]]));
+    let teachersAdded = 0;
     await db.transaction(async (tx) => {
+      // Kadroda olmayan öğretmenler önce kadroya eklenir, sonra o günün görevlilerinin sonuna yazılır
+      const names = body.days.flatMap((d) => d.newTeachers.map((n) => n.name));
+      let roster = await loadRoster(tx, schoolId);
+      if (names.length) ({ roster, added: teachersAdded } = await addTeachersToRoster(tx, schoolId, roster, names));
+      const days = new Map(
+        body.days.map((d) => {
+          const ids = [...d.teacherIds];
+          // Dosyadaki sıra korunur
+          for (const n of [...d.newTeachers].sort((a, b) => a.position - b.position)) {
+            const id = roster.find(n.name)?.id;
+            if (id) ids.splice(n.position, 0, id);
+          }
+          return [d.date, [...new Set(ids)]];
+        }),
+      );
       await saveHolidays(tx, schoolId, body.holidays);
       if (!days.size) return;
       await tx.delete(transportDuties).where(and(eq(transportDuties.schoolId, schoolId), inArray(transportDuties.date, [...days.keys()])));
       const values = [...days].flatMap(([date, list]) => list.map((teacherId, i) => ({ schoolId, date, teacherId, sortOrder: i })));
       if (values.length) await tx.insert(transportDuties).values(values);
     });
-    await audit(req, 'update', 'Taşımalı öğrenci görevlisi', null, `Excel'den servis nöbet çizelgesi: ${days.size} gün`);
+    const dayCount = body.days.length;
+    await audit(
+      req,
+      'update',
+      'Taşımalı öğrenci görevlisi',
+      null,
+      `Excel'den servis nöbet çizelgesi: ${dayCount} gün${teachersAdded ? `, kadroya ${teachersAdded} öğretmen eklendi` : ''}`,
+    );
     bus.contentChanged(schoolId);
-    return { days: days.size };
+    return { days: dayCount, teachersAdded };
   });
 
   /** Bir ayın tüm servis nöbetlerini siler */

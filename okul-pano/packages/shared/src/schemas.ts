@@ -375,7 +375,17 @@ export const transportDaySchema = z.object({
 /** Excel'den servis (taşımalı eğitim) nöbet çizelgesi: dosyadaki tarihlerin görevlileri yenilenir */
 export const transportImportSchema = z.object({
   days: z
-    .array(z.object({ date: isoDate, teacherIds: z.array(id).max(4) }))
+    .array(
+      z.object({
+        date: isoDate,
+        teacherIds: z.array(id).max(4),
+        /** Kadroda olmayan, kaydederken Öğretmen Kadrosu'na eklenecek öğretmenler; position: dosyadaki sırası */
+        newTeachers: z
+          .array(z.object({ name: required('Öğretmen', 80, 2), position: z.number().int().min(0).max(3) }))
+          .max(4)
+          .default([]),
+      }),
+    )
     .max(400),
   holidays: z.array(z.object({ date: isoDate, name: required('Tatil', 120) })).max(100).default([]),
 });
@@ -423,6 +433,8 @@ export const dutyImportSchema = z.object({
   /** Çizelgenin kaydedileceği ay */
   month: monthSchema,
   mode: z.enum(['replace', 'merge']).default('replace'),
+  /** Kadroda olmayan öğretmenler kaydederken Öğretmen Kadrosu'na eklensin */
+  addTeachers: z.boolean().default(false),
   weekdays: z.array(weekday).max(7),
   rows: z
     .array(

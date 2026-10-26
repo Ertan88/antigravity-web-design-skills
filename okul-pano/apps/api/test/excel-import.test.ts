@@ -145,13 +145,14 @@ describe('nöbet çizelgesi Excel', () => {
       // Yalnızca Türkçe harfleri farklı yazılan isim kadrodakiyle eşleşir
       'Cuma|Bahçe|Ayşe Demir',
       'Salı|1. Kat|Mehmet Öztürk',
+      // Kadroda hiç benzeri olmayan isim hata değil: kaydederken kadroya eklenebilir
+      'Perşembe|1. Kat|Hasan Yok',
     ]);
-    expect(body.issues).toEqual([
-      { row: 3, message: expect.stringMatching(/"Hasan Yok" kadroda yok; önce Öğretmen Kadrosu/) },
-      { row: 4, message: expect.stringMatching(/Nöbet yeri boş/) },
-    ]);
+    expect(body.rows.filter((r: { teacherNew: boolean }) => r.teacherNew)).toHaveLength(1);
+    expect(body.newTeachers).toEqual(['Hasan Yok']);
+    expect(body.issues).toEqual([{ row: 4, message: expect.stringMatching(/Nöbet yeri boş/) }]);
     expect(body.additions).toEqual([{ label: 'Yeni nöbet yerleri', values: ['Bahçe', '1. Kat'] }]);
-    expect(body.totals).toMatchObject({ new: 5, unchanged: 0, removed: 0 });
+    expect(body.totals).toMatchObject({ new: 6, unchanged: 0, removed: 0 });
   });
 
   it('"değiştir" dosyadaki günleri yeniler, dosyada olmayan günlere dokunmaz; "ekle" yalnızca eksikleri ekler', async () => {
@@ -167,7 +168,7 @@ describe('nöbet çizelgesi Excel', () => {
       { weekday: 3, area: 'Bahçe', teacherName: 'Bilinmeyen Kişi' },
     ];
     const replaced = await owner.post(path('duties/import'), { month: '2026-09', mode: 'replace', weekdays: [1, 2, 3, 4, 5], rows });
-    expect(replaced.json()).toEqual({ created: 3, removed: 1, unchanged: 0, skipped: 1, supervisors: 0, holidays: 0 });
+    expect(replaced.json()).toEqual({ created: 3, removed: 1, unchanged: 0, skipped: 1, supervisors: 0, holidays: 0, teachersAdded: 0 });
     let list = (await owner.get(path('duties'))).json() as { weekday: number; area: string; sortOrder: number }[];
     expect(list.map((d) => `${d.weekday}|${d.area}`).sort()).toEqual(['1|Bahçe', '2|1. Kat', '2|Bahçe', '6|Pansiyon']);
     // Yerler dosyadaki sırayla dizilir
@@ -183,7 +184,7 @@ describe('nöbet çizelgesi Excel', () => {
         { weekday: 1, area: 'Kantin', teacherName: 'Fatma Aydın' },
       ],
     });
-    expect(merged.json()).toEqual({ created: 1, removed: 0, unchanged: 1, skipped: 0, supervisors: 0, holidays: 0 });
+    expect(merged.json()).toEqual({ created: 1, removed: 0, unchanged: 1, skipped: 0, supervisors: 0, holidays: 0, teachersAdded: 0 });
     list = (await owner.get(path('duties'))).json();
     expect(list).toHaveLength(5);
   });
@@ -255,22 +256,22 @@ describe('nöbet çizelgesi Excel', () => {
       'Pazartesi|TESİSAT VE MOTOR ATÖLYELERİ ÖNÜ|Mehmet Öztürk',
       'Pazartesi|EK BİNA KAT 1|Ali Kaya',
       'Salı|EK BİNA KAT 1-2|Fatma Aydın',
+      'Salı|SPOR SAHASI|Hasan Yok',
     ]);
+    expect(body.newTeachers).toEqual(['Hasan Yok']);
     expect(body.supervisors).toEqual([
       { date: '2026-10-05', name: 'MUSTAFA AKKAYA', from: null, status: 'new' },
       { date: '2026-10-06', name: 'M.AKKAYA', from: null, status: 'new' },
       { date: '2026-10-12', name: 'ÜMİT KILIÇ', from: null, status: 'new' },
     ]);
-    expect(body.issues).toEqual([
-      { row: 9, message: 'Tarih anlaşılamadı: "31.02.2026"' },
-      { row: 9, message: expect.stringMatching(/"Hasan Yok" kadroda yok/) },
-    ]);
+    expect(body.issues).toEqual([{ row: 9, message: 'Tarih anlaşılamadı: "31.02.2026"' }]);
 
+    // Kadroya ekleme seçilmedi: kadroda olmayanın satırı gönderilmez
     const saved = await owner.post(path('duties/import'), {
       month: body.month.month,
       mode: 'merge',
       weekdays: body.weekdays,
-      rows: body.rows.map(({ weekday, area, teacherName }: { weekday: number; area: string; teacherName: string }) => ({ weekday, area, teacherName })),
+      rows: body.rows.filter((r: { teacherNew: boolean }) => !r.teacherNew).map(({ weekday, area, teacherName }: { weekday: number; area: string; teacherName: string }) => ({ weekday, area, teacherName })),
       supervisors: body.supervisors.map(({ date, name }: { date: string; name: string }) => ({ date, name })),
     });
     expect(saved.json()).toMatchObject({ created: 3, supervisors: 3 });
@@ -377,6 +378,34 @@ describe('nöbet çizelgesi Excel', () => {
     expect(((await owner.get(path('duties'))).json() as { month: string }[]).filter((d) => d.month === '2026-12')).toHaveLength(0);
     expect((await owner.post(path('duty-supervisors/clear'), { month: '2026-10' })).json()).toEqual({ removed: 1 });
     expect((await owner.post(path('duties/clear'), { month: '2026-1' })).statusCode).toBe(400);
+  });
+
+  it('kadrosu girilmemiş öğretmenler istenirse kadroya eklenir ve nöbetleri yazılır', async () => {
+    const buf = await xlsx([
+      ['Nöbet Yeri', 'Pazartesi', 'Salı'],
+      ['Spor Salonu', 'Kemal Sunal', 'Zeki Müren'],
+      ['Kütüphane', 'KEMAL SUNAL', null],
+    ]);
+    const body = (await preview('duties', buf, ownerToken, '?month=2026-12')).json();
+    // Aynı kişinin farklı yazımı tek öğretmen
+    expect(body.newTeachers).toEqual(['Kemal Sunal', 'Zeki Müren']);
+    expect(body.totals).toMatchObject({ new: 3, skipped: 0 });
+
+    const saved = await owner.post(path('duties/import'), {
+      month: '2026-12',
+      mode: 'replace',
+      addTeachers: true,
+      weekdays: body.weekdays,
+      rows: body.rows.map(({ weekday, area, teacherName }: { weekday: number; area: string; teacherName: string }) => ({ weekday, area, teacherName })),
+    });
+    expect(saved.json()).toMatchObject({ created: 3, skipped: 0, teachersAdded: 2 });
+    const roster = (await owner.get(path('teachers'))).json() as { fullName: string }[];
+    expect(roster.filter((x) => ['Kemal Sunal', 'Zeki Müren'].includes(x.fullName))).toHaveLength(2);
+
+    // Tekrar yüklenince kadroda bulunur, değişiklik çıkmaz
+    const again = (await preview('duties', buf, ownerToken, '?month=2026-12')).json();
+    expect(again.newTeachers).toEqual([]);
+    expect(again.totals).toMatchObject({ new: 0, unchanged: 3 });
   });
 
   it('nöbet yetkisi olmayan editör çizelge yükleyemez', async () => {

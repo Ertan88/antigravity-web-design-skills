@@ -1,13 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { AlertTriangle, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { AlertTriangle, FileSpreadsheet, Loader2, UserPlus } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useToast } from './Toast.tsx';
 import { Alert, Badge, Button, Modal } from './ui.tsx';
 
-export type RowStatus = 'new' | 'update' | 'unchanged';
+export type RowStatus = 'new' | 'update' | 'unchanged' | 'skip';
 
 export interface ImportPreview<R> {
   sheetName: string;
@@ -30,7 +30,40 @@ export const STATUS_BADGE: Record<RowStatus, { label: string; tone: Tone }> = {
   new: { label: 'Yeni', tone: 'green' },
   update: { label: 'Güncellenecek', tone: 'blue' },
   unchanged: { label: 'Değişiklik yok', tone: 'slate' },
+  skip: { label: 'Atlanacak', tone: 'amber' },
 };
+
+/**
+ * Çizelgede kadroda olmayan öğretmenler (ör. kadrosu henüz girilmemiş okul): kaydederken Öğretmen Kadrosu'na
+ * eklenip eklenmeyeceği sorulur. Kadrodaki bir isme benzeyenler yazım hatası sayılır ve burada çıkmaz.
+ */
+export function NewTeachersOption({ names, checked, onChange }: { names: string[]; checked: boolean; onChange: (v: boolean) => void }) {
+  if (!names.length) return null;
+  return (
+    <div className="rounded-xl bg-brand-50/60 p-4 text-sm ring-1 ring-brand-200">
+      <label className="flex cursor-pointer items-start gap-3">
+        <input type="checkbox" className="mt-0.5 size-4 accent-brand-600" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+        <span>
+          <span className="flex items-center gap-1.5 font-semibold text-ink">
+            <UserPlus className="size-4" /> Kadroda olmayan {names.length} öğretmeni Öğretmen Kadrosu'na ekle
+          </span>
+          <span className="mt-0.5 block text-xs text-slate-500">
+            {checked
+              ? 'Kaydederken kadroya eklenir; branş ve unvanı sonra Öğretmen Kadrosu sayfasından düzenleyebilirsiniz.'
+              : 'İşaretlemezseniz bu öğretmenlerin satırları atlanır.'}
+          </span>
+        </span>
+      </label>
+      <div className="mt-3 flex max-h-32 flex-wrap gap-1.5 overflow-auto">
+        {names.map((n) => (
+          <Badge key={n} tone={checked ? 'blue' : 'slate'}>
+            {n}
+          </Badge>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export interface ExcelImportDialogProps<R, P extends ImportPreview<R>, O> {
   file: File | null;
@@ -173,11 +206,11 @@ export function ExcelImportDialog<R, P extends ImportPreview<R>, O>(props: Excel
           {props.renderOptions?.(preview, options, setOptions)}
 
           {preview.issues.length > 0 && (
-            <details className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200" open={preview.issues.length <= 6}>
+            <details className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200" open>
               <summary className="flex cursor-pointer items-center gap-2 font-semibold">
-                <AlertTriangle className="size-4" /> {preview.issues.length} satır atlanacak
+                <AlertTriangle className="size-4" /> {preview.issues.length} satır atlanacak · nedenleri
               </summary>
-              <ul className="mt-2 space-y-1">
+              <ul className="mt-2 max-h-48 space-y-1 overflow-auto">
                 {preview.issues.map((i, n) => (
                   <li key={n}>
                     <span className="font-mono text-xs">{i.row}. satır:</span> {i.message}

@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { TransportToggle } from './duties/TransportToggle.tsx';
 import { CrudPage } from '../components/CrudPage.tsx';
 import { ExcelButtons } from '../components/ExcelButtons.tsx';
-import { ExcelImportDialog, type ImportPreview } from '../components/ExcelImportDialog.tsx';
+import { ExcelImportDialog, NewTeachersOption, type ImportPreview } from '../components/ExcelImportDialog.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { Badge, Card, Field, Input, Select } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
@@ -97,7 +97,7 @@ function ViewTabs({ view, onView, counts }: { view: View; onView: (v: View) => v
 }
 
 type Mode = 'replace' | 'merge';
-type DutyRow = { weekday: number; day: string; area: string; teacherName: string; teacherInactive: boolean };
+type DutyRow = { weekday: number; day: string; area: string; teacherName: string; teacherInactive: boolean; teacherNew: boolean };
 type SupervisorRow = { date: string; name: string; from: string | null; status: 'new' | 'update' | 'unchanged' };
 type DutyPreview = ImportPreview<DutyRow> & {
   month: MonthResolution;
@@ -107,7 +107,12 @@ type DutyPreview = ImportPreview<DutyRow> & {
   supervisors: SupervisorRow[];
   removed: { day: string; area: string; teacherName: string }[];
   additions: { label: string; values: string[] }[];
+  newTeachers: string[];
 };
+type DutyOptions = { mode: Mode; month: string | null; addTeachers: boolean };
+/** Kadroya eklenmeyecekse kadroda olmayan öğretmenin satırı atlanır */
+const dutyRowSkipped = (r: DutyRow, o: DutyOptions) => r.teacherNew && !o.addTeachers;
+const newDutyCount = (p: DutyPreview, o: DutyOptions) => p.rows.filter((r) => r.status === 'new' && !dutyRowSkipped(r, o)).length;
 
 const MODES: { value: Mode; title: string; text: (p: DutyPreview) => string }[] = [
   {
@@ -126,12 +131,13 @@ const trDate = (iso: string) => iso.split('-').reverse().join('.');
 function DutyExcelImport({ file, onClose, onSaved }: { file: File | null; onClose: () => void; onSaved: (month: string) => void }) {
   const basePath = useSchoolPath('duties');
   return (
-    <ExcelImportDialog<DutyRow, DutyPreview, { mode: Mode; month: string | null }>
+    <ExcelImportDialog<DutyRow, DutyPreview, DutyOptions>
       file={file}
       onClose={onClose}
       basePath={basePath}
-      invalidate={['duties', 'duty-supervisors', 'holidays']}
-      initialOptions={{ mode: 'replace', month: null }}
+      invalidate={['duties', 'duty-supervisors', 'holidays', 'teachers']}
+      initialOptions={{ mode: 'replace', month: null, addTeachers: true }}
+      rowStatus={(r, o) => (dutyRowSkipped(r, o) ? 'skip' : r.status)}
       previewQuery={(o) => (o.month ? `?month=${o.month}` : '')}
       columns={[
         { header: 'Gün', cell: (r) => r.day },
@@ -142,21 +148,23 @@ function DutyExcelImport({ file, onClose, onSaved }: { file: File | null; onClos
             <span className="flex items-center gap-1.5 font-medium whitespace-nowrap text-ink">
               {r.teacherName}
               {r.teacherInactive && <Badge tone="amber">pasif</Badge>}
+              {r.teacherNew && <Badge tone="blue">kadroda yok</Badge>}
             </span>
           ),
         },
       ]}
       stats={(p, o) => [
-        { label: 'Yeni nöbet', value: p.totals.new, tone: 'green' },
+        { label: 'Yeni nöbet', value: newDutyCount(p, o), tone: 'green' },
         { label: 'Değişiklik yok', value: p.totals.unchanged, tone: 'slate' },
         { label: 'Kaldırılacak', value: o.mode === 'replace' ? p.removed.length : 0, tone: o.mode === 'replace' && p.removed.length ? 'red' : 'slate' },
         { label: 'Müdür yrd. (tarih)', value: p.supervisors.filter((x) => x.status !== 'unchanged').length, tone: 'blue' },
-        { label: 'Atlanacak satır', value: p.totals.skipped, tone: p.totals.skipped ? 'amber' : 'slate' },
+        { label: 'Atlanacak satır', value: p.totals.skipped + p.rows.filter((r) => dutyRowSkipped(r, o)).length, tone: p.totals.skipped || p.rows.some((r) => dutyRowSkipped(r, o)) ? 'amber' : 'slate' },
       ]}
       additions={(p) => p.additions}
       renderOptions={(p, o, set) => (
         <div className="space-y-3">
         <MonthChoice resolution={p.month} onChoose={(month) => set({ ...o, month })} movedCount={p.supervisors.filter((x) => x.from).length} />
+        <NewTeachersOption names={p.newTeachers} checked={o.addTeachers} onChange={(addTeachers) => set({ ...o, addTeachers })} />
         <div className="grid gap-2 sm:grid-cols-2">
           {MODES.map((m) => (
             <button
@@ -225,7 +233,7 @@ function DutyExcelImport({ file, onClose, onSaved }: { file: File | null; onClos
         </>
       )}
       commitCount={(p, o) =>
-        (o.mode === 'replace' ? p.totals.new + p.removed.length : p.totals.new) +
+        (o.mode === 'replace' ? newDutyCount(p, o) + p.removed.length : newDutyCount(p, o)) +
         p.supervisors.filter((x) => x.status !== 'unchanged').length +
         p.holidays.length
       }
@@ -233,16 +241,17 @@ function DutyExcelImport({ file, onClose, onSaved }: { file: File | null; onClos
       commitBody={(p, o) => ({
         month: p.month.month,
         mode: o.mode,
+        addTeachers: o.addTeachers,
         weekdays: p.weekdays,
-        rows: p.rows.map(({ weekday, area, teacherName }) => ({ weekday, area, teacherName })),
+        rows: p.rows.filter((r) => !dutyRowSkipped(r, o)).map(({ weekday, area, teacherName }) => ({ weekday, area, teacherName })),
         supervisors: p.supervisors.map(({ date, name }) => ({ date, name })),
         holidays: p.holidays,
       })}
-      successMessage={(res: { created: number; supervisors: number }, p, o) => {
+      successMessage={(res: { created: number; supervisors: number; teachersAdded: number }, p, o) => {
         onSaved(p.month.month);
         return `${monthLabel(p.month.month)} · ` + (o.mode === 'replace'
-          ? `Nöbet çizelgesi güncellendi: ${p.totals.new} yeni nöbet${p.removed.length ? `, ${p.removed.length} nöbet kaldırıldı` : ''}`
-          : `${res.created} nöbet eklendi`) + (res.supervisors ? ` · ${res.supervisors} tarihin müdür yardımcısı kaydedildi` : '');
+          ? `Nöbet çizelgesi güncellendi: ${res.created} yeni nöbet${p.removed.length ? `, ${p.removed.length} nöbet kaldırıldı` : ''}`
+          : `${res.created} nöbet eklendi`) + (res.supervisors ? ` · ${res.supervisors} tarihin müdür yardımcısı kaydedildi` : '') + (res.teachersAdded ? ` · kadroya ${res.teachersAdded} öğretmen eklendi` : '');
       }}
     />
   );

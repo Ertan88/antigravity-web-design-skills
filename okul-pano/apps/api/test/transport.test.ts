@@ -90,20 +90,31 @@ describe('taşımalı öğrenci (servis) görevlileri', () => {
       '2026-11-03 Yasemin Emlek Hakverdi, Mehmet Öztürk',
       '2026-11-04 Zeynep Arslan',
     ]);
-    expect(body.issues).toEqual([
-      { row: 6, message: expect.stringMatching(/"Hasan Yok" kadroda yok/) },
-      { row: 7, message: 'Tarih anlaşılamadı: "31.11.2026"' },
-    ]);
+    expect(body.issues).toEqual([{ row: 7, message: 'Tarih anlaşılamadı: "31.11.2026"' }]);
+    // Kadroda hiç benzeri olmayan isim hata değil: kaydederken kadroya eklenebilir
+    expect(body.newTeachers).toEqual(['Hasan Yok']);
+    expect(body.rows[2].newTeachers).toEqual([{ name: 'Hasan Yok', position: 0 }]);
     expect(body.totals).toMatchObject({ new: 3, update: 0, unchanged: 0 });
 
+    // Kadroya eklenmesi istenmedi: yalnızca kadrodakiler yazılır
     const saved = await owner.post(path('transport-duties/import'), {
       days: body.rows.map((r: { date: string; teachers: { id: string }[] }) => ({ date: r.date, teacherIds: r.teachers.map((x) => x.id) })),
     });
-    expect(saved.json()).toEqual({ days: 3 });
+    expect(saved.json()).toEqual({ days: 3, teachersAdded: 0 });
     const days = (await owner.get(path('transport-duties?month=2026-11'))).json() as Day[];
     expect(days.map((d) => `${d.date}:${d.teachers.length}`)).toEqual(['2026-11-02:2', '2026-11-03:2', '2026-11-04:1']);
 
-    // Aynı dosya tekrar yüklenirse değişiklik yok
+    // Aynı dosya tekrar yüklenirse yalnızca kadroya eklenmemiş öğretmenin günü değişiklik olarak kalır
+    const again = (await upload(buf)).json();
+    expect(again.totals).toMatchObject({ new: 0, update: 1, unchanged: 2 });
+
+    // Bu kez kadroya eklenmesi istenir: öğretmen kadroya girer ve o güne yazılır
+    const added = await owner.post(path('transport-duties/import'), {
+      days: [{ date: '2026-11-04', teacherIds: again.rows[2].teachers.map((x: { id: string }) => x.id), newTeachers: [{ name: 'Hasan Yok', position: 0 }] }],
+    });
+    expect(added.json()).toEqual({ days: 1, teachersAdded: 1 });
+    const roster = (await owner.get(path('teachers'))).json() as { fullName: string }[];
+    expect(roster.filter((x) => x.fullName === 'Hasan Yok')).toHaveLength(1);
     expect((await upload(buf)).json().totals).toMatchObject({ new: 0, update: 0, unchanged: 3 });
   });
 

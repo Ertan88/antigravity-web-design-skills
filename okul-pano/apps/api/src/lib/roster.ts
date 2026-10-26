@@ -1,4 +1,4 @@
-import { normalizeName } from '@okulpano/shared';
+import { normalizeName, tidyName } from '@okulpano/shared';
 import { eq } from 'drizzle-orm';
 import type { DB } from '../db/client.ts';
 import { teachers } from '../db/schema.ts';
@@ -46,7 +46,9 @@ export interface RosterTeacher {
  * Okulun öğretmen kadrosu ve Excel'den gelen isimleri kadroyla eşleştiren yardımcılar.
  * Eşleşme sırası: birebir (büyük/küçük harf duyarsız) → Türkçe karakter hatası → kısaltma.
  */
-export async function loadRoster(db: DB, schoolId: string) {
+type Tx = Parameters<Parameters<DB['transaction']>[0]>[0];
+
+export async function loadRoster(db: DB | Tx, schoolId: string) {
   const rows = await db
     .select({ id: teachers.id, fullName: teachers.fullName, isActive: teachers.isActive })
     .from(teachers)
@@ -83,4 +85,27 @@ export async function loadRoster(db: DB, schoolId: string) {
     return best?.name ?? null;
   };
   return { rows, byName, find, suggest };
+}
+
+export type Roster = Awaited<ReturnType<typeof loadRoster>>;
+
+/**
+ * Kadroda olmayan ve kadrodaki hiçbir isme benzemeyen isim: içe aktarırken kadroya eklenebilir.
+ * Benzer bir isim varsa ("Ayse Demır" / "Ayşe Demir") yazım hatası sayılır, eklenmez.
+ */
+export const isNewTeacher = (roster: Roster, name: string) => !roster.find(name) && !roster.suggest(name);
+
+/** Kadroya eklenebilecek isimler (aynı kişinin farklı yazımları bir kez) */
+export function newTeacherNames(roster: Roster, names: string[]): string[] {
+  const out = new Map<string, string>();
+  for (const name of names) if (isNewTeacher(roster, name) && !out.has(loose(name))) out.set(loose(name), tidyName(name));
+  return [...out.values()];
+}
+
+/** Excel'den gelen yeni öğretmenleri kadroya ekler ve güncel kadroyu döndürür */
+export async function addTeachersToRoster(tx: DB | Tx, schoolId: string, roster: Roster, names: string[]): Promise<{ roster: Roster; added: number }> {
+  const fresh = newTeacherNames(roster, names);
+  if (!fresh.length) return { roster, added: 0 };
+  await tx.insert(teachers).values(fresh.map((fullName) => ({ schoolId, fullName })));
+  return { roster: await loadRoster(tx, schoolId), added: fresh.length };
 }
