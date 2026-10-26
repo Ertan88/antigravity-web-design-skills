@@ -180,7 +180,14 @@ CADDY
 set -euo pipefail
 cd /opt/okul-pano
 mkdir -p yedekler
-f="yedekler/okulpano-$(date +%F-%H%M).dump"
+ad="yedekler/okulpano-$(date +%F-%H%M%S)"
+f="$ad.dump"
+i=2
+# Var olan bir yedeğin üzerine asla yazılmaz
+while [ -e "$f" ]; do
+  f="$ad-$i.dump"
+  i=$((i + 1))
+done
 docker compose exec -T db pg_dump -U okulpano -Fc okulpano >"$f.tmp"
 mv "$f.tmp" "$f"
 # Son 14 günün yedeği tutulur (YEDEK_GUN ile değiştirilebilir)
@@ -190,7 +197,7 @@ SH
 
   cat >"$DIR/geri-yukle.sh" <<'SH'
 #!/usr/bin/env bash
-# Yedekten geri yükleme:  sudo /opt/okul-pano/geri-yukle.sh yedekler/okulpano-2026-10-26-0330.dump
+# Yedekten geri yükleme:  sudo /opt/okul-pano/geri-yukle.sh yedekler/okulpano-2026-10-26-033000.dump
 set -euo pipefail
 cd /opt/okul-pano
 f=${1:?Kullanım: geri-yukle.sh <yedek dosyası>}
@@ -199,9 +206,13 @@ if [ "${ONAY:-}" != evet ]; then
   read -rp "Şu anki veriler bu yedekle değiştirilecek (önce şu anki hâl yedeklenir). Devam? (evet/hayir) " ONAY </dev/tty
 fi
 [ "$ONAY" = evet ] || { echo "Vazgeçildi."; exit 1; }
+# Seçilen yedek bir kenara alınır: hemen ardından alınan güvenlik yedeği onu hiçbir durumda ezemez
+kopya=$(mktemp)
+trap 'rm -f "$kopya"' EXIT
+cp "$f" "$kopya"
 ./yedekle.sh
 docker compose stop app
-docker compose exec -T db pg_restore -U okulpano -d okulpano --clean --if-exists --no-owner <"$f"
+docker compose exec -T db pg_restore -U okulpano -d okulpano --clean --if-exists --no-owner <"$kopya"
 docker compose start app
 echo "Geri yüklendi: $f"
 SH
