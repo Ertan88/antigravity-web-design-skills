@@ -129,3 +129,50 @@ export function ResetPasswordDialog({
     </Modal>
   );
 }
+
+export interface InviteResult {
+  email: string;
+  fullName: string;
+  inviteUrl: string;
+  /** Sunucu daveti e-postayla gönderdi mi (SMTP ayarlıysa) */
+  emailed: boolean;
+}
+
+/** Davet bağlantısı: e-posta gönderildiyse bilgi, gönderilemediyse kopyala / e-posta programında aç */
+export function InviteDialog({ value, onClose }: { value: InviteResult | null; onClose: () => void }) {
+  const { school } = useAuth();
+  const [copied, setCopied] = useState(false);
+  if (!value) return null;
+  const text = `Merhaba ${value.fullName},\n\n${school?.name ?? ''} sizi Panokul yönetim paneline davet etti. Şifrenizi belirlemek için bağlantıyı açın (7 gün geçerli):\n${value.inviteUrl}\n\nMobil uygulamaya da aynı e-posta ve şifreyle giriş yapabilirsiniz.`;
+  const mailto = `mailto:${encodeURIComponent(value.email)}?subject=${encodeURIComponent(`${school?.name ?? ''} · Panokul daveti`)}&body=${encodeURIComponent(text)}`;
+  return (
+    <Modal open onClose={onClose} title="Davet" footer={<Button onClick={onClose}>Tamam</Button>}>
+      <div className="space-y-3 text-sm">
+        {value.emailed ? (
+          <Alert tone="blue">Davet {value.email} adresine e-postayla gönderildi. Kişi bağlantıyı açıp şifresini belirleyince giriş yapabilir.</Alert>
+        ) : (
+          <p>Davet bağlantısını {value.fullName} ile paylaşın. Bağlantı 7 gün geçerlidir ve bir kez kullanılabilir.</p>
+        )}
+        <div className="rounded-xl bg-slate-50 p-4 font-mono text-xs break-all ring-1 ring-slate-200">{value.inviteUrl}</div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="secondary"
+            icon={copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+            onClick={() => {
+              void navigator.clipboard?.writeText(text);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            }}
+          >
+            {copied ? 'Kopyalandı' : 'Daveti kopyala'}
+          </Button>
+          {!value.emailed && (
+            <a href={mailto} className="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-brand-700 ring-1 ring-brand-200 transition hover:bg-brand-50">
+              <Mail className="size-4" /> E-posta programında aç
+            </a>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}

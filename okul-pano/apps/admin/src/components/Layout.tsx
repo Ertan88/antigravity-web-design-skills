@@ -8,6 +8,7 @@ import { findNav, NAV } from '../lib/nav.ts';
 import { useTheme } from '../lib/theme.ts';
 import { BrandMark, BrandName } from './Brand.tsx';
 import { EmergencyBanner, EmergencyButton } from './Emergency.tsx';
+import { TrialBanner } from './TrialBanner.tsx';
 import { NotificationBell } from './Notifications.tsx';
 import { Spinner } from './ui.tsx';
 
@@ -235,6 +236,7 @@ export function Layout() {
       {/* Acil durum bandı ve üst bar birlikte yapışık kalır */}
       <div className="sticky top-0 z-20">
         <EmergencyBanner />
+        <TrialBanner />
         <TopBar onMenu={() => setOpen(true)} />
       </div>
 

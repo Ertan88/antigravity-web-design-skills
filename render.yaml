@@ -36,3 +36,7 @@ services:
       # Aydınlatma metni şablonunda "verilerin saklandığı yer" olarak yazılır. Kendi sunucunuza geçince değiştirin.
       - key: DATA_REGION
         value: Almanya (Frankfurt)
+      # Web'den okul kaydı: open (e-posta doğrulanınca açılır), approval (platform yöneticisi onaylar), closed (kapalı).
+      # SMTP ayarlı değilse doğrulama e-postası gitmez; başvurular Platform sayfasında onaylanır.
+      - key: SIGNUP_MODE
+        value: open

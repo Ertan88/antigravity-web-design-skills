@@ -7,6 +7,7 @@ import { EmptyState } from './components/ui.tsx';
 import { useAuth } from './lib/auth.tsx';
 import { Dashboard } from './pages/Dashboard.tsx';
 import { Login } from './pages/Login.tsx';
+import { AcceptInvite, Signup, VerifySignup } from './pages/Public.tsx';
 
 /** Sayfalar ihtiyaç anında yüklenir: telefondan giren öğretmen için ilk açılış hızlı olur. */
 function page<K extends string>(load: () => Promise<Record<K, ComponentType>>, name: K) {
@@ -57,7 +58,17 @@ export function App() {
       </div>
     );
   }
-  if (!me) return <Login />;
+  // Giriş yapılmamışken: kayıt, e-posta doğrulama ve davet sayfaları; diğer her adres giriş ekranı
+  if (!me) {
+    return (
+      <Routes>
+        <Route path="kayit" element={<Signup />} />
+        <Route path="dogrula" element={<VerifySignup />} />
+        <Route path="davet" element={<AcceptInvite />} />
+        <Route path="*" element={<Login />} />
+      </Routes>
+    );
+  }
 
   const needsSchool = (el: ReactNode) =>
     school ? (

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
-import { DEFAULT_SERVER } from '../src/api.ts';
+import { Image, KeyboardAvoidingView, Linking, Platform, Pressable, Text, View } from 'react-native';
+import { DEFAULT_SERVER, normalizeServer } from '../src/api.ts';
 import { useAuth } from '../src/auth.tsx';
 import { colors } from '../src/theme.ts';
 import { Button, Card, Field, Icon, Screen, T } from '../src/ui.tsx';
@@ -94,6 +94,17 @@ export default function Login() {
             Giriş yap
           </Button>
         </Card>
+        {Boolean(server.trim()) && (
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => void Linking.openURL(`${normalizeServer(server)}/admin/kayit`)}
+            style={{ alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 }}
+          >
+            <Text style={{ color: colors.muted, fontSize: 13, textAlign: 'center' }}>
+              Okulunuz Panokul kullanmıyor mu? <Text style={{ color: colors.primary, fontWeight: '700' }}>Web'den ücretsiz deneyin</Text>
+            </Text>
+          </Pressable>
+        )}
         {!editServer && (
           <Pressable accessibilityRole="button" onPress={() => setEditServer(true)} style={{ alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 }}>
             <Text style={{ color: colors.muted, fontSize: 13 }}>

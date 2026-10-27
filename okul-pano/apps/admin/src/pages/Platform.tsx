@@ -1,6 +1,6 @@
-import { createSchoolSchema, PLANS, type Plan } from '@okulpano/shared';
+import { createSchoolSchema, PLANS, trialStatus, type Plan } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Building2, Download, Plus, Trash2 } from 'lucide-react';
+import { Building2, Check, Download, Inbox, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Badge, Button, Card, EmptyState, Field, IconButton, Input, Modal, PageHeader, Select, Spinner, Table, Td, Toggle } from '../components/ui.tsx';
@@ -11,7 +11,21 @@ import type { School } from '../lib/data.ts';
 import { useForm } from '../lib/form.ts';
 import { formatDate, slugify } from '../lib/format.ts';
 
-type Row = School & { screenCount: number; createdAt: string };
+type Row = School & { screenCount: number; contactPhone: string | null; createdAt: string };
+
+interface Signup {
+  id: string;
+  schoolName: string;
+  schoolType: string;
+  city: string;
+  district: string | null;
+  ownerName: string;
+  email: string;
+  phone: string;
+  marketingConsent: boolean;
+  createdAt: string;
+  expired: boolean;
+}
 
 type Form = { name: string; slug: string; plan: Plan; maxScreens: number; ownerEmail: string; ownerName: string; ownerPassword: string };
 const empty: Form = { name: '', slug: '', plan: 'trial', maxScreens: 3, ownerEmail: '', ownerName: '', ownerPassword: '' };
@@ -30,9 +44,25 @@ export function Platform() {
 
   const create = useMutation({ mutationFn: (body: unknown) => api('/api/platform/schools', { method: 'POST', body }) });
   const patch = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: Partial<Pick<School, 'plan' | 'maxScreens' | 'isActive'>> }) =>
+    mutationFn: ({ id, body }: { id: string; body: Partial<Pick<School, 'plan' | 'maxScreens' | 'isActive'>> & { extendTrialDays?: number } }) =>
       api(`/api/platform/schools/${id}`, { method: 'PATCH', body }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['platform', 'schools'] }),
+    onError: (e) => toast.error(e.message),
+  });
+
+  // Web'den gelen, e-postası doğrulanmamış başvurular (SMTP yoksa e-posta gitmez: buradan elle onaylanır)
+  const signups = useQuery({ queryKey: ['platform', 'signups'], queryFn: () => api<Signup[]>('/api/platform/signups') });
+  const approve = useMutation({
+    mutationFn: (x: Signup) => api(`/api/platform/signups/${x.id}/approve`, { method: 'POST' }),
+    onSuccess: async (_r, x) => {
+      toast.success(`${x.schoolName} açıldı; ${x.email} kayıtta belirlediği şifreyle girebilir`);
+      await Promise.all([qc.invalidateQueries({ queryKey: ['platform'] }), reloadMe()]);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const reject = useMutation({
+    mutationFn: (x: Signup) => api(`/api/platform/signups/${x.id}`, { method: 'DELETE' }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['platform', 'signups'] }),
     onError: (e) => toast.error(e.message),
   });
 
@@ -86,6 +116,49 @@ export function Platform() {
           </Button>
         }
       />
+      {(signups.data?.length ?? 0) > 0 && (
+        <Card className="mb-6">
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-5 py-3.5">
+            <Inbox className="size-4 text-brand-600" />
+            <h2 className="text-sm font-semibold text-ink">E-postası doğrulanmamış kayıtlar ({signups.data!.length})</h2>
+            <span className="text-xs text-slate-500">E-posta ulaşmadıysa buradan onaylayın; 30 gün sonra kendiliğinden silinir.</span>
+          </div>
+          <Table head={['Okul', 'Yetkili', 'İletişim', 'Tarih', '']}>
+            {signups.data!.map((x) => (
+              <tr key={x.id}>
+                <Td>
+                  <div className="font-semibold">{x.schoolName}</div>
+                  <div className="text-xs text-slate-500">
+                    {x.schoolType} · {[x.district, x.city].filter(Boolean).join(', ')}
+                  </div>
+                </Td>
+                <Td>{x.ownerName}</Td>
+                <Td>
+                  <div>{x.email}</div>
+                  <div className="text-xs text-slate-500">
+                    {x.phone}
+                    {x.marketingConsent && ' · ileti izni var'}
+                  </div>
+                </Td>
+                <Td className="whitespace-nowrap text-slate-500">
+                  {formatDate(x.createdAt.slice(0, 10))}
+                  {x.expired && <div className="text-xs">bağlantı süresi doldu</div>}
+                </Td>
+                <Td className="w-px">
+                  <div className="flex justify-end gap-1">
+                    <Button size="sm" icon={<Check className="size-4" />} loading={approve.isPending && approve.variables?.id === x.id} onClick={() => approve.mutate(x)}>
+                      Onayla
+                    </Button>
+                    <IconButton label="Başvuruyu sil" onClick={() => reject.mutate(x)}>
+                      <Trash2 className="size-4 text-red-600" />
+                    </IconButton>
+                  </div>
+                </Td>
+              </tr>
+            ))}
+          </Table>
+        </Card>
+      )}
       <Card>
         {list.isLoading ? (
           <Spinner />
@@ -97,7 +170,10 @@ export function Platform() {
               <tr key={s.id}>
                 <Td>
                   <div className="font-semibold">{s.name}</div>
-                  <div className="text-xs text-slate-500">{s.slug}</div>
+                  <div className="text-xs text-slate-500">
+                    {s.slug}
+                    {s.contactPhone && ` · ${s.contactPhone}`}
+                  </div>
                 </Td>
                 <Td>
                   <Select value={s.plan} onChange={(e) => patch.mutate({ id: s.id, body: { plan: e.target.value as Plan } })} className="h-9 w-36" aria-label="Paket">
@@ -123,7 +199,21 @@ export function Platform() {
                     />
                   </div>
                 </Td>
-                <Td className="whitespace-nowrap text-slate-500">{s.plan === 'trial' && s.trialEndsAt ? formatDate(s.trialEndsAt.slice(0, 10)) : '—'}</Td>
+                <Td className="whitespace-nowrap text-slate-500">
+                  {(() => {
+                    const t = trialStatus(s);
+                    if (!t) return '—';
+                    return (
+                      <div className="flex items-center gap-2">
+                        <span>{formatDate(t.endsAt.slice(0, 10))}</span>
+                        {t.expired ? <Badge tone="red">doldu</Badge> : t.daysLeft <= 7 && <Badge tone="amber">{t.daysLeft} gün</Badge>}
+                        <Button size="sm" variant="ghost" onClick={() => patch.mutate({ id: s.id, body: { extendTrialDays: 30 } })}>
+                          +30 gün
+                        </Button>
+                      </div>
+                    );
+                  })()}
+                </Td>
                 <Td>
                   <Toggle checked={s.isActive} onChange={(x) => patch.mutate({ id: s.id, body: { isActive: x } })} />
                 </Td>

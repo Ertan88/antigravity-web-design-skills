@@ -6,7 +6,11 @@ import { audit, schoolGuard, UUID_RE } from '../context.ts';
 import { memberships, sessions, teachers, users } from '../db/schema.ts';
 import { hashPassword, readablePassword } from '../lib/crypto.ts';
 import { sendMail } from '../lib/mailer.ts';
+import { createInvite } from './signup.ts';
 import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
+
+/** Davetle eklenen ve henüz şifresini belirlemeyen hesap: bu değerle hiçbir şifre eşleşmez */
+export const INVITE_PENDING = 'davet-bekliyor';
 
 export async function memberRoutes(app: FastifyInstance) {
   const { db } = app.deps;
@@ -49,6 +53,7 @@ export async function memberRoutes(app: FastifyInstance) {
         teacherId: memberships.teacherId,
         teacherName: teachers.fullName,
         lastLoginAt: users.lastLoginAt,
+        passwordHash: users.passwordHash,
         createdAt: memberships.createdAt,
       })
       .from(memberships)
@@ -56,7 +61,11 @@ export async function memberRoutes(app: FastifyInstance) {
       .leftJoin(teachers, eq(teachers.id, memberships.teacherId))
       .where(eq(memberships.schoolId, req.ctx.schoolId))
       .orderBy(asc(users.fullName));
-    return rows.map((r) => ({ ...r, effectivePermissions: effectivePermissions(r.role, r.permissions) }));
+    return rows.map(({ passwordHash, ...r }) => ({
+      ...r,
+      invitePending: passwordHash === INVITE_PENDING,
+      effectivePermissions: effectivePermissions(r.role, r.permissions),
+    }));
   });
 
   app.post(base, manage, async (req, reply) => {
@@ -66,10 +75,15 @@ export async function memberRoutes(app: FastifyInstance) {
     let [user] = await db.select().from(users).where(eq(users.email, email));
     const created = !user;
     if (!user) {
-      if (!body.password) throw badRequest('Yeni kullanıcı için geçici bir şifre belirleyin.');
+      if (!body.invite && !body.password) throw badRequest('Yeni kullanıcı için geçici bir şifre belirleyin ya da davet gönderin.');
       [user] = await db
         .insert(users)
-        .values({ email, fullName: body.fullName, passwordHash: await hashPassword(body.password) })
+        .values({
+          email,
+          fullName: body.fullName,
+          // Davetle eklenen kişi şifresini bağlantıdan belirleyene kadar giriş yapamaz
+          passwordHash: body.invite ? INVITE_PENDING : await hashPassword(body.password!),
+        })
         .returning();
     }
     const [existing] = await db
@@ -89,8 +103,37 @@ export async function memberRoutes(app: FastifyInstance) {
       })
       .returning();
     await audit(req, 'create', 'Kullanıcı', m!.id, `${body.fullName} (${email})`);
+    // Davet yalnızca yeni hesaplara gider; e-posta sistemde zaten kayıtlıysa kişi kendi şifresiyle girer
+    const invite =
+      body.invite && created
+        ? await createInvite(app.deps, {
+            userId: user!.id,
+            schoolId: req.ctx.schoolId,
+            schoolName: req.ctx.school.name,
+            email,
+            fullName: body.fullName,
+            createdBy: req.ctx.userId,
+          })
+        : null;
     // E-posta sistemde zaten kayıtlıysa girilen geçici şifre kullanılmaz: panel bunu açıkça söyler
-    return reply.status(201).send({ id: m!.id, existingUser: !created });
+    return reply.status(201).send({ id: m!.id, existingUser: !created, invite });
+  });
+
+  /** Daveti yeniden gönderir (kişi henüz şifresini belirlemediyse): eski bağlantı geçersiz olur */
+  app.post(`${base}/:memberId/invite`, manage, async (req) => {
+    const m = await loadMember(req);
+    const [u] = await db.select({ passwordHash: users.passwordHash }).from(users).where(eq(users.id, m.membership.userId));
+    if (u?.passwordHash !== INVITE_PENDING) throw badRequest('Bu kullanıcı şifresini belirlemiş; gerekirse şifresini sıfırlayın.');
+    const invite = await createInvite(app.deps, {
+      userId: m.membership.userId,
+      schoolId: req.ctx.schoolId,
+      schoolName: req.ctx.school.name,
+      email: m.email,
+      fullName: m.fullName,
+      createdBy: req.ctx.userId,
+    });
+    await audit(req, 'update', 'Kullanıcı daveti', m.membership.id, `${m.fullName} için davet yenilendi`);
+    return invite;
   });
 
   app.patch(`${base}/:memberId`, manage, async (req) => {

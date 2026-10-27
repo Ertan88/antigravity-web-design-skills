@@ -23,6 +23,8 @@ export interface DisplayState {
     timezone: string;
     city: string | null;
     settings: SchoolSettings;
+    /** Deneme süresi doldu: pano içerik yerine "abonelik sona erdi" ekranı gösterir */
+    subscriptionEnded?: boolean;
   };
   /** Bu panonun düzeni (panoya özel ya da okulun) */
   layout: BoardLayout;

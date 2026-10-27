@@ -1,0 +1,166 @@
+import { eq } from 'drizzle-orm';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { schools, signups } from '../src/db/schema.ts';
+import { sha256 } from '../src/lib/crypto.ts';
+import { runTrialReminders } from '../src/routes/signup.ts';
+import { client, createTestApp, expectStatus, login, SUPER, type TestCtx } from './helpers.ts';
+
+let t: TestCtx;
+let root: ReturnType<typeof client>;
+
+const form = (over: Record<string, unknown> = {}) => ({
+  schoolName: 'Yıldız Ortaokulu',
+  city: 'Kayseri',
+  district: 'Melikgazi',
+  schoolType: 'Ortaokulu',
+  ownerName: 'Aylin Kara',
+  email: 'aylin@yildiz.test',
+  phone: '0532 111 22 33',
+  password: 'GuvenliSifre9',
+  kvkk: true,
+  ...over,
+});
+
+/** E-postadaki bağlantının yerine: başvurunun anahtarını bilinen bir değere çevirir */
+async function knownToken(email: string): Promise<string> {
+  const token = `sgn_test_${email.replace(/\W/g, '')}_0123456789`;
+  await t.database.db.update(signups).set({ tokenHash: sha256(token) }).where(eq(signups.email, email));
+  return token;
+}
+
+beforeAll(async () => {
+  t = await createTestApp();
+  root = client(t.app, (await login(t.app, SUPER.email, SUPER.password)).token);
+});
+
+afterAll(async () => {
+  await t.app.close();
+  await t.database.close();
+});
+
+describe('web kaydı', () => {
+  it('kayıt, e-posta doğrulanınca deneme paketiyle okulu açar; sahip kendi şifresiyle girer', async () => {
+    expect((await t.app.inject({ method: 'GET', url: '/api/signup/config' })).json()).toEqual({ mode: 'open', trialDays: 30, trialScreens: 2 });
+    const res = await t.app.inject({ method: 'POST', url: '/api/signup', payload: form() });
+    expectStatus(res, 202);
+    // SMTP yok: e-posta gitmedi, başvuru platform yöneticisinin listesine düşer
+    expect(res.json()).toEqual({ emailed: false });
+    // Doğrulanmadan giriş yapılamaz
+    expect((await t.app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'aylin@yildiz.test', password: 'GuvenliSifre9' } })).statusCode).toBe(401);
+
+    const token = await knownToken('aylin@yildiz.test');
+    const verified = await t.app.inject({ method: 'POST', url: '/api/signup/verify', payload: { token } });
+    expectStatus(verified, 200);
+    expect(verified.json()).toMatchObject({ schoolName: 'Yıldız Ortaokulu', pendingApproval: false });
+    // Aynı bağlantı ikinci kez açılırsa hata vermez
+    expect((await t.app.inject({ method: 'POST', url: '/api/signup/verify', payload: { token } })).json()).toMatchObject({ alreadyVerified: true });
+
+    const owner = client(t.app, (await login(t.app, 'aylin@yildiz.test', 'GuvenliSifre9')).token);
+    const me = (await owner.get('/api/me')).json();
+    expect(me.schools).toHaveLength(1);
+    expect(me.schools[0]).toMatchObject({ role: 'owner', name: 'Yıldız Ortaokulu' });
+    const school = (await owner.get(`/api/schools/${me.schools[0].id}`)).json();
+    expect(school).toMatchObject({ plan: 'trial', maxScreens: 2, city: 'Kayseri', slug: 'yildiz-ortaokulu' });
+    expect(Date.parse(school.trialEndsAt) - Date.now()).toBeGreaterThan(29 * 86400_000);
+  });
+
+  it('kayıtlı e-posta, eksik onay ve bot tuzağı', async () => {
+    expect((await t.app.inject({ method: 'POST', url: '/api/signup', payload: form() })).statusCode).toBe(409);
+    const noKvkk = await t.app.inject({ method: 'POST', url: '/api/signup', payload: form({ email: 'yeni@x.test', kvkk: false }) });
+    expect(noKvkk.statusCode).toBe(400);
+    const bot = await t.app.inject({ method: 'POST', url: '/api/signup', payload: form({ email: 'bot@x.test', website: 'http://spam' }) });
+    expect(bot.statusCode).toBe(202);
+    const [row] = await t.database.db.select().from(signups).where(eq(signups.email, 'bot@x.test'));
+    expect(row).toBeUndefined();
+  });
+
+  it('e-posta ulaşmazsa platform yöneticisi başvuruyu onaylar', async () => {
+    expectStatus(await t.app.inject({ method: 'POST', url: '/api/signup', payload: form({ email: 'mehmet@gunes.test', schoolName: 'Güneş İlkokulu', ownerName: 'Mehmet Er' }) }), 202);
+    const list = (await root.get('/api/platform/signups')).json() as { id: string; email: string; phone: string }[];
+    const item = list.find((x) => x.email === 'mehmet@gunes.test')!;
+    expect(item.phone).toBe('05321112233');
+    expect(item).not.toHaveProperty('passwordHash');
+    expectStatus(await root.post(`/api/platform/signups/${item.id}/approve`), 200);
+    expect((await root.get('/api/platform/signups')).json().some((x: { email: string }) => x.email === 'mehmet@gunes.test')).toBe(false);
+    await login(t.app, 'mehmet@gunes.test', 'GuvenliSifre9');
+    const owner = client(t.app, (await login(t.app, 'aylin@yildiz.test', 'GuvenliSifre9')).token);
+    expect((await owner.get('/api/platform/signups')).statusCode).toBe(403);
+  });
+});
+
+describe('deneme süresi', () => {
+  it('süre dolunca panel salt okunur; platform yöneticisi uzatınca açılır', async () => {
+    const owner = client(t.app, (await login(t.app, 'aylin@yildiz.test', 'GuvenliSifre9')).token);
+    const schoolId = (await owner.get('/api/me')).json().schools[0].id as string;
+    await t.database.db.update(schools).set({ trialEndsAt: new Date(Date.now() - 1000) }).where(eq(schools.id, schoolId));
+
+    expectStatus(await owner.get(`/api/schools/${schoolId}/teachers`), 200);
+    const blocked = await owner.post(`/api/schools/${schoolId}/teachers`, { fullName: 'Ali Veli' });
+    expect(blocked.statusCode).toBe(403);
+    expect(blocked.json().message).toMatch(/Deneme süreniz doldu/);
+    // Platform yöneticisi her zaman düzenleyebilir
+    expectStatus(await root.post(`/api/schools/${schoolId}/teachers`, { fullName: 'Destek Kaydı' }), 201);
+
+    expectStatus(await root.patch(`/api/platform/schools/${schoolId}`, { extendTrialDays: 14 }), 200);
+    expectStatus(await owner.post(`/api/schools/${schoolId}/teachers`, { fullName: 'Ali Veli' }), 201);
+    // Ücretli pakete geçince deneme bitişi kalkar
+    const paid = (await root.patch(`/api/platform/schools/${schoolId}`, { plan: 'basic' })).json();
+    expect(paid.trialEndsAt).toBeNull();
+  });
+
+  it('hatırlatmalar 7, 3, 1 gün kala ve bitince birer kez gider', async () => {
+    const [s] = await t.database.db.select().from(schools).where(eq(schools.name, 'Güneş İlkokulu'));
+    const day = 86400_000;
+    await t.database.db.update(schools).set({ trialEndsAt: new Date(Date.now() + 6.5 * day), trialNotice: null }).where(eq(schools.id, s!.id));
+    expect(await runTrialReminders(t.app.deps)).toBe(1);
+    expect(await runTrialReminders(t.app.deps)).toBe(0);
+    expect(await runTrialReminders(t.app.deps, Date.now() + 4 * day)).toBe(1);
+    expect(await runTrialReminders(t.app.deps, Date.now() + 8 * day)).toBe(1);
+    const [after] = await t.database.db.select({ n: schools.trialNotice }).from(schools).where(eq(schools.id, s!.id));
+    expect(after!.n).toBe(0);
+  });
+});
+
+describe('kullanıcı daveti', () => {
+  it('davetle eklenen kişi şifresini bağlantıdan belirler; bağlantı tek kullanımlık', async () => {
+    const owner = client(t.app, (await login(t.app, 'mehmet@gunes.test', 'GuvenliSifre9')).token);
+    const schoolId = (await owner.get('/api/me')).json().schools[0].id as string;
+    const res = await owner.post(`/api/schools/${schoolId}/members`, { email: 'ogretmen@gunes.test', fullName: 'Zeynep Ak', role: 'editor', invite: true });
+    expectStatus(res, 201);
+    const { invite } = res.json();
+    expect(invite.emailed).toBe(false);
+    const token = new URL(invite.inviteUrl).searchParams.get('token')!;
+
+    const members = (await owner.get(`/api/schools/${schoolId}/members`)).json() as { email: string; invitePending: boolean }[];
+    expect(members.find((m) => m.email === 'ogretmen@gunes.test')!.invitePending).toBe(true);
+    expect((await t.app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'ogretmen@gunes.test', password: 'davet-bekliyor' } })).statusCode).toBe(401);
+
+    expect((await t.app.inject({ method: 'GET', url: `/api/invites/${token}` })).json()).toEqual({ email: 'ogretmen@gunes.test', fullName: 'Zeynep Ak', schoolName: 'Güneş İlkokulu' });
+    expect((await t.app.inject({ method: 'POST', url: '/api/invites/accept', payload: { token, password: 'kisa' } })).statusCode).toBe(400);
+    expectStatus(await t.app.inject({ method: 'POST', url: '/api/invites/accept', payload: { token, password: 'ZeynepSifre42' } }), 200);
+    await login(t.app, 'ogretmen@gunes.test', 'ZeynepSifre42');
+    expect((await t.app.inject({ method: 'POST', url: '/api/invites/accept', payload: { token, password: 'BaskaSifre42' } })).statusCode).toBe(404);
+  });
+});
+
+describe('kayıt kapalı', () => {
+  it('SIGNUP_MODE=closed iken kayıt alınmaz; approval iken okul onay bekler', async () => {
+    const closed = await createTestApp({ SIGNUP_MODE: 'closed' });
+    expect((await closed.app.inject({ method: 'POST', url: '/api/signup', payload: form() })).statusCode).toBe(403);
+    await closed.app.close();
+    await closed.database.close();
+
+    const approval = await createTestApp({ SIGNUP_MODE: 'approval' });
+    const prev = t;
+    t = approval;
+    expectStatus(await approval.app.inject({ method: 'POST', url: '/api/signup', payload: form() }), 202);
+    const token = await knownToken('aylin@yildiz.test');
+    expect((await approval.app.inject({ method: 'POST', url: '/api/signup/verify', payload: { token } })).json()).toMatchObject({ pendingApproval: true });
+    const owner = client(approval.app, (await login(approval.app, 'aylin@yildiz.test', 'GuvenliSifre9')).token);
+    const schoolId = (await owner.get('/api/me')).json().schools[0].id as string;
+    expect((await owner.get(`/api/schools/${schoolId}/teachers`)).statusCode).toBe(403);
+    t = prev;
+    await approval.app.close();
+    await approval.database.close();
+  });
+});

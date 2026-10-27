@@ -145,7 +145,7 @@ export async function schoolRoutes(app: FastifyInstance) {
       .leftJoin(screens, eq(screens.schoolId, schools.id))
       .groupBy(schools.id)
       .orderBy(desc(schools.createdAt));
-    return rows.map((r) => ({ ...publicSchool(r.school), screenCount: r.screens, createdAt: r.school.createdAt }));
+    return rows.map((r) => ({ ...publicSchool(r.school), screenCount: r.screens, contactPhone: r.school.contactPhone, createdAt: r.school.createdAt }));
   });
 
   app.post('/api/platform/schools', platform, async (req, reply) => {
@@ -183,8 +183,23 @@ export async function schoolRoutes(app: FastifyInstance) {
   app.patch('/api/platform/schools/:id', platform, async (req) => {
     const { id } = req.params as { id: string };
     if (!UUID_RE.test(id)) throw notFound();
-    const body = parse(adminUpdateSchoolSchema, req.body);
-    const [updated] = await db.update(schools).set(body).where(eq(schools.id, id)).returning();
+    const { extendTrialDays, ...body } = parse(adminUpdateSchoolSchema, req.body);
+    const [current] = await db.select().from(schools).where(eq(schools.id, id));
+    if (!current) throw notFound();
+    const plan = body.plan ?? current.plan;
+    const trial: Partial<typeof schools.$inferInsert> =
+      plan !== 'trial'
+        ? // Ücretli pakette deneme bitişi yok
+          { trialEndsAt: null, trialNotice: null }
+        : extendTrialDays
+          ? {
+              trialEndsAt: new Date(Math.max(Date.now(), current.trialEndsAt?.getTime() ?? 0) + extendTrialDays * 86400_000),
+              trialNotice: null,
+            }
+          : current.plan !== 'trial'
+            ? { trialEndsAt: new Date(Date.now() + 30 * 86400_000), trialNotice: null }
+            : {};
+    const [updated] = await db.update(schools).set({ ...body, ...trial }).where(eq(schools.id, id)).returning();
     if (!updated) throw notFound();
     bus.contentChanged(id);
     return publicSchool(updated);

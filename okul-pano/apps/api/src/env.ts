@@ -19,6 +19,14 @@ const schema = z.object({
   DISPLAY_DIST: z.string().default('../display/dist'),
   /** Mobil uygulamanın web sürümü (varsa): /app/ — uygulamayı yüklemeyen öğretmenler tarayıcıdan kullanır */
   MOBILE_DIST: z.string().default('../../mobile/dist'),
+  /**
+   * Web'den kayıt: 'open' e-posta doğrulanınca okul açılır, 'approval' doğrulama sonrası platform yöneticisinin
+   * onayını bekler (okul askıda açılır), 'closed' kayıt kapalı (okulları yalnızca platform yöneticisi açar).
+   */
+  SIGNUP_MODE: z.enum(['open', 'approval', 'closed']).default('open'),
+  /** Kayıtla açılan okulun deneme süresi (gün) ve ekran sınırı */
+  TRIAL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
+  TRIAL_SCREENS: z.coerce.number().int().min(1).max(50).default(2),
   /** E-posta (şifre gönderimi). SMTP_HOST boşsa e-posta gönderilmez; panel e-posta programını açar. */
   SMTP_HOST: z.string().optional().transform((v) => v || undefined),
   SMTP_PORT: z.coerce.number().int().default(587),

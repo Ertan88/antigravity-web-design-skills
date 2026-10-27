@@ -159,6 +159,8 @@ export const adminUpdateSchoolSchema = z.object({
   plan: z.enum(['trial', 'basic', 'pro']).optional(),
   maxScreens: z.number().int().min(1).max(500).optional(),
   isActive: z.boolean().optional(),
+  /** Deneme süresini bugünden (ya da bitiş henüz gelmediyse bitişten) itibaren uzatır */
+  extendTrialDays: z.number().int().min(1).max(365).optional(),
 });
 
 /* ---------- Kimlik ve kullanıcılar ---------- */
@@ -186,7 +188,38 @@ export const createMemberSchema = z.object({
   permissions: permissionList.default([]),
   /** Kullanıcı bir öğretmense: mobil uygulamada kendi nöbetleri ve ders programı görünür */
   teacherId: id.nullable().optional(),
+  /** Şifre yerine davet: kişiye e-postayla bağlantı gider, şifresini kendisi belirler */
+  invite: z.boolean().default(false),
 });
+
+/* ---------- Web'den kayıt ve davet ---------- */
+
+const newPassword = z.string().min(8, 'Şifre en az 8 karakter olmalı').max(200);
+
+/** Okul için deneme kaydı (yalnızca web) */
+export const signupSchema = z.object({
+  schoolName: required('Okul adı', 120, 3),
+  city: required('İl', 40, 2),
+  district: optionalText(60),
+  schoolType: required('Okul türü', 80, 2),
+  ownerName: required('Ad soyad', 80, 3),
+  email: z.email('Geçerli bir e-posta girin'),
+  phone: z
+    .string()
+    .trim()
+    .transform((v) => v.replace(/[^\d+]/g, ''))
+    .pipe(z.string().regex(/^\+?\d{10,13}$/, 'Geçerli bir telefon numarası girin')),
+  password: newPassword,
+  kvkk: z.literal(true, { error: 'Aydınlatma metnini onaylayın' }),
+  marketing: z.boolean().default(false),
+  /** Bot tuzağı: insanlar bu alanı görmez, doluysa kayıt sessizce yok sayılır */
+  website: z.string().max(200).optional(),
+});
+export type SignupInput = z.infer<typeof signupSchema>;
+
+export const tokenSchema = z.object({ token: z.string().min(20).max(200) });
+
+export const acceptInviteSchema = z.object({ token: z.string().min(20).max(200), password: newPassword });
 
 /** Yöneticinin bir kullanıcının şifresini sıfırlaması; şifre verilmezse üretilir */
 export const resetPasswordSchema = z.object({

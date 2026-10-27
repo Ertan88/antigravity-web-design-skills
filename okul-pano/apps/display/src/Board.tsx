@@ -300,6 +300,20 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
     );
   }
 
+  // Deneme süresi doldu: içerik gösterilmez, okul yönetimine ne yapacağı söylenir
+  if (school.subscriptionEnded) {
+    return (
+      <Stage className="theme-dark" width={stageW} height={stageH}>
+        {reporter}
+        <div className="splash">
+          <BrandMark size={120} className="splash-mark" />
+          <div className="splash-title">{school.name}</div>
+          <div className="splash-sub">Panokul deneme süresi sona erdi. Okul yönetimi panelden aboneliği başlatabilir.</div>
+        </div>
+      </Stage>
+    );
+  }
+
   if (sleeping && (s.sleepMode === 'screensaver' || forcedSleep)) {
     return (
       <Stage className={classes} style={themeVars} width={stageW} height={stageH}>

@@ -78,6 +78,10 @@ export const schools = pgTable('schools', {
   emergency: jsonb('emergency').$type<{ type: EmergencyType; message: string | null; sound: boolean; startedAt: string; startedBy: string | null }>(),
   isActive: isActive(),
   trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
+  /** Deneme bitiş hatırlatması: en son gönderilen eşik (kalan gün: 7, 3, 1, 0) */
+  trialNotice: integer('trial_notice'),
+  /** Kayıtta verilen yetkili telefonu (yalnızca platform yöneticisi görür) */
+  contactPhone: text('contact_phone'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -508,4 +512,49 @@ export const auditLogs = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index('audit_logs_school_idx').on(t.schoolId, t.createdAt)],
+);
+
+/**
+ * Web'den kayıt başvurusu. E-posta doğrulanınca (ya da e-posta gönderilemiyorsa platform yöneticisi onaylayınca)
+ * okul deneme paketiyle açılır ve başvuran okul sahibi olur.
+ */
+export const signups = pgTable(
+  'signups',
+  {
+    id: pk(),
+    schoolName: text('school_name').notNull(),
+    city: text('city').notNull(),
+    district: text('district'),
+    schoolType: text('school_type').notNull(),
+    ownerName: text('owner_name').notNull(),
+    email: text('email').notNull(),
+    phone: text('phone').notNull(),
+    passwordHash: text('password_hash').notNull(),
+    marketingConsent: boolean('marketing_consent').notNull().default(false),
+    tokenHash: text('token_hash').notNull().unique(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
+    schoolId: uuid('school_id').references(() => schools.id, { onDelete: 'set null' }),
+    ip: text('ip'),
+    createdAt: createdAt(),
+  },
+  (t) => [index('signups_email_idx').on(t.email)],
+);
+
+/** Kullanıcı daveti: e-postadaki tek kullanımlık bağlantıyla kişi şifresini kendisi belirler */
+export const userInvites = pgTable(
+  'user_invites',
+  {
+    id: pk(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    schoolId: schoolId(),
+    tokenHash: text('token_hash').notNull().unique(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+  },
+  (t) => [index('user_invites_user_idx').on(t.userId)],
 );

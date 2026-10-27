@@ -1,13 +1,13 @@
 import { ADMIN_ONLY_PERMISSIONS, createMemberSchema, normalizeName, PERMISSION_KEYS, PERMISSIONS, updateMemberSchema, type Permission, type Role } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { KeyRound, Pencil, Plus, UserCog } from 'lucide-react';
+import { KeyRound, Pencil, Plus, Send, UserCog } from 'lucide-react';
 import { useState } from 'react';
 import { useToast } from '../components/Toast.tsx';
-import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Select, Spinner, Table, Td } from '../components/ui.tsx';
+import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Select, Spinner, Table, Td } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
-import { CredentialsDialog, ResetPasswordDialog, type Credentials } from './users/Credentials.tsx';
+import { CredentialsDialog, InviteDialog, ResetPasswordDialog, type Credentials, type InviteResult } from './users/Credentials.tsx';
 import { useList, useSchoolPath, type Teacher } from '../lib/data.ts';
 import { useForm } from '../lib/form.ts';
 import { timeAgo } from '../lib/format.ts';
@@ -24,6 +24,8 @@ interface Member {
   teacherId: string | null;
   teacherName: string | null;
   lastLoginAt: string | null;
+  /** Davetle eklendi, henüz şifresini belirlemedi */
+  invitePending: boolean;
 }
 
 const GRANTABLE = PERMISSION_KEYS.filter((p) => !ADMIN_ONLY_PERMISSIONS.includes(p));
@@ -38,7 +40,7 @@ function tempPassword() {
   return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('');
 }
 
-type Form = { email: string; fullName: string; password: string; role: 'admin' | 'editor'; permissions: Permission[]; teacherId: string };
+type Form = { email: string; fullName: string; password: string; invite: boolean; role: 'admin' | 'editor'; permissions: Permission[]; teacherId: string };
 
 /** Kullanıcının bağlı olduğu öğretmen kaydı (mobil uygulama: "Bugün" ve "Nöbetlerim") */
 function TeacherSelect({ value, onChange, teachers, id }: { value: string; onChange: (v: string) => void; teachers: Teacher[]; id?: string }) {
@@ -117,12 +119,18 @@ export function Users() {
   });
   const [mode, setMode] = useState<'add' | Member | null>(null);
   const [created, setCreated] = useState<Credentials | null>(null);
+  const [invited, setInvited] = useState<InviteResult | null>(null);
   const [resetting, setResetting] = useState<Member | null>(null);
-  const form = useForm<Form>({ email: '', fullName: '', password: '', role: 'editor', permissions: ['announcements.manage'], teacherId: '' });
+  const form = useForm<Form>({ email: '', fullName: '', password: '', invite: true, role: 'editor', permissions: ['announcements.manage'], teacherId: '' });
   const refresh = () => void qc.invalidateQueries({ queryKey: [schoolId, 'members'] });
 
   const save = useMutation({
     mutationFn: ({ id, body }: { id?: string; body: unknown }) => (id ? api(`${path}/${id}`, { method: 'PATCH', body }) : api(path, { method: 'POST', body })),
+  });
+  const reinvite = useMutation({
+    mutationFn: (m: Member) => api<{ inviteUrl: string; emailed: boolean }>(`${path}/${m.id}/invite`, { method: 'POST' }).then((r) => ({ ...r, email: m.email, fullName: m.fullName })),
+    onSuccess: (r) => setInvited(r),
+    onError: (e) => toast.error(e.message),
   });
   const remove = useMutation({
     mutationFn: (id: string) => api(`${path}/${id}`, { method: 'DELETE' }),
@@ -134,11 +142,11 @@ export function Users() {
   });
 
   const openAdd = () => {
-    form.reset({ email: '', fullName: '', password: tempPassword(), role: 'editor', permissions: ['announcements.manage'], teacherId: '' });
+    form.reset({ email: '', fullName: '', password: tempPassword(), invite: true, role: 'editor', permissions: ['announcements.manage'], teacherId: '' });
     setMode('add');
   };
   const openEdit = (m: Member) => {
-    form.reset({ email: m.email, fullName: m.fullName, password: '', role: m.role === 'admin' ? 'admin' : 'editor', permissions: m.permissions as Permission[], teacherId: m.teacherId ?? '' });
+    form.reset({ email: m.email, fullName: m.fullName, password: '', invite: false, role: m.role === 'admin' ? 'admin' : 'editor', permissions: m.permissions as Permission[], teacherId: m.teacherId ?? '' });
     setMode(m);
   };
 
@@ -149,14 +157,18 @@ export function Users() {
         const payload = form.validate(createMemberSchema, {
           email: v.email,
           fullName: v.fullName,
-          password: v.password || undefined,
+          password: v.invite ? undefined : v.password || undefined,
+          invite: v.invite,
           role: v.role,
           permissions: v.permissions,
           teacherId: v.teacherId || null,
         });
         if (!payload) return;
-        const res = (await save.mutateAsync({ body: payload })) as { existingUser?: boolean };
-        if (res.existingUser) {
+        const res = (await save.mutateAsync({ body: payload })) as { existingUser?: boolean; invite?: { inviteUrl: string; emailed: boolean } | null };
+        if (res.invite) {
+          setInvited({ email: v.email, fullName: v.fullName, ...res.invite });
+          toast.success(`${v.fullName} davet edildi`);
+        } else if (res.existingUser) {
           // E-posta sistemde kayıtlı: girilen şifre kullanılmadı, kullanıcı kendi şifresiyle girer
           toast.success(`${v.fullName} eklendi. Bu e-posta sistemde zaten kayıtlı olduğu için mevcut şifresi geçerli; gerekirse "Şifreyi sıfırla"yı kullanın.`);
         } else {
@@ -229,13 +241,18 @@ export function Users() {
                       onChange={(teacherId) => linkTeacher.mutate({ id: m.id, teacherId: teacherId || null })}
                     />
                   </Td>
-                  <Td className="whitespace-nowrap text-slate-500">{timeAgo(m.lastLoginAt)}</Td>
+                  <Td className="whitespace-nowrap text-slate-500">{m.invitePending ? <Badge tone="amber">Davet bekliyor</Badge> : timeAgo(m.lastLoginAt)}</Td>
                   <Td className="w-px text-right">
                     {!locked && (
                       <div className="flex justify-end">
                         <IconButton label="Yetkileri düzenle" onClick={() => openEdit(m)}>
                           <Pencil className="size-4" />
                         </IconButton>
+                        {m.invitePending && (
+                          <IconButton label="Daveti yeniden gönder" onClick={() => reinvite.mutate(m)}>
+                            <Send className="size-4" />
+                          </IconButton>
+                        )}
                         <IconButton label="Şifreyi sıfırla" onClick={() => setResetting(m)}>
                           <KeyRound className="size-4" />
                         </IconButton>
@@ -295,7 +312,20 @@ export function Users() {
                   {(id) => <Input id={id} type="email" value={form.values.email} onChange={(e) => form.set('email', e.target.value)} />}
                 </Field>
               </div>
-              <Field label="Geçici şifre" error={form.errors.password} help="Kullanıcı ilk girişten sonra Hesabım sayfasından değiştirebilir. E-posta sistemde kayıtlıysa mevcut şifresi geçerli kalır.">
+              <Field label="Giriş bilgisi" help={form.values.invite ? 'Kişiye bağlantı gider; şifresini kendisi belirler. E-posta sistemde kayıtlıysa mevcut şifresiyle girer.' : 'Kullanıcı ilk girişten sonra Hesabım sayfasından değiştirebilir. E-posta sistemde kayıtlıysa mevcut şifresi geçerli kalır.'}>
+                {() => (
+                  <Segmented
+                    value={form.values.invite ? 'invite' : 'password'}
+                    onChange={(v) => form.set('invite', v === 'invite')}
+                    options={[
+                      { value: 'invite', label: 'Davet bağlantısı gönder' },
+                      { value: 'password', label: 'Geçici şifre ver' },
+                    ]}
+                  />
+                )}
+              </Field>
+              {!form.values.invite && (
+              <Field label="Geçici şifre" error={form.errors.password}>
                 {(id) => (
                   <div className="flex gap-2">
                     <Input id={id} value={form.values.password} onChange={(e) => form.set('password', e.target.value)} className="font-mono" />
@@ -305,6 +335,7 @@ export function Users() {
                   </div>
                 )}
               </Field>
+              )}
               <Field label="Öğretmen kaydı" help="Öğretmense seçin: mobil uygulamada kendi ders programını ve nöbetlerini görür, izin bildirebilir.">
                 {(id) => <TeacherSelect id={id} value={form.values.teacherId} teachers={teacherList} onChange={(t) => form.set('teacherId', t)} />}
               </Field>
@@ -316,6 +347,7 @@ export function Users() {
       </Modal>
 
       <CredentialsDialog value={created} onClose={() => setCreated(null)} />
+      <InviteDialog value={invited} onClose={() => setInvited(null)} />
       <ResetPasswordDialog
         member={resetting}
         onClose={() => setResetting(null)}

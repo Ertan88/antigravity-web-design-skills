@@ -125,6 +125,17 @@ docker compose --env-file deploy/.env up -d --build
 
 Panel `https://alanadiniz/admin/`, pano `https://alanadiniz/display/`, mobil uygulamanın web sürümü `https://alanadiniz/app/` adresinde açılır. TV tarafında Chromium'u kiosk modunda çalıştırmanız yeterli; komut paneldeki **Ekranlar** sayfasında yazar.
 
+## Kayıt, deneme ve davet
+
+- **Kayıt yalnızca web'den:** `https://alanadiniz/admin/kayit`. Okul bilgileri ve yetkili hesabı alınır; e-posta doğrulanınca okul
+  deneme paketiyle açılır (varsayılan 30 gün, 2 pano: `TRIAL_DAYS`, `TRIAL_SCREENS`). Kayıt yapan okul sahibi olur.
+- **Kayıt modu** (`SIGNUP_MODE`): `open` doğrulayınca açılır, `approval` platform yöneticisinin onayını bekler, `closed` kapalı.
+- **E-posta gelmezse** (SMTP ayarlı değilse) başvuru **Platform › Okullar ve Abonelikler** sayfasında "Onayla" ile açılır.
+- **Deneme süresi:** bitişe 7, 3, 1 gün kala ve bitince okul sahibine e-posta; süre dolunca panel salt okunur, panolar "deneme
+  süresi sona erdi" ekranı gösterir. Platform yöneticisi "+30 gün" ile uzatır ya da ücretli pakete geçirir.
+- **Davet:** okul sahibi kullanıcı eklerken "Davet bağlantısı gönder"i seçer; kişi şifresini bağlantıdan kendisi belirler.
+  Mobil uygulamada kayıt yoktur; giriş ekranındaki bağlantı web'deki kayıt sayfasını açar.
+
 ## KVKK
 
 - **Aydınlatma metni:** her okul kendi metnini **Okul Ayarları › Kişisel veriler (KVKK)** bölümünde yazar

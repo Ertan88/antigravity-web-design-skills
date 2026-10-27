@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { BrandMark, BrandName } from '../components/Brand.tsx';
 import { Alert, Button, Field, Input, PasswordInput } from '../components/ui.tsx';
 import { useAuth } from '../lib/auth.tsx';
+import { useSignupConfig } from './Public.tsx';
 
 function MiniBoard() {
   // Giriş ekranındaki dekoratif pano çizimi (gerçek panonun 5 alanını yansıtır)
@@ -31,6 +33,7 @@ function MiniBoard() {
 
 export function Login() {
   const { login } = useAuth();
+  const signup = useSignupConfig();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -107,6 +110,14 @@ export function Login() {
           <Button type="submit" loading={busy} className="w-full">
             Giriş yap
           </Button>
+          {signup.data && signup.data.mode !== 'closed' && (
+            <p className="border-t border-slate-200/70 pt-5 text-center text-sm text-slate-500">
+              Okulunuz Panokul kullanmıyor mu?{' '}
+              <Link to="/kayit" className="font-semibold text-brand-600">
+                {signup.data.trialDays} gün ücretsiz deneyin
+              </Link>
+            </p>
+          )}
         </form>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { effectivePermissions, type Permission, type Role } from '@okulpano/shared';
+import { effectivePermissions, trialStatus, type Permission, type Role } from '@okulpano/shared';
 import { and, eq } from 'drizzle-orm';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { DB } from './db/client.ts';
@@ -86,7 +86,11 @@ export function schoolGuard(permission?: Permission) {
         .from(memberships)
         .where(and(eq(memberships.userId, user.sub), eq(memberships.schoolId, schoolId)));
       if (!m) throw forbidden('Bu okula erişiminiz yok.');
-      if (!school.isActive) throw forbidden('Okul hesabı askıya alınmış. Lütfen destek ile iletişime geçin.');
+      if (!school.isActive) throw forbidden('Okul hesabı askıya alınmış ya da onay bekliyor. Lütfen destek ile iletişime geçin.');
+      // Deneme süresi dolan okulda panel salt okunur: görüntüleme ve dışa aktarma serbest, değişiklik yapılamaz
+      if (req.method !== 'GET' && trialStatus(school)?.expired) {
+        throw forbidden('Deneme süreniz doldu; panel salt okunur. Aboneliği başlatmak için bizimle iletişime geçin.');
+      }
       role = m.role;
       granted = m.permissions;
       teacherId = m.teacherId;
