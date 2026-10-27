@@ -1,10 +1,11 @@
 import { changePasswordSchema, effectivePermissions, loginSchema } from '@okulpano/shared';
 import { and, asc, eq, gt, lt } from 'drizzle-orm';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { z } from 'zod';
 import { accessUser } from '../context.ts';
 import { memberships, schools, sessions, users } from '../db/schema.ts';
 import { burnPasswordCheck, hashPassword, randomToken, sha256, verifyPassword } from '../lib/crypto.ts';
-import { badRequest, parse, unauthorized } from '../lib/errors.ts';
+import { badRequest, notFound, parse, unauthorized } from '../lib/errors.ts';
 
 const ACCESS_TTL = '15m';
 const REFRESH_TTL_MS = 30 * 24 * 3600 * 1000;
@@ -89,21 +90,31 @@ export async function authRoutes(app: FastifyInstance) {
     return reply.status(204).send();
   });
 
+  /** Platform yöneticisi bütün okulları görür; üyesi olduğu (kendi) okulları listenin başındadır */
+  async function superAdminSchools(userId: string) {
+    const own = new Set(
+      (await db.select({ id: memberships.schoolId }).from(memberships).where(eq(memberships.userId, userId))).map((m) => m.id),
+    );
+    const all = await db.select().from(schools).orderBy(asc(schools.name));
+    return [...all.filter((s) => own.has(s.id)), ...all.filter((s) => !own.has(s.id))].map((school) => ({
+      school,
+      role: 'owner' as const,
+      permissions: [] as string[],
+      teacherId: null as string | null,
+    }));
+  }
+
   app.get('/api/me', { preHandler: app.authenticate }, async (req) => {
     const { sub } = accessUser(req);
     const [user] = await db
-      .select({ id: users.id, email: users.email, fullName: users.fullName, isSuperAdmin: users.isSuperAdmin })
+      .select({ id: users.id, email: users.email, fullName: users.fullName, isSuperAdmin: users.isSuperAdmin, lastSchoolId: users.lastSchoolId })
       .from(users)
       .where(eq(users.id, sub));
     if (!user) throw unauthorized();
+    const { lastSchoolId, ...profile } = user;
 
     const rows = user.isSuperAdmin
-      ? (await db.select().from(schools).orderBy(asc(schools.name))).map((school) => ({
-          school,
-          role: 'owner' as const,
-          permissions: [] as string[],
-          teacherId: null as string | null,
-        }))
+      ? await superAdminSchools(sub)
       : await db
           .select({ school: schools, role: memberships.role, permissions: memberships.permissions, teacherId: memberships.teacherId })
           .from(memberships)
@@ -112,7 +123,9 @@ export async function authRoutes(app: FastifyInstance) {
           .orderBy(asc(schools.name));
 
     return {
-      user,
+      user: profile,
+      /** Açılışta seçilecek okul: en son açılan, yoksa listenin ilki */
+      lastSchoolId: rows.some((r) => r.school.id === lastSchoolId) ? lastSchoolId : null,
       schools: rows.map((r) => ({
         id: r.school.id,
         name: r.school.name,
@@ -124,6 +137,21 @@ export async function authRoutes(app: FastifyInstance) {
         teacherId: r.teacherId,
       })),
     };
+  });
+
+  /** Seçilen okulu hatırlar (panelde ya da mobilde okul değiştirildiğinde) */
+  app.put('/api/me/school', { preHandler: app.authenticate }, async (req, reply) => {
+    const { sub, sa } = accessUser(req);
+    const { schoolId } = parse(z.object({ schoolId: z.string().uuid() }), req.body);
+    const [allowed] = sa
+      ? await db.select({ id: schools.id }).from(schools).where(eq(schools.id, schoolId))
+      : await db
+          .select({ id: memberships.schoolId })
+          .from(memberships)
+          .where(and(eq(memberships.userId, sub), eq(memberships.schoolId, schoolId)));
+    if (!allowed) throw notFound();
+    await db.update(users).set({ lastSchoolId: schoolId }).where(eq(users.id, sub));
+    return reply.status(204).send();
   });
 
   app.post('/api/me/password', { preHandler: app.authenticate }, async (req, reply) => {

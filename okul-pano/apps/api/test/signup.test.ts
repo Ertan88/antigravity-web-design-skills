@@ -186,6 +186,18 @@ describe('kullanıcı daveti', () => {
   });
 });
 
+describe('son açılan okul', () => {
+  it('seçilen okul hatırlanır; başka cihazdan girişte o açılır', async () => {
+    const schools = (await root.get('/api/me')).json().schools as { id: string; name: string }[];
+    const target = schools.find((s) => s.name === 'Güneş İlkokulu')!;
+    expect((await root.put('/api/me/school', { schoolId: target.id })).statusCode).toBe(204);
+    expect((await root.get('/api/me')).json().lastSchoolId).toBe(target.id);
+    // Üyesi olmadığı okulu seçemez
+    const owner = await as('aylin@yildiz.test');
+    expect((await owner.put('/api/me/school', { schoolId: target.id })).statusCode).toBe(404);
+  });
+});
+
 describe('kayıt kapalı', () => {
   it('SIGNUP_MODE=closed iken kayıt alınmaz; approval iken okul onay bekler', async () => {
     const closed = await createTestApp({ SIGNUP_MODE: 'closed' });

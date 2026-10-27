@@ -19,6 +19,8 @@ export interface SchoolAccess {
 export interface Me {
   user: { id: string; email: string; fullName: string; isSuperAdmin: boolean };
   schools: SchoolAccess[];
+  /** En son açılan okul (panelde ya da başka cihazda seçilmiş olabilir) */
+  lastSchoolId?: string | null;
 }
 
 /** Yönetici ekranlarını (kontrol merkezi, onaylar, pano kumandası) açan yetkiler */
@@ -51,7 +53,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadMe = useCallback(async (preferred: string | null) => {
     const data = await api<Me>('/api/me');
     setMe(data);
-    const pick = data.schools.find((s) => s.id === preferred) ?? data.schools[0] ?? null;
+    const pick =
+      data.schools.find((s) => s.id === preferred) ?? data.schools.find((s) => s.id === data.lastSchoolId) ?? data.schools[0] ?? null;
     setSchoolId(pick?.id ?? null);
     await session.setSchool(pick?.id ?? null);
     setStatus('signedIn');
@@ -102,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSchoolId(id);
         await session.setSchool(id);
         qc.clear();
+        void api('/api/me/school', { method: 'PUT', body: { schoolId: id } }).catch(() => undefined);
       },
     };
   }, [status, me, schoolId, server, loadMe, qc]);

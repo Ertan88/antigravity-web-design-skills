@@ -16,6 +16,8 @@ export interface SchoolAccess {
 export interface Me {
   user: { id: string; email: string; fullName: string; isSuperAdmin: boolean };
   schools: SchoolAccess[];
+  /** En son açılan okul (başka cihazda seçilmiş olabilir) */
+  lastSchoolId: string | null;
 }
 
 interface AuthState {
@@ -50,7 +52,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const reloadMe = useCallback(async () => {
     const data = await api<Me>('/api/me');
     setMe(data);
-    setSchoolIdState((current) => (data.schools.some((s) => s.id === current) ? current : (data.schools[0]?.id ?? '')));
+    setSchoolIdState((current) =>
+      data.schools.some((s) => s.id === current) ? current : (data.lastSchoolId ?? data.schools[0]?.id ?? ''),
+    );
   }, []);
 
   useEffect(() => {
@@ -80,6 +84,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         /* yok say */
       }
       queryClient.removeQueries();
+      // Başka cihazdan girişte de aynı okul açılsın
+      void api('/api/me/school', { method: 'PUT', body: { schoolId: id } }).catch(() => undefined);
     },
     [queryClient],
   );

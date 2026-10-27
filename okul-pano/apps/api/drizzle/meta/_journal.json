@@ -120,6 +120,13 @@
       "when": 1793400000000,
       "tag": "0016_onboarding_sample_data",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793500000000,
+      "tag": "0017_last_school",
+      "breakpoints": true
     }
   ]
 }

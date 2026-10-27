@@ -41,6 +41,8 @@ export const users = pgTable('users', {
   passwordHash: text('password_hash').notNull(),
   fullName: text('full_name').notNull(),
   isSuperAdmin: boolean('is_super_admin').notNull().default(false),
+  /** En son açılan okul: başka cihazdan girişte de aynı okul açılır (platform yöneticisi bütün okulları görür) */
+  lastSchoolId: uuid('last_school_id').references((): AnyPgColumn => schools.id, { onDelete: 'set null' }),
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),

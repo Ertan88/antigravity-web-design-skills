@@ -57,21 +57,27 @@ jobs:
           ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
 
       - name: APK'yı adlandır
-        run: cp android/app/build/outputs/apk/release/app-release.apk okul-pano.apk
+        # GitHub, dosya adındaki boşluk ve Türkçe karakterleri değiştirdiği için dosya Okul-Yayin.apk;
+        # sürüm sayfasında "Okul Yayın" etiketiyle görünür
+        run: cp android/app/build/outputs/apk/release/app-release.apk Okul-Yayin.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: okul-pano-apk
-          path: okul-pano/mobile/okul-pano.apk
+          name: okul-yayin-apk
+          path: okul-pano/mobile/Okul-Yayin.apk
 
       - name: Sürüm sayfasına yükle
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG=okul-pano-android
-          if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --prerelease --target "$GITHUB_SHA" \
-              --title "Okulyayın · Android deneme sürümü" \
-              --notes "Telefona indirip kurun (bilinmeyen kaynaklardan yüklemeye izin verin). Girişte e-posta ve şifrenizi yazmanız yeterli."
+          TITLE="Okulyayın · Android uygulaması"
+          NOTES="Okul Yayın uygulamasını telefona indirip kurun: Android \"bilinmeyen kaynak\" uyarısı verirse bu kaynaktan yüklemeye izin verin. Girişte okulunuzun size verdiği e-posta ve şifreyi yazmanız yeterli."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "$TITLE" --notes "$NOTES"
+          else
+            gh release create "$TAG" --prerelease --target "$GITHUB_SHA" --title "$TITLE" --notes "$NOTES"
           fi
-          gh release upload "$TAG" okul-pano.apk --clobber
+          gh release upload "$TAG" "Okul-Yayin.apk#Okul Yayın" --clobber
+          # Eski adla yüklenmiş dosya kaldırılır
+          gh release delete-asset "$TAG" okul-pano.apk --yes 2>/dev/null || true
