@@ -3,23 +3,48 @@ import * as Notifications from 'expo-notifications';
 import { router, Stack, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { Platform } from 'react-native';
+import { Image, Platform, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../src/auth.tsx';
 import { registerForPush } from '../src/push.ts';
-import { Loading, Screen } from '../src/ui.tsx';
 import { colors } from '../src/theme.ts';
+
+const SPLASH_MIN_MS = 1500;
+
+/** Açılış ekranı: marka renginde logo, yazı logosu ve slogan (sistemin açılış ekranından sonra kısa süre görünür) */
+function BrandSplash() {
+  return (
+    <View style={{ flex: 1, backgroundColor: '#0E5E66', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+      <StatusBar style="light" />
+      <Image source={require('../assets/splash-icon.png')} style={{ width: 150, height: 150 }} accessibilityIgnoresInvertColors />
+      <Text style={{ marginTop: 12, fontSize: 38, fontWeight: '800', letterSpacing: -1, color: '#FFFFFF' }}>
+        okul<Text style={{ color: '#F5B83D' }}>yayın</Text>
+      </Text>
+      <Text style={{ marginTop: 10, fontSize: 17, fontWeight: '600', color: '#FFFFFF', opacity: 0.9, textAlign: 'center' }}>
+        Okulunuzun Her Anı, Tek Ekranda
+      </Text>
+    </View>
+  );
+}
 
 /** Oturum yoksa giriş ekranına, varsa uygulamaya yönlendirir; telefon bildirimlerini kaydeder */
 function Gate() {
   const { status, school } = useAuth();
   const segments = useSegments();
   const onLogin = segments[0] === 'login';
+  // Açılış ekranı en az kısa bir süre görünür; oturum yüklenene kadar da kalır
+  const [minShown, setMinShown] = useState(Platform.OS === 'web');
+  useEffect(() => {
+    const t = setTimeout(() => setMinShown(true), SPLASH_MIN_MS);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
+    // Yönlendirme, gezinti yığını açılış ekranından sonra kurulunca yapılır
+    if (!minShown) return;
     if (status === 'signedOut' && !onLogin) router.replace('/login');
     if (status === 'signedIn' && onLogin) router.replace('/');
-  }, [status, onLogin]);
+  }, [status, onLogin, minShown]);
 
   useEffect(() => {
     if (status === 'signedIn') void registerForPush();
@@ -35,13 +60,7 @@ function Gate() {
     return () => sub.remove();
   }, []);
 
-  if (status === 'loading') {
-    return (
-      <Screen>
-        <Loading />
-      </Screen>
-    );
-  }
+  if (status === 'loading' || !minShown) return <BrandSplash />;
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
       <Stack.Screen name="(tabs)" />

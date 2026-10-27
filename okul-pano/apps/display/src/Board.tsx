@@ -61,6 +61,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         <div className="splash">
           <BrandMark size={120} className="splash-mark" />
           <BrandName className="splash-title" />
+          <div className="splash-slogan">Okulunuzun Her Anı, Tek Ekranda</div>
           <div className="splash-sub">
             {connection === 'offline' ? (
               <>

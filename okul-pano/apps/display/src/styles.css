@@ -1207,6 +1207,14 @@ p {
   color: var(--text);
 }
 
+.splash-slogan {
+  margin-top: -6px;
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--text);
+  opacity: 0.85;
+}
+
 .splash-sub {
   font-size: 28px;
   display: flex;
