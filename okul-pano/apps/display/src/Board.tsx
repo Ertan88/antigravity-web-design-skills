@@ -46,18 +46,14 @@ const monthName = (iso: string, timeZone: string) => new Intl.DateTimeFormat('tr
 /** Açılış ekranı en az bu kadar görünür; ilerleme çubuğu bu sürede dolar */
 const SPLASH_MIN_MS = 2600;
 
-/**
- * Açılış ekranı: veri gelse de en az SPLASH_MIN_MS görünür, sonra çubuk tamamlanıp kapanır.
- * Paneldeki canlı önizlemede beklenmez.
- */
-function useSplash(ready: boolean, skip: boolean) {
-  const [minDone, setMinDone] = useState(skip);
-  const [hidden, setHidden] = useState(skip);
+/** Açılış ekranı: veri gelse de en az SPLASH_MIN_MS görünür, sonra çubuk tamamlanıp kapanır (önizlemelerde de) */
+function useSplash(ready: boolean) {
+  const [minDone, setMinDone] = useState(false);
+  const [hidden, setHidden] = useState(false);
   useEffect(() => {
-    if (skip) return;
     const t = setTimeout(() => setMinDone(true), SPLASH_MIN_MS);
     return () => clearTimeout(t);
-  }, [skip]);
+  }, []);
   const finishing = ready && minDone;
   useEffect(() => {
     if (!finishing || hidden) return;
@@ -78,7 +74,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
   // Mobil uzaktan kumanda için: şu an gösterilen slayt ve panonun durumu sunucuya bildirilir
   const [shown, setShown] = useState<{ index: number; count: number; title: string | null }>({ index: 0, count: 0, title: null });
   const onShow = useCallback((v: { index: number; count: number; title: string | null }) => setShown(v), []);
-  const splash = useSplash(Boolean(state), Boolean(auth.preview));
+  const splash = useSplash(Boolean(state));
 
   if (!state || splash.show) {
     return (
