@@ -171,7 +171,10 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   if (spas.length) {
     app.get('/', (_req, reply) => reply.redirect('/admin/'));
     app.setNotFoundHandler((req, reply) => {
-      const path = req.url.split('?')[0] ?? '';
+      const [path = '', query] = req.url.split('?');
+      // Sondaki "/" unutulmuş adres (ör. /app, /display) uygulamanın kendisine gider
+      const bare = spas.find((s) => path === s.prefix.slice(0, -1));
+      if (bare && req.method === 'GET') return reply.redirect(`${bare.prefix}${query ? `?${query}` : ''}`);
       const spa = spas.find((s) => path.startsWith(s.prefix));
       // Sayfa rotaları uygulamanın index.html'ine düşer; eksik dosyalar (.js, .css...) gerçek 404 alır
       if (spa && req.method === 'GET' && !/\.[a-z0-9]+$/i.test(path)) {

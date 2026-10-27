@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Okulyayın",
+    "name": "Okul Yayın",
     "slug": "okul-pano",
     "scheme": "okulpano",
     "version": "0.1.0",
@@ -35,8 +35,8 @@
     "web": {
       "bundler": "metro",
       "output": "single",
-      "name": "Okulyayın",
-      "shortName": "Okulyayın",
+      "name": "Okul Yayın",
+      "shortName": "Okul Yayın",
       "themeColor": "#0E5E66",
       "backgroundColor": "#f3f6f8",
       "favicon": "./assets/favicon.png"

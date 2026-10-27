@@ -22,7 +22,7 @@ export async function registerForPush(): Promise<'ok' | 'denied' | 'unavailable'
   if (Platform.OS === 'web' || !Device.isDevice) return 'unavailable';
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
-      name: 'Okulyayın',
+      name: 'Okul Yayın',
       importance: Notifications.AndroidImportance.HIGH,
     });
   }
