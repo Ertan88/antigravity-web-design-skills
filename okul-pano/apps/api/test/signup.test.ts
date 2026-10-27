@@ -28,6 +28,13 @@ async function knownToken(email: string): Promise<string> {
   return token;
 }
 
+/** Giriş hız sınırına takılmamak için her hesapla bir kez giriş yapılır */
+const sessionsByEmail = new Map<string, ReturnType<typeof client>>();
+async function as(email: string, password = 'GuvenliSifre9') {
+  if (!sessionsByEmail.has(email)) sessionsByEmail.set(email, client(t.app, (await login(t.app, email, password)).token));
+  return sessionsByEmail.get(email)!;
+}
+
 beforeAll(async () => {
   t = await createTestApp();
   root = client(t.app, (await login(t.app, SUPER.email, SUPER.password)).token);
@@ -88,9 +95,45 @@ describe('web kaydı', () => {
   });
 });
 
+describe('ilk giriş: örnek veri', () => {
+  it('okul sahibi örnek verilerle başlar, sonra yalnızca örnekleri temizler', async () => {
+    const owner = await as('aylin@yildiz.test');
+    const schoolId = (await owner.get('/api/me')).json().schools[0].id as string;
+    expect((await owner.get(`/api/schools/${schoolId}`)).json()).toMatchObject({ onboarding: 'pending', hasSampleData: false });
+
+    const seeded = await owner.post(`/api/schools/${schoolId}/onboarding`, { sample: true });
+    expectStatus(seeded, 200);
+    expect(seeded.json()).toMatchObject({ onboarding: 'sample', hasSampleData: true });
+    // Soru bir kez cevaplanır; ikinci istek veri eklemez
+    expect((await owner.post(`/api/schools/${schoolId}/onboarding`, { sample: true })).statusCode).toBe(409);
+
+    const sampleTeachers = (await owner.get(`/api/schools/${schoolId}/teachers`)).json() as unknown[];
+    expect(sampleTeachers.length).toBeGreaterThan(5);
+    expect((await owner.get(`/api/schools/${schoolId}/ticker`)).json().length).toBeGreaterThan(0);
+    // Okulun kendi eklediği kayıt temizlikte silinmez
+    expectStatus(await owner.post(`/api/schools/${schoolId}/teachers`, { fullName: 'Kendi Öğretmenimiz' }), 201);
+
+    const cleared = await owner.post(`/api/schools/${schoolId}/sample-data/clear`);
+    expectStatus(cleared, 200);
+    expect(cleared.json()).toMatchObject({ hasSampleData: false });
+    const left = (await owner.get(`/api/schools/${schoolId}/teachers`)).json() as { fullName: string }[];
+    expect(left.map((x) => x.fullName)).toEqual(['Kendi Öğretmenimiz']);
+    expect((await owner.get(`/api/schools/${schoolId}/ticker`)).json()).toEqual([]);
+  });
+
+  it('boş başlamak veri eklemez; mevcut okullara soru sorulmaz', async () => {
+    const owner = await as('mehmet@gunes.test');
+    const schoolId = (await owner.get('/api/me')).json().schools[0].id as string;
+    expect((await owner.post(`/api/schools/${schoolId}/onboarding`, { sample: false })).json()).toMatchObject({ onboarding: 'empty', hasSampleData: false });
+    expect((await owner.get(`/api/schools/${schoolId}/teachers`)).json()).toEqual([]);
+    const demo = (await root.get('/api/platform/schools')).json() as { onboarding: string | null; name: string }[];
+    expect(demo.find((s) => s.name !== 'Yıldız Ortaokulu' && s.name !== 'Güneş İlkokulu')?.onboarding ?? null).toBeNull();
+  });
+});
+
 describe('deneme süresi', () => {
   it('süre dolunca panel salt okunur; platform yöneticisi uzatınca açılır', async () => {
-    const owner = client(t.app, (await login(t.app, 'aylin@yildiz.test', 'GuvenliSifre9')).token);
+    const owner = await as('aylin@yildiz.test');
     const schoolId = (await owner.get('/api/me')).json().schools[0].id as string;
     await t.database.db.update(schools).set({ trialEndsAt: new Date(Date.now() - 1000) }).where(eq(schools.id, schoolId));
 
@@ -123,7 +166,7 @@ describe('deneme süresi', () => {
 
 describe('kullanıcı daveti', () => {
   it('davetle eklenen kişi şifresini bağlantıdan belirler; bağlantı tek kullanımlık', async () => {
-    const owner = client(t.app, (await login(t.app, 'mehmet@gunes.test', 'GuvenliSifre9')).token);
+    const owner = await as('mehmet@gunes.test');
     const schoolId = (await owner.get('/api/me')).json().schools[0].id as string;
     const res = await owner.post(`/api/schools/${schoolId}/members`, { email: 'ogretmen@gunes.test', fullName: 'Zeynep Ak', role: 'editor', invite: true });
     expectStatus(res, 201);

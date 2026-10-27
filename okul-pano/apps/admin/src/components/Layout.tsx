@@ -8,6 +8,7 @@ import { findNav, NAV } from '../lib/nav.ts';
 import { useTheme } from '../lib/theme.ts';
 import { BrandMark, BrandName } from './Brand.tsx';
 import { EmergencyBanner, EmergencyButton } from './Emergency.tsx';
+import { WelcomeDialog } from './Onboarding.tsx';
 import { TrialBanner } from './TrialBanner.tsx';
 import { NotificationBell } from './Notifications.tsx';
 import { Spinner } from './ui.tsx';
@@ -245,6 +246,7 @@ export function Layout() {
           <Outlet />
         </Suspense>
       </main>
+      <WelcomeDialog />
     </div>
   );
 }

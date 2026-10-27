@@ -5,7 +5,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { audit, schoolGuard, UUID_RE } from '../context.ts';
 import { memberships, sessions, teachers, users } from '../db/schema.ts';
 import { hashPassword, readablePassword } from '../lib/crypto.ts';
-import { sendMail } from '../lib/mailer.ts';
+import { trySendMail } from '../lib/mailer.ts';
 import { createInvite } from './signup.ts';
 import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
 
@@ -183,11 +183,11 @@ export async function memberRoutes(app: FastifyInstance) {
     let emailed = false;
     if (body.sendEmail) {
       const url = `${app.deps.env.PUBLIC_URL.replace(/\/$/, '')}/admin/`;
-      emailed = await sendMail(app.deps.env, {
+      emailed = await trySendMail(app.deps.env, {
         to: m.email,
         subject: `${req.ctx.school.name} · Panokul şifreniz`,
         text: `Merhaba ${m.fullName},\n\nPanokul yönetim paneli şifreniz yenilendi.\n\nAdres: ${url}\nE-posta: ${m.email}\nŞifre: ${password}\n\nGiriş yaptıktan sonra Hesabım sayfasından şifrenizi değiştirin.\n`,
-      }).catch(() => false);
+      });
     }
     return { password, emailed, email: m.email, fullName: m.fullName };
   });

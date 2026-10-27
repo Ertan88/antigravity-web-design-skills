@@ -64,6 +64,182 @@ function seedAssetsDir(): string | null {
   return [resolve(here, '../seed-assets'), resolve(here, '../../seed-assets')].find((d) => existsSync(d)) ?? null;
 }
 
+type Tx = Parameters<Parameters<DB['transaction']>[0]>[0];
+
+/** Örnek kayıtların tutulduğu tablolar; silme sırası bağımlılıklara göre (önce ders programı, en son öğretmenler) */
+export const SAMPLE_TABLES = {
+  timetableEntries,
+  transportDuties,
+  duties,
+  dutySupervisors,
+  teacherLeaves,
+  students,
+  exams,
+  bellSchedules,
+  announcements,
+  tickerItems,
+  classGroups,
+  teachers,
+} as const;
+export type SampleData = Partial<Record<keyof typeof SAMPLE_TABLES, string[]>>;
+
+/**
+ * Bir okula örnek içerik ekler (öğretmen, sınıf, nöbet, ders programı, duyuru…); hesap ve pano eklemez.
+ * Tanıtım okulunda ve yeni okulun "örnek verilerle başla" seçiminde kullanılır. Eklenen kayıtların kimliklerini
+ * döndürür ki "örnek verileri temizle" yalnızca bunları silsin.
+ */
+export async function seedSchoolContent(
+  db: DB | Tx,
+  schoolId: string,
+  opts: { storage?: FileStorage; now?: Date; timezone?: string } = {},
+): Promise<{ ids: SampleData; teacherIds: string[] }> {
+  const now = opts.now ?? new Date();
+  const tz = opts.timezone ?? 'Europe/Istanbul';
+  const today = zonedParts(now, tz);
+  const ids: SampleData = {};
+  const keep = <T extends { id: string }>(table: keyof typeof SAMPLE_TABLES, rows: T[]): T[] => {
+    ids[table] = [...(ids[table] ?? []), ...rows.map((r) => r.id)];
+    return rows;
+  };
+
+  const branchIds = new Map((await db.select().from(teacherBranches).where(eq(teacherBranches.schoolId, schoolId))).map((b) => [b.name, b.id]));
+  const titleIds = new Map((await db.select().from(teacherTitles).where(eq(teacherTitles.schoolId, schoolId))).map((t) => [t.name, t.id]));
+  const teacherRows = keep(
+    'teachers',
+    await db
+      .insert(teachers)
+      .values(
+        TEACHERS.map(([fullName, branch, , title]) => ({
+          schoolId,
+          fullName,
+          branchId: branchIds.get(branch) ?? null,
+          titleId: titleIds.get(title) ?? null,
+        })),
+      )
+      .returning(),
+  );
+  const classRows = keep(
+    'classGroups',
+    await db
+      .insert(classGroups)
+      .values(CLASSES.map((name, i) => ({ schoolId, name, sortOrder: i })))
+      .returning(),
+  );
+
+  // Nöbet: her gün her alana farklı bir öğretmen
+  keep('duties', await db.insert(duties).values(
+    [1, 2, 3, 4, 5].flatMap((weekday) =>
+      DUTY_AREAS.map((area, i) => ({
+        schoolId,
+        month: today.isoDate.slice(0, 7),
+        weekday,
+        area,
+        sortOrder: i,
+        teacherId: teacherRows[(weekday * 3 + i) % teacherRows.length]!.id,
+      })),
+    ),
+  ).returning({ id: duties.id }));
+
+  // Nöbetçi müdür yardımcıları: önümüzdeki iki haftanın hafta içi günleri, iki kişi dönüşümlü
+  const supervisorDates = Array.from({ length: 14 }, (_, i) => zonedParts(new Date(now.getTime() + i * 86400_000), tz)).filter(
+    (d) => d.weekday <= 5,
+  );
+  keep(
+    'dutySupervisors',
+    await db
+      .insert(dutySupervisors)
+      .values(supervisorDates.map((d, i) => ({ schoolId, date: d.isoDate, name: i % 2 ? 'Ümit Kılıç' : 'Mustafa Akkaya' })))
+      .returning({ id: dutySupervisors.id }),
+  );
+
+  // Taşımalı öğrenci görevlileri: o günün nöbetçilerinden dönüşümlü iki kişi
+  keep('transportDuties', await db.insert(transportDuties).values(
+    supervisorDates.flatMap((d, i) =>
+      [0, 1].map((k) => ({
+        schoolId,
+        date: d.isoDate,
+        sortOrder: k,
+        teacherId: teacherRows[(d.weekday * 3 + ((i + k) % DUTY_AREAS.length)) % teacherRows.length]!.id,
+      })),
+    ),
+  ).returning({ id: transportDuties.id }));
+
+  keep('teacherLeaves', await db.insert(teacherLeaves).values([
+    { schoolId, teacherId: teacherRows[8]!.id, startDate: today.isoDate, endDate: today.isoDate, note: 'Sağlık raporu' },
+    { schoolId, teacherId: teacherRows[11]!.id, startDate: today.isoDate, endDate: today.isoDate, note: 'Seminer' },
+  ]).returning({ id: teacherLeaves.id }));
+
+  // Bugün doğum günü olan üç öğrenci, diğerleri yıla dağılmış
+  keep('students', await db.insert(students).values(
+    STUDENT_NAMES.map((fullName, i) => {
+      const year = i < 3 ? 2008 : 2008 + (i % 3); // 2008 artık yıl: 29 Şubat'ta da geçerli tarih
+      const birthDate = i < 3 ? `${year}-${today.monthDay}` : `${year}-${String((i % 12) + 1).padStart(2, '0')}-${String((i % 27) + 1).padStart(2, '0')}`;
+      return { schoolId, fullName, classGroupId: classRows[i % classRows.length]!.id, birthDate };
+    }),
+  ).returning({ id: students.id }));
+
+  const nextYear = today.month >= 7 ? today.year + 1 : today.year;
+  keep('exams', await db.insert(exams).values([
+    { schoolId, title: 'YKS (örnek tarih)', examAt: new Date(`${nextYear}-06-19T10:15:00+03:00`), sortOrder: 0 },
+    { schoolId, title: '1. Dönem Ortak Sınavı', examAt: new Date(now.getTime() + 24 * 86400_000), sortOrder: 1 },
+  ]).returning({ id: exams.id }));
+
+  const periods = generatePeriods({ firstStart: '08:30', lessonMin: 40, breakMin: 10, count: 8, lunchAfter: 5, lunchMin: 45 });
+  keep('bellSchedules', await db.insert(bellSchedules).values({ schoolId, name: 'Hafta içi', weekdays: [1, 2, 3, 4, 5], periods }).returning({ id: bellSchedules.id }));
+
+  // Ders programı: dönüşümlü atama sayesinde bir öğretmen aynı saatte tek sınıfta olur
+  const entries: (typeof timetableEntries.$inferInsert)[] = [];
+  for (const weekday of [1, 2, 3, 4, 5]) {
+    for (const p of periods) {
+      classRows.forEach((cls, ci) => {
+        const teacher = TEACHERS[(ci + p.no + weekday * 3) % TEACHERS.length]!;
+        const teacherRow = teacherRows.find((t) => t.fullName === teacher[0])!;
+        entries.push({ schoolId, weekday, periodNo: p.no, classGroupId: cls.id, teacherId: teacherRow.id, subject: teacher[2] });
+      });
+    }
+  }
+  keep('timetableEntries', await db.insert(timetableEntries).values(entries).returning({ id: timetableEntries.id }));
+
+  // Görselli duyurular: seed-assets klasöründeki afişler yüklenir
+  const assets = seedAssetsDir();
+  const posters: { file: string; title: string; body: string }[] = [
+    { file: 'cumhuriyet.png', title: '29 Ekim Cumhuriyet Bayramımız Kutlu Olsun', body: 'Tören 08:45\'te okul bahçesinde başlayacaktır.' },
+    { file: 'bilim-fuari.png', title: 'Bilim Fuarı Başvuruları Başladı', body: 'Proje başvuruları için danışman öğretmeninizle görüşün.' },
+    { file: 'kutuphane.png', title: 'Kütüphane Haftası', body: 'Ayın kitabı: "Çalıkuşu". Okuma köşemiz teneffüslerde açık.' },
+  ];
+  let order = 0;
+  for (const poster of posters) {
+    const path = assets ? resolve(assets, poster.file) : null;
+    if (!path || !existsSync(path) || !opts.storage) continue;
+    const imageUrl = await opts.storage.saveImage(schoolId, readFileSync(path));
+    keep(
+      'announcements',
+      await db
+        .insert(announcements)
+        .values({ schoolId, kind: 'image', title: poster.title, body: poster.body, imageUrl, sortOrder: order++ })
+        .returning({ id: announcements.id }),
+    );
+  }
+  keep('announcements', await db.insert(announcements).values({
+    schoolId,
+    kind: 'text',
+    title: 'Veli Toplantısı',
+    body: 'Birinci dönem veli toplantısı Cumartesi saat 10:00\'da sınıflarda yapılacaktır.',
+    sortOrder: order++,
+  }).returning({ id: announcements.id }));
+
+  keep('tickerItems', await db.insert(tickerItems).values(
+    [
+      `Cumhuriyetimizin ${today.year - (today.month >= 10 ? 1923 : 1924)}. yılı kutlu olsun!`,
+      'Kantin fiyat listesi güncellendi, panoya asılmıştır.',
+      'Satranç turnuvası kayıtları rehberlik servisinde.',
+      'Okul servisleri 15:40\'ta hareket eder.',
+    ].map((text, i) => ({ schoolId, text, sortOrder: i })),
+  ).returning({ id: tickerItems.id }));
+
+  return { ids, teacherIds: ids.teachers ?? [] };
+}
+
 /** Tanıtım ve geliştirme için gerçekçi örnek okul verisi oluşturur. */
 export async function seedDemo(
   db: DB,
@@ -133,19 +309,7 @@ export async function seedDemo(
   }
 
   await addDefaultTeacherOptions(db, schoolId);
-  const branchIds = new Map((await db.select().from(teacherBranches).where(eq(teacherBranches.schoolId, schoolId))).map((b) => [b.name, b.id]));
-  const titleIds = new Map((await db.select().from(teacherTitles).where(eq(teacherTitles.schoolId, schoolId))).map((t) => [t.name, t.id]));
-  const teacherRows = await db
-    .insert(teachers)
-    .values(
-      TEACHERS.map(([fullName, branch, , title]) => ({
-        schoolId,
-        fullName,
-        branchId: branchIds.get(branch) ?? null,
-        titleId: titleIds.get(title) ?? null,
-      })),
-    )
-    .returning();
+  const { teacherIds } = await seedSchoolContent(db, schoolId, { storage: opts.storage, now, timezone: tz });
   // Mobil uygulama denemesi için öğretmen hesabı: kadrodaki ilk öğretmene bağlı (kendi nöbetleri ve programı)
   {
     const email = 'ogretmen@okulpano.local';
@@ -154,121 +318,16 @@ export async function seedDemo(
     if (!u) {
       [u] = await db
         .insert(users)
-        .values({ email, fullName: teacherRows[0]!.fullName, passwordHash: await hashPassword(password) })
+        .values({ email, fullName: TEACHERS[0]![0], passwordHash: await hashPassword(password) })
         .returning();
     }
     await db
       .insert(memberships)
-      .values({ userId: u!.id, schoolId, role: 'editor', permissions: ['announcements.manage'], teacherId: teacherRows[0]!.id })
+      .values({ userId: u!.id, schoolId, role: 'editor', permissions: ['announcements.manage'], teacherId: teacherIds[0]! })
       .onConflictDoNothing();
     accounts.push({ role: 'Öğretmen (mobil uygulama)', email, password });
   }
 
-  const classRows = await db
-    .insert(classGroups)
-    .values(CLASSES.map((name, i) => ({ schoolId, name, sortOrder: i })))
-    .returning();
-
-  // Nöbet: her gün her alana farklı bir öğretmen
-  await db.insert(duties).values(
-    [1, 2, 3, 4, 5].flatMap((weekday) =>
-      DUTY_AREAS.map((area, i) => ({
-        schoolId,
-        month: today.isoDate.slice(0, 7),
-        weekday,
-        area,
-        sortOrder: i,
-        teacherId: teacherRows[(weekday * 3 + i) % teacherRows.length]!.id,
-      })),
-    ),
-  );
-
-  // Nöbetçi müdür yardımcıları: önümüzdeki iki haftanın hafta içi günleri, iki kişi dönüşümlü
-  const supervisorDates = Array.from({ length: 14 }, (_, i) => zonedParts(new Date(now.getTime() + i * 86400_000), tz)).filter(
-    (d) => d.weekday <= 5,
-  );
-  await db
-    .insert(dutySupervisors)
-    .values(supervisorDates.map((d, i) => ({ schoolId, date: d.isoDate, name: i % 2 ? 'Ümit Kılıç' : 'Mustafa Akkaya' })));
-
-  // Taşımalı öğrenci görevlileri: o günün nöbetçilerinden dönüşümlü iki kişi
-  await db.insert(transportDuties).values(
-    supervisorDates.flatMap((d, i) =>
-      [0, 1].map((k) => ({
-        schoolId,
-        date: d.isoDate,
-        sortOrder: k,
-        teacherId: teacherRows[(d.weekday * 3 + ((i + k) % DUTY_AREAS.length)) % teacherRows.length]!.id,
-      })),
-    ),
-  );
-
-  await db.insert(teacherLeaves).values([
-    { schoolId, teacherId: teacherRows[8]!.id, startDate: today.isoDate, endDate: today.isoDate, note: 'Sağlık raporu' },
-    { schoolId, teacherId: teacherRows[11]!.id, startDate: today.isoDate, endDate: today.isoDate, note: 'Seminer' },
-  ]);
-
-  // Bugün doğum günü olan üç öğrenci, diğerleri yıla dağılmış
-  await db.insert(students).values(
-    STUDENT_NAMES.map((fullName, i) => {
-      const year = i < 3 ? 2008 : 2008 + (i % 3); // 2008 artık yıl: 29 Şubat'ta da geçerli tarih
-      const birthDate = i < 3 ? `${year}-${today.monthDay}` : `${year}-${String((i % 12) + 1).padStart(2, '0')}-${String((i % 27) + 1).padStart(2, '0')}`;
-      return { schoolId, fullName, classGroupId: classRows[i % classRows.length]!.id, birthDate };
-    }),
-  );
-
-  const nextYear = today.month >= 7 ? today.year + 1 : today.year;
-  await db.insert(exams).values([
-    { schoolId, title: 'YKS (örnek tarih)', examAt: new Date(`${nextYear}-06-19T10:15:00+03:00`), sortOrder: 0 },
-    { schoolId, title: '1. Dönem Ortak Sınavı', examAt: new Date(now.getTime() + 24 * 86400_000), sortOrder: 1 },
-  ]);
-
-  const periods = generatePeriods({ firstStart: '08:30', lessonMin: 40, breakMin: 10, count: 8, lunchAfter: 5, lunchMin: 45 });
-  await db.insert(bellSchedules).values({ schoolId, name: 'Hafta içi', weekdays: [1, 2, 3, 4, 5], periods });
-
-  // Ders programı: dönüşümlü atama sayesinde bir öğretmen aynı saatte tek sınıfta olur
-  const entries: (typeof timetableEntries.$inferInsert)[] = [];
-  for (const weekday of [1, 2, 3, 4, 5]) {
-    for (const p of periods) {
-      classRows.forEach((cls, ci) => {
-        const teacher = TEACHERS[(ci + p.no + weekday * 3) % TEACHERS.length]!;
-        const teacherRow = teacherRows.find((t) => t.fullName === teacher[0])!;
-        entries.push({ schoolId, weekday, periodNo: p.no, classGroupId: cls.id, teacherId: teacherRow.id, subject: teacher[2] });
-      });
-    }
-  }
-  await db.insert(timetableEntries).values(entries);
-
-  // Görselli duyurular: seed-assets klasöründeki afişler yüklenir
-  const assets = seedAssetsDir();
-  const posters: { file: string; title: string; body: string }[] = [
-    { file: 'cumhuriyet.png', title: '29 Ekim Cumhuriyet Bayramımız Kutlu Olsun', body: 'Tören 08:45\'te okul bahçesinde başlayacaktır.' },
-    { file: 'bilim-fuari.png', title: 'Bilim Fuarı Başvuruları Başladı', body: 'Proje başvuruları için son gün 15 Kasım. Danışman öğretmeninizle görüşün.' },
-    { file: 'kutuphane.png', title: 'Kütüphane Haftası', body: 'Ayın kitabı: "Çalıkuşu". Okuma köşemiz teneffüslerde açık.' },
-  ];
-  let order = 0;
-  for (const poster of posters) {
-    const path = assets ? resolve(assets, poster.file) : null;
-    if (!path || !existsSync(path) || !opts.storage) continue;
-    const imageUrl = await opts.storage.saveImage(schoolId, readFileSync(path));
-    await db.insert(announcements).values({ schoolId, kind: 'image', title: poster.title, body: poster.body, imageUrl, sortOrder: order++ });
-  }
-  await db.insert(announcements).values({
-    schoolId,
-    kind: 'text',
-    title: 'Veli Toplantısı',
-    body: 'Birinci dönem veli toplantısı 7 Kasım Cumartesi saat 10:00\'da sınıflarda yapılacaktır.',
-    sortOrder: order++,
-  });
-
-  await db.insert(tickerItems).values(
-    [
-      'Cumhuriyetimizin 103. yılı kutlu olsun!',
-      'Kantin fiyat listesi güncellendi, panoya asılmıştır.',
-      'Satranç turnuvası kayıtları rehberlik servisinde.',
-      'Okul servisleri 15:40\'ta hareket eder.',
-    ].map((text, i) => ({ schoolId, text, sortOrder: i })),
-  );
 
   const screenToken = randomToken('opd');
   await db.insert(screens).values({ schoolId, name: 'Giriş Holü', location: 'Zemin kat, ana giriş', tokenHash: sha256(screenToken) });

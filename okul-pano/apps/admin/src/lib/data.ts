@@ -135,6 +135,9 @@ export interface School {
   maxScreens: number;
   isActive: boolean;
   trialEndsAt: string | null;
+  /** İlk giriş sorusu: 'pending' iken örnek veri sorulur */
+  onboarding: 'pending' | 'sample' | 'empty' | null;
+  hasSampleData: boolean;
 }
 
 /* ---------- Kancalar ---------- */

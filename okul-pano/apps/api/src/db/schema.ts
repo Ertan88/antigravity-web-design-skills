@@ -82,6 +82,10 @@ export const schools = pgTable('schools', {
   trialNotice: integer('trial_notice'),
   /** Kayıtta verilen yetkili telefonu (yalnızca platform yöneticisi görür) */
   contactPhone: text('contact_phone'),
+  /** İlk giriş: 'pending' iken okul sahibine örnek veri sorulur; 'sample' ya da 'empty' cevaplanmıştır */
+  onboarding: text('onboarding').$type<'pending' | 'sample' | 'empty'>(),
+  /** Eklenen örnek kayıtların kimlikleri (tablo adı -> id listesi): "örnek verileri temizle" yalnızca bunları siler */
+  sampleData: jsonb('sample_data').$type<Record<string, string[]>>(),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

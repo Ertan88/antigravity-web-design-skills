@@ -27,6 +27,12 @@ const schema = z.object({
   /** Kayıtla açılan okulun deneme süresi (gün) ve ekran sınırı */
   TRIAL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
   TRIAL_SCREENS: z.coerce.number().int().min(1).max(50).default(2),
+  /**
+   * E-posta, HTTPS ile (önerilen): Brevo hesabındaki API anahtarı. Render gibi ücretsiz barındırmalar SMTP portlarını
+   * kapattığı için doğrulama ve davet e-postaları bu yolla gider. Gönderen adresi SMTP_FROM'dur (Brevo'da doğrulanmış olmalı).
+   */
+  BREVO_API_KEY: z.string().optional().transform((v) => v || undefined),
+  BREVO_API_URL: z.string().default('https://api.brevo.com/v3/smtp/email'),
   /** E-posta (şifre gönderimi). SMTP_HOST boşsa e-posta gönderilmez; panel e-posta programını açar. */
   SMTP_HOST: z.string().optional().transform((v) => v || undefined),
   SMTP_PORT: z.coerce.number().int().default(587),

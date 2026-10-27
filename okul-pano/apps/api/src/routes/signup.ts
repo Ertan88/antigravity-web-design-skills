@@ -5,7 +5,7 @@ import type { AppDeps } from '../context.ts';
 import { accessUser, UUID_RE } from '../context.ts';
 import { memberships, schools, sessions, signups, userInvites, users } from '../db/schema.ts';
 import { hashPassword, randomToken, sha256 } from '../lib/crypto.ts';
-import { sendMail } from '../lib/mailer.ts';
+import { trySendMail } from '../lib/mailer.ts';
 import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
 import { addDefaultTeacherOptions } from './teachers.ts';
 
@@ -29,11 +29,11 @@ export async function createInvite(
     createdBy: opts.createdBy,
   });
   const inviteUrl = panelUrl(deps, `davet?token=${encodeURIComponent(token)}`);
-  const emailed = await sendMail(deps.env, {
+  const emailed = await trySendMail(deps.env, {
     to: opts.email,
     subject: `${opts.schoolName} · Panokul daveti`,
     text: `Merhaba ${opts.fullName},\n\n${opts.schoolName} sizi Panokul yönetim paneline davet etti.\n\nŞifrenizi belirleyip giriş yapmak için bağlantıyı açın (7 gün geçerli):\n${inviteUrl}\n\nMobil uygulamaya da aynı e-posta ve şifreyle giriş yapabilirsiniz.\n`,
-  }).catch(() => false);
+  });
   return { inviteUrl, emailed };
 }
 
@@ -62,6 +62,7 @@ async function openSchool(deps: AppDeps, signup: typeof signups.$inferSelect, ac
         isActive: active,
         contactPhone: signup.phone,
         settings: { schoolType: signup.schoolType },
+        onboarding: 'pending',
       })
       .returning();
     const [owner] = await tx
@@ -113,11 +114,11 @@ export async function signupRoutes(app: FastifyInstance) {
       ip: req.ip,
     });
     const url = panelUrl(deps, `dogrula?token=${encodeURIComponent(token)}`);
-    const emailed = await sendMail(env, {
+    const emailed = await trySendMail(env, {
       to: email,
       subject: 'Panokul · e-posta adresinizi doğrulayın',
       text: `Merhaba ${body.ownerName},\n\n${body.schoolName} için Panokul kaydınızı tamamlamak üzere bağlantıyı açın (48 saat geçerli):\n${url}\n\nBu kaydı siz yapmadıysanız e-postayı yok sayın.\n`,
-    }).catch(() => false);
+    });
     return reply.status(202).send({ emailed });
   });
 
@@ -156,11 +157,11 @@ export async function signupRoutes(app: FastifyInstance) {
     const [signup] = await db.select().from(signups).where(and(eq(signups.id, id), isNull(signups.verifiedAt)));
     if (!signup) throw notFound('Başvuru bulunamadı.');
     const school = await openSchool(deps, signup, true);
-    await sendMail(env, {
+    await trySendMail(env, {
       to: signup.email,
       subject: 'Panokul · okulunuz hazır',
       text: `Merhaba ${signup.ownerName},\n\n${signup.schoolName} için Panokul hesabınız açıldı. Kayıtta belirlediğiniz şifreyle giriş yapabilirsiniz:\n${panelUrl(deps)}\n`,
-    }).catch(() => false);
+    });
     return { schoolId: school.id };
   });
 
@@ -224,14 +225,14 @@ export async function runTrialReminders(deps: AppDeps, now = Date.now()): Promis
       .where(and(eq(memberships.schoolId, s.id), eq(memberships.role, 'owner')));
     const when = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Istanbul' }).format(new Date(status.endsAt));
     for (const o of owners) {
-      await sendMail(env, {
+      await trySendMail(env, {
         to: o.email,
         subject: due === 0 ? `${s.name} · Panokul deneme süreniz doldu` : `${s.name} · Panokul denemenizin bitmesine ${due} gün kaldı`,
         text:
           due === 0
             ? `Merhaba ${o.fullName},\n\n${s.name} için Panokul deneme süresi ${when} tarihinde doldu. Panel salt okunur, panolarda içerik gösterilmiyor. Verileriniz 30 gün saklanır.\n\nAboneliği başlatmak için bizimle iletişime geçin.\n`
             : `Merhaba ${o.fullName},\n\n${s.name} için Panokul deneme süreniz ${when} tarihinde bitiyor. Kesintisiz devam etmek için aboneliği başlatın; bütün içerikleriniz olduğu gibi kalır.\n`,
-      }).catch(() => false);
+      });
     }
     await db.update(schools).set({ trialNotice: due }).where(eq(schools.id, s.id));
     sent++;

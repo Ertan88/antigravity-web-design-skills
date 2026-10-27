@@ -37,6 +37,12 @@ services:
       - key: DATA_REGION
         value: Almanya (Frankfurt)
       # Web'den okul kaydı: open (e-posta doğrulanınca açılır), approval (platform yöneticisi onaylar), closed (kapalı).
-      # SMTP ayarlı değilse doğrulama e-postası gitmez; başvurular Platform sayfasında onaylanır.
+      # E-posta ayarlı değilse doğrulama e-postası gitmez; başvurular Platform sayfasında onaylanır.
       - key: SIGNUP_MODE
         value: open
+      # E-posta: Render'ın ücretsiz sunucusu SMTP portlarını kapatır, bu yüzden Brevo'nun HTTPS API'si kullanılır.
+      # brevo.com'da API anahtarı oluşturun; gönderen adresi Brevo'da doğrulanmış olmalı: "Panokul <adres@alanadi.com>"
+      - key: BREVO_API_KEY
+        sync: false
+      - key: SMTP_FROM
+        sync: false

@@ -1,5 +1,5 @@
 import { adminUpdateSchoolSchema, createSchoolSchema, schoolSettingsSchema, updateSchoolSchema } from '@okulpano/shared';
-import { and, count, desc, eq, gte, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { accessUser, audit, schoolGuard, UUID_RE } from '../context.ts';
@@ -7,6 +7,7 @@ import { announcements, auditLogs, memberships, schools, screens, students, teac
 import { hashPassword } from '../lib/crypto.ts';
 import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
 import { geocode } from '../lib/weather.ts';
+import { SAMPLE_TABLES, seedSchoolContent, type SampleData } from '../seed-data.ts';
 import { addDefaultTeacherOptions } from './teachers.ts';
 
 export function publicSchool(s: typeof schools.$inferSelect) {
@@ -24,6 +25,8 @@ export function publicSchool(s: typeof schools.$inferSelect) {
     maxScreens: s.maxScreens,
     isActive: s.isActive,
     trialEndsAt: s.trialEndsAt,
+    onboarding: s.onboarding,
+    hasSampleData: Boolean(s.sampleData && Object.values(s.sampleData).some((ids) => ids.length)),
   };
 }
 
@@ -44,6 +47,46 @@ export async function schoolRoutes(app: FastifyInstance) {
       .returning();
     await audit(req, 'update', 'Okul ayarları', req.ctx.schoolId, updated!.name);
     bus.contentChanged(req.ctx.schoolId);
+    return publicSchool(updated!);
+  });
+
+  /** İlk giriş sorusu: örnek verilerle mi boş mu başlanacak */
+  app.post('/api/schools/:schoolId/onboarding', { preHandler: [app.authenticate, schoolGuard('settings.manage')] }, async (req) => {
+    const { sample } = parse(z.object({ sample: z.boolean() }), req.body);
+    const id = req.ctx.schoolId;
+    // Çift tıklamada iki kez örnek veri eklenmesin: soru tek seferde "cevaplandı" yapılır
+    const [claimed] = await db
+      .update(schools)
+      .set({ onboarding: sample ? 'sample' : 'empty' })
+      .where(and(eq(schools.id, id), eq(schools.onboarding, 'pending')))
+      .returning();
+    if (!claimed) throw conflict('Bu soru zaten cevaplandı.');
+    if (!sample) return publicSchool(claimed);
+    try {
+      const { ids } = await seedSchoolContent(db, id, { storage, timezone: claimed.timezone });
+      const [updated] = await db.update(schools).set({ sampleData: ids }).where(eq(schools.id, id)).returning();
+      await audit(req, 'create', 'Örnek veriler', id, claimed.name);
+      bus.contentChanged(id);
+      return publicSchool(updated!);
+    } catch (err) {
+      await db.update(schools).set({ onboarding: 'pending' }).where(eq(schools.id, id));
+      throw err;
+    }
+  });
+
+  /** Örnek verileri temizler: yalnızca örnek olarak eklenen kayıtlar silinir, okulun kendi girdiği veriler kalır */
+  app.post('/api/schools/:schoolId/sample-data/clear', { preHandler: [app.authenticate, schoolGuard('settings.manage')] }, async (req) => {
+    const id = req.ctx.schoolId;
+    const sampleData = (req.ctx.school.sampleData ?? {}) as SampleData;
+    const [updated] = await db.transaction(async (tx) => {
+      for (const [key, table] of Object.entries(SAMPLE_TABLES) as [keyof typeof SAMPLE_TABLES, (typeof SAMPLE_TABLES)[keyof typeof SAMPLE_TABLES]][]) {
+        const rowIds = sampleData[key];
+        if (rowIds?.length) await tx.delete(table).where(and(eq(table.schoolId, id), inArray(table.id, rowIds)));
+      }
+      return tx.update(schools).set({ sampleData: null }).where(eq(schools.id, id)).returning();
+    });
+    await audit(req, 'delete', 'Örnek veriler', id, updated!.name);
+    bus.contentChanged(id);
     return publicSchool(updated!);
   });
 
@@ -171,6 +214,7 @@ export async function schoolRoutes(app: FastifyInstance) {
           plan: body.plan,
           maxScreens: body.maxScreens,
           trialEndsAt: body.plan === 'trial' ? new Date(Date.now() + 30 * 86400_000) : null,
+          onboarding: 'pending',
         })
         .returning();
       await tx.insert(memberships).values({ userId: owner!.id, schoolId: school!.id, role: 'owner' });

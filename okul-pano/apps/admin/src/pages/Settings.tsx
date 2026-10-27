@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Copy, Download, ExternalLink, FileText, MapPin, Search } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ImageUpload } from '../components/ImageUpload.tsx';
+import { SampleDataCard } from '../components/Onboarding.tsx';
 import { SaveBar } from '../components/SaveBar.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Button, Card, Field, Input, PageHeader, Spinner, Textarea, Toggle } from '../components/ui.tsx';
@@ -353,7 +354,7 @@ export function Settings() {
           onCancel={() => school.data && form.reset(toForm(school.data))}
         />
       </Card>
-
+      <SampleDataCard />
     </div>
   );
 }
