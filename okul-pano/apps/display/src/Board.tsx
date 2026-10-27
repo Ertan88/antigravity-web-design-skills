@@ -37,11 +37,35 @@ import { Slideshow } from './components/Slideshow.tsx';
 import { Stage, STAGE_H, STAGE_W } from './components/Stage.tsx';
 import { Ticker, type TickerEntry } from './components/Ticker.tsx';
 import { useClock, useDisplayData, useNightlyReload, useStatusReport, useWeather } from './hooks.ts';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 const NATIONAL_DAYS = new Set(['10-29', '04-23', '05-19', '08-30']);
 /** "Ekim 2026" */
 const monthName = (iso: string, timeZone: string) => new Intl.DateTimeFormat('tr-TR', { month: 'long', year: 'numeric', timeZone }).format(new Date(iso));
+
+/** Açılış ekranı en az bu kadar görünür; ilerleme çubuğu bu sürede dolar */
+const SPLASH_MIN_MS = 2600;
+
+/**
+ * Açılış ekranı: veri gelse de en az SPLASH_MIN_MS görünür, sonra çubuk tamamlanıp kapanır.
+ * Paneldeki canlı önizlemede beklenmez.
+ */
+function useSplash(ready: boolean, skip: boolean) {
+  const [minDone, setMinDone] = useState(skip);
+  const [hidden, setHidden] = useState(skip);
+  useEffect(() => {
+    if (skip) return;
+    const t = setTimeout(() => setMinDone(true), SPLASH_MIN_MS);
+    return () => clearTimeout(t);
+  }, [skip]);
+  const finishing = ready && minDone;
+  useEffect(() => {
+    if (!finishing || hidden) return;
+    const t = setTimeout(() => setHidden(true), 350);
+    return () => clearTimeout(t);
+  }, [finishing, hidden]);
+  return { show: !ready || !hidden, finishing };
+}
 
 /** Sütunda kalan alanı dolduran kartlar (listeler) */
 const GROW = new Set<BoardModule>(['duties', 'lessons', 'events']);
@@ -54,8 +78,9 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
   // Mobil uzaktan kumanda için: şu an gösterilen slayt ve panonun durumu sunucuya bildirilir
   const [shown, setShown] = useState<{ index: number; count: number; title: string | null }>({ index: 0, count: 0, title: null });
   const onShow = useCallback((v: { index: number; count: number; title: string | null }) => setShown(v), []);
+  const splash = useSplash(Boolean(state), Boolean(auth.preview));
 
-  if (!state) {
+  if (!state || splash.show) {
     return (
       <Stage className="theme-dark">
         <div className="splash">
@@ -73,6 +98,11 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
               'Yükleniyor…'
             )}
           </div>
+          {connection !== 'unauthorized' && (
+            <div className={`splash-progress${splash.finishing ? ' is-done' : ''}`} role="progressbar" aria-label="Yükleniyor">
+              <span />
+            </div>
+          )}
         </div>
       </Stage>
     );

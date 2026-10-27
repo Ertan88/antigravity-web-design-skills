@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import type { ComponentProps, ReactNode } from 'react';
+import { useEffect, useRef, type ComponentProps, type ReactNode } from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -336,10 +338,39 @@ export function Empty({ icon = 'checkmark-circle-outline', title, text }: { icon
   );
 }
 
+/** Belirsiz süreli ilerleme çubuğu: bir parça soldan sağa akar */
+export function ProgressBar({ color = colors.primary, track = colors.primarySoft, width = 220 }: { color?: string; track?: string; width?: number }) {
+  const x = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.timing(x, { toValue: 1, duration: 1100, easing: Easing.inOut(Easing.quad), useNativeDriver: true }));
+    loop.start();
+    return () => loop.stop();
+  }, [x]);
+  const segment = width * 0.4;
+  return (
+    <View
+      accessibilityRole="progressbar"
+      accessibilityLabel="Yükleniyor"
+      style={{ width, height: 6, borderRadius: 3, backgroundColor: track, overflow: 'hidden' }}
+    >
+      <Animated.View
+        style={{
+          width: segment,
+          height: '100%',
+          borderRadius: 3,
+          backgroundColor: color,
+          transform: [{ translateX: x.interpolate({ inputRange: [0, 1], outputRange: [-segment, width] }) }],
+        }}
+      />
+    </View>
+  );
+}
+
+/** Veri yüklenirken: yuvarlak simge yerine ince ilerleme çubuğu */
 export function Loading() {
   return (
     <View style={{ paddingVertical: 48, alignItems: 'center' }}>
-      <ActivityIndicator color={colors.primary} size="large" />
+      <ProgressBar />
     </View>
   );
 }
