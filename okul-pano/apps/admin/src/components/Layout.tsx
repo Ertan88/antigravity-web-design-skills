@@ -1,11 +1,12 @@
 import clsx from 'clsx';
-import { Building2, ChevronRight, ChevronsUpDown, LogOut, Menu, MonitorSmartphone, Moon, School, Sun, X } from 'lucide-react';
+import { Building2, ChevronRight, ChevronsUpDown, LogOut, Menu, Moon, School, Sun, X } from 'lucide-react';
 import { Suspense, useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth.tsx';
 import { useSchool } from '../lib/data.ts';
 import { findNav, NAV } from '../lib/nav.ts';
 import { useTheme } from '../lib/theme.ts';
+import { BrandMark, BrandName } from './Brand.tsx';
 import { EmergencyBanner, EmergencyButton } from './Emergency.tsx';
 import { NotificationBell } from './Notifications.tsx';
 import { Spinner } from './ui.tsx';
@@ -80,11 +81,9 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       <div className="pointer-events-none absolute -top-28 -left-28 size-72 rounded-full bg-brand-500/10 blur-3xl" />
 
       <div className="relative flex items-center gap-2.5 px-5 pt-5 pb-4">
-        <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 text-white shadow-md shadow-brand-600/30">
-          <MonitorSmartphone className="size-[18px]" />
-        </div>
+        <BrandMark className="size-9 shrink-0 drop-shadow-sm" />
         <div className="leading-tight">
-          <div className="text-[15px] font-bold tracking-tight text-ink">Okul Pano</div>
+          <BrandName className="block text-[17px] font-extrabold tracking-tight text-ink" />
           <div className="text-[11px] font-medium text-slate-500">Yönetim Paneli</div>
         </div>
       </div>
@@ -184,7 +183,7 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
           <Menu className="size-5" />
         </button>
         <nav aria-label="Konum" className="flex min-w-0 items-center gap-1.5 text-sm">
-          <span className="font-bold tracking-tight text-ink lg:hidden">Okul Pano</span>
+          <BrandName className="font-extrabold tracking-tight text-ink lg:hidden" />
           {nav?.group && (
             <>
               <span className="hidden font-medium text-slate-400 lg:inline">{nav.group}</span>

@@ -124,7 +124,7 @@ export async function buildTransportWorkbook(opts: {
       horizontalCentered: true,
       margins: { left: 0.5, right: 0.5, top: 0.6, bottom: 0.6, header: 0.3, footer: 0.3 },
     },
-    headerFooter: { oddHeader: `&C&"-,Bold"&12${opts.schoolName.replace(/&/g, '&&')}`, oddFooter: '&LOkul Pano&R&D' },
+    headerFooter: { oddHeader: `&C&"-,Bold"&12${opts.schoolName.replace(/&/g, '&&')}`, oddFooter: '&LPanokul&R&D' },
   });
   ws.columns = [{ width: 14 }, { width: 17 }, ...Array.from({ length: slots }, () => ({ width: 28 }))];
 

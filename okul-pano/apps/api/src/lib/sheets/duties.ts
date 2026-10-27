@@ -330,7 +330,7 @@ export async function buildDutiesWorkbook(opts: {
       horizontalCentered: true,
       margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 },
     },
-    headerFooter: { oddHeader: `&C&"-,Bold"&12${opts.schoolName.replace(/&/g, '&&')}`, oddFooter: '&LOkul Pano&R&D' },
+    headerFooter: { oddHeader: `&C&"-,Bold"&12${opts.schoolName.replace(/&/g, '&&')}`, oddFooter: '&LPanokul&R&D' },
   });
   ws.columns = [
     { key: 'day', width: 16 },

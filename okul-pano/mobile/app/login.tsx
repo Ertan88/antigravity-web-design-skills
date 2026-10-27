@@ -1,11 +1,17 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
 import { DEFAULT_SERVER } from '../src/api.ts';
 import { useAuth } from '../src/auth.tsx';
 import { colors } from '../src/theme.ts';
 import { Button, Card, Field, Icon, Screen, T } from '../src/ui.tsx';
 
-/** Giriş: okulun panel hesabıyla. Sunucu adresi kurulumdan kuruluma değişir; web sürümünde kendiliğinden dolar. */
+/** Logodaki marka rengi (pano + okul'un ortak "o" harfi) */
+const BRAND = '#0E5E66';
+
+/**
+ * Giriş: panel hesabıyla, yalnızca e-posta ve şifre. Sunucu adresi uygulamaya derlemede verilir (EXPO_PUBLIC_API_URL);
+ * web sürümünde açıldığı adrestir. Kendi sunucusunu kuran okullar için "Farklı sunucu" ile değiştirilebilir.
+ */
 export default function Login() {
   const { signIn, server: saved } = useAuth();
   const [server, setServer] = useState(saved || DEFAULT_SERVER);
@@ -18,7 +24,10 @@ export default function Login() {
 
   const submit = async () => {
     setError(null);
-    if (!server.trim()) return setError('Sunucu adresini yazın (okulunuzun Okul Pano adresi).');
+    if (!server.trim()) {
+      setEditServer(true);
+      return setError('Sunucu adresini yazın (Panokul panelini açtığınız adres).');
+    }
     setBusy(true);
     try {
       await signIn(server, email, password);
@@ -33,19 +42,17 @@ export default function Login() {
     <Screen>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ gap: 18, paddingTop: 32 }}>
         <View style={{ alignItems: 'center', gap: 10 }}>
-          <View style={{ width: 72, height: 72, borderRadius: 20, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="tv-outline" size={36} color="#fff" />
-          </View>
-          <T size={26} weight="800">
-            Okul Pano
-          </T>
+          <Image source={require('../assets/icon.png')} style={{ width: 76, height: 76, borderRadius: 20 }} accessibilityIgnoresInvertColors />
+          <Text style={{ fontSize: 30, fontWeight: '800', letterSpacing: -0.6, color: colors.ink }} accessibilityRole="header">
+            pan<Text style={{ color: BRAND }}>o</Text>kul
+          </Text>
           <T color={colors.muted} style={{ textAlign: 'center' }}>
             Panel hesabınızla giriş yapın. Hesabınız yoksa okul yöneticinizden isteyin.
           </T>
         </View>
 
         <Card>
-          {editServer ? (
+          {editServer && (
             <Field
               label="Sunucu adresi"
               value={server}
@@ -54,16 +61,8 @@ export default function Login() {
               autoCorrect={false}
               keyboardType="url"
               placeholder="ör. pano.okulunuz.k12.tr"
-              help="Okul Pano yönetim panelini açtığınız adres"
+              help="Panokul panelini açtığınız adres"
             />
-          ) : (
-            <Pressable accessibilityRole="button" onPress={() => setEditServer(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Icon name="server-outline" size={18} color={colors.muted} />
-              <Text style={{ flex: 1, color: colors.muted, fontSize: 14 }} numberOfLines={1}>
-                {server.replace(/^https?:\/\//, '')}
-              </Text>
-              <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }}>Değiştir</Text>
-            </Pressable>
           )}
           <Field label="E-posta" value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" textContentType="username" />
           <View>
@@ -95,6 +94,13 @@ export default function Login() {
             Giriş yap
           </Button>
         </Card>
+        {!editServer && (
+          <Pressable accessibilityRole="button" onPress={() => setEditServer(true)} style={{ alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 }}>
+            <Text style={{ color: colors.muted, fontSize: 13 }}>
+              Okulunuzun kendi sunucusu mu var? <Text style={{ color: colors.primary, fontWeight: '700' }}>Farklı sunucu</Text>
+            </Text>
+          </Pressable>
+        )}
       </KeyboardAvoidingView>
     </Screen>
   );

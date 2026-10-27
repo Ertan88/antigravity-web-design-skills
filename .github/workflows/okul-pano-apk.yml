@@ -1,4 +1,4 @@
-# Okul Pano mobil uygulamasının Android deneme sürümü (APK).
+# Panokul mobil uygulamasının Android deneme sürümü (APK).
 # Elle çalıştırılabilir (Actions › "Okul Pano · Android APK" › Run workflow) ya da mobil kod değişince kendiliğinden çalışır.
 # Çıkan APK, deponun Releases sayfasındaki "okul-pano-android" sürümüne yüklenir: telefondan indirilip kurulabilir.
 name: Okul Pano · Android APK
@@ -23,6 +23,10 @@ jobs:
   apk:
     runs-on: ubuntu-latest
     timeout-minutes: 75
+    env:
+      # Uygulamanın bağlandığı sunucu: girişte yalnızca e-posta ve şifre sorulur. Kendi alan adınıza geçince
+      # GitHub › Settings › Secrets and variables › Actions › Variables altında PANOKUL_API_URL tanımlayın.
+      EXPO_PUBLIC_API_URL: ${{ vars.PANOKUL_API_URL || 'https://okul-pano.onrender.com' }}
     defaults:
       run:
         working-directory: okul-pano/mobile
@@ -67,7 +71,7 @@ jobs:
           TAG=okul-pano-android
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --prerelease --target "$GITHUB_SHA" \
-              --title "Okul Pano · Android deneme sürümü" \
-              --notes "Telefona indirip kurun (bilinmeyen kaynaklardan yüklemeye izin verin). Girişte sunucu adresini yazın, ör. http://192.168.1.20:3000"
+              --title "Panokul · Android deneme sürümü" \
+              --notes "Telefona indirip kurun (bilinmeyen kaynaklardan yüklemeye izin verin). Girişte e-posta ve şifrenizi yazmanız yeterli."
           fi
           gh release upload "$TAG" okul-pano.apk --clobber

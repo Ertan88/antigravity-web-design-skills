@@ -26,6 +26,7 @@ import { EmergencyScreen } from './components/Emergency.tsx';
 import { GroupCard } from './components/GroupCard.tsx';
 import { Header } from './components/Header.tsx';
 import { ClockScreen } from './components/Remote.tsx';
+import { BrandMark, BrandName } from './components/Brand.tsx';
 import { SpecialMark } from './components/SpecialMark.tsx';
 import { BookIcon, CakeIcon, CalendarIcon, CapIcon, LibraryIcon, MonitorIcon, ShieldIcon, TrophyIcon, UserMinusIcon, WifiOffIcon } from './components/Icons.tsx';
 import { AchievementsCard, BookCard, EventsCard } from './components/LifeCards.tsx';
@@ -58,8 +59,8 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
     return (
       <Stage className="theme-dark">
         <div className="splash">
-          <MonitorIcon size={96} />
-          <div className="splash-title">Okul Pano</div>
+          <BrandMark size={120} className="splash-mark" />
+          <BrandName className="splash-title" />
           <div className="splash-sub">
             {connection === 'offline' ? (
               <>

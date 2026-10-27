@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { pollPairing, startPairing, type PairingStart } from './api.ts';
-import { MonitorIcon } from './components/Icons.tsx';
+import { BrandMark } from './components/Brand.tsx';
 import { Stage } from './components/Stage.tsx';
 
 const ADMIN_URL = (import.meta.env.VITE_ADMIN_URL as string | undefined) ?? `${location.origin}/admin/`;
@@ -60,7 +60,7 @@ export function Pairing({ onPaired }: { onPaired: (token: string) => void }) {
   return (
     <Stage className="theme-dark">
       <div className="pairing">
-        <MonitorIcon size={88} className="pairing-icon" />
+        <BrandMark size={96} className="pairing-icon" />
         <h1>Bu ekranı okulunuza bağlayın</h1>
         {pairing ? (
           <>

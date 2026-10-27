@@ -19,7 +19,7 @@ const panelUrl = () => `${location.origin}/admin/`;
 
 /** Kullanıcıya gidecek ileti: e-posta programında hazır açılır ya da kopyalanır */
 function message(c: Credentials, schoolName: string) {
-  return `Merhaba ${c.fullName},\n\n${schoolName} Okul Pano yönetim paneli giriş bilgileriniz:\n\nAdres: ${panelUrl()}\nE-posta: ${c.email}\nŞifre: ${c.password}\n\nGiriş yaptıktan sonra Hesabım sayfasından şifrenizi değiştirin.`;
+  return `Merhaba ${c.fullName},\n\n${schoolName} Panokul yönetim paneli giriş bilgileriniz:\n\nAdres: ${panelUrl()}\nE-posta: ${c.email}\nŞifre: ${c.password}\n\nGiriş yaptıktan sonra Hesabım sayfasından şifrenizi değiştirin.`;
 }
 
 /** Giriş bilgileri: kopyala ya da e-postayla gönder */
@@ -28,7 +28,7 @@ export function CredentialsDialog({ value, onClose }: { value: Credentials | nul
   const [copied, setCopied] = useState(false);
   if (!value) return null;
   const text = message(value, school?.name ?? '');
-  const mailto = `mailto:${encodeURIComponent(value.email)}?subject=${encodeURIComponent(`${school?.name ?? ''} · Okul Pano şifreniz`)}&body=${encodeURIComponent(text)}`;
+  const mailto = `mailto:${encodeURIComponent(value.email)}?subject=${encodeURIComponent(`${school?.name ?? ''} · Panokul şifreniz`)}&body=${encodeURIComponent(text)}`;
   return (
     <Modal open onClose={onClose} title="Giriş bilgileri" footer={<Button onClick={onClose}>Tamam</Button>}>
       <div className="space-y-3 text-sm">

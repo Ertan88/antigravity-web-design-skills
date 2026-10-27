@@ -1,5 +1,5 @@
 /*
- * Okul Pano · Ekran
+ * Panokul · Ekran
  * 1920x1080 tuval, 3-5 metreden okunacak şekilde ölçülendirilmiştir.
  * Gövde metni >= 22px, başlıklar >= 34px, sayaç rakamları sabit genişlikli (tabular).
  */
@@ -1191,9 +1191,19 @@ p {
   color: var(--primary);
 }
 
+.splash-mark {
+  border-radius: 28px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+}
+
+.brand-o {
+  color: #f5b83d;
+}
+
 .splash-title {
-  font-size: 64px;
+  font-size: 72px;
   font-weight: 850;
+  letter-spacing: -0.03em;
   color: var(--text);
 }
 

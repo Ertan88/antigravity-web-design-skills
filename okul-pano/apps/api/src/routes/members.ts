@@ -142,8 +142,8 @@ export async function memberRoutes(app: FastifyInstance) {
       const url = `${app.deps.env.PUBLIC_URL.replace(/\/$/, '')}/admin/`;
       emailed = await sendMail(app.deps.env, {
         to: m.email,
-        subject: `${req.ctx.school.name} · Okul Pano şifreniz`,
-        text: `Merhaba ${m.fullName},\n\nOkul Pano yönetim paneli şifreniz yenilendi.\n\nAdres: ${url}\nE-posta: ${m.email}\nŞifre: ${password}\n\nGiriş yaptıktan sonra Hesabım sayfasından şifrenizi değiştirin.\n`,
+        subject: `${req.ctx.school.name} · Panokul şifreniz`,
+        text: `Merhaba ${m.fullName},\n\nPanokul yönetim paneli şifreniz yenilendi.\n\nAdres: ${url}\nE-posta: ${m.email}\nŞifre: ${password}\n\nGiriş yaptıktan sonra Hesabım sayfasından şifrenizi değiştirin.\n`,
       }).catch(() => false);
     }
     return { password, emailed, email: m.email, fullName: m.fullName };

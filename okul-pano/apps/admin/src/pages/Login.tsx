@@ -1,5 +1,5 @@
-import { MonitorSmartphone } from 'lucide-react';
 import { useState } from 'react';
+import { BrandMark, BrandName } from '../components/Brand.tsx';
 import { Alert, Button, Field, Input, PasswordInput } from '../components/ui.tsx';
 import { useAuth } from '../lib/auth.tsx';
 
@@ -54,10 +54,8 @@ export function Login() {
       <div className="relative hidden overflow-hidden bg-slate-950 [--color-slate-300:#cbd5e1] [--color-slate-400:#94a3b8] [--color-slate-500:#64748b] lg:flex lg:flex-col lg:justify-between lg:p-12">
         <div className="absolute inset-0 bg-[radial-gradient(800px_500px_at_0%_0%,rgba(31,139,173,0.4),transparent_60%),radial-gradient(600px_400px_at_100%_100%,rgba(245,158,11,0.18),transparent_60%)]" />
         <div className="relative flex items-center gap-2.5 text-white">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-brand-600">
-            <MonitorSmartphone className="size-5" />
-          </div>
-          <span className="text-lg font-bold">Okul Pano</span>
+          <BrandMark className="size-10" />
+          <BrandName className="text-xl font-extrabold tracking-tight" accent="text-[#F5B83D]" />
         </div>
         <div className="relative">
           <MiniBoard />
@@ -66,14 +64,15 @@ export function Login() {
             Duyurular, zil saatleri, nöbetçi öğretmenler ve sınav sayaçları; değişiklik yaptığınız anda koridordaki her ekranda.
           </p>
         </div>
-        <div className="relative text-xs text-slate-500">© {new Date().getFullYear()} Okul Pano</div>
+        <div className="relative text-xs text-slate-500">© {new Date().getFullYear()} Panokul</div>
       </div>
 
       <div className="flex items-center justify-center px-6 py-12">
         <form onSubmit={submit} className="w-full max-w-sm space-y-5">
           <div className="lg:hidden">
-            <div className="mb-6 flex size-11 items-center justify-center rounded-xl bg-brand-600 text-white">
-              <MonitorSmartphone className="size-6" />
+            <div className="mb-6 flex items-center gap-2.5">
+              <BrandMark className="size-11" />
+              <BrandName className="text-2xl font-extrabold tracking-tight text-ink" />
             </div>
           </div>
           <div>

@@ -124,7 +124,7 @@ export function findHeaderRow<K extends string>(
 
 export function newWorkbook(): ExcelJS.Workbook {
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'Okul Pano';
+  wb.creator = 'Panokul';
   wb.created = new Date();
   return wb;
 }
