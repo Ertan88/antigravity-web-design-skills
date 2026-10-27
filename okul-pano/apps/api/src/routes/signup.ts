@@ -31,8 +31,8 @@ export async function createInvite(
   const inviteUrl = panelUrl(deps, `davet?token=${encodeURIComponent(token)}`);
   const emailed = await trySendMail(deps.env, {
     to: opts.email,
-    subject: `${opts.schoolName} · Panokul daveti`,
-    text: `Merhaba ${opts.fullName},\n\n${opts.schoolName} sizi Panokul yönetim paneline davet etti.\n\nŞifrenizi belirleyip giriş yapmak için bağlantıyı açın (7 gün geçerli):\n${inviteUrl}\n\nMobil uygulamaya da aynı e-posta ve şifreyle giriş yapabilirsiniz.\n`,
+    subject: `${opts.schoolName} · Okulyayın daveti`,
+    text: `Merhaba ${opts.fullName},\n\n${opts.schoolName} sizi Okulyayın yönetim paneline davet etti.\n\nŞifrenizi belirleyip giriş yapmak için bağlantıyı açın (7 gün geçerli):\n${inviteUrl}\n\nMobil uygulamaya da aynı e-posta ve şifreyle giriş yapabilirsiniz.\n`,
   });
   return { inviteUrl, emailed };
 }
@@ -116,8 +116,8 @@ export async function signupRoutes(app: FastifyInstance) {
     const url = panelUrl(deps, `dogrula?token=${encodeURIComponent(token)}`);
     const emailed = await trySendMail(env, {
       to: email,
-      subject: 'Panokul · e-posta adresinizi doğrulayın',
-      text: `Merhaba ${body.ownerName},\n\n${body.schoolName} için Panokul kaydınızı tamamlamak üzere bağlantıyı açın (48 saat geçerli):\n${url}\n\nBu kaydı siz yapmadıysanız e-postayı yok sayın.\n`,
+      subject: 'Okulyayın · e-posta adresinizi doğrulayın',
+      text: `Merhaba ${body.ownerName},\n\n${body.schoolName} için Okulyayın kaydınızı tamamlamak üzere bağlantıyı açın (48 saat geçerli):\n${url}\n\nBu kaydı siz yapmadıysanız e-postayı yok sayın.\n`,
     });
     return reply.status(202).send({ emailed });
   });
@@ -159,8 +159,8 @@ export async function signupRoutes(app: FastifyInstance) {
     const school = await openSchool(deps, signup, true);
     await trySendMail(env, {
       to: signup.email,
-      subject: 'Panokul · okulunuz hazır',
-      text: `Merhaba ${signup.ownerName},\n\n${signup.schoolName} için Panokul hesabınız açıldı. Kayıtta belirlediğiniz şifreyle giriş yapabilirsiniz:\n${panelUrl(deps)}\n`,
+      subject: 'Okulyayın · okulunuz hazır',
+      text: `Merhaba ${signup.ownerName},\n\n${signup.schoolName} için Okulyayın hesabınız açıldı. Kayıtta belirlediğiniz şifreyle giriş yapabilirsiniz:\n${panelUrl(deps)}\n`,
     });
     return { schoolId: school.id };
   });
@@ -227,11 +227,11 @@ export async function runTrialReminders(deps: AppDeps, now = Date.now()): Promis
     for (const o of owners) {
       await trySendMail(env, {
         to: o.email,
-        subject: due === 0 ? `${s.name} · Panokul deneme süreniz doldu` : `${s.name} · Panokul denemenizin bitmesine ${due} gün kaldı`,
+        subject: due === 0 ? `${s.name} · Okulyayın deneme süreniz doldu` : `${s.name} · Okulyayın denemenizin bitmesine ${due} gün kaldı`,
         text:
           due === 0
-            ? `Merhaba ${o.fullName},\n\n${s.name} için Panokul deneme süresi ${when} tarihinde doldu. Panel salt okunur, panolarda içerik gösterilmiyor. Verileriniz 30 gün saklanır.\n\nAboneliği başlatmak için bizimle iletişime geçin.\n`
-            : `Merhaba ${o.fullName},\n\n${s.name} için Panokul deneme süreniz ${when} tarihinde bitiyor. Kesintisiz devam etmek için aboneliği başlatın; bütün içerikleriniz olduğu gibi kalır.\n`,
+            ? `Merhaba ${o.fullName},\n\n${s.name} için Okulyayın deneme süresi ${when} tarihinde doldu. Panel salt okunur, panolarda içerik gösterilmiyor. Verileriniz 30 gün saklanır.\n\nAboneliği başlatmak için bizimle iletişime geçin.\n`
+            : `Merhaba ${o.fullName},\n\n${s.name} için Okulyayın deneme süreniz ${when} tarihinde bitiyor. Kesintisiz devam etmek için aboneliği başlatın; bütün içerikleriniz olduğu gibi kalır.\n`,
       });
     }
     await db.update(schools).set({ trialNotice: due }).where(eq(schools.id, s.id));

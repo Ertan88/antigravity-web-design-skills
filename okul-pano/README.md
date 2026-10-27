@@ -131,7 +131,7 @@ Panel `https://alanadiniz/admin/`, pano `https://alanadiniz/display/`, mobil uyg
   deneme paketiyle açılır (varsayılan 30 gün, 2 pano: `TRIAL_DAYS`, `TRIAL_SCREENS`). Kayıt yapan okul sahibi olur.
 - **Kayıt modu** (`SIGNUP_MODE`): `open` doğrulayınca açılır, `approval` platform yöneticisinin onayını bekler, `closed` kapalı.
 - **E-posta:** `BREVO_API_KEY` (HTTPS, önerilen; Render'ın ücretsiz sunucusu SMTP portlarını kapatır) ya da `SMTP_HOST`.
-  Gönderen `SMTP_FROM="Panokul <adres@alanadi.com>"` Brevo'da doğrulanmış olmalı. Gönderim hataları sunucu günlüğüne yazılır.
+  Gönderen `SMTP_FROM="Okulyayın <adres@alanadi.com>"` Brevo'da doğrulanmış olmalı. Gönderim hataları sunucu günlüğüne yazılır.
 - **E-posta gelmezse** (e-posta ayarlı değilse) başvuru **Platform › Okullar ve Abonelikler** sayfasında "Onayla" ile açılır.
 - **Deneme süresi:** bitişe 7, 3, 1 gün kala ve bitince okul sahibine e-posta; süre dolunca panel salt okunur, panolar "deneme
   süresi sona erdi" ekranı gösterir. Platform yöneticisi "+30 gün" ile uzatır ya da ücretli pakete geçirir.

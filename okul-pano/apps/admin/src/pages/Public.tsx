@@ -20,12 +20,12 @@ export const useSignupConfig = () => useQuery({ queryKey: ['signup-config'], que
 function PublicShell({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
   return (
     <div className="flex min-h-dvh flex-col items-center bg-slate-50 px-4 py-10 sm:py-14">
-      <Link to="/" className="mb-8 flex items-center gap-2.5" aria-label="Panokul girişine dön">
+      <Link to="/" className="mb-8 flex items-center gap-2.5" aria-label="Okulyayın girişine dön">
         <BrandMark className="size-10" />
         <BrandName className="text-2xl font-extrabold tracking-tight text-ink" />
       </Link>
       <main className={`w-full ${wide ? 'max-w-xl' : 'max-w-md'} rounded-2xl bg-surface p-6 shadow-sm ring-1 ring-slate-900/[0.06] sm:p-8`}>{children}</main>
-      <p className="mt-6 text-xs text-slate-500">© {new Date().getFullYear()} Panokul</p>
+      <p className="mt-6 text-xs text-slate-500">© {new Date().getFullYear()} Okulyayın</p>
     </div>
   );
 }
@@ -73,7 +73,7 @@ export function Signup() {
     return (
       <PublicShell>
         <Done icon={<MailCheck className="size-7" />} title="Şu an yeni kayıt alınmıyor">
-          <p>Okulunuz için Panokul kullanmak istiyorsanız bizimle iletişime geçin.</p>
+          <p>Okulunuz için Okulyayın kullanmak istiyorsanız bizimle iletişime geçin.</p>
           <Link to="/" className="font-semibold text-brand-600">Girişe dön</Link>
         </Done>
       </PublicShell>
@@ -271,7 +271,7 @@ export function AcceptInvite() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Hoş geldiniz, {invite.data!.fullName}</h1>
             <p className="mt-1 text-sm text-slate-500">
-              {invite.data!.schoolName} sizi Panokul'a davet etti. Şifrenizi belirleyin; panele ve mobil uygulamaya <strong>{invite.data!.email}</strong> ile girersiniz.
+              {invite.data!.schoolName} sizi Okulyayın'a davet etti. Şifrenizi belirleyin; panele ve mobil uygulamaya <strong>{invite.data!.email}</strong> ile girersiniz.
             </p>
           </div>
           {error && <Alert tone="red">{error}</Alert>}

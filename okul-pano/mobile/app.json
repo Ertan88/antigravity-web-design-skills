@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Panokul",
+    "name": "Okulyayın",
     "slug": "okul-pano",
     "scheme": "okulpano",
     "version": "0.1.0",
@@ -35,8 +35,8 @@
     "web": {
       "bundler": "metro",
       "output": "single",
-      "name": "Panokul",
-      "shortName": "Panokul",
+      "name": "Okulyayın",
+      "shortName": "Okulyayın",
       "themeColor": "#0E5E66",
       "backgroundColor": "#f3f6f8",
       "favicon": "./assets/favicon.png"

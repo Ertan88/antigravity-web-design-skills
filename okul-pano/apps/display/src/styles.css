@@ -1,5 +1,5 @@
 /*
- * Panokul · Ekran
+ * Okulyayın · Ekran
  * 1920x1080 tuval, 3-5 metreden okunacak şekilde ölçülendirilmiştir.
  * Gövde metni >= 22px, başlıklar >= 34px, sayaç rakamları sabit genişlikli (tabular).
  */
@@ -1196,7 +1196,7 @@ p {
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
 }
 
-.brand-o {
+.brand-accent {
   color: #f5b83d;
 }
 

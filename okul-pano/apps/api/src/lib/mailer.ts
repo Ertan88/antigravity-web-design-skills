@@ -3,10 +3,10 @@ import type { Env } from '../env.ts';
 
 let cached: { key: string; transport: Transporter } | null = null;
 
-/** "Panokul <bildirim@alanadi.com>" -> { name, email } */
+/** "Okulyayın <bildirim@alanadi.com>" -> { name, email } */
 export function parseFrom(from: string): { name: string; email: string } {
   const m = /^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/.exec(from);
-  return m ? { name: m[1]!.trim() || 'Panokul', email: m[2]!.trim() } : { name: 'Panokul', email: from.trim() };
+  return m ? { name: m[1]!.trim() || 'Okulyayın', email: m[2]!.trim() } : { name: 'Okulyayın', email: from.trim() };
 }
 
 /** E-posta gönderimi ayarlı mı (Brevo ya da SMTP) */

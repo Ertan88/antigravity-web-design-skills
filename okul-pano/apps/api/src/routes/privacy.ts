@@ -60,13 +60,13 @@ function noticeHtml(text: string): string {
 }
 
 /**
- * KVKK aydınlatma metni şablonu. Veri sorumlusu okuldur (Panokul veri işleyendir). Okula özel bilgiler
+ * KVKK aydınlatma metni şablonu. Veri sorumlusu okuldur (Okulyayın veri işleyendir). Okula özel bilgiler
  * (adres, iletişim) köşeli parantezle bırakılır; okul kendi bilgisiyle doldurur ve hukukçusuna kontrol ettirir.
  */
 export function privacyTemplate(schoolName: string, dataRegion: string): string {
   return `# ${schoolName} · Kişisel Verilerin Korunması Aydınlatma Metni
 
-6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) kapsamında veri sorumlusu ${schoolName} olarak, okul içi dijital pano ve mobil uygulama (Panokul) aracılığıyla işlenen kişisel verileriniz hakkında sizi bilgilendiririz.
+6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) kapsamında veri sorumlusu ${schoolName} olarak, okul içi dijital pano ve mobil uygulama (Okulyayın) aracılığıyla işlenen kişisel verileriniz hakkında sizi bilgilendiririz.
 
 # Hangi veriler işlenir
 - Öğretmen ve personel: ad soyad, branş ve unvan, nöbet yeri ve günleri, ders programı, izin tarihleri, panel kullanıcılarının e-posta adresi ve işlem kayıtları
@@ -82,7 +82,7 @@ export function privacyTemplate(schoolName: string, dataRegion: string): string 
 Veriler KVKK'nın 5. maddesindeki kanunlarda açıkça öngörülme, veri sorumlusunun hukuki yükümlülüğü ve meşru menfaati sebeplerine dayanılarak; öğrenci fotoğrafı ve başarı paylaşımı ise velinin açık rızasıyla işlenir. Açık rıza her zaman geri alınabilir.
 
 # Saklama ve aktarım
-Veriler ${dataRegion} sunucularında saklanır ve okul dışındaki kişilerle paylaşılmaz. Panolar okul binası içinde gösterilir. Hizmet sağlayıcı (Panokul) verileri yalnızca okul adına, veri işleyen olarak işler. İçerikler yayın süresi bitince panodan kalkar; okulun aboneliği sona erdiğinde veriler silinir.
+Veriler ${dataRegion} sunucularında saklanır ve okul dışındaki kişilerle paylaşılmaz. Panolar okul binası içinde gösterilir. Hizmet sağlayıcı (Okulyayın) verileri yalnızca okul adına, veri işleyen olarak işler. İçerikler yayın süresi bitince panodan kalkar; okulun aboneliği sona erdiğinde veriler silinir.
 
 # Toplama yöntemi
 Veriler okul idaresince yönetim paneline elektronik ortamda girilerek ya da Excel dosyasıyla aktarılarak toplanır.
@@ -113,7 +113,7 @@ export async function privacyRoutes(app: FastifyInstance) {
       .type('text/html; charset=utf-8')
       .send(`<!doctype html>
 <html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(school?.name ?? 'Panokul')} · Aydınlatma Metni</title>
+<title>${esc(school?.name ?? 'Okulyayın')} · Aydınlatma Metni</title>
 <style>
 body{margin:0;background:#f3f6f8;color:#0f172a;font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 main{max-width:760px;margin:0 auto;padding:32px 20px 64px}
@@ -121,7 +121,7 @@ article{background:#fff;border:1px solid #e2e8ee;border-radius:16px;padding:24px
 h2{font-size:19px;margin:24px 0 8px}h2:first-child{margin-top:0;font-size:23px}
 ul{padding-left:22px}footer{margin-top:16px;color:#475569;font-size:13px;text-align:center}
 </style></head>
-<body><main><article>${body}</article><footer>Panokul</footer></main></body></html>`);
+<body><main><article>${body}</article><footer>Okulyayın</footer></main></body></html>`);
   });
 
   app.get('/api/schools/:schoolId/privacy-template', { preHandler: [app.authenticate, schoolGuard('settings.manage')] }, async (req) => ({

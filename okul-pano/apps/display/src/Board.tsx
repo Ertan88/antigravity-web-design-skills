@@ -308,7 +308,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         <div className="splash">
           <BrandMark size={120} className="splash-mark" />
           <div className="splash-title">{school.name}</div>
-          <div className="splash-sub">Panokul deneme süresi sona erdi. Okul yönetimi panelden aboneliği başlatabilir.</div>
+          <div className="splash-sub">Okulyayın deneme süresi sona erdi. Okul yönetimi panelden aboneliği başlatabilir.</div>
         </div>
       </Stage>
     );

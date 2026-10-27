@@ -38,7 +38,7 @@ const schema = z.object({
   SMTP_PORT: z.coerce.number().int().default(587),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
-  SMTP_FROM: z.string().default('Panokul <bildirim@panokul.local>'),
+  SMTP_FROM: z.string().default('Okulyayın <bildirim@okulyayin.local>'),
   /**
    * Mobil uygulamaya telefon bildirimi (Expo push servisi). 'off': gönderilmez;
    * 'memory': testler için yalnızca bellekte tutulur.

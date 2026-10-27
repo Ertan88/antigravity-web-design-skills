@@ -5,7 +5,7 @@ import { useAuth } from '../src/auth.tsx';
 import { colors } from '../src/theme.ts';
 import { Button, Card, Field, Icon, Screen, T } from '../src/ui.tsx';
 
-/** Logodaki marka rengi (pano + okul'un ortak "o" harfi) */
+/** Logodaki marka rengi (yazı logosunda "yayın") */
 const BRAND = '#0E5E66';
 
 /**
@@ -26,7 +26,7 @@ export default function Login() {
     setError(null);
     if (!server.trim()) {
       setEditServer(true);
-      return setError('Sunucu adresini yazın (Panokul panelini açtığınız adres).');
+      return setError('Sunucu adresini yazın (Okulyayın panelini açtığınız adres).');
     }
     setBusy(true);
     try {
@@ -44,7 +44,7 @@ export default function Login() {
         <View style={{ alignItems: 'center', gap: 10 }}>
           <Image source={require('../assets/icon.png')} style={{ width: 76, height: 76, borderRadius: 20 }} accessibilityIgnoresInvertColors />
           <Text style={{ fontSize: 30, fontWeight: '800', letterSpacing: -0.6, color: colors.ink }} accessibilityRole="header">
-            pan<Text style={{ color: BRAND }}>o</Text>kul
+            okul<Text style={{ color: BRAND }}>yayın</Text>
           </Text>
           <T color={colors.muted} style={{ textAlign: 'center' }}>
             Panel hesabınızla giriş yapın. Hesabınız yoksa okul yöneticinizden isteyin.
@@ -61,7 +61,7 @@ export default function Login() {
               autoCorrect={false}
               keyboardType="url"
               placeholder="ör. pano.okulunuz.k12.tr"
-              help="Panokul panelini açtığınız adres"
+              help="Okulyayın panelini açtığınız adres"
             />
           )}
           <Field label="E-posta" value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" textContentType="username" />
@@ -101,7 +101,7 @@ export default function Login() {
             style={{ alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 }}
           >
             <Text style={{ color: colors.muted, fontSize: 13, textAlign: 'center' }}>
-              Okulunuz Panokul kullanmıyor mu? <Text style={{ color: colors.primary, fontWeight: '700' }}>Web'den ücretsiz deneyin</Text>
+              Okulunuz Okulyayın kullanmıyor mu? <Text style={{ color: colors.primary, fontWeight: '700' }}>Web'den ücretsiz deneyin</Text>
             </Text>
           </Pressable>
         )}

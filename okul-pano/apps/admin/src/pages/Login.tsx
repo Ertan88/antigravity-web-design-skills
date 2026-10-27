@@ -67,7 +67,7 @@ export function Login() {
             Duyurular, zil saatleri, nöbetçi öğretmenler ve sınav sayaçları; değişiklik yaptığınız anda koridordaki her ekranda.
           </p>
         </div>
-        <div className="relative text-xs text-slate-500">© {new Date().getFullYear()} Panokul</div>
+        <div className="relative text-xs text-slate-500">© {new Date().getFullYear()} Okulyayın</div>
       </div>
 
       <div className="flex items-center justify-center px-6 py-12">
@@ -112,7 +112,7 @@ export function Login() {
           </Button>
           {signup.data && signup.data.mode !== 'closed' && (
             <p className="border-t border-slate-200/70 pt-5 text-center text-sm text-slate-500">
-              Okulunuz Panokul kullanmıyor mu?{' '}
+              Okulunuz Okulyayın kullanmıyor mu?{' '}
               <Link to="/kayit" className="font-semibold text-brand-600">
                 {signup.data.trialDays} gün ücretsiz deneyin
               </Link>

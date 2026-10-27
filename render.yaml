@@ -41,7 +41,7 @@ services:
       - key: SIGNUP_MODE
         value: open
       # E-posta: Render'ın ücretsiz sunucusu SMTP portlarını kapatır, bu yüzden Brevo'nun HTTPS API'si kullanılır.
-      # brevo.com'da API anahtarı oluşturun; gönderen adresi Brevo'da doğrulanmış olmalı: "Panokul <adres@alanadi.com>"
+      # brevo.com'da API anahtarı oluşturun; gönderen adresi Brevo'da doğrulanmış olmalı: "Okulyayın <adres@alanadi.com>"
       - key: BREVO_API_KEY
         sync: false
       - key: SMTP_FROM
