@@ -114,13 +114,14 @@ describe('okul hayatı kartları', () => {
     const soon = new Date(Date.now() + 3 * 86400_000).toISOString().slice(0, 10);
     const far = new Date(Date.now() + 60 * 86400_000).toISOString().slice(0, 10);
     expectStatus(await owner.post(path('events'), { title: 'Satranç turnuvası', organizer: 'Satranç Kulübü', date: soon, time: '14:00', place: 'Kütüphane' }), 201);
+    // Uzak tarihli etkinlik de gösterilir (yaklaşan bütün etkinlikler); geçmiş olan gösterilmez
     expectStatus(await owner.post(path('events'), { title: 'Uzak etkinlik', date: far }), 201);
     expectStatus(await owner.post(path('books'), { title: 'Çalıkuşu', author: 'Reşat Nuri Güntekin' }), 201);
     expect((await editor.post(path('books'), { title: 'X', author: 'Y' })).statusCode).toBe(403);
 
     const s = await state(hol.token);
     expect(s.achievements[0]).toMatchObject({ kind: 'month', name: 'Elif Yılmaz' });
-    expect(s.events.map((e: { title: string }) => e.title)).toEqual(['Satranç turnuvası']);
+    expect(s.events.map((e: { title: string }) => e.title)).toEqual(['Satranç turnuvası', 'Uzak etkinlik']);
     expect(s.books[0]).toMatchObject({ title: 'Çalıkuşu', author: 'Reşat Nuri Güntekin' });
   });
 });
