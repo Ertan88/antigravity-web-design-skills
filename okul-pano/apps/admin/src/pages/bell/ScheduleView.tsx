@@ -1,6 +1,6 @@
-import { computeBellStatus, parseClock, periodLabel, pickSchedule, sortPeriods, WEEKDAY_NAMES, WEEKDAY_SHORT, type Period } from '@okulpano/shared';
+import { computeBellStatus, halfDayPeriods, parseClock, periodLabel, pickSchedule, sortPeriods, WEEKDAY_NAMES, WEEKDAY_SHORT, zonedParts, type Period } from '@okulpano/shared';
 import clsx from 'clsx';
-import { BellRing, Clock, Coffee, CopyPlus, Pencil, Sunrise, Sunset, Utensils } from 'lucide-react';
+import { BellRing, CalendarOff, Clock, Coffee, CopyPlus, Pencil, Sunrise, Sunset, Utensils } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { DeleteButton } from '../../components/ui.tsx';
 import type { BellSchedule } from '../../lib/data.ts';
@@ -32,19 +32,35 @@ function duration(sec: number): string {
 }
 const clock = (sec: number) => `${String(Math.floor(sec / 3600)).padStart(2, '0')}:${String(Math.floor((sec % 3600) / 60)).padStart(2, '0')}`;
 
-/** Yerel saatle güncellenen "şu an" (yalnızca vurgu için) */
-export function useNow() {
-  const read = () => {
-    const d = new Date();
-    return { weekday: ((d.getDay() + 6) % 7) + 1, sec: d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds() };
-  };
-  const [now, setNow] = useState(read);
+/** Okulun saat dilimine göre "şu an": tarayıcının saat dilimi farklı olsa da panodaki zil ile aynı an */
+export function useNow(timeZone = 'Europe/Istanbul') {
+  const [, setTick] = useState(0);
   useEffect(() => {
-    const t = setInterval(() => setNow(read()), 1000);
+    const t = setInterval(() => setTick((x) => x + 1), 1000);
     return () => clearInterval(t);
   }, []);
-  return now;
+  const p = zonedParts(new Date(), timeZone);
+  return { weekday: p.weekday, sec: p.secondsOfDay, iso: p.isoDate };
 }
+
+/** Seçili günün takvim bilgisi: tarih, tatil / arife ve bugün bu çizelge mi geçerli */
+export interface DayContext {
+  date: string;
+  /** Tam gün tatil adı (resmî / dini ya da okulun tatili) */
+  holiday: string | null;
+  /** Arife (yarım gün) adı */
+  halfDay: string | null;
+  /** Arifede son zil */
+  endsAt: string;
+  /** Bugün ve bu çizelge geçerli: canlı vurgu yapılır */
+  live: boolean;
+}
+
+const weekdayOf = (iso: string) => ((new Date(`${iso}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
+
+const DAY_MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+/** "2026-10-29" -> "29 Ekim" */
+export const shortDate = (iso: string) => `${Number(iso.slice(8))} ${DAY_MONTHS[Number(iso.slice(5, 7)) - 1]}`;
 
 /** Haftanın 7 günü ve her güne düşen çizelge (panoda da aynı kural: listede ilk eşleşen) */
 export function WeekCoverage({
@@ -52,12 +68,15 @@ export function WeekCoverage({
   day,
   today,
   onDay,
+  info,
 }: {
   schedules: BellSchedule[];
   /** Seçili gün */
   day: number;
   today: number;
   onDay: (d: number) => void;
+  /** Haftanın günlerine düşen tarih ve tatil / arife bilgisi (Tatiller ve arifeler listesinden) */
+  info?: Record<number, { date: string; holiday: string | null; halfDay: string | null; endsAt: string }>;
 }) {
   // Hafta sonu yalnızca bir çizelgede seçiliyse gösterilir
   const days = [1, 2, 3, 4, 5, ...[6, 7].filter((d) => schedules.some((x) => x.weekdays.includes(d)))];
@@ -67,6 +86,9 @@ export function WeekCoverage({
         const s = pickSchedule(schedules, d);
         const sorted = s ? sortPeriods(s.periods) : [];
         const active = d === day;
+        const di = info?.[d];
+        // Arifede son ders son zilde biter
+        const shown = s && di?.halfDay ? halfDayPeriods(s.periods, di.endsAt) : sorted;
         return (
           <button
             key={d}
@@ -83,15 +105,26 @@ export function WeekCoverage({
               <span className="sm:hidden">{WEEKDAY_SHORT[d]}</span>
               <span className="hidden sm:inline">{WEEKDAY_NAMES[d]}</span>
               {d === today && <span className={clsx('size-1.5 rounded-full', active ? 'bg-white' : 'bg-brand-500')} title="Bugün" />}
+              {di && <span className={clsx('ml-auto hidden font-medium tabular-nums lg:inline', active ? 'text-white/75' : 'text-slate-400')}>{shortDate(di.date)}</span>}
             </div>
-            {s && sorted.length ? (
+            {di?.holiday ? (
+              <>
+                <div className={clsx('mt-0.5 text-sm font-bold', active ? 'text-white' : 'text-rose-600')}>Tatil</div>
+                <div className={clsx('hidden truncate text-[11px] sm:block', active ? 'text-white/80' : 'text-rose-500')} title={di.holiday}>
+                  {di.holiday}
+                </div>
+              </>
+            ) : s && sorted.length ? (
               <>
                 <div className={clsx('mt-0.5 truncate text-sm font-bold tabular-nums', active ? 'text-white' : 'text-ink')}>
                   {sorted[0]!.start}
-                  <span className="hidden sm:inline">–{sorted[sorted.length - 1]!.end}</span>
+                  <span className="hidden sm:inline">–{(shown[shown.length - 1] ?? sorted[sorted.length - 1]!).end}</span>
                 </div>
-                <div className={clsx('hidden truncate text-[11px] sm:block', active ? 'text-white/75' : 'text-slate-500')}>
-                  {sorted.length} ders · {s.name}
+                <div
+                  className={clsx('hidden truncate text-[11px] sm:block', di?.halfDay ? (active ? 'font-semibold text-amber-200' : 'font-semibold text-amber-600') : active ? 'text-white/75' : 'text-slate-500')}
+                  title={di?.halfDay ?? undefined}
+                >
+                  {di?.halfDay ? `Yarım gün · ${di.halfDay}` : `${sorted.length} ders · ${s.name}`}
                 </div>
               </>
             ) : (
@@ -129,6 +162,8 @@ export function ScheduleView({
   schedule,
   editable,
   lunchThresholdMin,
+  day,
+  now,
   onEdit,
   onCopy,
   onDelete,
@@ -136,11 +171,13 @@ export function ScheduleView({
   schedule: BellSchedule;
   editable: boolean;
   lunchThresholdMin: number;
+  /** Seçili günün tarihi ve tatil / arife bilgisi */
+  day: DayContext;
+  now: ReturnType<typeof useNow>;
   onEdit: () => void;
   onCopy: () => void;
   onDelete: () => void;
 }) {
-  const now = useNow();
   const segs = segments(schedule.periods, lunchThresholdMin);
   const lessons = segs.filter((s): s is Extract<Segment, { kind: 'lesson' }> => s.kind === 'lesson');
   const gaps = segs.filter((s) => s.kind !== 'lesson');
@@ -151,8 +188,14 @@ export function ScheduleView({
   const lessonTotal = lessons.reduce((a, s) => a + s.end - s.start, 0);
   const breakTotal = gaps.filter((s) => s.kind === 'break').reduce((a, s) => a + s.end - s.start, 0);
 
-  const isToday = schedule.weekdays.includes(now.weekday);
-  const status = isToday ? computeBellStatus(schedule.periods, now.sec, lunchThresholdMin) : null;
+  // O gün çalan dersler: tatilde hiç, arifede son zile kadar (panodaki hesapla aynı)
+  const effective = day.holiday ? [] : day.halfDay ? halfDayPeriods(schedule.periods, day.endsAt) : sortPeriods(schedule.periods);
+  const effByNo = new Map(effective.map((p) => [p.no, p]));
+  const isToday = day.live;
+  const status = isToday && effective.length ? computeBellStatus(effective, now.sec, lunchThresholdMin) : null;
+  // Arifede son zilden sonrası şeritte taranır
+  const cutPct = day.halfDay ? Math.min(100, Math.max(0, ((parseClock(day.endsAt) - dayStart) / span) * 100)) : null;
+  const off = day.holiday ? 'holiday' : day.halfDay ? 'half' : null;
   const activeStart =
     status?.kind === 'lesson' ? parseClock(status.period.start) : status?.kind === 'break' ? parseClock(status.prev.end) : null;
   const nowPct = isToday && now.sec >= dayStart && now.sec <= dayEnd ? ((now.sec - dayStart) / span) * 100 : null;
@@ -182,11 +225,31 @@ export function ScheduleView({
             <span className="ml-2 size-2.5 rounded-sm bg-amber-400" /> Öğle
           </div>
         </header>
+        {off && (
+          <div
+            className={clsx(
+              'flex items-start gap-3 border-b px-5 py-3 text-sm sm:px-6',
+              off === 'holiday' ? 'border-rose-100 bg-rose-50 text-rose-800' : 'border-amber-100 bg-amber-50 text-amber-900',
+            )}
+          >
+            <CalendarOff className="mt-0.5 size-4 shrink-0" />
+            <span>
+              <b>
+                {shortDate(day.date)} {WEEKDAY_NAMES[weekdayOf(day.date)]}
+                {isToday && ' (bugün)'}: {off === 'holiday' ? day.holiday : day.halfDay}.
+              </b>{' '}
+              {off === 'holiday'
+                ? 'Tam gün tatil; zil çalmaz, dersler yapılmaz.'
+                : `Yarım gün; son zil ${day.endsAt}. Bu saatten sonra başlayan dersler yapılmaz, taşan ders son zilde biter.`}{' '}
+              <span className="opacity-75">Bilgi sayfanın altındaki Tatiller ve arifeler listesinden gelir.</span>
+            </span>
+          </div>
+        )}
 
         {/* Zaman şeridi */}
         <div className="px-5 pt-6 pb-2 sm:px-6">
           <div className="relative">
-            <div className="flex h-14 overflow-hidden rounded-xl bg-slate-100">
+            <div className={clsx('relative flex h-14 overflow-hidden rounded-xl bg-slate-100', off === 'holiday' && 'opacity-35 grayscale')}>
               {segs.map((s, i) => (
                 <div
                   key={i}
@@ -202,7 +265,21 @@ export function ScheduleView({
                   {s.kind === 'lesson' ? <span className="truncate px-1">{s.period.no}</span> : s.kind === 'lunch' ? <Utensils className="size-4" /> : null}
                 </div>
               ))}
+              {cutPct != null && cutPct < 100 && (
+                <div
+                  className="absolute inset-y-0 right-0 flex items-center justify-center bg-[repeating-linear-gradient(135deg,rgba(255,251,235,0.92)_0_8px,rgba(254,243,199,0.92)_8px_16px)] text-xs font-bold text-amber-800"
+                  style={{ left: `${cutPct}%` }}
+                  title={`${day.halfDay}: son zil ${day.endsAt}`}
+                >
+                  <span className="truncate px-2">Öğleden sonra tatil</span>
+                </div>
+              )}
             </div>
+            {off === 'holiday' && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <span className="rounded-full bg-rose-600 px-3 py-1 text-xs font-bold text-white shadow">Tatil · zil çalmaz</span>
+              </div>
+            )}
             {nowPct != null && (
               <div className="pointer-events-none absolute -top-2 -bottom-2 w-0.5 rounded bg-rose-500" style={{ left: `${nowPct}%` }}>
                 <span className="absolute -top-5 left-1/2 -translate-x-1/2 rounded bg-rose-500 px-1.5 text-[10px] font-bold whitespace-nowrap text-white">
@@ -258,30 +335,40 @@ export function ScheduleView({
                     );
                   }
                   const active = activeStart === seg.start && status?.kind === 'lesson';
+                  // Tatilde ya da arifede son zilden sonra: yapılmaz; taşan ders son zilde biter
+                  const held = effByNo.get(seg.period.no);
+                  const cancelled = !held;
+                  const clippedEnd = held && held.end !== seg.period.end ? held.end : null;
                   const progress = active && status?.kind === 'lesson' ? 1 - status.remainingSec / status.totalSec : null;
                   return (
                     <li key={seg.start} className="grid grid-cols-[4.5rem_1.5rem_1fr] items-stretch">
                       <span className="flex flex-col justify-center pr-3 text-right tabular-nums">
-                        <span className={clsx('text-base font-bold', active ? 'text-brand-600' : 'text-ink')}>{seg.period.start}</span>
-                        <span className="text-xs text-slate-400">{seg.period.end}</span>
+                        <span className={clsx('text-base font-bold', active ? 'text-brand-600' : cancelled ? 'text-slate-400 line-through' : 'text-ink')}>{seg.period.start}</span>
+                        {clippedEnd ? (
+                          <span className="text-xs font-semibold text-amber-600">
+                            {clippedEnd} <span className="font-normal text-slate-400 line-through">{seg.period.end}</span>
+                          </span>
+                        ) : (
+                          <span className={clsx('text-xs text-slate-400', cancelled && 'line-through')}>{seg.period.end}</span>
+                        )}
                       </span>
                       <span className="relative flex justify-center">
                         <span className="absolute w-0.5 bg-slate-200" style={{ top: i === 0 ? '50%' : 0, bottom: i === half.length - 1 ? '50%' : 0 }} />
                         <span
                           className={clsx(
                             'relative z-10 my-auto size-3.5 rounded-full ring-4 ring-surface',
-                            active ? 'bg-brand-500' : status && seg.end <= now.sec && isToday ? 'bg-slate-300' : 'bg-brand-300',
+                            active ? 'bg-brand-500' : cancelled ? 'bg-slate-200' : status && seg.end <= now.sec ? 'bg-slate-300' : 'bg-brand-300',
                           )}
                         />
                       </span>
                       <span
                         className={clsx(
                           'my-1 flex min-w-0 items-center gap-3 rounded-xl px-4 py-2.5 ring-1 transition',
-                          active ? 'bg-brand-600 text-white shadow-md ring-brand-600' : 'bg-slate-50/70 ring-slate-200/80',
+                          active ? 'bg-brand-600 text-white shadow-md ring-brand-600' : cancelled ? 'bg-slate-50/40 opacity-60 ring-slate-200/60' : 'bg-slate-50/70 ring-slate-200/80',
                         )}
                       >
                         <span className="min-w-0 flex-1">
-                          <span className={clsx('block truncate text-[15px] font-bold', active ? 'text-white' : 'text-ink')}>{periodLabel(seg.period)}</span>
+                          <span className={clsx('block truncate text-[15px] font-bold', active ? 'text-white' : cancelled ? 'text-slate-500 line-through' : 'text-ink')}>{periodLabel(seg.period)}</span>
                           {progress !== null && (
                             <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-white/25">
                               <span className="block h-full rounded-full bg-white" style={{ width: `${progress * 100}%` }} />
@@ -290,6 +377,12 @@ export function ScheduleView({
                         </span>
                         {active ? (
                           <span className="shrink-0 rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-semibold">Şu an</span>
+                        ) : cancelled ? (
+                          <span className={clsx('shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold', off === 'holiday' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800')}>
+                            {off === 'holiday' ? 'Tatil' : 'Yapılmaz'}
+                          </span>
+                        ) : clippedEnd ? (
+                          <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">{duration(parseClock(clippedEnd) - seg.start)} · kısaldı</span>
                         ) : (
                           <span className="shrink-0 text-xs font-medium text-slate-400">{duration(seg.end - seg.start)}</span>
                         )}
@@ -308,12 +401,32 @@ export function ScheduleView({
         <div
           className={clsx(
             'rounded-2xl p-5 text-white shadow-sm',
-            status?.kind === 'break' ? 'bg-gradient-to-br from-emerald-500 to-teal-600' : 'bg-gradient-to-br from-brand-500 to-brand-600',
+            off === 'holiday'
+              ? 'bg-gradient-to-br from-rose-500 to-rose-600'
+              : status?.kind === 'break'
+                ? 'bg-gradient-to-br from-emerald-500 to-teal-600'
+                : off === 'half' && (!isToday || status?.kind === 'after')
+                  ? 'bg-gradient-to-br from-amber-500 to-orange-600'
+                  : 'bg-gradient-to-br from-brand-500 to-brand-600',
           )}
         >
           <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-white/75 uppercase">
-            <BellRing className="size-4" /> {isToday ? 'Şu an' : 'Bugün geçerli değil'}
+            <BellRing className="size-4" /> {isToday ? 'Şu an' : off ? `${shortDate(day.date)} ${WEEKDAY_NAMES[weekdayOf(day.date)]}` : 'Bugün geçerli değil'}
           </div>
+          {off === 'holiday' && (
+            <>
+              <div className="mt-2 text-2xl font-bold">{isToday ? 'Bugün tatil' : 'Tatil'}</div>
+              <div className="mt-1 text-sm text-white/90">{day.holiday}</div>
+              <div className="mt-1 text-sm text-white/75">Zil çalmaz, dersler yapılmaz.</div>
+            </>
+          )}
+          {off === 'half' && !isToday && (
+            <>
+              <div className="mt-2 text-2xl font-bold">Yarım gün</div>
+              <div className="mt-1 text-sm text-white/90">{day.halfDay}</div>
+              <div className="mt-1 text-sm text-white/75">Son zil {day.endsAt} · {effective.length} ders yapılır</div>
+            </>
+          )}
           {status?.kind === 'lesson' && (
             <>
               <div className="mt-2 text-2xl font-bold">{periodLabel(status.period)}</div>
@@ -334,8 +447,14 @@ export function ScheduleView({
               <div className="text-sm text-white/80">İlk ders {status.next.start}'de · {duration(status.remainingSec)} sonra</div>
             </>
           )}
-          {status?.kind === 'after' && <div className="mt-2 text-2xl font-bold">Dersler bitti</div>}
-          {!isToday && <div className="mt-2 text-sm text-white/85">Bu çizelge {schedule.weekdays.map((d) => WEEKDAY_SHORT[d]).join(', ')} günleri kullanılır.</div>}
+          {status?.kind === 'after' && (
+            <>
+              <div className="mt-2 text-2xl font-bold">{off === 'half' ? 'Öğleden sonra tatil' : 'Dersler bitti'}</div>
+              {off === 'half' && <div className="mt-1 text-sm text-white/90">{day.halfDay} · son zil {day.endsAt}</div>}
+            </>
+          )}
+          {status && off === 'half' && status.kind !== 'after' && <div className="mt-2 text-sm text-white/85">Yarım gün: son zil {day.endsAt}</div>}
+          {!isToday && !off && <div className="mt-2 text-sm text-white/85">Bu çizelge {schedule.weekdays.map((d) => WEEKDAY_SHORT[d]).join(', ')} günleri kullanılır.</div>}
           {status && (status.kind === 'lesson' || status.kind === 'break') && (
             <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/25">
               <div className="h-full rounded-full bg-surface" style={{ width: `${(1 - status.remainingSec / status.totalSec) * 100}%` }} />
@@ -344,9 +463,10 @@ export function ScheduleView({
         </div>
 
         <div className="rounded-2xl bg-surface px-5 py-3 shadow-sm ring-1 ring-slate-200/70">
-          <Stat icon={<BellRing className="size-4" />} label="Ders sayısı" value={`${lessons.length}`} />
+          <Stat icon={<BellRing className="size-4" />} label={off ? 'Bu gün yapılan ders' : 'Ders sayısı'} value={off ? `${effective.length} / ${lessons.length}` : `${lessons.length}`} />
           <Stat icon={<Sunrise className="size-4" />} label="İlk ders" value={segs.length ? clock(dayStart) : '—'} />
           <Stat icon={<Sunset className="size-4" />} label="Son zil" value={segs.length ? clock(dayEnd) : '—'} />
+          {off === 'half' && <Stat icon={<CalendarOff className="size-4" />} label="Arifede son zil" value={day.endsAt} tone="amber" />}
           <Stat icon={<Clock className="size-4" />} label="Toplam ders" value={duration(lessonTotal)} />
           <Stat icon={<Coffee className="size-4" />} label="Toplam teneffüs" value={duration(breakTotal)} tone="emerald" />
           <Stat icon={<Utensils className="size-4" />} label="Öğle arası" value={lunch ? `${clock(lunch.start)} · ${duration(lunch.end - lunch.start)}` : 'Yok'} tone="amber" />

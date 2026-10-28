@@ -75,7 +75,9 @@ export async function holidayRoutes(app: FastifyInstance) {
    */
   app.get(`${base}/upcoming`, read, async (req) => {
     const today = zonedParts(new Date(), req.ctx.school.timezone).isoDate;
-    return upcomingHolidays(db, req.ctx.schoolId, today, 150);
+    // Zil Saatleri'ndeki hafta şeridi için başlangıç (bu haftanın pazartesisi) ve gün sayısı verilebilir
+    const q = parse(z.object({ from: z.iso.date().optional(), days: z.coerce.number().int().min(1).max(200).default(150) }), req.query ?? {});
+    return upcomingHolidays(db, req.ctx.schoolId, q.from ?? today, q.days);
   });
 
   app.post(base, write, async (req, reply) => {

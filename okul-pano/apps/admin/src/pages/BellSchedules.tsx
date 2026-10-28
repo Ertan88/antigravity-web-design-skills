@@ -1,10 +1,10 @@
-import { bellScheduleSchema, generatePeriods, pickSchedule, WEEKDAY_NAMES, zonedParts, type Period } from '@okulpano/shared';
+import { bellScheduleSchema, generatePeriods, pickSchedule, WEEKDAY_NAMES, addIsoDays, type Period } from '@okulpano/shared';
 import { BellRing, Plus, Trash2, Wand2 } from 'lucide-react';
 import { useState } from 'react';
 import { Alert, Button, Card, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Spinner, WeekdayPicker } from '../components/ui.tsx';
 import { useAuth } from '../lib/auth.tsx';
 import { useList, useResource, useSchool, type BellSchedule } from '../lib/data.ts';
-import { HolidaysCard, useUpcomingHolidays } from './bell/HolidaysCard.tsx';
+import { HolidaysCard, useUpcomingHolidays, useWeekHolidays } from './bell/HolidaysCard.tsx';
 import { ScheduleView, useNow, WeekCoverage } from './bell/ScheduleView.tsx';
 import { useForm } from '../lib/form.ts';
 
@@ -162,7 +162,8 @@ export function BellSchedules() {
   const form = useForm<Form>({ name: '', weekdays: [1, 2, 3, 4, 5], periods: [] });
   const [editing, setEditing] = useState<BellSchedule | null>(null);
   const [open, setOpen] = useState(false);
-  const now = useNow();
+  const tz = school.data?.timezone ?? 'Europe/Istanbul';
+  const now = useNow(tz);
   // Seçili gün: o gün geçerli olan çizelge gösterilir (varsayılan bugün, hafta sonuysa pazartesi)
   const [day, setDay] = useState(() => (now.weekday <= 5 ? now.weekday : 1));
   // Belirli bir çizelge sekmesinden seçilmişse o gösterilir
@@ -172,7 +173,33 @@ export function BellSchedules() {
 
   // Bugün arife ya da tatilse çizelgenin üstünde not: panoda zil buna göre çalar
   const upcoming = useUpcomingHolidays();
-  const todayIso = zonedParts(new Date(), school.data?.timezone ?? 'Europe/Istanbul').isoDate;
+  const todayIso = now.iso;
+
+  // Hafta şeridi: bu hafta (hafta sonu ders yoksa gelecek hafta). Tatil ve arifeler Tatiller ve arifeler listesinden gelir
+  const weekendClass = now.weekday >= 6 && !pickSchedule(schedules, now.weekday);
+  const monday = addIsoDays(todayIso, weekendClass ? 8 - now.weekday : 1 - now.weekday);
+  const week = useWeekHolidays(monday);
+  const halfEndSetting = school.data?.settings.halfDayEnd ?? '13:00';
+  const weekInfo = Object.fromEntries(
+    [1, 2, 3, 4, 5, 6, 7].map((d) => {
+      const date = addIsoDays(monday, d - 1);
+      return [
+        d,
+        {
+          date,
+          holiday: week.data?.holidays.find((h) => h.date === date)?.name ?? null,
+          halfDay: week.data?.halfDays.find((h) => h.date === date)?.name ?? null,
+          endsAt: halfEndSetting,
+        },
+      ];
+    }),
+  );
+  const selectedDay = weekInfo[day]!;
+  const dayContext = {
+    ...selectedDay,
+    // Canlı vurgu yalnızca bugün ve bugün gerçekten bu çizelge geçerliyse (ör. cuma günü "Cuma" çizelgesi varken "Hafta içi" değil)
+    live: selectedDay.date === todayIso && Boolean(selected) && pickSchedule(schedules, now.weekday)?.id === selected?.id,
+  };
   const halfToday = upcoming.data?.halfDays.find((h) => h.date === todayIso);
   const holidayToday = upcoming.data?.holidays.find((h) => h.date === todayIso);
   const halfEnd = school.data?.settings.halfDayEnd ?? '13:00';
@@ -271,7 +298,8 @@ export function BellSchedules() {
               <WeekCoverage
                 schedules={schedules}
                 day={day}
-                today={now.weekday}
+                today={monday <= todayIso && todayIso <= addIsoDays(monday, 6) ? now.weekday : 0}
+                info={weekInfo}
                 onDay={(d) => {
                   setDay(d);
                   setForcedId(null);
@@ -295,6 +323,8 @@ export function BellSchedules() {
               schedule={selected}
               editable={editable}
               lunchThresholdMin={school.data?.settings.lunchThresholdMin ?? 30}
+              day={dayContext}
+              now={now}
               onEdit={() => openEditor(selected)}
               onCopy={() => openCopy(selected)}
               onDelete={() => {

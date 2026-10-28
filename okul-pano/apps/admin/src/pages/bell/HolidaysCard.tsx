@@ -26,6 +26,17 @@ export function useUpcomingHolidays() {
   });
 }
 
+/** Bir haftanın tatil ve arifeleri (Zil Saatleri'ndeki gün şeridi için; geçmiş günler dahil) */
+export function useWeekHolidays(monday: string) {
+  const { schoolId } = useAuth();
+  const path = useSchoolPath('holidays');
+  return useQuery({
+    queryKey: [schoolId, 'holidays', 'week', monday],
+    queryFn: () => api<Upcoming>(`${path}/upcoming?from=${monday}&days=6`),
+    enabled: Boolean(schoolId),
+  });
+}
+
 type Row =
   | { kind: 'holiday'; date: string; name: string; id: string | null; source: 'official' | 'school' }
   | { kind: 'half'; date: string; name: string }
