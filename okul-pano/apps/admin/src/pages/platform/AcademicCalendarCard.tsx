@@ -117,7 +117,7 @@ export function AcademicCalendarCard() {
     editing && setEditing({ ...editing, data: { ...editing.data, breaks: editing.data.breaks.map((b, j) => (j === i ? { ...b, ...patch } : b)) } });
 
   return (
-    <Card className="mt-6">
+    <Card>
       <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-5 py-4">
         <span className="flex size-9 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
           <CalendarRange className="size-4" />

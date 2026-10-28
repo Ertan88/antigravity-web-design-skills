@@ -10,7 +10,6 @@ import { useAuth } from '../lib/auth.tsx';
 import type { School } from '../lib/data.ts';
 import { useForm } from '../lib/form.ts';
 import { formatDate, formatDateTime, slugify } from '../lib/format.ts';
-import { AcademicCalendarCard } from './platform/AcademicCalendarCard.tsx';
 
 type Row = School & {
   screenCount: number;
@@ -260,8 +259,6 @@ export function Platform() {
           </Table>
         )}
       </Card>
-
-      <AcademicCalendarCard />
 
       <Modal
         open={deleting !== null}

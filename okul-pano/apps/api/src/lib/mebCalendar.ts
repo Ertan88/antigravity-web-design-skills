@@ -101,7 +101,7 @@ export async function scanMebCalendar(deps: AppDeps, startYear: number, opts: { 
 
     if (!row) {
       await deps.db.insert(academicCalendars).values({ startYear, data, source: 'meb', sourceUrl: url, status: 'review', checkedAt: now });
-      await tellPlatform(deps, `meb-calendar:${startYear}:found`, `${label} çalışma takvimi işlendi`, `MEB duyurusundan okundu ve okulların tatillerine eklendi. Platform › MEB çalışma takviminden kontrol edin.`);
+      await tellPlatform(deps, `meb-calendar:${startYear}:found`, `${label} çalışma takvimi işlendi`, `MEB duyurusundan okundu ve okulların tatillerine eklendi. Platform › MEB Çalışma Takvimi'nden kontrol edin.`);
       return { outcome: 'saved', url, data, message: `${label} takvimi MEB duyurusundan okundu ve uygulandı.` };
     }
     if (same(row.data, data)) {
@@ -116,7 +116,7 @@ export async function scanMebCalendar(deps: AppDeps, startYear: number, opts: { 
       .update(academicCalendars)
       .set({ status: 'review', pending: { data, sourceUrl: url, foundAt: now.toISOString() }, checkedAt: now })
       .where(eq(academicCalendars.startYear, startYear));
-    await tellPlatform(deps, `meb-calendar:${startYear}:diff:${canon(data)}`, `${label} çalışma takviminde fark var`, `MEB duyurusundaki tarihler sistemdekinden farklı. Platform › MEB çalışma takviminden inceleyip onaylayın.`);
+    await tellPlatform(deps, `meb-calendar:${startYear}:diff:${canon(data)}`, `${label} çalışma takviminde fark var`, `MEB duyurusundaki tarihler sistemdekinden farklı. Platform › MEB Çalışma Takvimi'nden inceleyip onaylayın.`);
     return { outcome: 'review', url, data, message: `${label}: MEB duyurusu sistemdeki takvimden farklı; onayınızı bekliyor.` };
   }
   if (row) await deps.db.update(academicCalendars).set({ checkedAt: now }).where(eq(academicCalendars.startYear, startYear));
@@ -131,7 +131,7 @@ export async function scanMebCalendar(deps: AppDeps, startYear: number, opts: { 
 /** Platform yöneticilerine: bildirim kutusu ve telefon */
 async function tellPlatform(deps: AppDeps, key: string, title: string, body: string) {
   const admins = (await deps.db.select({ id: users.id }).from(users).where(eq(users.isSuperAdmin, true))).map((u) => u.id);
-  await addToInbox(deps.db, admins, { key, kind: 'meb-calendar', title, body, to: '/platform' });
+  await addToInbox(deps.db, admins, { key, kind: 'meb-calendar', title, body, to: '/platform/takvim' });
   notifyUsers(deps, admins, { title, body });
 }
 
@@ -154,7 +154,7 @@ export async function runMebCalendarJob(deps: AppDeps, now = new Date()) {
     lastTry.set(year, now.getTime());
     const result = await scanMebCalendar(deps, year, { now });
     if (result.outcome === 'not-found' && !row && today >= `${year}-08-25`) {
-      await tellPlatform(deps, `meb-calendar:${year}:missing`, `${academicYearLabel(year)} çalışma takvimi bulunamadı`, 'MEB duyurusu otomatik okunamadı. Platform › MEB çalışma takviminden tarihleri elle girin ya da duyuru adresini verin.');
+      await tellPlatform(deps, `meb-calendar:${year}:missing`, `${academicYearLabel(year)} çalışma takvimi bulunamadı`, "MEB duyurusu otomatik okunamadı. Platform › MEB Çalışma Takvimi'nden tarihleri elle girin ya da duyuru adresini verin.");
     }
   }
 }
