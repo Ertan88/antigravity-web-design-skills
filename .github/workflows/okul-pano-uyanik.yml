@@ -1,0 +1,24 @@
+# Okul Yayın sunucusunu uyanık tutar: Render'ın ücretsiz planı 15 dakika ziyaret almayan servisi uyutur,
+# ilk açılışta "Application loading" ekranı çıkar. Her 10 dakikada bir sağlık adresine istek gönderilir.
+# Adres GitHub › Settings › Secrets and variables › Actions › Variables altındaki PANOKUL_API_URL'den alınır.
+# Ücretli plana geçince bu dosya silinebilir.
+name: Okul Pano · Sunucuyu uyanık tut
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Sağlık adresine istek
+        env:
+          URL: ${{ vars.PANOKUL_API_URL || 'https://okul-pano.onrender.com' }}
+        # Uyanması bir dakikayı bulabilir; bir kez yeniden denenir. Başarısızlık iş akışını kırmızıya çevirmez.
+        run: |
+          curl -fsS -m 120 "$URL/api/health" || { sleep 20; curl -fsS -m 120 "$URL/api/health"; } || echo "Sunucu yanıt vermedi"
