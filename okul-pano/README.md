@@ -141,6 +141,10 @@ Panel `https://alanadiniz/admin/`, pano `https://alanadiniz/display/`, mobil uyg
   "Sıradaki Ders" tatilden sonraki ilk ders gününü gösterir. Arifede (Ramazan, Kurban, Cumhuriyet Bayramı) dersler okulun
   belirlediği son zilde (varsayılan 13:00) biter. Bayrama bitişik 1–2 iş günü "olası köprü günü" olarak önerilir; idari izin
   ilan edilirse tek tıkla tatil yapılır.
+- **MEB çalışma takvimi** (Platform › MEB çalışma takvimi): eğitim yılı 1 Eylül'de başlar. MEB takvimi her yıl haziran ortasından
+  itibaren yayımlar; sunucu haziran başından itibaren günde bir kez MEB'in sitesini (`MEB_INDEX_URLS`) tarar, duyuruyu bulunca ara
+  tatil, yarıyıl ve yaz tatilini bütün okullara işler ve platform yöneticisine bildirir. Taranan tarihler öncekinden farklıysa
+  onay bekler; bulunamazsa tarihler elle girilir. Okul, Zil Saatleri › Tatiller ve arifeler'den MEB takvimini kapatabilir.
 - **Bildirimler** (panelde sağ üstteki zil › Tüm bildirimler; mobilde Bildirimler): okunanlar da 180 gün saklanır, okundu
   bilgisi her cihazda aynıdır. İşi biten bildirimler (duyuru onaylandı, nöbet dolduruldu) "Tamamlandı" olarak geçmişte kalır.
 - **KVKK ve destek erişimi:** platform yöneticisi Platform sayfasında okulların yalnızca abonelik bilgilerini görür; okul verilerine

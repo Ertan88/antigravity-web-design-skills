@@ -1,4 +1,4 @@
-import type { AnnouncementDesign, BoardLayout, EmergencyType, Period, SchoolSettings, ScreenDisplay } from '@okulpano/shared';
+import type { AcademicCalendarData, AnnouncementDesign, BoardLayout, EmergencyType, Period, SchoolSettings, ScreenDisplay } from '@okulpano/shared';
 import { sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
@@ -198,6 +198,25 @@ export const schoolHolidays = pgTable(
   },
   (t) => [uniqueIndex('school_holidays_school_date_uq').on(t.schoolId, t.date)],
 );
+
+/**
+ * MEB eğitim ve öğretim yılı çalışma takvimi (bütün okullar için ortak). Sunucu haziran ortasından itibaren MEB'in
+ * sitesini tarar; bulunca yazar (source 'meb'). Platform yöneticisi düzeltebilir (source 'manual'). 'builtin':
+ * kurulumla gelen veri. status 'review': taranan takvim öncekinden farklı ya da doğrulanmadı.
+ */
+export const academicCalendars = pgTable('academic_calendars', {
+  /** Eğitim yılının başladığı yıl: 2026 -> 2026-2027 */
+  startYear: integer('start_year').primaryKey(),
+  data: jsonb('data').$type<AcademicCalendarData>().notNull(),
+  source: text('source').$type<'meb' | 'manual' | 'builtin'>().notNull(),
+  sourceUrl: text('source_url'),
+  status: text('status').$type<'confirmed' | 'review'>().notNull().default('confirmed'),
+  /** Taranan farklı takvim (onay bekler) */
+  pending: jsonb('pending').$type<{ data: AcademicCalendarData; sourceUrl: string; foundAt: string } | null>(),
+  checkedAt: timestamp('checked_at', { withTimezone: true }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
 
 /** Nöbetçi müdür yardımcısı: tarihe bağlı, okul başına günde bir kayıt */
 export const dutySupervisors = pgTable(

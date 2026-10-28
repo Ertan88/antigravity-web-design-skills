@@ -15,7 +15,7 @@ export function dutyMonthSql(schoolId: string, month: string) {
 }
 
 /** Arife günleri yarım gündür: panoda ve nöbette tatil sayılmaz */
-const realHoliday = (h: { source: 'official' | 'school'; name: string }) => !(h.source === 'official' && h.name.endsWith('Arifesi'));
+const realHoliday = (h: { source: 'official' | 'meb' | 'school'; name: string }) => !(h.source === 'official' && h.name.endsWith('Arifesi'));
 
 /** Tatiller: resmi / dini tatiller ve okulun eklediği tatiller (arife yarım gün, sayılmaz) */
 export async function effectiveHolidays(db: DB, schoolId: string, from: string, to: string) {

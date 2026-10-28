@@ -53,6 +53,7 @@ export const KIND_STYLE: Record<string, { icon: LucideIcon; tone: string }> = {
   'support-revoked': { icon: LockKeyhole, tone: 'bg-slate-200 text-slate-700' },
   'support-expired': { icon: TimerOff, tone: 'bg-slate-200 text-slate-700' },
   'bridge-day': { icon: CalendarDays, tone: 'bg-amber-100 text-amber-700' },
+  'meb-calendar': { icon: CalendarDays, tone: 'bg-emerald-100 text-emerald-700' },
 };
 export const kindStyle = (kind: string) => KIND_STYLE[kind] ?? { icon: Bell, tone: 'bg-slate-100 text-slate-600' };
 

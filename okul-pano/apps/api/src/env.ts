@@ -44,6 +44,8 @@ const schema = z.object({
    * 'memory': testler için yalnızca bellekte tutulur.
    */
   PUSH_URL: z.string().default('https://exp.host/--/api/v2/push/send'),
+  /** MEB çalışma takvimi duyurusunun aranacağı sayfalar (virgülle). Boş bırakılırsa tarama yapılmaz. */
+  MEB_INDEX_URLS: z.string().default('https://www.meb.gov.tr/,https://www.meb.gov.tr/meb_haberindex.php?dil=tr'),
   /** Expo hesabında "push güvenliği" açıksa erişim anahtarı */
   PUSH_ACCESS_TOKEN: z.string().optional().transform((v) => v || undefined),
 });

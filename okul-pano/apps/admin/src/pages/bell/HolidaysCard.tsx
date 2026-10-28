@@ -1,29 +1,38 @@
+import { academicYearOf, semesterBreak, type AcademicCalendarData } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { CalendarDays, CalendarPlus, Plus, Sunset, Trash2 } from 'lucide-react';
+import { CalendarDays, CalendarPlus, GraduationCap, Plus, Sunset, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useToast } from '../../components/Toast.tsx';
-import { Badge, Button, Card, Input } from '../../components/ui.tsx';
+import { Badge, Button, Card, Input, Toggle } from '../../components/ui.tsx';
 import { api } from '../../lib/api.ts';
 import { useAuth } from '../../lib/auth.tsx';
 import { useSchool, useSchoolPath, type School } from '../../lib/data.ts';
 
 interface Upcoming {
-  holidays: { id: string | null; date: string; name: string; source: 'official' | 'school' }[];
+  holidays: { id: string | null; date: string; name: string; source: 'official' | 'meb' | 'school' }[];
   halfDays: { date: string; name: string }[];
   bridges: { date: string; near: string }[];
 }
 
-/** Bugünden itibaren tatiller, arifeler ve olası köprü günleri */
+/** Bugünden eğitim yılının sonuna (30 Haziran) kadar tatiller, arifeler ve olası köprü günleri */
 export function useUpcomingHolidays() {
   const { schoolId } = useAuth();
   const path = useSchoolPath('holidays');
+  const today = new Date().toISOString().slice(0, 10);
+  const days = Math.max(30, Math.round((Date.parse(`${academicYearOf(today) + 1}-06-30`) - Date.parse(today)) / 86400_000));
   return useQuery({
     queryKey: [schoolId, 'holidays', 'upcoming'],
-    queryFn: () => api<Upcoming>(`${path}/upcoming`),
+    queryFn: () => api<Upcoming>(`${path}/upcoming?days=${days}`),
     enabled: Boolean(schoolId),
   });
+}
+
+interface SchoolAcademic {
+  currentYear: number;
+  follow: boolean;
+  years: { startYear: number; label: string; data: AcademicCalendarData; source: 'meb' | 'manual' | 'builtin'; status: 'confirmed' | 'review' }[];
 }
 
 /** Bir haftanın tatil ve arifeleri (Zil Saatleri'ndeki gün şeridi için; geçmiş günler dahil) */
@@ -38,12 +47,36 @@ export function useWeekHolidays(monday: string) {
 }
 
 type Row =
-  | { kind: 'holiday'; date: string; name: string; id: string | null; source: 'official' | 'school' }
+  | { kind: 'holiday'; date: string; name: string; id: string | null; source: 'official' | 'meb' | 'school'; end?: string; days?: number }
   | { kind: 'half'; date: string; name: string }
   | { kind: 'bridge'; date: string; near: string };
 
 const dateText = (iso: string) =>
   new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', weekday: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));
+const shortText = (iso: string) => new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));
+const nextDay = (iso: string) => new Date(Date.parse(`${iso}T12:00:00Z`) + 86400_000).toISOString().slice(0, 10);
+/** "Kurban Bayramı 2. Gün" -> "Kurban Bayramı": aynı tatilin günleri tek satırda */
+const groupName = (name: string) => name.replace(/ \d+\. Gün$/, '');
+
+/** Ardışık, aynı adlı resmî / MEB tatil günlerini tek satırda topla (okulun kendi tatilleri tek tek silinebilir kalır) */
+function groupHolidays(list: Upcoming['holidays']): Extract<Row, { kind: 'holiday' }>[] {
+  const out: Extract<Row, { kind: 'holiday' }>[] = [];
+  for (const h of list) {
+    const last = out[out.length - 1];
+    if (last && h.source !== 'school' && last.source === h.source && groupName(last.name) === groupName(h.name) && nextDay(last.end ?? last.date) === h.date) {
+      last.end = h.date;
+      last.days = (last.days ?? 1) + 1;
+      last.name = groupName(h.name);
+    } else out.push({ kind: 'holiday', ...h });
+  }
+  return out;
+}
+
+const SOURCE_BADGE = {
+  official: { tone: 'red', label: 'Resmî tatil' },
+  meb: { tone: 'green', label: 'MEB takvimi' },
+  school: { tone: 'blue', label: 'Okulun tatili' },
+} as const;
 
 /** Köprü günü tatil yapılınca panoda ve nöbet çizelgesinde görünen ad */
 const BRIDGE_NAME = 'İdari İzin (Köprü Günü)';
@@ -108,7 +141,7 @@ export function HolidaysCard() {
   const halfDates = new Set((list.data?.halfDays ?? []).map((h) => h.date));
   const bridgeDates = new Set((list.data?.bridges ?? []).map((h) => h.date));
   const rows: Row[] = [
-    ...(list.data?.holidays ?? []).map((h) => ({ kind: 'holiday' as const, ...h })),
+    ...groupHolidays(list.data?.holidays ?? []),
     ...(list.data?.halfDays ?? []).map((h) => ({ kind: 'half' as const, ...h })),
     ...(list.data?.bridges ?? []).filter((h) => !halfDates.has(h.date)).map((h) => ({ kind: 'bridge' as const, ...h })),
   ].sort((a, b) => a.date.localeCompare(b.date));
@@ -124,7 +157,7 @@ export function HolidaysCard() {
               </span>
               <div>
                 <h2 className="font-semibold text-ink">Tatiller ve arifeler</h2>
-                <p className="text-sm text-slate-500">Önümüzdeki 5 ay</p>
+                <p className="text-sm text-slate-500">Eğitim yılının sonuna kadar</p>
               </div>
             </div>
             <ul className="space-y-2 text-sm text-slate-600">
@@ -138,6 +171,7 @@ export function HolidaysCard() {
                 <b className="text-ink">Köprü günü:</b> bayram ile hafta sonu arasında kalan iş günü. İdari izin ilan edilirse tatil olarak işaretleyin.
               </li>
             </ul>
+            <AcademicYearBox canSettings={canSettings} />
             <div className="rounded-xl bg-amber-50 p-3 ring-1 ring-amber-200">
               <label htmlFor="half-day-end" className="flex items-center gap-2 text-sm font-semibold text-amber-900">
                 <Sunset className="size-4" /> Arifede son zil
@@ -168,11 +202,14 @@ export function HolidaysCard() {
               <ul className="divide-y divide-slate-100 rounded-xl ring-1 ring-slate-200">
                 {rows.map((r) => (
                   <li key={`${r.kind}-${r.date}`} className={clsx('flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5', r.kind === 'bridge' && 'bg-amber-50/50')}>
-                    <span className="w-44 shrink-0 text-sm font-medium text-slate-700">{dateText(r.date)}</span>
+                    <span className="w-44 shrink-0 text-sm font-medium text-slate-700">
+                      {r.kind === 'holiday' && r.end ? `${shortText(r.date)} – ${shortText(r.end)}` : dateText(r.date)}
+                      {r.kind === 'holiday' && r.days && r.days > 1 && <span className="block text-xs font-normal text-slate-400">{r.days} gün</span>}
+                    </span>
                     <span className="min-w-0 flex-1 text-sm text-ink">
                       {r.kind === 'bridge' ? <span className="text-slate-600">{r.near} tatiline bitişik</span> : r.name}
                     </span>
-                    {r.kind === 'holiday' && <Badge tone={r.source === 'school' ? 'blue' : 'red'}>{r.source === 'school' ? 'Okulun tatili' : 'Tatil'}</Badge>}
+                    {r.kind === 'holiday' && <Badge tone={SOURCE_BADGE[r.source].tone}>{SOURCE_BADGE[r.source].label}</Badge>}
                     {r.kind === 'half' && <Badge tone="amber">Yarım gün · son zil {savedEnd}</Badge>}
                     {r.kind === 'half' && bridgeDates.has(r.date) && <Badge tone="slate">Olası köprü günü</Badge>}
                     {r.kind === 'bridge' && <Badge tone="slate">Olası köprü günü</Badge>}
@@ -221,6 +258,72 @@ export function HolidaysCard() {
           </div>
         </div>
       </Card>
+    </div>
+  );
+}
+
+const MONTHS_SHORT = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+const dm = (iso: string) => `${Number(iso.slice(8))} ${MONTHS_SHORT[Number(iso.slice(5, 7)) - 1]}`;
+
+/**
+ * Eğitim yılının MEB takvimi (bu ve varsa gelecek yıl): ders başlangıcı, ara tatiller, yarıyıl, ders yılı sonu.
+ * Okul "MEB takvimini uygula"yı kapatırsa ara tatil, yarıyıl ve yaz tatili okulda tatil sayılmaz.
+ */
+function AcademicYearBox({ canSettings }: { canSettings: boolean }) {
+  const { schoolId } = useAuth();
+  const path = useSchoolPath('academic-calendar');
+  const schoolPath = useSchoolPath();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const cal = useQuery({ queryKey: [schoolId, 'holidays', 'academic'], queryFn: () => api<SchoolAcademic>(path), enabled: Boolean(schoolId) });
+  const toggle = useMutation({
+    mutationFn: (followMebCalendar: boolean) => api<School>(schoolPath, { method: 'PATCH', body: { settings: { followMebCalendar } } }),
+    onSuccess: (data) => {
+      qc.setQueryData([schoolId, 'school'], data);
+      void qc.invalidateQueries({ queryKey: [schoolId, 'holidays'] });
+      toast.success(data.settings.followMebCalendar ? 'MEB takvimindeki tatiller uygulanıyor' : 'MEB takvimindeki tatiller okulda uygulanmıyor');
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const years = cal.data?.years ?? [];
+  if (!cal.data) return null;
+  return (
+    <div className="rounded-xl bg-emerald-50 p-3 ring-1 ring-emerald-200">
+      <div className="flex items-center gap-2 text-sm font-semibold text-emerald-900">
+        <GraduationCap className="size-4" /> MEB çalışma takvimi
+      </div>
+      {years.length ? (
+        years.map((y) => {
+          const d = y.data;
+          const rows: [string, string][] = [
+            ['Dersler başlar', dm(d.lessonsStart)],
+            ...d.breaks.map((b): [string, string] => [b.name.replace(' Dönem', '.').replace('Birinci.', '1.').replace('İkinci.', '2.'), `${dm(b.start)} – ${dm(b.end)}`]),
+            ['Yarıyıl tatili', `${dm(semesterBreak(d).start)} – ${dm(semesterBreak(d).end)}`],
+            ['Ders yılı biter', dm(d.lessonsEnd)],
+          ];
+          return (
+            <div key={y.startYear} className="mt-2">
+              <div className="text-xs font-bold text-emerald-800">
+                {y.label} eğitim yılı{y.status === 'review' && ' · kontrol ediliyor'}
+              </div>
+              <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 text-xs">
+                {rows.map(([k, v]) => (
+                  <div key={k} className="contents">
+                    <dt className="text-slate-600">{k}</dt>
+                    <dd className="font-semibold text-ink tabular-nums">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          );
+        })
+      ) : (
+        <p className="mt-2 text-xs text-slate-600">Bu eğitim yılının takvimi henüz yayımlanmadı. MEB yayımlayınca kendiliğinden eklenir.</p>
+      )}
+      <div className="mt-3 border-t border-emerald-200 pt-2">
+        <Toggle checked={cal.data.follow} disabled={!canSettings} onChange={(v) => toggle.mutate(v)} label="Ara tatil, yarıyıl ve yaz tatilini uygula" />
+      </div>
+      <p className="mt-1 text-[11px] text-slate-500">Takvim her yıl haziran ortasından itibaren MEB'in sitesinden otomatik alınır.</p>
     </div>
   );
 }

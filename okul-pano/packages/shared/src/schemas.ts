@@ -62,6 +62,8 @@ export const schoolSettingsSchema = z.object({
   schoolType: z.string().trim().max(80).default(''),
   /** Okulda taşımalı eğitim (servisle gelen öğrenci) var mı; açıksa Taşımalı Eğitim sayfası ve panodaki görevli bilgisi görünür */
   hasTransport: z.boolean().default(false),
+  /** MEB çalışma takvimindeki ara tatil, yarıyıl ve yaz tatili okulda da tatil sayılır */
+  followMebCalendar: z.boolean().default(true),
   theme: z.enum(['dark', 'light']).default('dark'),
   primaryColor: hexColor.default('#1f8bad'),
   accentColor: hexColor.default('#f59e0b'),

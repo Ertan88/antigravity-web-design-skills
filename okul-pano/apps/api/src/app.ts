@@ -10,10 +10,12 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import type { AppDeps } from './context.ts';
 import { openDatabase, type Database } from './db/client.ts';
 import { loadEnv, type Env } from './env.ts';
+import { runMebCalendarJob } from './lib/mebCalendar.ts';
 import { errorHandler, unauthorized } from './lib/errors.ts';
 import { DisplayBus } from './lib/events.ts';
 import { DbStorage, LocalStorage, type FileStorage } from './lib/storage.ts';
 import { UUID_RE } from './context.ts';
+import { academicCalendarRoutes } from './routes/academicCalendar.ts';
 import { authRoutes } from './routes/auth.ts';
 import { contentRoutes } from './routes/content.ts';
 import { dutyRoutes } from './routes/duties.ts';
@@ -111,10 +113,15 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   await app.register(meRoutes);
   await app.register(privacyRoutes);
   await app.register(signupRoutes);
+  await app.register(academicCalendarRoutes);
 
   // Deneme süresi hatırlatmaları: açılıştan kısa süre sonra ve saatte bir (testlerde elle çağrılır)
   if (env.NODE_ENV !== 'test') {
-    const run = () => void runTrialReminders(deps).catch((err) => app.log.error(err, 'deneme hatırlatması'));
+    const run = () => {
+      void runTrialReminders(deps).catch((err) => app.log.error(err, 'deneme hatırlatması'));
+      // MEB çalışma takvimi: haziran ortasından itibaren yayımlanır; her yıl için günde bir deneme
+      if (deps.env.MEB_INDEX_URLS) void runMebCalendarJob(deps).catch((err) => app.log.error(err, 'MEB çalışma takvimi'));
+    };
     const first = setTimeout(run, 60_000);
     const hourly = setInterval(run, 3600_000);
     first.unref();

@@ -74,7 +74,7 @@ export interface Holiday {
   id: string | null;
   date: string;
   name: string;
-  source: 'official' | 'school';
+  source: 'official' | 'meb' | 'school';
 }
 
 /** Ayın tatilleri: resmi / dini tatiller ve Excel'den tanınan okul tatilleri */
