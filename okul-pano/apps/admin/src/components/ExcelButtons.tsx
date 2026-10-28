@@ -1,5 +1,5 @@
 import { FileDown, FileSpreadsheet, Upload } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { downloadFile, excelFileName } from '../lib/api.ts';
 import { useSchool } from '../lib/data.ts';
 import { useToast } from './Toast.tsx';
@@ -16,6 +16,8 @@ export function ExcelButtons({
   canImport,
   onFile,
   query,
+  size,
+  afterImport,
 }: {
   basePath: string;
   /** Dosya adındaki modül adı: "<Okul> - <modül>.xlsx"; şablon okul adı olmadan "<modül> Şablonu.xlsx" */
@@ -26,6 +28,10 @@ export function ExcelButtons({
   onFile: (file: File) => void;
   /** İndirme adreslerine eklenecek sorgu (ör. "month=2026-10") */
   query?: string;
+  /** Liste üstündeki araç çubuğunda küçük düğmeler */
+  size?: 'sm';
+  /** "Excel'den yükle"nin hemen ardından gelecek düğme (ör. yapıştırarak ekle) */
+  afterImport?: ReactNode;
 }) {
   const toast = useToast();
   const school = useSchool();
@@ -50,7 +56,7 @@ export function ExcelButtons({
     <>
       {canImport && (
         <>
-          <Button variant="secondary" icon={<Upload className="size-4" />} onClick={() => input.current?.click()}>
+          <Button variant="secondary" size={size} icon={<Upload className="size-4" />} onClick={() => input.current?.click()}>
             Excel'den yükle
           </Button>
           <input
@@ -67,11 +73,12 @@ export function ExcelButtons({
           />
         </>
       )}
-      <Button variant="secondary" icon={<FileDown className="size-4" />} loading={busy === 'export'} onClick={() => void download('export')}>
+      {afterImport}
+      <Button variant="secondary" size={size} icon={<FileDown className="size-4" />} loading={busy === 'export'} onClick={() => void download('export')}>
         Excel'e aktar
       </Button>
       {canImport && (
-        <Button variant="ghost" icon={<FileSpreadsheet className="size-4" />} loading={busy === 'template'} onClick={() => void download('template')}>
+        <Button variant={size ? 'secondary' : 'ghost'} size={size} icon={<FileSpreadsheet className="size-4" />} loading={busy === 'template'} onClick={() => void download('template')}>
           Örnek şablon
         </Button>
       )}

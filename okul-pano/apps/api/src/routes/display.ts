@@ -296,6 +296,8 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
       photoUrl: a.photoUrl,
       startsAt: iso(a.startsAt),
       endsAt: iso(a.endsAt),
+      showCard: a.showCard,
+      showSlide: a.showSlide,
     })),
     events: eventRows.map((e) => ({ id: e.id, title: e.title, organizer: e.organizer, date: e.date, time: e.time, place: e.place })),
     books: bookRows.map((b) => ({ id: b.id, title: b.title, author: b.author, coverUrl: b.coverUrl, note: b.note, startsAt: iso(b.startsAt), endsAt: iso(b.endsAt) })),

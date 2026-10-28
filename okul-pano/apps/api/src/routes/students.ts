@@ -1,6 +1,7 @@
 import { normalizeClassName, normalizeName, studentImportSchema, studentSchema, trCompare } from '@okulpano/shared';
 import { asc, eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { audit, schoolGuard } from '../context.ts';
 import type { DB } from '../db/client.ts';
 import { classGroups, students } from '../db/schema.ts';
@@ -39,6 +40,15 @@ export async function studentRoutes(app: FastifyInstance) {
     orderBy: [asc(students.fullName)],
     refs: { classGroupId: classGroups },
     toRow: (i) => ({ ...i, classGroupId: i.classGroupId ?? null }),
+  });
+
+  /** Öğrenci listesini tamamen siler (sınıflar kalır; ders programında kullanılırlar) */
+  app.post(`${base}/delete-all`, write, async (req) => {
+    parse(z.object({ confirm: z.literal('delete-all', { error: 'Silme onayı eksik' }) }), req.body);
+    const removed = await db.delete(students).where(eq(students.schoolId, req.ctx.schoolId)).returning({ id: students.id });
+    await audit(req, 'delete', 'Öğrenci', null, `Öğrenci listesi temizlendi (${removed.length} öğrenci)`);
+    bus.contentChanged(req.ctx.schoolId);
+    return { deleted: removed.length };
   });
 
   /**

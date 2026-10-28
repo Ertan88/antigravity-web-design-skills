@@ -37,4 +37,19 @@ describe('kaydedilen ayarlar geri dönmez', () => {
     const after = (await root.get(`${base}/ticker`)).json().find((x: { id: string }) => x.id === a.id);
     expect(after).toMatchObject({ text: 'Birinci (düzeltildi)', sortOrder: before.sortOrder, isActive: false });
   });
+
+  it('başarı kartta ya da duyuruda ayrı gösterilir', async () => {
+    const res = await root.post(`${base}/achievements`, { kind: 'achievement', name: 'Ali K.', title: 'İl birincisi', showCard: false, showSlide: true });
+    expectStatus(res, 201);
+    expect(res.json()).toMatchObject({ showCard: false, showSlide: true, isActive: true });
+  });
+});
+
+describe('öğrenci listesini temizle', () => {
+  it('onay olmadan silmez, onayla hepsini siler', async () => {
+    expectStatus(await root.post(`${base}/students`, { fullName: 'Deniz Ak', birthDate: '2012-05-04' }), 201);
+    expect((await root.post(`${base}/students/delete-all`, {})).statusCode).toBe(400);
+    expect((await root.post(`${base}/students/delete-all`, { confirm: 'delete-all' })).json()).toEqual({ deleted: 1 });
+    expect((await root.get(`${base}/students`)).json()).toEqual([]);
+  });
 });

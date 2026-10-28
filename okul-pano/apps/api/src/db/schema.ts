@@ -311,6 +311,10 @@ export const achievements = pgTable(
     startsAt: timestamp('starts_at', { withTimezone: true }),
     endsAt: timestamp('ends_at', { withTimezone: true }),
     isActive: isActive(),
+    /** Panodaki Başarılar kartında gösterilsin mi */
+    showCard: boolean('show_card').notNull().default(true),
+    /** Duyuru alanında hazır şablonlu slayt olarak dönsün mü */
+    showSlide: boolean('show_slide').notNull().default(true),
     sortOrder: sortOrder(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

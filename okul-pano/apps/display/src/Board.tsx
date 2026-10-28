@@ -131,12 +131,14 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
 
 
   // Okul hayatı kartları
-  const achievementsNow = (state.achievements ?? []).filter((a) => isWithinWindow(nowMs, a.startsAt, a.endsAt));
+  const achievementsLive = (state.achievements ?? []).filter((a) => isWithinWindow(nowMs, a.startsAt, a.endsAt));
+  // Her başarı için ayrı seçim: Başarılar kartında ve / veya duyuru alanında
+  const achievementsNow = achievementsLive.filter((a) => a.showCard !== false);
   const book = (state.books ?? []).find((b) => isWithinWindow(nowMs, b.startsAt, b.endsAt)) ?? null;
   const events = (state.events ?? []).filter((e) => e.date >= today.isoDate);
   // Başarılar ve ayın öğrencisi duyurularda da hazır şablonla döner (motive edici, büyük ve fotoğraflı)
   const achievementSlides: DisplayAnnouncement[] = s.achievementSlides
-    ? achievementsNow.map((a) => ({
+    ? achievementsLive.filter((a) => a.showSlide !== false).map((a) => ({
         id: `achievement-${a.id}`,
         kind: 'design',
         title: a.name,

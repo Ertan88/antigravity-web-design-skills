@@ -41,7 +41,8 @@ type AchievementForm = {
   photoUrl: string | null;
   startsAt: string;
   endsAt: string;
-  isActive: boolean;
+  showCard: boolean;
+  showSlide: boolean;
 };
 
 export function Achievements() {
@@ -85,7 +86,7 @@ export function Achievements() {
       // Bildirimden gelen ?yeni=ay: form "ayın öğrencisi" ve bu ay seçili açılır
       emptyForm={(preset) => {
         const month = preset === 'ay';
-        return { kind: month ? 'month' : 'achievement', month: thisMonth(), name: '', className: '', title: month ? `${monthTitle(thisMonth())} ayının öğrencisi` : '', description: '', photoUrl: null, startsAt: '', endsAt: '', isActive: true };
+        return { kind: month ? 'month' : 'achievement', month: thisMonth(), name: '', className: '', title: month ? `${monthTitle(thisMonth())} ayının öğrencisi` : '', description: '', photoUrl: null, startsAt: '', endsAt: '', showCard: true, showSlide: true };
       }}
       savedMessage={(r) => {
         if (r.kind !== 'month' || !r.startsAt) return null;
@@ -104,7 +105,9 @@ export function Achievements() {
         photoUrl: r.photoUrl,
         startsAt: isoToLocalInput(r.startsAt),
         endsAt: isoToLocalInput(r.endsAt),
-        isActive: r.isActive,
+        // Eski kayıtlar: "panoda gösterme" seçilmişse ikisi de kapalı açılır
+        showCard: r.isActive && r.showCard,
+        showSlide: r.isActive && r.showSlide,
       })}
       toPayload={(f) => ({
         kind: f.kind,
@@ -115,7 +118,10 @@ export function Achievements() {
         photoUrl: f.photoUrl,
         // Ayın öğrencisi: seçilen ayın tamamı; başarı: verilen yayın tarihleri
         ...(f.kind === 'month' && f.month ? monthWindow(f.month) : { startsAt: localInputToIso(f.startsAt), endsAt: localInputToIso(f.endsAt) }),
-        isActive: f.isActive,
+        showCard: f.showCard,
+        showSlide: f.showSlide,
+        // İkisi de kapalıysa panoda hiç görünmez (listede "taslak" durur)
+        isActive: f.showCard || f.showSlide,
       })}
       renderForm={({ values: v, set, errors }) => (
         <>
@@ -191,7 +197,10 @@ export function Achievements() {
               </Field>
             </div>
           )}
-          <Toggle checked={v.isActive} onChange={(x) => set('isActive', x)} label="Panoda göster" description="Panodaki Başarılar kartında ve duyuru alanında hazır şablonla döner." />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Toggle checked={v.showCard} onChange={(x) => set('showCard', x)} label="Kart olarak göster" description="Panonun yan sütunundaki Başarılar kartında döner." />
+            <Toggle checked={v.showSlide} onChange={(x) => set('showSlide', x)} label="Duyuru olarak göster" description="Ortadaki duyuru alanında aşağıdaki hazır şablonla döner." />
+          </div>
           <div>
             <div className="mb-2 text-sm font-medium text-slate-700">Duyuru alanında böyle görünür</div>
             <DesignThumb

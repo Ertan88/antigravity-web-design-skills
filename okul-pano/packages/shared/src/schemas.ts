@@ -305,6 +305,10 @@ export const achievementSchema = z
     startsAt: isoDateTime.nullable().optional(),
     endsAt: isoDateTime.nullable().optional(),
     isActive: z.boolean().default(true),
+    /** Panodaki Başarılar kartında göster */
+    showCard: z.boolean().default(true),
+    /** Duyuru alanında hazır şablonla göster */
+    showSlide: z.boolean().default(true),
     sortOrder: z.number().int().default(0),
   })
   .superRefine(endAfterStart);

@@ -43,6 +43,11 @@ export interface CrudPageProps<T extends { id: string }, F extends Record<string
   modalSize?: 'md' | 'lg' | 'xl';
   rowActions?: (row: T) => ReactNode;
   headerActions?: ReactNode;
+  /**
+   * "Ekle" ve sayfa düğmeleri (Excel vb.) başlıkta değil, listenin üstündeki araç çubuğunda durur;
+   * çok düğmeli sayfalarda düzenli görünüm için. Sıra: ekle, sonra headerActions.
+   */
+  actionsInToolbar?: boolean;
   /** Başlığın altında sekmeler (ör. Nöbet yerleri / Müdür yardımcısı) */
   tabs?: ReactNode;
   /** Verilirse liste kartının yerine gösterilir ve "ekle" düğmesi gizlenir (başka sekme açıkken) */
@@ -165,14 +170,16 @@ export function CrudPage<T extends { id: string; isActive?: boolean }, F extends
         title={p.title}
         description={p.description}
         actions={
-          <>
-            {p.headerActions}
-            {editable && !p.replaceContent && (
-              <Button icon={<Plus className="size-4" />} onClick={() => openNew()}>
-                {p.addLabel}
-              </Button>
-            )}
-          </>
+          p.actionsInToolbar ? undefined : (
+            <>
+              {p.headerActions}
+              {editable && !p.replaceContent && (
+                <Button icon={<Plus className="size-4" />} onClick={() => openNew()}>
+                  {p.addLabel}
+                </Button>
+              )}
+            </>
+          )
         }
       />
 
@@ -186,6 +193,16 @@ export function CrudPage<T extends { id: string; isActive?: boolean }, F extends
 
       {p.replaceContent ?? (
       <Card>
+        {p.actionsInToolbar && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50/70 px-5 py-3">
+            {editable && (
+              <Button size="sm" icon={<Plus className="size-4" />} onClick={() => openNew()}>
+                {p.addLabel}
+              </Button>
+            )}
+            {p.headerActions}
+          </div>
+        )}
         {p.toolbar && <div className="border-b border-slate-100 px-5 py-3">{p.toolbar}</div>}
         {list.isLoading ? (
           <Spinner />

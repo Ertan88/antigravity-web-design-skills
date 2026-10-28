@@ -228,6 +228,8 @@ export interface Achievement extends Base {
   startsAt: string | null;
   endsAt: string | null;
   isActive: boolean;
+  showCard: boolean;
+  showSlide: boolean;
   sortOrder: number;
 }
 export interface SchoolEvent extends Base {

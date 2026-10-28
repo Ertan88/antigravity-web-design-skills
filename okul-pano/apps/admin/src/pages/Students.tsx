@@ -1,6 +1,6 @@
 import { layoutModules, normalizeClassName, resolveLayout, studentSchema } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { Cake, ClipboardPaste, Search } from 'lucide-react';
+import { Cake, ClipboardPaste, Search, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { CrudPage } from '../components/CrudPage.tsx';
 import { ExcelButtons } from '../components/ExcelButtons.tsx';
@@ -188,6 +188,62 @@ function ImportModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   );
 }
 
+/** Öğrenci listesini tamamen siler: yanlış ya da eski yıla ait liste yüklendiğinde baştan başlamak için */
+function ClearStudents({ count }: { count: number }) {
+  const { schoolId } = useAuth();
+  const path = useSchoolPath('students');
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const clear = async () => {
+    setBusy(true);
+    try {
+      const res = await api<{ deleted: number }>(`${path}/delete-all`, { method: 'POST', body: { confirm: 'delete-all' } });
+      await qc.invalidateQueries({ queryKey: [schoolId, 'students'] });
+      toast.success(`Öğrenci listesi temizlendi (${res.deleted} öğrenci)`);
+      setOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Silinemedi');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="ml-auto text-red-600! hover:bg-red-50 hover:text-red-700!"
+        icon={<Trash2 className="size-3.5" />}
+        onClick={() => setOpen(true)}
+      >
+        Listeyi temizle
+      </Button>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Öğrenci listesi temizlensin mi?"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setOpen(false)}>
+              Vazgeç
+            </Button>
+            <Button variant="danger" loading={busy} onClick={() => void clear()}>
+              {count} öğrenciyi sil
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-slate-600">
+          Bütün öğrenciler ve doğum tarihleri silinir; panoda doğum günü kutlaması görünmez. Sınıflar kalır. Bu işlem geri alınamaz; gerekiyorsa önce
+          "Excel'e aktar" ile listeyi indirin.
+        </p>
+      </Modal>
+    </>
+  );
+}
+
 export function Students() {
   const [q, setQ] = useState('');
   const [onlyToday, setOnlyToday] = useState(false);
@@ -196,6 +252,7 @@ export function Students() {
   const { can } = useAuth();
   const studentsPath = useSchoolPath('students');
   const classes = useList<ClassGroup>('classes');
+  const studentCount = useList<Student>('students').data?.length ?? 0;
   const school = useSchool();
   const classNames = nameMap(classes.data, (c) => c.name);
   const now = new Date();
@@ -221,6 +278,7 @@ export function Students() {
         emptyTitle="Öğrenci eklenmemiş"
         emptyText="Öğrencileri tek tek ekleyebilir ya da Excel / e-Okul listesinden toplu aktarabilirsiniz."
         addLabel="Öğrenci ekle"
+        actionsInToolbar
         headerActions={
           <>
             <ExcelButtons
@@ -228,12 +286,16 @@ export function Students() {
               module="Öğrenci Listesi"
               canImport={can('students.manage')}
               onFile={setExcelFile}
+              size="sm"
+              afterImport={
+                can('students.manage') && (
+                  <Button variant="secondary" size="sm" icon={<ClipboardPaste className="size-4" />} onClick={() => setImporting(true)}>
+                    Yapıştırarak ekle
+                  </Button>
+                )
+              }
             />
-            {can('students.manage') && (
-              <Button variant="ghost" icon={<ClipboardPaste className="size-4" />} onClick={() => setImporting(true)}>
-                Yapıştırarak ekle
-              </Button>
-            )}
+            {can('students.manage') && studentCount > 0 && <ClearStudents count={studentCount} />}
           </>
         }
         schema={studentSchema}

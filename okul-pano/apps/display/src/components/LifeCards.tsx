@@ -57,7 +57,7 @@ export function EventsCard({ items, todayIso }: { items: NonNullable<DisplayStat
       </div>
       <AutoPager
         items={items}
-        rowHeight={74}
+        rowHeight={118}
         keyOf={(e) => e.id}
         render={(e) => {
           const d = new Date(`${e.date}T00:00:00Z`);
@@ -69,7 +69,8 @@ export function EventsCard({ items, todayIso }: { items: NonNullable<DisplayStat
                 <span>{monFmt.format(d)}</span>
               </div>
               <div className="event-text">
-                <div className="event-title">{e.title}</div>
+                {/* Uzun ad küçülür; yine de sığmazsa iki satırdan sonra "…" */}
+                <div className={`event-title${e.title.length > 70 ? ' is-longer' : e.title.length > 34 ? ' is-long' : ''}`}>{e.title}</div>
                 <div className="event-meta">{meta}</div>
               </div>
             </div>
