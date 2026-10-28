@@ -12,7 +12,7 @@ import { Badge, Button, Card } from './ui.tsx';
  * okul yöneticisi süreli erişim verir; süre dolunca kendiliğinden kapanır, yapılan işlemler Etkinlik Geçmişi'ne düşer.
  */
 export function SupportAccessCard() {
-  const { schoolId, me } = useAuth();
+  const { schoolId, me, school: access } = useAuth();
   const school = useSchool();
   const path = useSchoolPath('support-access');
   const qc = useQueryClient();
@@ -25,8 +25,8 @@ export function SupportAccessCard() {
     },
     onError: (e) => toast.error(e.message),
   });
-  // Platform yöneticisi kendi kendine erişim vermez
-  if (!school.data || me?.user.isSuperAdmin) return null;
+  // Yalnızca okul sahibi (müdür) verir; platform yöneticisi kendi kendine erişim vermez
+  if (!school.data || me?.user.isSuperAdmin || access?.role !== 'owner') return null;
   const until = school.data.supportAccessUntil;
   const open = Boolean(until && Date.parse(until) > Date.now());
   return (

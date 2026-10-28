@@ -58,10 +58,13 @@ function TeacherSelect({ value, onChange, teachers, id }: { value: string; onCha
 
 function RoleAndPermissions({ form }: { form: ReturnType<typeof useForm<Form>> }) {
   const { values: v, set } = form;
+  // Yönetici atama okul sahibinde (müdür); yönetici yalnızca editör ekler
+  const { school } = useAuth();
+  const roles = school?.role === 'owner' ? (['editor', 'admin'] as const) : (['editor'] as const);
   return (
     <>
       <div className="grid gap-2 sm:grid-cols-2">
-        {(['editor', 'admin'] as const).map((r) => (
+        {roles.map((r) => (
           <button
             key={r}
             type="button"
@@ -102,7 +105,7 @@ function RoleAndPermissions({ form }: { form: ReturnType<typeof useForm<Form>> }
 }
 
 export function Users() {
-  const { me, schoolId } = useAuth();
+  const { me, schoolId, school } = useAuth();
   const path = useSchoolPath('members');
   const qc = useQueryClient();
   const toast = useToast();
@@ -207,7 +210,7 @@ export function Users() {
         ) : (
           <Table head={['Kullanıcı', 'Rol', 'Yetkiler', 'Öğretmen kaydı', 'Son giriş', '']}>
             {list.data.map((m) => {
-              const locked = m.role === 'owner' || m.userId === me?.user.id;
+              const locked = m.role === 'owner' || m.userId === me?.user.id || (m.role === 'admin' && school?.role !== 'owner');
               return (
                 <tr key={m.id}>
                   <Td>

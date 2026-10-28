@@ -62,7 +62,7 @@ export async function schoolRoutes(app: FastifyInstance) {
    * süre dolunca erişim kendiliğinden kapanır. Destek erişimiyle girilen işlemler etkinlik geçmişine düşer.
    */
   app.post('/api/schools/:schoolId/support-access', { preHandler: [app.authenticate, schoolGuard('settings.manage')] }, async (req) => {
-    if (req.ctx.isSupport) throw forbidden('Destek erişimini yalnızca okul yöneticisi verebilir.');
+    if (req.ctx.isSupport || req.ctx.role !== 'owner') throw forbidden('Destek erişimini yalnızca okul sahibi (müdür) verebilir.');
     const { hours } = parse(z.object({ hours: z.union([z.literal(0), z.literal(24), z.literal(168)]) }), req.body);
     const until = hours ? new Date(Date.now() + hours * 3600_000) : null;
     const wasOpen = (req.ctx.school.supportAccessUntil?.getTime() ?? 0) > Date.now();

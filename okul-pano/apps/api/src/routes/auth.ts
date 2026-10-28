@@ -1,11 +1,11 @@
-import { changePasswordSchema, effectivePermissions, loginSchema } from '@okulpano/shared';
+import { changePasswordSchema, effectivePermissions, loginSchema, updateProfileSchema } from '@okulpano/shared';
 import { and, asc, eq, gt, lt } from 'drizzle-orm';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { accessUser } from '../context.ts';
 import { memberships, schools, sessions, users } from '../db/schema.ts';
 import { burnPasswordCheck, hashPassword, randomToken, sha256, verifyPassword } from '../lib/crypto.ts';
-import { badRequest, notFound, parse, unauthorized } from '../lib/errors.ts';
+import { badRequest, conflict, notFound, parse, unauthorized } from '../lib/errors.ts';
 
 const ACCESS_TTL = '15m';
 const REFRESH_TTL_MS = 30 * 24 * 3600 * 1000;
@@ -158,6 +158,28 @@ export async function authRoutes(app: FastifyInstance) {
     if (!allowed) throw notFound();
     await db.update(users).set({ lastSchoolId: schoolId }).where(eq(users.id, sub));
     return reply.status(204).send();
+  });
+
+  /** Profil: ad ve e-posta. E-posta değişikliği mevcut şifreyle onaylanır (hesap ele geçirmeye karşı). */
+  app.patch('/api/me', { preHandler: app.authenticate }, async (req) => {
+    const { sub } = accessUser(req);
+    const body = parse(updateProfileSchema, req.body);
+    const [user] = await db.select().from(users).where(eq(users.id, sub));
+    if (!user) throw unauthorized();
+    const email = body.email?.toLowerCase();
+    if (email && email !== user.email) {
+      if (!body.currentPassword || !(await verifyPassword(body.currentPassword, user.passwordHash))) {
+        throw badRequest('E-postayı değiştirmek için mevcut şifrenizi doğru girin.');
+      }
+      const [taken] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
+      if (taken) throw conflict('Bu e-posta başka bir hesapta kullanılıyor.');
+    }
+    const [updated] = await db
+      .update(users)
+      .set({ ...(body.fullName ? { fullName: body.fullName } : {}), ...(email ? { email } : {}) })
+      .where(eq(users.id, sub))
+      .returning({ id: users.id, email: users.email, fullName: users.fullName, isSuperAdmin: users.isSuperAdmin });
+    return updated;
   });
 
   app.post('/api/me/password', { preHandler: app.authenticate }, async (req, reply) => {

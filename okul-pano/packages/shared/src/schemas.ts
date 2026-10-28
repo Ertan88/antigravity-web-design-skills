@@ -184,6 +184,13 @@ export const loginSchema = z.object({
   client: z.enum(['web', 'mobile']).default('web'),
 });
 
+export const updateProfileSchema = z.object({
+  fullName: z.string().trim().min(2, 'Ad soyad en az 2 karakter olmalı').max(120).optional(),
+  email: z.email('Geçerli bir e-posta yazın').max(200).optional(),
+  /** E-posta değişirse zorunlu */
+  currentPassword: z.string().max(200).optional(),
+});
+
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1).max(200),
   newPassword: z.string().min(8, 'Yeni şifre en az 8 karakter olmalı').max(200),
