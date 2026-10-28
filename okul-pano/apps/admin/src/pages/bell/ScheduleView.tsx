@@ -121,7 +121,7 @@ export function WeekCoverage({
                   <span className="hidden sm:inline">–{(shown[shown.length - 1] ?? sorted[sorted.length - 1]!).end}</span>
                 </div>
                 <div
-                  className={clsx('hidden truncate text-[11px] sm:block', di?.halfDay ? (active ? 'font-semibold text-amber-200' : 'font-semibold text-amber-600') : active ? 'text-white/75' : 'text-slate-500')}
+                  className={clsx('hidden truncate text-[11px] sm:block', di?.halfDay ? (active ? 'font-semibold text-[#fde68a]' : 'font-semibold text-[#d97706]') : active ? 'text-white/75' : 'text-slate-500')}
                   title={di?.halfDay ?? undefined}
                 >
                   {di?.halfDay ? `Yarım gün · ${di.halfDay}` : `${sorted.length} ders · ${s.name}`}
@@ -266,12 +266,13 @@ export function ScheduleView({
                 </div>
               ))}
               {cutPct != null && cutPct < 100 && (
+                // Taralı alan iki temada da opak; yazı sabit renkli rozette (koyu temada amber tonları yarı saydama döner)
                 <div
-                  className="absolute inset-y-0 right-0 flex items-center justify-center bg-[repeating-linear-gradient(135deg,rgba(255,251,235,0.92)_0_8px,rgba(254,243,199,0.92)_8px_16px)] text-xs font-bold text-amber-800"
+                  className="absolute inset-y-0 right-0 flex items-center justify-center bg-[repeating-linear-gradient(135deg,#fffbeb_0_8px,#fef3c7_8px_16px)] dark:bg-[repeating-linear-gradient(135deg,#2a1d0b_0_8px,#3b2a10_8px_16px)]"
                   style={{ left: `${cutPct}%` }}
                   title={`${day.halfDay}: son zil ${day.endsAt}`}
                 >
-                  <span className="truncate px-2">Öğleden sonra tatil</span>
+                  <span className="truncate rounded-full bg-[#d97706] px-2.5 py-0.5 text-xs font-bold text-white shadow-sm">Öğleden sonra tatil</span>
                 </div>
               )}
             </div>
