@@ -137,6 +137,9 @@ Panel `https://alanadiniz/admin/`, pano `https://alanadiniz/display/`, mobil uyg
   süresi sona erdi" ekranı gösterir. Platform yöneticisi "+30 gün" ile uzatır ya da ücretli pakete geçirir.
 - **Davet:** okul sahibi kullanıcı eklerken "Davet bağlantısı gönder"i seçer; kişi şifresini bağlantıdan kendisi belirler.
   Mobil uygulamada kayıt yoktur; giriş ekranındaki bağlantı web'deki kayıt sayfasını açar.
+- **KVKK ve destek erişimi:** platform yöneticisi Platform sayfasında okulların yalnızca abonelik bilgilerini görür; okul verilerine
+  ancak üye olduğu okulda ya da okul sahibinin **Genel Ayarlar › Destek erişimi** bölümünden verdiği süreli (24 saat / 7 gün)
+  erişimle girer. Kendi okulunuzda okul sahibi olmak için `PLATFORM_OWNER_SCHOOLS=okul-kisa-adi` (virgülle birden çok) yazın.
 
 ## Başlıklar
 

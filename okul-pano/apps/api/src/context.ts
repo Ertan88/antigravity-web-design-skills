@@ -34,6 +34,8 @@ export interface SchoolCtx {
   permissions: Permission[];
   userId: string;
   isSuperAdmin: boolean;
+  /** Platform yöneticisi okula üye değil, okulun verdiği destek erişimiyle giriyor */
+  isSupport: boolean;
   /** Kullanıcı bu okulda bir öğretmen kaydına bağlıysa */
   teacherId: string | null;
 }
@@ -80,24 +82,37 @@ export function schoolGuard(permission?: Permission) {
     let role: Role = 'owner';
     let granted: string[] = [];
     let teacherId: string | null = null;
-    if (!user.sa) {
-      const [m] = await db
-        .select()
-        .from(memberships)
-        .where(and(eq(memberships.userId, user.sub), eq(memberships.schoolId, schoolId)));
-      if (!m) throw forbidden('Bu okula erişiminiz yok.');
-      if (!school.isActive) throw forbidden('Okul hesabı askıya alınmış ya da onay bekliyor. Lütfen destek ile iletişime geçin.');
-      // Deneme süresi dolan okulda panel salt okunur: görüntüleme ve dışa aktarma serbest, değişiklik yapılamaz
-      if (req.method !== 'GET' && trialStatus(school)?.expired) {
-        throw forbidden('Deneme süreniz doldu; panel salt okunur. Aboneliği başlatmak için bizimle iletişime geçin.');
-      }
+    let isSupport = false;
+    const [m] = await db
+      .select()
+      .from(memberships)
+      .where(and(eq(memberships.userId, user.sub), eq(memberships.schoolId, schoolId)));
+    if (m) {
       role = m.role;
       granted = m.permissions;
       teacherId = m.teacherId;
     }
+    if (user.sa) {
+      // KVKK: platform yöneticisi üyesi olmadığı okulun verilerini yalnızca okulun verdiği süreli destek erişimiyle görür
+      if (!m) {
+        if (!school.supportAccessUntil || school.supportAccessUntil.getTime() < Date.now()) {
+          throw forbidden('Bu okulun verilerine erişim kapalı. Okul yöneticisi Genel Ayarlar › Destek erişimi bölümünden süreli erişim verebilir.');
+        }
+        isSupport = true;
+        role = 'owner';
+      }
+    } else {
+      if (!m) throw forbidden('Bu okula erişiminiz yok.');
+      if (!school.isActive) throw forbidden('Okul hesabı askıya alınmış ya da onay bekliyor. Lütfen destek ile iletişime geçin.');
+      // Deneme süresi dolan okulda panel salt okunur: görüntüleme ve dışa aktarma serbest, değişiklik yapılamaz
+      // (destek erişimi verilebilir: okul yardım isteyebilsin)
+      if (req.method !== 'GET' && trialStatus(school)?.expired && !req.url.split('?')[0]!.endsWith('/support-access')) {
+        throw forbidden('Deneme süreniz doldu; panel salt okunur. Aboneliği başlatmak için bizimle iletişime geçin.');
+      }
+    }
     const perms = effectivePermissions(role, granted);
     if (permission && !perms.includes(permission)) throw forbidden();
-    req.ctx = { schoolId, school, role, permissions: perms, userId: user.sub, isSuperAdmin: user.sa, teacherId };
+    req.ctx = { schoolId, school, role, permissions: perms, userId: user.sub, isSuperAdmin: user.sa, isSupport, teacherId };
   };
 }
 

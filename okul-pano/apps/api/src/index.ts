@@ -1,6 +1,6 @@
-import { count } from 'drizzle-orm';
+import { count, eq, inArray } from 'drizzle-orm';
 import { buildApp } from './app.ts';
-import { users } from './db/schema.ts';
+import { memberships, schools, users } from './db/schema.ts';
 import { hashPassword } from './lib/crypto.ts';
 import { seedDemo } from './seed-data.ts';
 
@@ -33,6 +33,21 @@ if (userCount === 0) {
       console.log(`İlk açılış: platform yöneticisi oluşturuldu (${email}).`);
     }
   }
+}
+
+// Platform yöneticisinin kendi okulu (okul sahibi olarak üye): PLATFORM_OWNER_SCHOOLS=okulun-kisa-adi[,baska-okul]
+// Destek erişimi kuralı (KVKK) üyesi olmadığı okullara uygulanır; kendi okuluna böylece her zaman girer.
+const ownSlugs = (process.env.PLATFORM_OWNER_SCHOOLS ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+if (ownSlugs.length) {
+  const admins = await app.deps.db.select({ id: users.id }).from(users).where(eq(users.isSuperAdmin, true));
+  const own = await app.deps.db.select({ id: schools.id, slug: schools.slug }).from(schools).where(inArray(schools.slug, ownSlugs));
+  for (const a of admins) {
+    for (const s of own) {
+      await app.deps.db.insert(memberships).values({ userId: a.id, schoolId: s.id, role: 'owner' }).onConflictDoNothing();
+    }
+  }
+  const missing = ownSlugs.filter((x) => !own.some((s) => s.slug === x));
+  if (missing.length) console.warn(`PLATFORM_OWNER_SCHOOLS: bulunamayan okul kısa adı: ${missing.join(', ')}`);
 }
 
 try {

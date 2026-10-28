@@ -26,6 +26,7 @@ export function publicSchool(s: typeof schools.$inferSelect) {
     isActive: s.isActive,
     trialEndsAt: s.trialEndsAt,
     onboarding: s.onboarding,
+    supportAccessUntil: s.supportAccessUntil,
     hasSampleData: Boolean(s.sampleData && Object.values(s.sampleData).some((ids) => ids.length)),
   };
 }
@@ -51,6 +52,19 @@ export async function schoolRoutes(app: FastifyInstance) {
       .returning();
     await audit(req, 'update', 'Okul ayarları', req.ctx.schoolId, updated!.name);
     bus.contentChanged(req.ctx.schoolId);
+    return publicSchool(updated!);
+  });
+
+  /**
+   * KVKK: platform desteğinin okul verilerine erişimi. Yalnızca okulun kendi yöneticisi verir ya da kapatır;
+   * süre dolunca erişim kendiliğinden kapanır. Destek erişimiyle girilen işlemler etkinlik geçmişine düşer.
+   */
+  app.post('/api/schools/:schoolId/support-access', { preHandler: [app.authenticate, schoolGuard('settings.manage')] }, async (req) => {
+    if (req.ctx.isSupport) throw forbidden('Destek erişimini yalnızca okul yöneticisi verebilir.');
+    const { hours } = parse(z.object({ hours: z.union([z.literal(0), z.literal(24), z.literal(168)]) }), req.body);
+    const until = hours ? new Date(Date.now() + hours * 3600_000) : null;
+    const [updated] = await db.update(schools).set({ supportAccessUntil: until }).where(eq(schools.id, req.ctx.schoolId)).returning();
+    await audit(req, 'update', 'Destek erişimi', req.ctx.schoolId, hours ? `Platform desteğine ${hours === 24 ? '24 saat' : '7 gün'} erişim verildi` : 'Platform desteğinin erişimi kapatıldı');
     return publicSchool(updated!);
   });
 
@@ -197,14 +211,24 @@ export async function schoolRoutes(app: FastifyInstance) {
     ],
   };
 
-  app.get('/api/platform/schools', platform, async () => {
+  app.get('/api/platform/schools', platform, async (req) => {
     const rows = await db
       .select({ school: schools, screens: count(screens.id) })
       .from(schools)
       .leftJoin(screens, eq(screens.schoolId, schools.id))
       .groupBy(schools.id)
       .orderBy(desc(schools.createdAt));
-    return rows.map((r) => ({ ...publicSchool(r.school), screenCount: r.screens, contactPhone: r.school.contactPhone, createdAt: r.school.createdAt }));
+    // Panelde açılabilen okullar: üyesi olunan ya da destek erişimi süren (KVKK)
+    const own = new Set((await db.select({ id: memberships.schoolId }).from(memberships).where(eq(memberships.userId, accessUser(req).sub))).map((m) => m.id));
+    const now = Date.now();
+    return rows.map((r) => ({
+      ...publicSchool(r.school),
+      screenCount: r.screens,
+      contactPhone: r.school.contactPhone,
+      createdAt: r.school.createdAt,
+      member: own.has(r.school.id),
+      canOpen: own.has(r.school.id) || (r.school.supportAccessUntil?.getTime() ?? 0) > now,
+    }));
   });
 
   app.post('/api/platform/schools', platform, async (req, reply) => {

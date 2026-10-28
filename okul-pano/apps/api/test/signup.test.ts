@@ -141,8 +141,19 @@ describe('deneme süresi', () => {
     const blocked = await owner.post(`/api/schools/${schoolId}/teachers`, { fullName: 'Ali Veli' });
     expect(blocked.statusCode).toBe(403);
     expect(blocked.json().message).toMatch(/Deneme süreniz doldu/);
-    // Platform yöneticisi her zaman düzenleyebilir
+    // KVKK: platform yöneticisi üyesi olmadığı okulun verilerini göremez; okul süreli destek erişimi verince görür
+    expect((await root.get(`/api/schools/${schoolId}/teachers`)).statusCode).toBe(403);
+    expect((await root.get('/api/me')).json().schools.some((s: { id: string }) => s.id === schoolId)).toBe(false);
+    expect((await root.post(`/api/schools/${schoolId}/support-access`, { hours: 24 })).statusCode).toBe(403);
+    expectStatus(await owner.post(`/api/schools/${schoolId}/support-access`, { hours: 24 }), 200);
+    expect((await root.get('/api/me')).json().schools.some((s: { id: string }) => s.id === schoolId)).toBe(true);
     expectStatus(await root.post(`/api/schools/${schoolId}/teachers`, { fullName: 'Destek Kaydı' }), 201);
+    // Destek erişimindeki platform yöneticisi süreyi kendisi uzatamaz
+    expect((await root.post(`/api/schools/${schoolId}/support-access`, { hours: 168 })).statusCode).toBe(403);
+    const log = (await owner.get(`/api/schools/${schoolId}/audit`)).json() as { entity: string }[];
+    expect(log.some((x) => x.entity === 'Destek erişimi')).toBe(true);
+    expectStatus(await owner.post(`/api/schools/${schoolId}/support-access`, { hours: 0 }), 200);
+    expect((await root.get(`/api/schools/${schoolId}/teachers`)).statusCode).toBe(403);
 
     expectStatus(await root.patch(`/api/platform/schools/${schoolId}`, { extendTrialDays: 14 }), 200);
     expectStatus(await owner.post(`/api/schools/${schoolId}/teachers`, { fullName: 'Ali Veli' }), 201);
@@ -188,6 +199,9 @@ describe('kullanıcı daveti', () => {
 
 describe('son açılan okul', () => {
   it('seçilen okul hatırlanır; başka cihazdan girişte o açılır', async () => {
+    const gunes = await as('mehmet@gunes.test');
+    const gunesId = (await gunes.get('/api/me')).json().schools[0].id as string;
+    expectStatus(await gunes.post(`/api/schools/${gunesId}/support-access`, { hours: 24 }), 200);
     const schools = (await root.get('/api/me')).json().schools as { id: string; name: string }[];
     const target = schools.find((s) => s.name === 'Güneş İlkokulu')!;
     expect((await root.put('/api/me/school', { schoolId: target.id })).statusCode).toBe(204);

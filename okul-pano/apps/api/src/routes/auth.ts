@@ -90,18 +90,22 @@ export async function authRoutes(app: FastifyInstance) {
     return reply.status(204).send();
   });
 
-  /** Platform yöneticisi bütün okulları görür; üyesi olduğu (kendi) okulları listenin başındadır */
+  /**
+   * Platform yöneticisinin panelde açabildiği okullar: üyesi olduğu (kendi) okulları ve okul sahibinin süreli
+   * destek erişimi verdiği okullar (KVKK). Diğer okulların yalnızca kayıt bilgileri Platform sayfasında görünür.
+   */
   async function superAdminSchools(userId: string) {
-    const own = new Set(
-      (await db.select({ id: memberships.schoolId }).from(memberships).where(eq(memberships.userId, userId))).map((m) => m.id),
-    );
-    const all = await db.select().from(schools).orderBy(asc(schools.name));
-    return [...all.filter((s) => own.has(s.id)), ...all.filter((s) => !own.has(s.id))].map((school) => ({
-      school,
-      role: 'owner' as const,
-      permissions: [] as string[],
-      teacherId: null as string | null,
-    }));
+    const own = await db
+      .select({ school: schools, role: memberships.role, permissions: memberships.permissions, teacherId: memberships.teacherId })
+      .from(memberships)
+      .innerJoin(schools, eq(schools.id, memberships.schoolId))
+      .where(eq(memberships.userId, userId))
+      .orderBy(asc(schools.name));
+    const ownIds = new Set(own.map((r) => r.school.id));
+    const support = (await db.select().from(schools).where(gt(schools.supportAccessUntil, new Date())).orderBy(asc(schools.name)))
+      .filter((s) => !ownIds.has(s.id))
+      .map((school) => ({ school, role: 'owner' as const, permissions: [] as string[], teacherId: null as string | null }));
+    return [...own, ...support];
   }
 
   app.get('/api/me', { preHandler: app.authenticate }, async (req) => {

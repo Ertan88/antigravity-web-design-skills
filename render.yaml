@@ -46,3 +46,7 @@ services:
         sync: false
       - key: SMTP_FROM
         sync: false
+      # KVKK: platform yöneticisi okul verilerine yalnızca üye olduğu okullarda ya da okulun verdiği süreli
+      # destek erişimiyle girer. Kendi okul(lar)ınızın kısa adlarını virgülle yazın; açılışta okul sahibi olarak eklenirsiniz.
+      - key: PLATFORM_OWNER_SCHOOLS
+        sync: false

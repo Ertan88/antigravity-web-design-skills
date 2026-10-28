@@ -137,6 +137,8 @@ export interface School {
   trialEndsAt: string | null;
   /** İlk giriş sorusu: 'pending' iken örnek veri sorulur */
   onboarding: 'pending' | 'sample' | 'empty' | null;
+  /** Platform desteğinin okul verilerine erişebileceği son an (KVKK; okul yöneticisi verir) */
+  supportAccessUntil: string | null;
   hasSampleData: boolean;
 }
 

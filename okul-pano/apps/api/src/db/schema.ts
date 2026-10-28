@@ -88,6 +88,8 @@ export const schools = pgTable('schools', {
   onboarding: text('onboarding').$type<'pending' | 'sample' | 'empty'>(),
   /** Eklenen örnek kayıtların kimlikleri (tablo adı -> id listesi): "örnek verileri temizle" yalnızca bunları siler */
   sampleData: jsonb('sample_data').$type<Record<string, string[]>>(),
+  /** KVKK: platform yöneticisinin (üye değilse) okul içeriğine erişebileceği son an; okul sahibi verir */
+  supportAccessUntil: timestamp('support_access_until', { withTimezone: true }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

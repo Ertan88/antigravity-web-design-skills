@@ -1,6 +1,6 @@
 import { createSchoolSchema, PLANS, trialStatus, type Plan } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Building2, Check, Download, Inbox, Plus, Trash2 } from 'lucide-react';
+import { Building2, Check, Download, Inbox, Lock, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Badge, Button, Card, EmptyState, Field, IconButton, Input, Modal, PageHeader, Select, Spinner, Table, Td, Toggle } from '../components/ui.tsx';
@@ -9,9 +9,17 @@ import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import type { School } from '../lib/data.ts';
 import { useForm } from '../lib/form.ts';
-import { formatDate, slugify } from '../lib/format.ts';
+import { formatDate, formatDateTime, slugify } from '../lib/format.ts';
 
-type Row = School & { screenCount: number; contactPhone: string | null; createdAt: string };
+type Row = School & {
+  screenCount: number;
+  contactPhone: string | null;
+  createdAt: string;
+  /** Platform yöneticisi bu okulun üyesi (kendi okulu) */
+  member: boolean;
+  /** Okul verileri panelde açılabilir: üyelik ya da süreli destek erişimi (KVKK) */
+  canOpen: boolean;
+};
 
 interface Signup {
   id: string;
@@ -103,7 +111,7 @@ export function Platform() {
     <>
       <PageHeader
         title="Okullar ve Abonelikler"
-        description="Platformdaki tüm okullar. Paket ve ekran limitini buradan yönetin; abonelik bitince okulun verilerini dışa aktarıp kalıcı olarak silebilirsiniz (KVKK)."
+        description="Platformdaki tüm okulların kayıt ve abonelik bilgileri. Okulların içeriğini (öğretmen, öğrenci, nöbet…) yalnızca kendi okulunuzda ya da okul yöneticisinin süreli destek erişimi verdiği okullarda açabilirsiniz (KVKK)."
         actions={
           <Button
             icon={<Plus className="size-4" />}
@@ -169,7 +177,18 @@ export function Platform() {
             {list.data.map((s) => (
               <tr key={s.id}>
                 <Td>
-                  <div className="font-semibold">{s.name}</div>
+                  <div className="flex flex-wrap items-center gap-2 font-semibold">
+                    {s.name}
+                    {s.member ? (
+                      <Badge tone="blue">Kendi okulunuz</Badge>
+                    ) : s.canOpen ? (
+                      <Badge tone="green">Destek erişimi · {s.supportAccessUntil ? formatDateTime(s.supportAccessUntil) : ''}</Badge>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-400" title="Okul yöneticisi destek erişimi verirse açılır">
+                        <Lock className="size-3" /> Veriler kapalı
+                      </span>
+                    )}
+                  </div>
                   <div className="text-xs text-slate-500">
                     {s.slug}
                     {s.contactPhone && ` · ${s.contactPhone}`}
@@ -219,9 +238,11 @@ export function Platform() {
                 </Td>
                 <Td className="w-px">
                   <div className="flex justify-end">
-                    <IconButton label="Verileri dışa aktar (JSON)" onClick={() => void exportSchool(s)}>
-                      <Download className="size-4" />
-                    </IconButton>
+                    {s.canOpen && (
+                      <IconButton label="Verileri dışa aktar (JSON)" onClick={() => void exportSchool(s)}>
+                        <Download className="size-4" />
+                      </IconButton>
+                    )}
                     <IconButton
                       label="Okulu ve bütün verilerini sil"
                       onClick={() => {
