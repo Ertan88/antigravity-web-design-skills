@@ -5,3 +5,6 @@ local.properties
 *.iml
 captures/
 .kotlin/
+
+# Üst klasördeki "data/" kuralı (sunucunun veri klasörü) uygulamanın data paketini kapsamasın
+!data/
