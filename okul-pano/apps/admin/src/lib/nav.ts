@@ -49,11 +49,11 @@ export const NAV: NavGroup[] = [
   {
     title: 'Okul Hayatı',
     items: [
+      { to: '/ogretmenler', label: 'Öğretmen Kadrosu', icon: Users, permission: 'directory.manage' },
       { to: '/nobet', label: 'Nöbet Çizelgesi', icon: ShieldCheck, permission: 'duties.manage' },
       { to: '/tasimali', label: 'Taşımalı Eğitim', icon: Bus, permission: 'duties.manage', when: (s) => Boolean(s?.hasTransport) },
       { to: '/izinler', label: 'İzinli Öğretmenler', icon: UserMinus, permission: 'leaves.manage' },
       { to: '/ogrenciler', label: 'Doğum Günleri', icon: Cake, permission: 'students.manage' },
-      { to: '/ogretmenler', label: 'Öğretmen Kadrosu', icon: Users, permission: 'directory.manage' },
       { to: '/basarilar', label: 'Başarılar', icon: Trophy, permission: 'highlights.manage' },
       { to: '/etkinlikler', label: 'Etkinlik Takvimi', icon: CalendarDays, permission: 'highlights.manage' },
       { to: '/haftanin-kitabi', label: 'Haftanın Kitabı', icon: Library, permission: 'highlights.manage' },
