@@ -199,8 +199,8 @@ fun MenuScreen() {
             Text(state.me?.user?.email.orEmpty(), style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(4.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-              StatusBadge(role.label, Tone.Primary)
-              if (state.isTeacher && role != AppRole.Teacher && role != AppRole.Platform) StatusBadge("Öğretmen")
+              StatusBadge(role.label, Tone.Neutral)
+              if (state.isTeacher && role != AppRole.Teacher && role != AppRole.Platform) StatusBadge("Öğretmen", Tone.Neutral)
               if (state.school?.support == true && role != AppRole.Platform) StatusBadge("Destek erişimi", Tone.Warning)
             }
             if (role != AppRole.Platform && state.school != null) Text(state.school!!.name, style = MaterialTheme.typography.bodySmall)

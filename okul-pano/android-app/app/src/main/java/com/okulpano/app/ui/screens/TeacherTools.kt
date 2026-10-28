@@ -124,7 +124,8 @@ fun TimetableScreen() {
               Modifier.fillMaxWidth().background(if (nowRow) MaterialTheme.colorScheme.primaryContainer else Color.Transparent).padding(horizontal = 16.dp, vertical = 12.dp),
               verticalAlignment = Alignment.CenterVertically,
             ) {
-              val faded = st == LessonState.Past || cut
+              val ended = isToday && com.okulpano.core.parseClock(p.end) <= today.now.secondsOfDay
+              val faded = st == LessonState.Past || cut || ended
               Column(Modifier.width(104.dp)) {
                 Text("${p.start} – ${p.end}", style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"), color = if (faded) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface)
                 Text(periodLabel(p), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

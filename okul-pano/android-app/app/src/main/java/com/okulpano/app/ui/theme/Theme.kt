@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -43,6 +44,12 @@ val AppShapes = Shapes(
   large = RoundedCornerShape(24.dp),
   extraLarge = RoundedCornerShape(32.dp),
 )
+
+/** Koyu tema mı (renk şemasından; testlerde tema elle verildiğinde de doğru çalışır) */
+val androidx.compose.material3.ColorScheme.isDark: Boolean get() = surface.luminance() < 0.5f
+
+/** Acil durum kırmızısı: iki temada da aynı güçlü kırmızı (uyarı her zaman uyarı gibi görünsün) */
+val AlarmRed = androidx.compose.ui.graphics.Color(0xFFC62828)
 
 /** Geri sayım rakamları: sabit genişlikli rakamlar (saniye değişirken metin oynamaz) */
 val CountdownStyle = TextStyle(fontSize = 52.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp, fontFeatureSettings = "tnum")

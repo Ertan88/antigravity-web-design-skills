@@ -62,6 +62,8 @@ Expo (React Native) ile yazılmış tek uygulama; ekranlar kişinin yetkisine g�
 
 Yalnızca duyuru yetkisi olan öğretmen öğretmen görünümünde kalır. Yeni pano bağlarken televizyondaki QR kod uygulamayla (Panolar › QR ile bağla) ya da telefonun kamerasıyla okutulur; 6 haneli kod yedek yol olarak durur.
 
+**Yerel Android uygulaması:** `android-app/` klasöründe Kotlin + Jetpack Compose ile Material Design 3 sürümü var (açık / koyu tema, aynı roller ve ekranlar). Ayrıntılar: [android-app/README.md](android-app/README.md).
+
 Telefon bildirimleri (Expo push): onaya düşen duyuru ve izin, onay sonucu, acil durum, nöbet görevlendirmesi, 10 dakikadır kapalı pano. Aynı uygulamanın web sürümü sunucunun `/app/` adresinden açılır; uygulama kurmayan öğretmenler tarayıcıdan kullanır.
 
 ## Öne çıkan teknik kararlar

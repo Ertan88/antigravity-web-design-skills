@@ -63,6 +63,7 @@ import com.okulpano.app.ui.nav.R
 import com.okulpano.app.ui.nav.authState
 import com.okulpano.app.ui.nav.go
 import com.okulpano.app.ui.theme.CountdownStyle
+import com.okulpano.app.ui.theme.isDark
 import com.okulpano.app.ui.theme.status
 import com.okulpano.core.InboxPage
 import com.okulpano.core.LessonState
@@ -182,15 +183,19 @@ fun BellHero(data: MeToday) {
   val day = teacherDay(data, now)
   val h = bellHeadline(day.bell)
   val next = day.lessons.firstOrNull { it.state == LessonState.Next }
+  // Koyu temada parlak birincil renk yerine koyu birincil kap: gözü yormaz
+  val dark = MaterialTheme.colorScheme.isDark
+  val heroBg = if (dark) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.primary
+  val heroFg = if (dark) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onPrimary
   ElevatedCard(
-    colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
+    colors = CardDefaults.elevatedCardColors(containerColor = heroBg, contentColor = heroFg),
     shape = MaterialTheme.shapes.large,
     modifier = Modifier.fillMaxWidth(),
   ) {
     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
       Row(verticalAlignment = Alignment.CenterVertically) {
         Text(if (day.holiday != null) "Tatil · ${day.holiday}" else h.title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Surface(color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.16f), contentColor = MaterialTheme.colorScheme.onPrimary, shape = RoundedCornerShape(50)) {
+        Surface(color = heroFg.copy(alpha = 0.16f), contentColor = heroFg, shape = RoundedCornerShape(50)) {
           Text(WEEKDAY_LONG[day.now.weekday], style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
         }
       }
@@ -210,8 +215,8 @@ fun BellHero(data: MeToday) {
         LinearProgressIndicator(
           progress = { h.progress!!.coerceIn(0f, 1f) },
           modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-          color = MaterialTheme.colorScheme.onPrimary,
-          trackColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.25f),
+          color = heroFg,
+          trackColor = heroFg.copy(alpha = 0.25f),
           drawStopIndicator = {},
         )
       }

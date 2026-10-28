@@ -107,7 +107,7 @@ fun LoginScreen() {
       Text(
         buildAnnotatedString {
           append("okul")
-          withStyle(SpanStyle(color = MaterialTheme.colorScheme.tertiary)) { append("yayın") }
+          withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append("yayın") }
         },
         style = MaterialTheme.typography.displaySmall,
         fontWeight = FontWeight.ExtraBold,

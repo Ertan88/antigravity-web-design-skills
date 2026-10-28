@@ -54,6 +54,7 @@ import com.okulpano.app.ui.components.SwitchRow
 import com.okulpano.app.ui.components.rememberRunner
 import com.okulpano.app.ui.components.rememberSnackbar
 import com.okulpano.app.ui.nav.authState
+import com.okulpano.app.ui.theme.AlarmRed
 import com.okulpano.core.ControlCenter
 import com.okulpano.core.EMERGENCY_TYPES
 import com.okulpano.core.Perm
@@ -88,7 +89,7 @@ fun EmergencyScreen() {
     }
     if (active != null) {
       item {
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError), modifier = Modifier.fillMaxWidth()) {
+        Card(colors = CardDefaults.cardColors(containerColor = AlarmRed, contentColor = androidx.compose.ui.graphics.Color.White), modifier = Modifier.fillMaxWidth()) {
           Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("UYARI SÜRÜYOR", style = MaterialTheme.typography.labelLarge)
             Text(emergencyLabel(active.type), style = MaterialTheme.typography.headlineMedium)
@@ -142,8 +143,8 @@ private fun HoldButton(label: String, sub: String, dark: Boolean = false, onComp
   val scope = rememberCoroutineScope()
   val haptic = LocalHapticFeedback.current
   var holding by remember { mutableStateOf(false) }
-  val bg = if (dark) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.error
-  val fg = if (dark) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onError
+  val bg = if (dark) MaterialTheme.colorScheme.inverseSurface else AlarmRed
+  val fg = if (dark) MaterialTheme.colorScheme.inverseOnSurface else androidx.compose.ui.graphics.Color.White
   Box(
     Modifier
       .size(232.dp)
