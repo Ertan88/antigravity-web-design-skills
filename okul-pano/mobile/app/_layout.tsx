@@ -89,7 +89,7 @@ function Gate() {
   }, [status, onLogin]);
 
   useEffect(() => {
-    if (status === 'signedIn') void registerForPush();
+    if (status === 'signedIn') void registerForPush().catch(() => undefined);
   }, [status, school?.id]);
 
   // Bildirime dokununca ilgili ekran açılır (ör. onay bekleyen duyuru → Onaylar)

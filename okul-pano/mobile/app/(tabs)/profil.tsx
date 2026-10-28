@@ -190,9 +190,15 @@ export default function Menu() {
               onPress: () =>
                 void registerForPush().then((r) =>
                   setPush(
-                    r === 'ok' ? 'Bu telefon bildirim alacak.' : r === 'denied' ? 'İzin verilmedi: telefon ayarlarından açın.' : 'Bu cihazda kullanılamıyor.',
+                    r === 'ok'
+                      ? 'Açık: bu telefon bildirim alacak.'
+                      : r === 'local'
+                        ? 'İzin verildi: nöbet hatırlatmaları çalışır. Onay ve acil durum bildirimleri için bildirim hizmeti henüz kurulmadı.'
+                        : r === 'denied'
+                          ? 'İzin verilmedi: telefon ayarlarından Okul Yayın için bildirimleri açın.'
+                          : 'Bu cihazda kullanılamıyor.',
                   ),
-                ),
+                ).catch(() => setPush('Kaydedilemedi: internet bağlantınızı kontrol edip yeniden deneyin.')),
             },
           ]
         : []),

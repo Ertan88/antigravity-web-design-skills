@@ -54,6 +54,22 @@ gönderilir. Bunun için:
 3. Derleyin: `npx eas build -p android` ve `npx eas build -p ios`, mağazaya gönderin: `npx eas submit`.
 4. Expo hesabında "push güvenliği" açıksa sunucunun `.env` dosyasına `PUSH_ACCESS_TOKEN=...` ekleyin.
 
+### GitHub'da derlenen APK için (Releases › okul-pano-android)
+
+APK GitHub Actions'ta derlenir; anahtarlar depoya yazılmaz, derleme sırasında eklenir (`app.config.js`):
+
+1. [console.firebase.google.com](https://console.firebase.google.com) › yeni proje › Android uygulaması ekle, paket adı
+   `com.okulpano.app`. İndirilen `google-services.json` dosyasının **içeriğini** GitHub › Settings › Secrets and
+   variables › Actions › **Secrets** altına `GOOGLE_SERVICES_JSON` adıyla yapıştırın.
+2. Firebase › Proje ayarları › Hizmet hesapları › "Yeni özel anahtar oluştur" ile inen JSON'u expo.dev'de projenin
+   Credentials › Android › FCM V1 bölümüne yükleyin (Expo bildirimleri Firebase üzerinden gönderir).
+3. expo.dev'de proje açın; proje kimliğini (UUID) GitHub › **Variables** altına `EXPO_PROJECT_ID` adıyla yazın.
+4. Actions › "Okul Pano · Android APK" › Run workflow. Yeni APK'da Menü › Telefon bildirimlerini aç "Açık" der.
+
+Bu ayarlar yokken uygulama izin ister ve telefondaki hatırlatmaları (nöbet sabahı) kurar; sunucudan gelen bildirimler
+(onay, acil durum, nöbet görevlendirmesi) o sürümde gelmez. Bildirimler panelde ve uygulamadaki Bildirimler ekranında
+yine görünür.
+
 Notlar:
 - Android'de Expo Go uzaktan bildirim almaz; denemek için `npx eas build --profile development` ile geliştirme
   sürümü kurun. Nöbet hatırlatmaları (telefonda yerel kurulur) Expo Go'da da çalışır.

@@ -27,6 +27,10 @@ jobs:
       # Uygulamanın bağlandığı sunucu: girişte yalnızca e-posta ve şifre sorulur. Kendi alan adınıza geçince
       # GitHub › Settings › Secrets and variables › Actions › Variables altında PANOKUL_API_URL tanımlayın.
       EXPO_PUBLIC_API_URL: ${{ vars.PANOKUL_API_URL || 'https://okul-pano.onrender.com' }}
+      # Telefon bildirimleri (isteğe bağlı): Expo projesinin kimliği (Variables › EXPO_PROJECT_ID) ve Firebase'in
+      # google-services.json içeriği (Secrets › GOOGLE_SERVICES_JSON). Tanımlı değilse uygulama yalnızca telefondaki
+      # hatırlatmaları (nöbet sabahı) kurar; sunucudan gelen bildirimler bu sürümde gelmez.
+      EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID }}
     defaults:
       run:
         working-directory: okul-pano/mobile
@@ -46,6 +50,17 @@ jobs:
 
       - name: Bağımlılıklar
         run: npm ci
+
+      - name: Bildirim hizmeti (Firebase) ayarı
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > google-services.json
+            echo "Firebase ayarı eklendi"
+          else
+            echo "::warning::GOOGLE_SERVICES_JSON tanımlı değil: APK sunucudan telefon bildirimi alamaz"
+          fi
 
       - name: Android projesini oluştur
         run: npx expo prebuild --platform android --no-install

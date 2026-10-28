@@ -16,9 +16,12 @@ if (Platform.OS !== 'web') {
 
 /**
  * Telefon bildirimleri için cihazı kaydeder (onay bekleyen duyuru, acil durum, nöbet görevlendirmesi…).
- * İzin verilmezse, emülatörde ya da Expo hesabı (projectId) tanımlı değilse sessizce vazgeçer.
+ * - ok: bu telefon sunucudan bildirim alır
+ * - local: izin verildi, telefondaki hatırlatmalar (nöbet sabahı) çalışır; ama uygulamada bildirim hizmeti
+ *   (Firebase / Expo projesi) tanımlı olmadığı için sunucudan gelen bildirimler bu sürümde gelmez
+ * - denied: izin verilmedi · unavailable: web ya da emülatör
  */
-export async function registerForPush(): Promise<'ok' | 'denied' | 'unavailable'> {
+export async function registerForPush(): Promise<'ok' | 'local' | 'denied' | 'unavailable'> {
   if (Platform.OS === 'web' || !Device.isDevice) return 'unavailable';
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
@@ -30,14 +33,17 @@ export async function registerForPush(): Promise<'ok' | 'denied' | 'unavailable'
   const granted = current.granted || (await Notifications.requestPermissionsAsync()).granted;
   if (!granted) return 'denied';
   const projectId = (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId ?? Constants.easConfig?.projectId;
+  if (!projectId) return 'local';
+  let token: string;
   try {
-    const { data: token } = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
-    await api('/api/me/push-tokens', { method: 'POST', body: { token, platform: Platform.OS } });
-    await storage.set(TOKEN_KEY, token);
-    return 'ok';
-  } catch {
-    return 'unavailable';
+    token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+  } catch (err) {
+    console.warn('Bildirim anahtarı alınamadı:', (err as Error).message);
+    return 'local';
   }
+  await api('/api/me/push-tokens', { method: 'POST', body: { token, platform: Platform.OS } });
+  await storage.set(TOKEN_KEY, token);
+  return 'ok';
 }
 
 /** Çıkışta bu telefon artık bildirim almaz */
