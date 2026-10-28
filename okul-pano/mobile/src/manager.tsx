@@ -4,6 +4,7 @@ import { Pressable, Text, View } from 'react-native';
 import { useAuth } from './auth.tsx';
 import { useControlCenter, useMeToday } from './data.ts';
 import { clock, timeAgo } from './day.ts';
+import { MenuButton, QuickAdd } from './quick.tsx';
 import { NotificationsButton, SchoolBadge, TodayDutyCard } from './teacher.tsx';
 import { colors } from './theme.ts';
 import { Card, Empty, ErrorNote, Icon, ListRow, Loading, Screen, SectionTitle, T } from './ui.tsx';
@@ -21,31 +22,9 @@ function Stat({ value, label, to }: { value: string | number; label: string; to:
   );
 }
 
-function Action({ label, to, primary }: { label: string; to: string; primary?: boolean }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={() => router.push(to as never)}
-      style={({ pressed }) => ({
-        width: '48.5%',
-        height: 56,
-        borderRadius: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: primary ? colors.primary : '#fff',
-        borderWidth: 1,
-        borderColor: primary ? colors.primary : '#dbe3e8',
-        opacity: pressed ? 0.8 : 1,
-      })}
-    >
-      <Text style={{ fontSize: 14, fontWeight: primary ? '700' : '600', color: primary ? '#fff' : colors.ink }}>{label}</Text>
-    </Pressable>
-  );
-}
-
 /** Yöneticinin ana ekranı: kontrol merkezi (tasarım 7) */
 export function ManagerHome() {
-  const { school, can, isTeacher } = useAuth();
+  const { school, role, isTeacher } = useAuth();
   const center = useControlCenter();
   const me = useMeToday();
   const c = center.data;
@@ -98,26 +77,24 @@ export function ManagerHome() {
       ]
     : [];
 
-  const actions = [
-    can('announcements.manage') && { label: 'Duyuru ekle', to: '/duyuru-yeni', primary: true },
-    can('announcements.manage') && { label: 'Yayın akışı', to: '/yayin-akisi' },
-  ].filter(Boolean) as { label: string; to: string; primary?: boolean }[];
 
   return (
     <Screen refreshing={center.isRefetching} onRefresh={() => void center.refetch()}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 8 }}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Profil" onPress={() => router.push('/profil')}>
-          <SchoolBadge name={school?.name ?? 'O'} />
-        </Pressable>
+        <SchoolBadge name={school?.name ?? 'O'} />
         <View style={{ flex: 1, minWidth: 0 }}>
+          <T size={12} weight="700" color={colors.primary}>
+            {school?.support ? 'DESTEK ERİŞİMİ' : role === 'owner' ? 'OKUL SAHİBİ' : 'YÖNETİCİ'}
+          </T>
           <T size={18} weight="800">
-            Kontrol merkezi
+            Merkez
           </T>
           <T size={13} color={colors.muted} lines={1}>
-            {c?.holiday ? `Tatil · ${c.holiday}` : 'Normal gün'}
+            {c?.holiday ? `Tatil · ${c.holiday}` : (school?.name ?? 'Normal gün')}
           </T>
         </View>
         <NotificationsButton />
+        <MenuButton />
       </View>
       <ErrorNote error={center.error} />
       {!c ? (
@@ -141,16 +118,8 @@ export function ManagerHome() {
             )}
           </Card>
 
-          {actions.length > 0 && (
-            <>
-              <SectionTitle>Hızlı işlemler</SectionTitle>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between' }}>
-                {actions.map((a) => (
-                  <Action key={a.to} {...a} />
-                ))}
-              </View>
-            </>
-          )}
+          {/* "Benim günüm" kartı yer kapladığı için öğretmen kaydı olan yöneticide üç hızlı ekleme; diğerleri Menü › İçerik'te */}
+          <QuickAdd max={isTeacher ? 3 : 6} />
 
           {isTeacher && me.data && (
             <>

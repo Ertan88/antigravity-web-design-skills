@@ -1,13 +1,11 @@
-import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { api } from '../../src/api.ts';
-import { useAuth, useSchoolPath } from '../../src/auth.tsx';
+import { useAuth } from '../../src/auth.tsx';
 import { useScreens, type Screen as Board } from '../../src/data.ts';
 import { timeAgo } from '../../src/day.ts';
+import { PairCard } from '../../src/pair.tsx';
 import { colors } from '../../src/theme.ts';
-import { Button, Card, Empty, ErrorNote, Field, Icon, Loading, Screen, T } from '../../src/ui.tsx';
+import { Card, Empty, ErrorNote, Icon, Loading, Screen, T } from '../../src/ui.tsx';
 
 const MODE_LABEL = { board: 'Tam pano', slides: 'Yalnızca duyurular', clock: 'Tam ekran saat' } as const;
 
@@ -29,7 +27,7 @@ export default function Panolar() {
         <Loading />
       ) : !list.length ? (
         <Card>
-          <Empty icon="tv-outline" title="Henüz pano yok" text="Okuldaki televizyonda pano adresini açın, ekrandaki 6 haneli kodu aşağıya yazın." />
+          <Empty icon="tv-outline" title="Henüz pano yok" text="Okuldaki televizyonda pano adresini açın; ekrandaki QR kodu okutun ya da 6 haneli kodu yazın." />
         </Card>
       ) : (
         list.map((s) => <BoardRow key={s.id} s={s} />)
@@ -72,58 +70,5 @@ function BoardRow({ s }: { s: Board }) {
         <Icon name="chevron-forward" size={18} color={colors.faint} />
       </Card>
     </Pressable>
-  );
-}
-
-/** Yeni pano: televizyonda görünen 6 haneli kodla eşleştirme */
-function PairCard() {
-  const { school } = useAuth();
-  const path = useSchoolPath('screens/pair');
-  const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [code, setCode] = useState('');
-  const [name, setName] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  if (!open) {
-    return (
-      <Button variant="secondary" icon="add-circle-outline" onPress={() => setOpen(true)}>
-        Kodla yeni pano bağla
-      </Button>
-    );
-  }
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await api(path, { method: 'POST', body: { code, name } });
-      await qc.invalidateQueries({ queryKey: [school?.id, 'screens'] });
-      setOpen(false);
-      setCode('');
-      setName('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Bağlanamadı');
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <Card style={{ gap: 12 }}>
-      <T weight="700">Yeni pano bağla</T>
-      <T size={13} color={colors.muted}>
-        Televizyonda pano adresini açın; ekranda görünen 6 haneli kodu yazın.
-      </T>
-      <Field label="Ekrandaki kod" value={code} onChangeText={(v) => setCode(v.toUpperCase())} autoCapitalize="characters" maxLength={7} placeholder="ör. K7M2QX" />
-      <Field label="Pano adı" value={name} onChangeText={setName} placeholder="ör. Giriş holü" maxLength={60} />
-      {error && <T color={colors.danger}>{error}</T>}
-      <View style={{ flexDirection: 'row', gap: 10 }}>
-        <Button variant="secondary" style={{ flex: 1 }} onPress={() => setOpen(false)}>
-          Vazgeç
-        </Button>
-        <Button style={{ flex: 1 }} loading={busy} disabled={code.length < 6 || !name.trim()} onPress={() => void submit()}>
-          Bağla
-        </Button>
-      </View>
-    </Card>
   );
 }

@@ -3,8 +3,10 @@ import { router } from 'expo-router';
 import { useEffect, useRef, type ComponentProps, type ReactNode } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Easing,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -418,3 +420,14 @@ export const styles = StyleSheet.create({
   listRowBorder: { borderBottomWidth: 1, borderBottomColor: '#eef2f5' },
   iconBox: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
 });
+
+/** Geri alınamayan işlemlerden önce onay (web'de tarayıcının onay penceresi) */
+export function confirm(title: string, message: string, ok = 'Evet', destructive = true): Promise<boolean> {
+  if (Platform.OS === 'web') return Promise.resolve(window.confirm(`${title}\n\n${message}`));
+  return new Promise((resolve) =>
+    Alert.alert(title, message, [
+      { text: 'Vazgeç', style: 'cancel', onPress: () => resolve(false) },
+      { text: ok, style: destructive ? 'destructive' : 'default', onPress: () => resolve(true) },
+    ], { cancelable: true, onDismiss: () => resolve(false) }),
+  );
+}

@@ -1,19 +1,57 @@
 import { Tabs } from 'expo-router';
 import { Text } from 'react-native';
-import { useAuth } from '../../src/auth.tsx';
-import { useControlCenter } from '../../src/data.ts';
+import { useAuth, type AppRole } from '../../src/auth.tsx';
+import { useControlCenter, useInbox } from '../../src/data.ts';
 import { colors } from '../../src/theme.ts';
 import { Icon, type IconName } from '../../src/ui.tsx';
 
+type TabName = 'index' | 'onaylar' | 'panolar' | 'nobet' | 'acil' | 'duyurular' | 'izinlerim' | 'okullar' | 'takvim' | 'kutu' | 'profil';
+
 /**
- * Alt menü role göre değişir. Öğretmen: Bugün · Nöbet · Duyurular · Panolar · Profil.
- * Yönetici: Merkez · Onaylar · Panolar · Nöbet · Acil (profil, merkezin sağ üstünde).
+ * Alt menü role göre kurulur (en çok 5 sekme; geri kalanı profil menüsünde):
+ * - Platform yöneticisi: Platform · Okullar · Takvim · Bildirimler
+ * - Okul sahibi ve yönetici: Merkez · Onaylar · Panolar · Nöbet · Acil
+ * - Editör: İçerik + yetkilerinden gelen sekmeler (Duyurular, Onaylar, Panolar, Nöbet, Acil) + Bildirimler
+ * - Öğretmen: Bugün · Nöbetim · Duyurular · İzin · Profil
  */
+function visibleTabs(role: AppRole, can: (p: Parameters<ReturnType<typeof useAuth>['can']>[0]) => boolean): TabName[] {
+  switch (role) {
+    case 'platform':
+      return ['index', 'okullar', 'takvim', 'kutu'];
+    case 'owner':
+    case 'admin':
+      return ['index', 'onaylar', 'panolar', 'nobet', 'acil'];
+    case 'editor': {
+      const extra: TabName[] = [];
+      if (can('announcements.manage')) extra.push('duyurular');
+      if (can('announcements.approve') || can('leaves.manage')) extra.push('onaylar');
+      if (can('board.control') || can('screens.manage')) extra.push('panolar');
+      if (can('duties.manage')) extra.push('nobet');
+      if (can('emergency.manage')) extra.push('acil');
+      return ['index', ...extra.slice(0, 3), 'kutu'];
+    }
+    default:
+      return ['index', 'nobet', 'duyurular', 'izinlerim', 'profil'];
+  }
+}
+
+const HOME_TITLE: Record<AppRole, string> = { platform: 'Platform', owner: 'Merkez', admin: 'Merkez', editor: 'İçerik', teacher: 'Bugün' };
+const HOME_ICON: Record<AppRole, [IconName, IconName]> = {
+  platform: ['grid-outline', 'grid'],
+  owner: ['grid-outline', 'grid'],
+  admin: ['grid-outline', 'grid'],
+  editor: ['create-outline', 'create'],
+  teacher: ['home-outline', 'home'],
+};
+
 export default function TabsLayout() {
-  const { isManager, can } = useAuth();
-  const center = useControlCenter(isManager);
-  const pending = isManager ? (center.data?.pending.announcements ?? 0) + (center.data?.pending.leaves ?? 0) : 0;
-  const showApprovals = isManager && (can('announcements.approve') || can('leaves.manage'));
+  const { role, can, isManager } = useAuth();
+  const center = useControlCenter(isManager && role !== 'platform');
+  const inbox = useInbox('unread');
+  const pending = (center.data?.pending.announcements ?? 0) + (center.data?.pending.leaves ?? 0);
+  const shown = new Set(visibleTabs(role, can));
+  // Rolde olmayan sekmenin yalnızca düğmesi gizlenir (href: null rotayı da kapatır; bildirimden ya da Menü'den açılamaz)
+  const hide = (name: TabName) => (shown.has(name) ? {} : { tabBarButton: () => null, tabBarItemStyle: { display: 'none' as const } });
   const icon = (name: IconName, active: IconName) =>
     function TabIcon({ focused, color }: { focused: boolean; color: unknown }) {
       return <Icon name={focused ? active : name} size={23} color={typeof color === 'string' ? color : colors.muted} />;
@@ -29,25 +67,35 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: colors.bg },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: isManager ? 'Merkez' : 'Bugün', tabBarIcon: isManager ? icon('grid-outline', 'grid') : icon('home-outline', 'home') }} />
+      <Tabs.Screen name="index" options={{ title: HOME_TITLE[role], tabBarIcon: icon(...HOME_ICON[role]) }} />
+      <Tabs.Screen name="okullar" options={{ title: 'Okullar', ...hide('okullar'), tabBarIcon: icon('business-outline', 'business') }} />
+      <Tabs.Screen name="takvim" options={{ title: 'Takvim', ...hide('takvim'), tabBarIcon: icon('calendar-outline', 'calendar') }} />
       <Tabs.Screen
         name="onaylar"
-        options={{ title: 'Onaylar', href: showApprovals ? undefined : null, tabBarIcon: icon('checkmark-done-outline', 'checkmark-done'), tabBarBadge: pending || undefined }}
+        options={{ title: 'Onaylar', ...hide('onaylar'), tabBarIcon: icon('checkmark-done-outline', 'checkmark-done'), tabBarBadge: pending || undefined }}
       />
-      <Tabs.Screen name="nobet" options={{ title: 'Nöbet', tabBarIcon: icon('shield-checkmark-outline', 'shield-checkmark') }} />
-      <Tabs.Screen name="duyurular" options={{ title: 'Duyurular', href: isManager ? null : undefined, tabBarIcon: icon('megaphone-outline', 'megaphone') }} />
-      <Tabs.Screen name="panolar" options={{ title: 'Panolar', tabBarIcon: icon('tv-outline', 'tv') }} />
+      <Tabs.Screen name="duyurular" options={{ title: 'Duyurular', ...hide('duyurular'), tabBarIcon: icon('megaphone-outline', 'megaphone') }} />
+      <Tabs.Screen name="panolar" options={{ title: 'Panolar', ...hide('panolar'), tabBarIcon: icon('tv-outline', 'tv') }} />
+      <Tabs.Screen
+        name="nobet"
+        options={{ title: role === 'teacher' ? 'Nöbetim' : 'Nöbet', ...hide('nobet'), tabBarIcon: icon('shield-checkmark-outline', 'shield-checkmark') }}
+      />
+      <Tabs.Screen name="izinlerim" options={{ title: 'İzin', ...hide('izinlerim'), tabBarIcon: icon('calendar-clear-outline', 'calendar-clear') }} />
       <Tabs.Screen
         name="acil"
         options={{
           title: 'Acil',
-          href: can('emergency.manage') ? undefined : null,
+          ...hide('acil'),
           // Acil sekmesi her zaman kırmızı (diğer sekmelerin rengini değiştirmeden)
           tabBarIcon: ({ focused }) => <Icon name={focused ? 'warning' : 'warning-outline'} size={23} color={colors.danger} />,
           tabBarLabel: () => <Text style={{ fontSize: 11, fontWeight: '700', color: colors.danger }}>Acil</Text>,
         }}
       />
-      <Tabs.Screen name="profil" options={{ title: 'Profil', href: isManager ? null : undefined, tabBarIcon: icon('person-outline', 'person') }} />
+      <Tabs.Screen
+        name="kutu"
+        options={{ title: 'Bildirimler', ...hide('kutu'), tabBarIcon: icon('notifications-outline', 'notifications'), tabBarBadge: inbox.data?.unread || undefined }}
+      />
+      <Tabs.Screen name="profil" options={{ title: 'Profil', ...hide('profil'), tabBarIcon: icon('person-outline', 'person') }} />
     </Tabs>
   );
 }

@@ -14,6 +14,10 @@ const ROUTES: Record<string, string> = {
   approved: '/duyurular',
   'duty-gap': '/nobet',
   'month-student': '/duyuru-yeni',
+  'support-access': '/okullar',
+  'support-revoked': '/okullar',
+  'support-expired': '/okullar',
+  'meb-calendar': '/takvim',
 };
 const ICONS: Record<string, { icon: IconName; tone: 'primary' | 'warning' | 'danger' | 'gold' | 'muted' }> = {
   approval: { icon: 'checkmark-done-outline', tone: 'primary' },
@@ -23,6 +27,10 @@ const ICONS: Record<string, { icon: IconName; tone: 'primary' | 'warning' | 'dan
   'duty-gap': { icon: 'shield-checkmark-outline', tone: 'warning' },
   'month-student': { icon: 'star-outline', tone: 'gold' },
   'bridge-day': { icon: 'calendar-outline', tone: 'warning' },
+  'support-access': { icon: 'key-outline', tone: 'primary' },
+  'support-revoked': { icon: 'lock-closed-outline', tone: 'muted' },
+  'support-expired': { icon: 'lock-closed-outline', tone: 'muted' },
+  'meb-calendar': { icon: 'calendar-outline', tone: 'primary' },
 };
 const FALLBACK = { icon: 'notifications-outline' as IconName, tone: 'muted' as const };
 
@@ -31,6 +39,11 @@ const FALLBACK = { icon: 'notifications-outline' as IconName, tone: 'muted' as c
  * ekran açılır; zarf simgesi okundu / okunmadı yapar.
  */
 export default function Bildirimler() {
+  return <InboxScreen back />;
+}
+
+/** Alt menüdeki Bildirimler sekmesi de aynı ekranı geri düğmesi olmadan kullanır */
+export function InboxScreen({ back }: { back?: boolean }) {
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const inbox = useInbox(filter);
   const { read, unread, readAll } = useInboxActions();
@@ -44,7 +57,7 @@ export default function Bildirimler() {
   };
 
   return (
-    <Screen back title="Bildirimler" refreshing={inbox.isRefetching} onRefresh={() => void inbox.refetch()}>
+    <Screen back={back} title="Bildirimler" refreshing={inbox.isRefetching} onRefresh={() => void inbox.refetch()}>
       <Segmented
         value={filter}
         onChange={setFilter}

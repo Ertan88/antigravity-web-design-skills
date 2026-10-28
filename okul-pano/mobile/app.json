@@ -17,14 +17,18 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Duyuru ve başarı fotoğrafı çekmek için kamera kullanılır.",
-        "NSPhotoLibraryUsageDescription": "Duyuru ve başarı fotoğrafı seçmek için galeri kullanılır."
+        "NSPhotoLibraryUsageDescription": "Duyuru ve başarı fotoğrafı seçmek için galeri kullanılır.",
+        "NSCalendarsUsageDescription": "Nöbetlerinizi ve sınavları telefon takviminize eklemek için kullanılır.",
+        "NSCalendarsFullAccessUsageDescription": "Nöbetlerinizi ve sınavları telefon takviminize eklemek için kullanılır."
       }
     },
     "android": {
       "package": "com.okulpano.app",
       "permissions": [
         "CAMERA",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "READ_CALENDAR",
+        "WRITE_CALENDAR"
       ],
       "versionCode": 1,
       "adaptiveIcon": {
@@ -72,6 +76,20 @@
           "android": {
             "usesCleartextTraffic": true
           }
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Panoyu eşleştirmek için QR kodu okutmak ve fotoğraf çekmek için kamera kullanılır.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Nöbetlerinizi ve sınavları telefon takviminize eklemek için kullanılır."
         }
       ]
     ],

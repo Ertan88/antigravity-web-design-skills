@@ -197,6 +197,8 @@ export async function authRoutes(app: FastifyInstance) {
     await db.delete(sessions).where(eq(sessions.userId, sub));
     const refreshToken = await issueSession(req, sub);
     setRefreshCookie(reply, refreshToken);
-    return { ok: true };
+    // Mobil uygulama çerez kullanmaz: oturumu sürdürmek için yeni anahtarı yanıttan alır
+    const mobile = (req.body as { client?: unknown } | undefined)?.client === 'mobile';
+    return mobile ? { ok: true, refreshToken } : { ok: true };
   });
 }

@@ -123,6 +123,12 @@ export async function login(email: string, password: string) {
   await session.setTokens(json.accessToken, json.refreshToken);
 }
 
+/** Şifre değişince sunucu diğer oturumları kapatır; bu cihazın oturumu yeni anahtarla sürer */
+export async function changePassword(currentPassword: string, newPassword: string) {
+  const json = await api<{ refreshToken?: string }>('/api/me/password', { method: 'POST', body: { currentPassword, newPassword, client: 'mobile' } });
+  if (json.refreshToken) await session.setTokens(null, json.refreshToken);
+}
+
 export async function logout() {
   const token = refreshToken;
   await session.setTokens(null, null);

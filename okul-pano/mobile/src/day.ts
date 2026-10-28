@@ -109,3 +109,12 @@ export function timeAgo(iso: string | null | undefined): string {
 }
 
 export const clock = (iso: string) => new Intl.DateTimeFormat('tr-TR', { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+
+/** Kısaltmasız, yıl ve gün adıyla: "16 Kasım 2026 Pazartesi" (tarih ya da tarih-saat) */
+export const fullDate = (iso: string) => dayTitle(iso.slice(0, 10), { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' });
+/** "16 Kasım 2026 Pazartesi – 20 Kasım 2026 Cuma" (aynı günse tek tarih) */
+export const dateSpan = (a: string, b: string) => (a === b ? fullDate(a) : `${fullDate(a)} – ${fullDate(b)}`);
+/** Telefonun saatine göre tarih: YYYY-AA-GG */
+export function localIso(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}

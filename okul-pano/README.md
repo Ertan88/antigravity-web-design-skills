@@ -50,6 +50,18 @@ Expo (React Native) ile yazılmış tek uygulama; ekranlar kişinin yetkisine g�
 | **İzin bildirimi:** onaylanınca panoda izinli görünür | **Boş nöbet:** izinli öğretmenin nöbeti için öneriler (o gün nöbeti olmayan, bu ay en az nöbet tutan); "Ata" ile bildirim gider |
 | | **Acil durum:** 3 saniye basılı tutunca bütün panolarda uyarı ve herkesin telefonuna bildirim |
 
+**Role göre menüler:** alt menü ve sağ üstteki Menü kişinin rolüne göre kurulur; herkes Menü › Hesabım'dan profil bilgilerini (ad, e-posta) günceller, şifresini değiştirir ve çıkış yapar.
+
+| Rol | Alt menü | Menü'deki ek ekranlar |
+|---|---|---|
+| Platform yöneticisi | Platform · Okullar · Takvim · Bildirimler | Okulumu aç (kendi okulunda her şey açık), destek erişimi olan okullar, kayıt onayları, MEB çalışma takvimi (tara, onayla) |
+| Okul sahibi (müdür) | Merkez · Onaylar · Panolar · Nöbet · Acil | Kullanıcılar ve yetkiler (yönetici ve editör atar), **destek erişimi** (24 saat / 7 gün), tatil takvimi, etkinlik geçmişi, içerik (kayan yazı, başarılar, etkinlik, sınav, haftanın kitabı; fotoğraf kameradan), doğum günleri |
+| Yönetici | Merkez · Onaylar · Panolar · Nöbet · Acil | Okul sahibiyle aynı; yalnızca editör ekler, yönetici atamaz ve destek erişimi veremez |
+| Editör | İçerik + yetkilerinden gelen en çok 3 sekme + Bildirimler | Yalnızca yetkisi olan içerik türleri; öğretmen kaydı varsa öğretmen araçları |
+| Öğretmen | Bugün · Nöbetim · Duyurular · İzin · Profil | Ders programım ve zil saatleri, telefon takvimine ekle (nöbetler ve sınavlar), tatil takvimi, sınavlar ve etkinlikler, bugün doğum günü olanlar |
+
+Yalnızca duyuru yetkisi olan öğretmen öğretmen görünümünde kalır. Yeni pano bağlarken televizyondaki QR kod uygulamayla (Panolar › QR ile bağla) ya da telefonun kamerasıyla okutulur; 6 haneli kod yedek yol olarak durur.
+
 Telefon bildirimleri (Expo push): onaya düşen duyuru ve izin, onay sonucu, acil durum, nöbet görevlendirmesi, 10 dakikadır kapalı pano. Aynı uygulamanın web sürümü sunucunun `/app/` adresinden açılır; uygulama kurmayan öğretmenler tarayıcıdan kullanır.
 
 ## Öne çıkan teknik kararlar

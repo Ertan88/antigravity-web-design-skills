@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react';
 import { pollPairing, startPairing, type PairingStart } from './api.ts';
 import { BrandMark } from './components/Brand.tsx';
+import { QrCode } from './components/QrCode.tsx';
 import { Stage } from './components/Stage.tsx';
 
 const ADMIN_URL = (import.meta.env.VITE_ADMIN_URL as string | undefined) ?? `${location.origin}/admin/`;
+
+/** Telefondaki Okul Yayın uygulamasının açtığı eşleştirme adresi (QR ile okutulur) */
+export const pairingLink = (code: string) => `okulpano://eslestir/${code}`;
 
 /**
  * İlk kurulum ekranı: TV'de klavye gerekmez. Ekran 6 haneli kod gösterir,
@@ -71,15 +75,21 @@ export function Pairing({ onPaired }: { onPaired: (token: string) => void }) {
                 </span>
               ))}
             </div>
-            <ol className="pairing-steps">
-              <li>
-                Yönetim panelini açın: <strong>{ADMIN_URL.replace(/^https?:\/\//, '')}</strong>
-              </li>
-              <li>
-                <strong>Ekranlar → Ekran Ekle</strong> bölümüne gelin
-              </li>
-              <li>Yukarıdaki kodu girin; ekran kendiliğinden açılacak</li>
-            </ol>
+            <div className="pairing-ways">
+              <div className="pairing-qr">
+                <QrCode value={pairingLink(pairing.code)} size={260} label="Eşleştirme QR kodu" />
+                <span>Okul Yayın uygulamasında Panolar › QR ile bağla</span>
+              </div>
+              <ol className="pairing-steps">
+                <li>
+                  Yönetim panelini açın: <strong>{ADMIN_URL.replace(/^https?:\/\//, '')}</strong>
+                </li>
+                <li>
+                  <strong>Ekranlar → Ekran Ekle</strong> bölümüne gelin
+                </li>
+                <li>Yukarıdaki kodu girin; ekran kendiliğinden açılacak</li>
+              </ol>
+            </div>
             <div className="pairing-expiry">
               Kod {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')} sonra yenilenecek
             </div>

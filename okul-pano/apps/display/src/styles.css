@@ -1313,6 +1313,23 @@ p {
   margin-left: 44px;
 }
 
+.pairing-ways {
+  display: flex;
+  align-items: center;
+  gap: 64px;
+}
+
+.pairing-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: 300px;
+  font-size: 22px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
 .pairing-steps {
   font-size: 30px;
   line-height: 1.8;

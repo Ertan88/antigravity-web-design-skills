@@ -1,7 +1,9 @@
+import { academicYearOf, type AcademicCalendarData } from '@okulpano/shared/academicCalendar';
 import type { BellScheduleLike } from '@okulpano/shared/bell';
 import type { ScreenLiveStatus } from '@okulpano/shared/control';
 import type { AnnouncementDesign } from '@okulpano/shared/designs';
 import type { EmergencyType } from '@okulpano/shared/emergency';
+import type { Permission, Role } from '@okulpano/shared/permissions';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { api } from './api.ts';
@@ -14,6 +16,7 @@ export interface SchoolInfo {
   name: string;
   logoUrl: string | null;
   timezone: string;
+  supportAccessUntil?: string | null;
   settings: { requireApproval?: boolean; schoolType?: string; lunchThresholdMin?: number };
 }
 
@@ -130,7 +133,7 @@ export interface InboxPage {
 
 /* ---------- Sorgular ---------- */
 
-function useSchoolQuery<T>(resource: string, opts: { refetchInterval?: number; enabled?: boolean } = {}) {
+export function useSchoolQuery<T>(resource: string, opts: { refetchInterval?: number; enabled?: boolean } = {}) {
   const { school } = useAuth();
   const path = useSchoolPath(resource);
   return useQuery({
@@ -148,13 +151,22 @@ export const useScreens = (fast = false) => useSchoolQuery<Screen[]>('screens', 
 export const useAnnouncements = () => useSchoolQuery<Announcement[]>('announcements', { refetchInterval: 60_000 });
 export const useLeaves = (enabled = true) => useSchoolQuery<Leave[]>('leaves', { enabled });
 export const useMyLeaves = () => useSchoolQuery<Leave[]>('me/leaves');
-export const useInbox = (filter: 'all' | 'unread' = 'all') => useSchoolQuery<InboxPage>(`inbox?filter=${filter}&limit=50`, { refetchInterval: 60_000 });
+/** Bildirim kutusu: okul seçiliyse okulun ve platformun bildirimleri, değilse (platform yöneticisi) yalnızca platformunkiler */
+export function useInbox(filter: 'all' | 'unread' = 'all') {
+  const { school } = useAuth();
+  const path = useSchoolPath(`inbox?filter=${filter}&limit=50`);
+  return useQuery({
+    queryKey: [school?.id ?? 'me', `inbox?filter=${filter}`],
+    queryFn: () => api<InboxPage>(school ? path : `/api/me/inbox?filter=${filter}&limit=50`),
+    refetchInterval: 60_000,
+  });
+}
 
 /** Okundu / okunmadı / sil; sonrasında kutu ve zil tazelenir */
 export function useInboxActions() {
   const { school } = useAuth();
   const qc = useQueryClient();
-  const refresh = () => qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === school?.id && String(q.queryKey[1]).startsWith('inbox') });
+  const refresh = () => qc.invalidateQueries({ predicate: (q) => String(q.queryKey[1]).startsWith('inbox') });
   const read = useMutation({ mutationFn: (body: { ids?: string[]; all?: true; schoolId?: string }) => api('/api/me/inbox/read', { method: 'POST', body }), onSuccess: refresh });
   const unread = useMutation({ mutationFn: (id: string) => api(`/api/me/inbox/${id}/unread`, { method: 'POST' }), onSuccess: refresh });
   const remove = useMutation({ mutationFn: (id: string) => api(`/api/me/inbox/${id}`, { method: 'DELETE' }), onSuccess: refresh });
@@ -177,3 +189,87 @@ export function useNow(ms = 1000): Date {
   }, [ms]);
   return now;
 }
+
+/* ---------- Okul yönetimi ---------- */
+
+export interface Member {
+  id: string;
+  userId: string;
+  email: string;
+  fullName: string;
+  role: Role;
+  permissions: Permission[];
+  effectivePermissions: Permission[];
+  teacherId: string | null;
+  teacherName: string | null;
+  lastLoginAt: string | null;
+  invitePending: boolean;
+}
+export const useMembers = (enabled = true) => useSchoolQuery<Member[]>('members', { enabled });
+
+export interface HolidayList {
+  holidays: { id: string | null; date: string; name: string; source: 'official' | 'meb' | 'school' }[];
+  halfDays: { date: string; name: string }[];
+  bridges: { date: string; near: string }[];
+}
+/** Bugünden eğitim yılının sonuna (30 Haziran) kadar tatiller, arifeler ve olası köprü günleri */
+export function useUpcomingHolidays() {
+  const today = new Date().toISOString().slice(0, 10);
+  const end = `${academicYearOf(today) + 1}-06-30`;
+  const days = Math.max(30, Math.round((Date.parse(end) - Date.parse(today)) / 86400_000));
+  return useSchoolQuery<HolidayList>(`holidays/upcoming?days=${days}`);
+}
+
+export interface AuditRow {
+  id: string;
+  action: string;
+  entity: string;
+  summary: string | null;
+  createdAt: string;
+  userName: string | null;
+}
+
+/* ---------- Platform yöneticisi ---------- */
+
+export interface PlatformSchool {
+  id: string;
+  name: string;
+  slug: string;
+  city: string | null;
+  plan: 'trial' | 'basic' | 'pro';
+  maxScreens: number;
+  isActive: boolean;
+  trialEndsAt: string | null;
+  supportAccessUntil: string | null;
+  screenCount: number;
+  createdAt: string;
+  member: boolean;
+  canOpen: boolean;
+}
+export interface Signup {
+  id: string;
+  schoolName: string;
+  ownerName: string;
+  email: string;
+  city: string | null;
+  createdAt: string;
+  expired: boolean;
+}
+export interface CalendarRow {
+  startYear: number;
+  label: string;
+  data: AcademicCalendarData;
+  source: 'meb' | 'manual' | 'builtin';
+  sourceUrl: string | null;
+  status: 'confirmed' | 'review';
+  pending: { data: AcademicCalendarData; sourceUrl: string; foundAt: string } | null;
+  checkedAt: string | null;
+}
+
+function usePlatformQuery<T>(path: string) {
+  const { me } = useAuth();
+  return useQuery({ queryKey: ['platform', path], queryFn: () => api<T>(`/api/platform/${path}`), enabled: Boolean(me?.user.isSuperAdmin) });
+}
+export const usePlatformSchools = () => usePlatformQuery<PlatformSchool[]>('schools');
+export const useSignups = () => usePlatformQuery<Signup[]>('signups');
+export const useAcademicCalendars = () => usePlatformQuery<CalendarRow[]>('academic-calendars');

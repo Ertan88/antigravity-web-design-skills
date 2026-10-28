@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { View } from 'react-native';
 import { useAuth } from '../../src/auth.tsx';
 import { useAnnouncements, type Announcement } from '../../src/data.ts';
-import { timeAgo } from '../../src/day.ts';
+import { fullDate, localIso, timeAgo } from '../../src/day.ts';
 import { AnnouncementPreview } from '../../src/preview.tsx';
 import { colors } from '../../src/theme.ts';
 import { Badge, Button, Card, Empty, Loading, Screen, SectionTitle, T } from '../../src/ui.tsx';
@@ -15,6 +15,41 @@ function status(a: Announcement): { label: string; tone: 'success' | 'warning' |
   return { label: 'Panolarda yayında', tone: 'success' };
 }
 
+/** Duyuru yetkisi olmayan öğretmen: panolarda şu an yayında olan duyurular (okuma) */
+function OnAir({ list }: { list: Announcement[] }) {
+  const now = Date.now();
+  const live = list.filter((a) => a.approvalStatus === 'approved' && a.isActive && (!a.startsAt || Date.parse(a.startsAt) <= now) && (!a.endsAt || Date.parse(a.endsAt) > now));
+  if (!live.length)
+    return (
+      <Card>
+        <Empty icon="megaphone-outline" title="Şu an panolarda duyuru yok" text="Panoya duyuru eklemek isterseniz okul yöneticinizden Duyurular yetkisi isteyin." />
+      </Card>
+    );
+  return (
+    <>
+      <SectionTitle>Panolarda yayında</SectionTitle>
+      {live.map((a) => (
+        <Card key={a.id} style={{ padding: 0, gap: 0, overflow: 'hidden' }}>
+          <AnnouncementPreview kind={a.kind} title={a.title} body={a.body} imageUrl={a.imageUrl} design={a.design} height={140} />
+          <View style={{ padding: 14, gap: 4 }}>
+            <T weight="700">{a.title}</T>
+            {a.body ? (
+              <T size={13} color={colors.muted}>
+                {a.body}
+              </T>
+            ) : null}
+            {a.endsAt ? (
+              <T size={12} color={colors.muted}>
+                {fullDate(localIso(new Date(a.endsAt)))} tarihine kadar
+              </T>
+            ) : null}
+          </View>
+        </Card>
+      ))}
+    </>
+  );
+}
+
 /** Öğretmenin duyuruları: gönderdikleri ve durumları (onay bekliyor, yayında, düzeltme istendi) */
 export default function Duyurular() {
   const { me, can } = useAuth();
@@ -22,7 +57,7 @@ export default function Duyurular() {
   const mine = (list.data ?? []).filter((a) => a.createdBy === me?.user.id);
   return (
     <Screen
-      title="Duyurularım"
+      title={can('announcements.manage') ? 'Duyurularım' : 'Duyurular'}
       refreshing={list.isRefetching}
       onRefresh={() => void list.refetch()}
       right={
@@ -36,9 +71,7 @@ export default function Duyurular() {
       {list.isLoading ? (
         <Loading />
       ) : !can('announcements.manage') ? (
-        <Card>
-          <Empty icon="megaphone-outline" title="Duyuru ekleme yetkiniz yok" text="Panoya duyuru eklemek için okul yöneticinizden Duyurular yetkisi isteyin." />
-        </Card>
+        <OnAir list={list.data ?? []} />
       ) : !mine.length ? (
         <Card>
           <Empty icon="megaphone-outline" title="Henüz duyuru göndermediniz" text="Veli toplantısı, gezi, sınav gibi hazır şablonlarla bir dakikada duyuru hazırlayın." />
