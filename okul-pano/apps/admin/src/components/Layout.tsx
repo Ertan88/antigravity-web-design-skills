@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { Building2, CalendarRange, ChevronRight, ChevronsUpDown, LogOut, Menu, Moon, School, Sun, X } from 'lucide-react';
+import { Building2, ChevronRight, ChevronsUpDown, LogOut, Menu, Moon, School, Sun, X } from 'lucide-react';
 import { Suspense, useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth.tsx';
@@ -120,9 +120,6 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             <div className="px-3 pb-1.5 text-[10.5px] font-semibold tracking-[0.12em] text-slate-400 uppercase">Platform</div>
             <NavLink to="/platform" end onClick={onNavigate} className={navLinkClass}>
               <Building2 className="size-[18px] text-slate-400" /> Okullar ve Abonelikler
-            </NavLink>
-            <NavLink to="/platform/takvim" onClick={onNavigate} className={navLinkClass}>
-              <CalendarRange className="size-[18px] text-slate-400" /> MEB Çalışma Takvimi
             </NavLink>
           </div>
         )}

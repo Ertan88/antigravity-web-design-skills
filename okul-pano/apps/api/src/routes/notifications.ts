@@ -139,8 +139,8 @@ export async function notificationRoutes(app: FastifyInstance) {
       }
     }
 
-    // Önümüzdeki 3 hafta: bayrama bitişik olası köprü günleri (idari izin ilan edilirse Zil Saatleri › Tatiller'den işaretlenir)
-    if (permissions.includes('duties.manage') && permissions.includes('schedule.manage')) {
+    // Önümüzdeki 3 hafta: bayrama bitişik olası köprü günleri (idari izin ilan edilirse Tatil Takvimi'nden işaretlenir)
+    if (permissions.includes('duties.manage')) {
       const today = zonedParts(new Date(), school.timezone).isoDate;
       const { bridges } = await upcomingHolidays(db, schoolId, today, 21);
       for (const b of bridges) {
@@ -150,7 +150,7 @@ export async function notificationRoutes(app: FastifyInstance) {
           title: 'Olası köprü günü',
           body: `${dateText(b.date)}, ${b.near} tatiline bitişik. İdari izin ilan edilirse tatil olarak işaretleyin; pano o gün zil çalmaz.`,
           at: new Date(`${today}T06:00:00Z`).toISOString(),
-          to: '/zil-saatleri?tatiller=1',
+          to: '/tatil-takvimi',
         });
       }
     }

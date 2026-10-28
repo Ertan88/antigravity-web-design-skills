@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Alert, Button, Card, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Spinner, WeekdayPicker } from '../components/ui.tsx';
 import { useAuth } from '../lib/auth.tsx';
 import { useList, useResource, useSchool, type BellSchedule } from '../lib/data.ts';
-import { HolidaysCard, useUpcomingHolidays, useWeekHolidays } from './bell/HolidaysCard.tsx';
+import { useUpcomingHolidays, useWeekHolidays } from './bell/HolidaysCard.tsx';
 import { ScheduleView, useNow, WeekCoverage } from './bell/ScheduleView.tsx';
 import { useForm } from '../lib/form.ts';
 
@@ -335,10 +335,6 @@ export function BellSchedules() {
           )}
         </div>
       )}
-
-      <div className="mt-5">
-        <HolidaysCard />
-      </div>
 
       <Modal
         open={open}

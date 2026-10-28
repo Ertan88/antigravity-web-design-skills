@@ -2,6 +2,7 @@ import { computeBellStatus, halfDayPeriods, parseClock, periodLabel, pickSchedul
 import clsx from 'clsx';
 import { BellRing, CalendarOff, Clock, Coffee, CopyPlus, Pencil, Sunrise, Sunset, Utensils } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { DeleteButton } from '../../components/ui.tsx';
 import type { BellSchedule } from '../../lib/data.ts';
 
@@ -241,7 +242,9 @@ export function ScheduleView({
               {off === 'holiday'
                 ? 'Tam gün tatil; zil çalmaz, dersler yapılmaz.'
                 : `Yarım gün; son zil ${day.endsAt}. Bu saatten sonra başlayan dersler yapılmaz, taşan ders son zilde biter.`}{' '}
-              <span className="opacity-75">Bilgi sayfanın altındaki Tatiller ve arifeler listesinden gelir.</span>
+              <Link to="/tatil-takvimi" className="font-semibold underline-offset-2 opacity-80 hover:underline">
+                Tatil Takvimi
+              </Link>
             </span>
           </div>
         )}

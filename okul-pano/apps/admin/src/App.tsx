@@ -25,7 +25,7 @@ const Events = page(() => import('./pages/SchoolLife.tsx'), 'Events');
 const Books = page(() => import('./pages/SchoolLife.tsx'), 'Books');
 const Leaves = page(() => import('./pages/Leaves.tsx'), 'Leaves');
 const Platform = page(() => import('./pages/Platform.tsx'), 'Platform');
-const AcademicCalendarPage = page(() => import('./pages/platform/AcademicCalendarPage.tsx'), 'AcademicCalendarPage');
+const HolidayCalendar = page(() => import('./pages/HolidayCalendar.tsx'), 'HolidayCalendar');
 const NotificationsPage = page(() => import('./pages/NotificationsPage.tsx'), 'NotificationsPage');
 const Screens = page(() => import('./pages/Screens.tsx'), 'Screens');
 const Settings = page(() => import('./pages/Settings.tsx'), 'Settings');
@@ -116,7 +116,8 @@ export function App() {
         <Route path="gecmis" element={needsSchool(<Guard permission="users.manage"><Audit /></Guard>)} />
         <Route path="hesap" element={<Account />} />
         <Route path="platform" element={me.user.isSuperAdmin ? <Platform /> : null} />
-        <Route path="platform/takvim" element={me.user.isSuperAdmin ? <AcademicCalendarPage /> : null} />
+        <Route path="tatil-takvimi" element={me.user.isSuperAdmin ? <HolidayCalendar /> : needsSchool(<HolidayCalendar />)} />
+        <Route path="platform/takvim" element={<Navigate to="/tatil-takvimi#meb" replace />} />
         <Route path="bildirimler" element={<NotificationsPage />} />
         <Route
           path="*"

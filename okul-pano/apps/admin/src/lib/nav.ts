@@ -3,6 +3,7 @@ import {
   BellRing,
   Cake,
   CalendarClock,
+  CalendarRange,
   CalendarDays,
   GraduationCap,
   History,
@@ -62,6 +63,8 @@ export const NAV: NavGroup[] = [
     title: 'Ders Düzeni',
     items: [
       { to: '/zil-saatleri', label: 'Zil Saatleri', icon: BellRing, permission: 'schedule.manage' },
+      // Herkes görür; tatil ekleme Nöbet yetkisiyle, MEB takvimini düzeltme yalnızca platform yöneticisinde
+      { to: '/tatil-takvimi', label: 'Tatil Takvimi', icon: CalendarRange },
       { to: '/ders-programi', label: 'Ders Programı ve Sınıflar', icon: CalendarClock, permission: 'schedule.manage' },
     ],
   },
