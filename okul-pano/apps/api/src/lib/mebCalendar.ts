@@ -66,7 +66,7 @@ export interface ScanResult {
 
 /** Alan sırasından bağımsız karşılaştırma (Postgres jsonb anahtarların sırasını değiştirir) */
 const canon = (c: AcademicCalendarData) =>
-  [c.lessonsStart, c.term1End, c.term2Start, c.lessonsEnd, ...c.breaks.map((b) => `${b.name}|${b.start}|${b.end}`)].join(',');
+  [c.lessonsStart, c.term1End, c.term2Start, c.lessonsEnd, ...c.breaks.map((b) => `${b.name}|${b.start}|${b.end}`), ...(c.seminars ?? []).map((p) => `s|${p.start}|${p.end}`)].join(',');
 const same = (a: AcademicCalendarData, b: AcademicCalendarData) => canon(a) === canon(b);
 
 /**

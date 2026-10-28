@@ -83,10 +83,15 @@ describe('MEB çalışma takvimi', () => {
     expectStatus(await root.post('/api/platform/academic-calendars/2027/accept'), 200);
     list = (await root.get('/api/platform/academic-calendars')).json();
     expect(list.find((r) => r.startYear === 2027)).toMatchObject({ status: 'confirmed', data: { lessonsStart: '2027-09-14' }, pending: null });
-    // Yaz tatili sonraki yılın derslerine kadar uzar
+    // Eylülde derslerden önceki günler öğretmenlerin mesleki çalışması (yaz tatili değil); yaz tatili 31 Ağustos'ta biter
     const sep = (await owner.get(path('holidays?month=2027-09'))).json() as Holiday[];
-    expect(sep.find((h) => h.date === '2027-09-10')?.name).toBe('Yaz Tatili');
+    expect(sep.find((h) => h.date === '2027-09-01')?.name).toBe('Öğretmenlerin Mesleki Çalışması');
+    expect(sep.find((h) => h.date === '2027-09-10')?.name).toBe('Öğretmenlerin Mesleki Çalışması');
     expect(sep.some((h) => h.date === '2027-09-14')).toBe(false);
+    const jun = (await owner.get(path('holidays?month=2027-06'))).json() as Holiday[];
+    expect(jun.find((h) => h.date === '2027-06-28')?.name).toBe('Öğretmenlerin Mesleki Çalışması');
+    const aug = (await owner.get(path('holidays?month=2027-08'))).json() as Holiday[];
+    expect(aug.find((h) => h.date === '2027-08-31')?.name).toBe('Yaz Tatili');
 
     expect((await scanMebCalendar(t.app.deps, 2028, { fetchFn: fakeMeb({ [INDEX]: index }) })).outcome).toBe('not-found');
   });

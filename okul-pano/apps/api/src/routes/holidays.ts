@@ -32,8 +32,7 @@ async function mebHolidaysInRange(db: DB, schoolId: string, from: string, to: st
     .from(academicCalendars)
     .where(and(gte(academicCalendars.startYear, academicYearOf(from) - 1), lte(academicCalendars.startYear, academicYearOf(to))))
     .orderBy(asc(academicCalendars.startYear));
-  const byYear = new Map(years.map((y) => [y.startYear, y.data]));
-  return years.flatMap((y) => academicHolidays(y.data, y.startYear, byYear.get(y.startYear + 1)?.lessonsStart).filter((h) => h.date >= from && h.date <= to));
+  return years.flatMap((y) => academicHolidays(y.data, y.startYear).filter((h) => h.date >= from && h.date <= to));
 }
 
 /** Ay içindeki tatiller: resmi / dini tatiller + MEB çalışma takvimi + okulun eklediği (Excel'den ya da elle) */

@@ -22,10 +22,18 @@ export interface AcademicCalendarData {
   lessonsEnd: string;
   /** Ara tatiller (yarıyıl tatili hariç) */
   breaks: AcademicBreak[];
+  /**
+   * Öğretmenlerin mesleki çalışma (seminer) dönemleri: öğrenciler için ders yok, öğretmenler okulda. MEB duyurusunda
+   * yazıyorsa oradan; yoksa kuraldan hesaplanır (bkz. seminarPeriods).
+   */
+  seminars?: { start: string; end: string }[];
 }
 
 export const SEMESTER_BREAK = 'Yarıyıl Tatili';
 export const SUMMER_BREAK = 'Yaz Tatili';
+/** Seminer günleri tatil değildir: öğrenciler için ders yok, öğretmenler mesleki çalışmada */
+export const SEMINAR = 'Öğretmenlerin Mesleki Çalışması';
+export const isSeminarName = (name: string) => name === SEMINAR;
 
 /** "2026-2027" */
 export const academicYearLabel = (startYear: number) => `${startYear}-${startYear + 1}`;
@@ -51,11 +59,26 @@ function trimWeekends(start: string, end: string): { start: string; end: string 
 export const semesterBreak = (cal: AcademicCalendarData) => trimWeekends(addDays(cal.term1End, 1), addDays(cal.term2Start, -1));
 
 /**
- * Takvimdeki tatil günleri: ara tatiller, yarıyıl tatili ve yaz tatili (ders yılı sonundan sonraki eğitim yılının
- * derslerine kadar; o takvim henüz yoksa 31 Ağustos'a kadar). Ders başlamadan önceki eylül günleri önceki yılın
- * yaz tatiline girer. Resmî tatiller (bayramlar) ayrıca hesaplanır ve aynı güne düşerse onların adı görünür.
+ * Öğretmenlerin mesleki çalışma (seminer) dönemleri. MEB duyurusunda yazıyorsa o tarihler; yoksa yönetmelikteki kural:
+ * eğitim yılı başında 1 Eylül'den derslerin başladığı güne kadar, sonunda ders yılının bittiği günün ertesinden
+ * 30 Haziran'a kadar (hafta sonları hariç).
  */
-export function academicHolidays(cal: AcademicCalendarData, startYear: number, nextLessonsStart?: string | null): { date: string; name: string }[] {
+export function seminarPeriods(cal: AcademicCalendarData, startYear: number): { start: string; end: string }[] {
+  if (cal.seminars?.length) return cal.seminars;
+  const out: { start: string; end: string }[] = [];
+  const first = trimWeekends(`${startYear}-09-01`, addDays(cal.lessonsStart, -1));
+  if (first.start < cal.lessonsStart && !isWeekend(first.start)) out.push(first);
+  const last = trimWeekends(addDays(cal.lessonsEnd, 1), `${startYear + 1}-06-30`);
+  if (last.start <= `${startYear + 1}-06-30` && !isWeekend(last.start)) out.push(last);
+  return out;
+}
+
+/**
+ * Takvimdeki günler: ara tatiller, yarıyıl tatili, öğretmenlerin mesleki çalışması (seminer: öğrenci için ders yok,
+ * öğretmen okulda) ve yaz tatili (yıl sonu seminerinin ertesinden 31 Ağustos'a kadar). Eylül'deki seminer o eğitim
+ * yılının takviminden gelir. Resmî tatiller (bayramlar) ayrıca hesaplanır ve aynı güne düşerse onların adı görünür.
+ */
+export function academicHolidays(cal: AcademicCalendarData, startYear: number): { date: string; name: string }[] {
   const out: { date: string; name: string }[] = [];
   const range = (from: string, to: string, name: string) => {
     for (let d = from; d <= to; d = addDays(d, 1)) out.push({ date: d, name });
@@ -63,7 +86,11 @@ export function academicHolidays(cal: AcademicCalendarData, startYear: number, n
   for (const b of cal.breaks) range(b.start, b.end, b.name);
   const sem = semesterBreak(cal);
   range(sem.start, sem.end, SEMESTER_BREAK);
-  const summer = trimWeekends(addDays(cal.lessonsEnd, 1), nextLessonsStart ? addDays(nextLessonsStart, -1) : `${startYear + 1}-08-31`);
+  const seminars = seminarPeriods(cal, startYear);
+  for (const p of seminars) range(p.start, p.end, SEMINAR);
+  // Yaz tatili: ders yılı sonundan (varsa yıl sonu seminerinden) sonra; hafta sonu kenarları dahil, seminer günleri hariç
+  const lastSeminarEnd = seminars.filter((p) => p.start > cal.lessonsEnd).map((p) => p.end).sort().at(-1);
+  const summer = trimWeekends(addDays(lastSeminarEnd ?? cal.lessonsEnd, 1), `${startYear + 1}-08-31`);
   range(summer.start, summer.end, SUMMER_BREAK);
   return out;
 }
@@ -71,13 +98,17 @@ export function academicHolidays(cal: AcademicCalendarData, startYear: number, n
 /** Takvimin tutarlılığı: tarihler eğitim yılının içinde ve sıralı mı. Sorun yoksa null. */
 export function validateAcademicCalendar(cal: AcademicCalendarData, startYear: number): string | null {
   const iso = /^\d{4}-\d{2}-\d{2}$/;
-  const all = [cal.lessonsStart, cal.term1End, cal.term2Start, cal.lessonsEnd, ...cal.breaks.flatMap((b) => [b.start, b.end])];
+  const all = [cal.lessonsStart, cal.term1End, cal.term2Start, cal.lessonsEnd, ...cal.breaks.flatMap((b) => [b.start, b.end]), ...(cal.seminars ?? []).flatMap((p) => [p.start, p.end])];
   if (all.some((d) => !iso.test(d))) return 'Tarih biçimi geçersiz.';
   const from = `${startYear}-08-15`;
   const to = `${startYear + 1}-07-15`;
   if (all.some((d) => d < from || d > to)) return `Tarihler ${academicYearLabel(startYear)} eğitim yılının dışında.`;
   if (!(cal.lessonsStart < cal.term1End && cal.term1End < cal.term2Start && cal.term2Start < cal.lessonsEnd)) {
     return 'Sıra hatalı: dersler başlar < birinci dönem biter < ikinci dönem başlar < ders yılı biter olmalı.';
+  }
+  for (const p of cal.seminars ?? []) {
+    if (p.start > p.end) return 'Mesleki çalışma: başlangıç bitişten sonra.';
+    if (!(p.end < cal.lessonsStart || p.start > cal.lessonsEnd)) return 'Mesleki çalışma (seminer) ders günlerine denk geliyor.';
   }
   for (const b of cal.breaks) {
     if (b.start > b.end) return `${b.name}: başlangıç bitişten sonra.`;
@@ -133,14 +164,16 @@ function dateMentions(text: string, startYear: number): Mention[] {
 }
 
 /** Tarihin anlamını önündeki son anahtar sözden çıkarır */
-const KEYS: { re: RegExp; key: 'break' | 'semester' | 'term1' | 'term2' | 'year' | 'ignore' }[] = [
+const KEYS: { re: RegExp; key: 'break' | 'semester' | 'term1' | 'term2' | 'year' | 'seminar' | 'teachers' | 'ignore' }[] = [
   { re: /yarıyıl tatil|yarı yıl tatil|sömestr/g, key: 'semester' },
   { re: /ara tatil/g, key: 'break' },
   { re: /(birinci|1\.)\s*dönem/g, key: 'term1' },
   { re: /(ikinci|2\.)\s*dönem/g, key: 'term2' },
   { re: /ders yılı|dersler|eğitim ve öğretim yılı|eğitim öğretim yılı/g, key: 'year' },
-  // Öğretmenlerin mesleki çalışması, uyum haftası, sınavlar: tatil değil
-  { re: /mesleki çalışma|öğretmenler|uyum (?:haftası|eğitimi|programı)|sınav/g, key: 'ignore' },
+  // Öğretmenlerin mesleki çalışması (seminer): ayrı dönem; uyum haftası ve sınavlar: dikkate alınmaz
+  { re: /mesleki çalışma|seminer/g, key: 'seminar' },
+  { re: /öğretmenler/g, key: 'teachers' },
+  { re: /uyum (?:haftası|eğitimi|programı)|sınav/g, key: 'ignore' },
 ];
 
 const STARTS = /başla|açıl/;
@@ -163,15 +196,29 @@ export function parseMebCalendar(rawText: string, startYear: number): AcademicCa
   let semStart: string | null = null;
   let semEnd: string | null = null;
   const breaks: { start: string; end: string }[] = [];
+  // Seminer: yıl başı (ağustos–eylül) ve yıl sonu (haziran–temmuz); tek tarihte "başlayacak" ise bitiş sonra hesaplanır
+  let seminarStart: { start: string; end: string | null } | null = null;
+  let seminarEnd: { start: string; end: string | null } | null = null;
 
   for (const s of sentences) {
     const keys = KEYS.flatMap((k) => [...s.matchAll(k.re)].map((m) => ({ at: m.index!, end: m.index! + m[0].length, key: k.key })));
     for (const d of dateMentions(s, startYear)) {
       // Önündeki en yakın anahtar söz; "birinci dönem ara tatili" gibi iç içe ifadelerde daha özel olan (ara tatil) kazanır
       const before = keys.filter((k) => k.end <= d.at).sort((a, b) => b.at - a.at);
-      const key = before[0]?.key;
-      if (!key || key === 'ignore') continue;
       const tail = s.slice(d.to, d.to + 60);
+      let key = before[0]?.key;
+      // "Öğretmenler 28-30 Haziran'da mesleki çalışma yapacak": anahtar söz tarihten sonra gelebilir
+      if (key === 'teachers' || ((!key || key === 'year') && /mesleki çalışma|seminer/.test(s.slice(d.to, d.to + 80)))) {
+        key = /mesleki çalışma|seminer/.test(s.slice(Math.max(0, d.at - 80), d.to + 80)) ? 'seminar' : 'ignore';
+      }
+      if (!key || key === 'ignore') continue;
+      if (key === 'seminar') {
+        const month = Number(d.start.slice(5, 7));
+        const period = { start: d.start, end: d.start !== d.end ? d.end : null };
+        if (month >= 8 && month <= 10) seminarStart ??= period;
+        else if (month >= 6 && month <= 7) seminarEnd ??= period;
+        continue;
+      }
       const verb = STARTS.test(tail) ? 'start' : ENDS.test(tail) ? 'end' : null;
       const isRange = d.start !== d.end;
       if (key === 'break' && isRange) breaks.push({ start: d.start, end: d.end });
@@ -201,6 +248,12 @@ export function parseMebCalendar(rawText: string, startYear: number): AcademicCa
   if (semStart) term1End = lastWeekdayBefore(semStart);
   if (semEnd) term2Start = nextMonday(semEnd);
 
+  // Seminer bitişi yazmıyorsa: yıl başında derslerden önceki son iş günü, yıl sonunda 30 Haziran
+  const seminars = [
+    seminarStart && { start: seminarStart.start, end: seminarStart.end ?? lastWeekdayBefore(lessonsStart) },
+    seminarEnd && { start: seminarEnd.start, end: seminarEnd.end ?? `${startYear + 1}-06-30` },
+  ].filter((p): p is { start: string; end: string } => Boolean(p) && p!.start <= p!.end);
+
   const uniq = [...new Map(breaks.map((b) => [`${b.start}|${b.end}`, b])).values()].sort((a, b) => a.start.localeCompare(b.start));
   const cal: AcademicCalendarData = {
     lessonsStart,
@@ -210,6 +263,7 @@ export function parseMebCalendar(rawText: string, startYear: number): AcademicCa
     breaks: uniq
       .filter((b) => b.start > lessonsStart! && b.end < lessonsEnd! && !(b.start <= term2Start! && b.end >= term1End!))
       .map((b) => ({ ...b, name: b.start < term1End! ? 'Birinci Dönem Ara Tatili' : 'İkinci Dönem Ara Tatili' })),
+    ...(seminars.length ? { seminars } : {}),
   };
   return validateAcademicCalendar(cal, startYear) ? null : cal;
 }

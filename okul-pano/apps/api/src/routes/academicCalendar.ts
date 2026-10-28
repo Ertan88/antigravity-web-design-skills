@@ -14,6 +14,8 @@ const calendarSchema = z.object({
   term2Start: isoDate,
   lessonsEnd: isoDate,
   breaks: z.array(z.object({ name: z.string().trim().min(2).max(80), start: isoDate, end: isoDate })).max(6),
+  /** Öğretmenlerin mesleki çalışması; verilmezse kuraldan hesaplanır */
+  seminars: z.array(z.object({ start: isoDate, end: isoDate })).max(4).optional(),
 });
 
 type Row = typeof academicCalendars.$inferSelect;

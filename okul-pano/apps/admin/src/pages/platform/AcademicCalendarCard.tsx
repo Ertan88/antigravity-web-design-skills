@@ -1,4 +1,4 @@
-import { semesterBreak, type AcademicCalendarData } from '@okulpano/shared';
+import { semesterBreak, seminarPeriods, type AcademicCalendarData } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarRange, Check, ExternalLink, Pencil, Plus, RefreshCw, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
@@ -34,8 +34,12 @@ const SOURCE: Record<CalendarRow['source'], { label: string; tone: 'green' | 'bl
 };
 
 /** Takvimin satır satır özeti (karşılaştırmada da kullanılır) */
-function Summary({ data }: { data: AcademicCalendarData }) {
+function Summary({ data, startYear }: { data: AcademicCalendarData; startYear: number }) {
+  const seminars = seminarPeriods(data, startYear);
+  const seminarRow = (p: { start: string; end: string } | undefined, label: string): [string, string][] =>
+    p ? [[label, p.start === p.end ? d(p.start) : span(p.start, p.end)]] : [];
   const rows: [string, string][] = [
+    ...seminarRow(seminars.find((p) => p.end < data.lessonsStart), 'Öğretmen semineri (yıl başı)'),
     ['Dersler başlar', d(data.lessonsStart)],
     ...data.breaks.filter((b) => b.start < data.term1End).map((b): [string, string] => [b.name, span(b.start, b.end)]),
     ['Birinci dönem biter', d(data.term1End)],
@@ -43,6 +47,7 @@ function Summary({ data }: { data: AcademicCalendarData }) {
     ['İkinci dönem başlar', d(data.term2Start)],
     ...data.breaks.filter((b) => b.start > data.term1End).map((b): [string, string] => [b.name, span(b.start, b.end)]),
     ['Ders yılı biter', d(data.lessonsEnd)],
+    ...seminarRow(seminars.find((p) => p.start > data.lessonsEnd), 'Öğretmen semineri (yıl sonu)'),
   ];
   return (
     <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
@@ -152,11 +157,11 @@ export function AcademicCalendarCard() {
               {r.checkedAt && <div className="text-xs text-slate-400">Son tarama: {formatDateTime(r.checkedAt)}</div>}
             </div>
             <div className="min-w-0 space-y-3">
-              <Summary data={r.data} />
+              <Summary data={r.data} startYear={r.startYear} />
               {r.pending && (
                 <div className="rounded-xl bg-amber-50 p-3 ring-1 ring-amber-200">
                   <div className="mb-2 text-sm font-semibold text-amber-900">MEB duyurusunda farklı tarihler bulundu — onaylarsanız bunlar uygulanır:</div>
-                  <Summary data={r.pending.data} />
+                  <Summary data={r.pending.data} startYear={r.startYear} />
                   <div className="mt-3 flex gap-2">
                     <Button size="sm" icon={<Check className="size-4" />} loading={accept.isPending} onClick={() => accept.mutate(r.startYear)}>
                       Yeni tarihleri uygula
@@ -206,7 +211,7 @@ export function AcademicCalendarCard() {
         open={editing !== null}
         onClose={() => setEditing(null)}
         title={editing ? `${editing.year}-${editing.year + 1} çalışma takvimi` : ''}
-        description="Elle girilen takvim taramayla değişmez. Yarıyıl tatili birinci dönemin bitişi ile ikinci dönemin başlangıcı arasından hesaplanır."
+        description="Elle girilen takvim taramayla değişmez. Yarıyıl tatili birinci dönemin bitişi ile ikinci dönemin başlangıcı arasından hesaplanır. Öğretmen semineri (mesleki çalışma) 1 Eylül'den derslerin başlamasına ve ders yılı bitişinden 30 Haziran'a kadar sayılır; tatil değildir."
         size="lg"
         footer={
           <>

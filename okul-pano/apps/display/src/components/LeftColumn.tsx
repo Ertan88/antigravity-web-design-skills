@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { countdown, formatPersonName, type DisplayState } from '@okulpano/shared/client';
+import { countdown, formatPersonName, isSeminarName, type DisplayState } from '@okulpano/shared/client';
 import { AutoPager } from './AutoPager.tsx';
 import { useLabel } from './Labels.tsx';
 import { CakeIcon, CapIcon, HourglassIcon, ShieldIcon, UserMinusIcon } from './Icons.tsx';
@@ -79,7 +79,7 @@ export function DutyCard({
       </div>
       {holiday ? (
         <div className="duty-holiday">
-          <span className="duty-holiday-label">Bugün tatil</span>
+          <span className="duty-holiday-label">{isSeminarName(holiday) ? 'Bugün ders yok' : 'Bugün tatil'}</span>
           <span className="duty-holiday-name">{holiday}</span>
         </div>
       ) : (

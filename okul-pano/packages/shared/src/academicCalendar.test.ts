@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { academicHolidays, academicYearOf, isCalendarTitle, parseMebCalendar, semesterBreak, validateAcademicCalendar } from './academicCalendar.ts';
+import { academicHolidays, academicYearOf, isCalendarTitle, parseMebCalendar, SEMINAR, seminarPeriods, semesterBreak, validateAcademicCalendar } from './academicCalendar.ts';
 
 // MEB duyurusu üslubu (2025-2026)
 const MEB_2025 = `2025-2026 Eğitim Öğretim Yılı Çalışma Takvimi Açıklandı.
@@ -28,6 +28,11 @@ describe('MEB çalışma takvimi', () => {
         { name: 'Birinci Dönem Ara Tatili', start: '2025-11-10', end: '2025-11-14' },
         { name: 'İkinci Dönem Ara Tatili', start: '2026-03-16', end: '2026-03-20' },
       ],
+      // "mesleki çalışmaları 1 Eylül'de başlayacak" (bitiş: derslerden önceki cuma) ve "yıl sonu mesleki çalışmaları 29-30 Haziran"
+      seminars: [
+        { start: '2025-09-01', end: '2025-09-05' },
+        { start: '2026-06-29', end: '2026-06-30' },
+      ],
     });
   });
 
@@ -41,6 +46,8 @@ describe('MEB çalışma takvimi', () => {
         { name: 'Birinci Dönem Ara Tatili', start: '2026-11-16', end: '2026-11-20' },
         { name: 'İkinci Dönem Ara Tatili', start: '2027-03-08', end: '2027-03-12' },
       ],
+      // "Öğretmenler 28-30 Haziran 2027'de mesleki çalışma yapacak": anahtar söz tarihten sonra
+      seminars: [{ start: '2027-06-28', end: '2027-06-30' }],
     });
   });
 
@@ -49,7 +56,7 @@ describe('MEB çalışma takvimi', () => {
     expect(parseMebCalendar(MEB_2025, 2026)).toBeNull();
   });
 
-  it('tatil günleri: ara tatiller, yarıyıl ve yaz tatili', () => {
+  it('tatil günleri: ara tatiller, yarıyıl, seminer ve yaz tatili ayrı', () => {
     const cal = parseMebCalendar(NEWS_2026, 2026)!;
     const days = new Map(academicHolidays(cal, 2026).map((d) => [d.date, d.name]));
     expect(days.get('2026-11-18')).toBe('Birinci Dönem Ara Tatili');
@@ -59,11 +66,27 @@ describe('MEB çalışma takvimi', () => {
     expect(days.has('2027-01-23')).toBe(false);
     expect(semesterBreak(cal)).toEqual({ start: '2027-01-25', end: '2027-02-05' });
     expect(days.has('2027-02-08')).toBe(false);
-    expect(days.get('2027-06-28')).toBe('Yaz Tatili');
-    expect(days.has('2027-06-26')).toBe(false);
+    // Ders yılı 25 Haziran'da biter; 28-30 Haziran öğretmenlerin mesleki çalışması (yaz tatili değil), sonra yaz tatili
+    expect(days.get('2027-06-28')).toBe(SEMINAR);
+    expect(days.get('2027-06-30')).toBe(SEMINAR);
+    expect(days.get('2027-07-01')).toBe('Yaz Tatili');
+    expect(days.get('2027-08-31')).toBe('Yaz Tatili');
     expect(days.has('2027-09-01')).toBe(false);
-    // Sonraki yılın dersleri biliniyorsa yaz tatili ona kadar
-    expect(new Map(academicHolidays(cal, 2026, '2027-09-13').map((d) => [d.date, d.name])).get('2027-09-10')).toBe('Yaz Tatili');
+  });
+
+  it('seminer duyuruda yoksa kuraldan: 1 Eylül – derslerden önceki gün ve ders yılı sonu – 30 Haziran', () => {
+    const cal = { lessonsStart: '2026-09-14', term1End: '2027-01-22', term2Start: '2027-02-08', lessonsEnd: '2027-06-25', breaks: [] };
+    expect(seminarPeriods(cal, 2026)).toEqual([
+      { start: '2026-09-01', end: '2026-09-11' },
+      { start: '2027-06-28', end: '2027-06-30' },
+    ]);
+    const days = new Map(academicHolidays(cal, 2026).map((d) => [d.date, d.name]));
+    expect(days.get('2026-09-01')).toBe(SEMINAR);
+    expect(days.get('2026-09-11')).toBe(SEMINAR);
+    expect(days.has('2026-09-14')).toBe(false);
+    expect(days.get('2027-07-01')).toBe('Yaz Tatili');
+    // Dersler 1 Eylül'de başlıyorsa yıl başı semineri yok
+    expect(seminarPeriods({ ...cal, lessonsStart: '2026-09-01' }, 2026)).toEqual([{ start: '2027-06-28', end: '2027-06-30' }]);
   });
 
   it('eğitim yılı ve başlık', () => {
