@@ -31,7 +31,6 @@ const Students = page(() => import('./pages/Students.tsx'), 'Students');
 const Teachers = page(() => import('./pages/Teachers.tsx'), 'Teachers');
 const Ticker = page(() => import('./pages/Ticker.tsx'), 'Ticker');
 const Timetable = page(() => import('./pages/Timetable.tsx'), 'Timetable');
-const Transport = page(() => import('./pages/Transport.tsx'), 'Transport');
 const Users = page(() => import('./pages/Users.tsx'), 'Users');
 
 function Guard({ permission, children }: { permission: Permission; children: ReactNode }) {
@@ -99,7 +98,7 @@ export function App() {
         <Route path="etkinlikler" element={needsSchool(<Guard permission="highlights.manage"><Events /></Guard>)} />
         <Route path="haftanin-kitabi" element={needsSchool(<Guard permission="highlights.manage"><Books /></Guard>)} />
         <Route path="nobet" element={needsSchool(<Guard permission="duties.manage"><Duties /></Guard>)} />
-        <Route path="tasimali" element={needsSchool(<Guard permission="duties.manage"><Transport /></Guard>)} />
+        <Route path="tasimali" element={<Navigate to="/nobet?bolum=tasimali" replace />} />
         <Route path="izinler" element={needsSchool(<Guard permission="leaves.manage"><Leaves /></Guard>)} />
         <Route path="ogrenciler" element={needsSchool(<Guard permission="students.manage"><Students /></Guard>)} />
         <Route path="zil-saatleri" element={needsSchool(<Guard permission="schedule.manage"><BellSchedules /></Guard>)} />

@@ -1,7 +1,6 @@
 import type { Permission, SchoolSettings } from '@okulpano/shared';
 import {
   BellRing,
-  Bus,
   Cake,
   CalendarClock,
   CalendarDays,
@@ -51,7 +50,6 @@ export const NAV: NavGroup[] = [
     items: [
       { to: '/ogretmenler', label: 'Öğretmen Kadrosu', icon: Users, permission: 'directory.manage' },
       { to: '/nobet', label: 'Nöbet Çizelgesi', icon: ShieldCheck, permission: 'duties.manage' },
-      { to: '/tasimali', label: 'Taşımalı Eğitim', icon: Bus, permission: 'duties.manage', when: (s) => Boolean(s?.hasTransport) },
       { to: '/izinler', label: 'İzinli Öğretmenler', icon: UserMinus, permission: 'leaves.manage' },
       { to: '/ogrenciler', label: 'Doğum Günleri', icon: Cake, permission: 'students.manage' },
       { to: '/basarilar', label: 'Başarılar', icon: Trophy, permission: 'highlights.manage' },

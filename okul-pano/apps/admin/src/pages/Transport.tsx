@@ -1,24 +1,20 @@
 import { holidayFullName, isHalfDayHoliday } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Bus, Settings2, Sunrise, Sunset, Utensils, Wand2 } from 'lucide-react';
+import { Bus, Sunrise, Sunset, Utensils, Wand2 } from 'lucide-react';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ExcelButtons } from '../components/ExcelButtons.tsx';
 import { ExcelImportDialog, NewTeachersOption, type ImportPreview } from '../components/ExcelImportDialog.tsx';
 import { useToast } from '../components/Toast.tsx';
-import { Alert, Badge, Button, Card, EmptyState, PageHeader, Spinner } from '../components/ui.tsx';
+import { Alert, Badge, Button, Card, EmptyState, Spinner } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useList, useSchool, useSchoolPath, type Duty, type Teacher } from '../lib/data.ts';
 import {
   ClearMonthButton,
-  currentMonth,
   DayShell,
   fieldClass,
   filledCount,
   MonthGrid,
-  MonthNav,
   monthLabel,
   SaveMark,
   useHolidays,
@@ -27,6 +23,7 @@ import {
   type Holiday,
 } from './duties/calendar.tsx';
 import { MonthChoice, type MonthResolution } from './duties/MonthChoice.tsx';
+import { TransportSwitch } from './duties/TransportToggle.tsx';
 import { AutoFillDialog, BalanceCard, useTransportStats } from './transport/Balance.tsx';
 
 type TeacherOption = { id: string; fullName: string };
@@ -126,7 +123,7 @@ const transportDaysToSave = (p: Preview, o: ImportOptions) => p.rows.filter((r) 
 
 const trDate = (iso: string) => iso.split('-').reverse().join('.');
 
-function TransportImport({ file, onClose, onSaved }: { file: File | null; onClose: () => void; onSaved: (month: string) => void }) {
+export function TransportImport({ file, onClose, onSaved }: { file: File | null; onClose: () => void; onSaved: (month: string) => void }) {
   const basePath = useSchoolPath('transport-duties');
   return (
     <ExcelImportDialog<ImportRow, Preview, ImportOptions>
@@ -225,50 +222,53 @@ function TransportImport({ file, onClose, onSaved }: { file: File | null; onClos
   );
 }
 
+/** Ayın dolu gün sayısı için (Nöbet Çizelgesi sekmesinde de kullanılır) */
+export function useTransportMonth(month: string) {
+  const { schoolId } = useAuth();
+  const path = useSchoolPath('transport-duties');
+  const school = useSchool();
+  return useQuery({
+    queryKey: [schoolId, 'transport-duties', month],
+    queryFn: () => api<TransportDay[]>(`${path}?month=${month}`),
+    enabled: Boolean(schoolId) && Boolean(school.data?.settings.hasTransport),
+  });
+}
+
+const SHIFTS = [
+  { icon: Sunrise, title: 'Sabah', text: 'servisten inenleri karşılar' },
+  { icon: Utensils, title: 'Öğle', text: 'yemeği kontrol eder' },
+  { icon: Sunset, title: 'Akşam', text: 'servise bindirir' },
+];
+
 /**
- * Taşımalı eğitim: servisle gelen öğrencileri sabah karşılayan, öğle yemeğini kontrol eden ve
- * akşam servise bindiren görevli öğretmenler. Okul ayarlarında "taşımalı eğitim" açıksa görünür.
+ * Taşımalı eğitim (Nöbet Çizelgesi'nin sekmesi): servisle gelen öğrencileri sabah karşılayan, öğle yemeğini
+ * kontrol eden ve akşam servise bindiren görevli öğretmenler. Modül bu sekmeden açılıp kapanır.
  */
-export function Transport() {
+export function TransportView({ month }: { month: string }) {
   const { can, schoolId } = useAuth();
   const editable = can('duties.manage');
   const school = useSchool();
   const path = useSchoolPath('transport-duties');
   const qc = useQueryClient();
   const toast = useToast();
-  const [month, setMonth] = useState(currentMonth);
-  const [file, setFile] = useState<File | null>(null);
   const teachers = useList<Teacher>('teachers');
   const duties = useList<Duty>('duties');
   const holidays = useHolidays(month);
   const stats = useTransportStats(month);
   const [autoFill, setAutoFill] = useState(false);
-  const list = useQuery({
-    queryKey: [schoolId, 'transport-duties', month],
-    queryFn: () => api<TransportDay[]>(`${path}?month=${month}`),
-    enabled: Boolean(schoolId),
-  });
+  const list = useTransportMonth(month);
 
   if (school.isLoading) return <Spinner />;
   if (!school.data?.settings.hasTransport) {
     return (
-      <>
-        <PageHeader title="Taşımalı Eğitim" />
-        <Card>
-          <EmptyState
-            icon={<Bus className="size-6" />}
-            title="Taşımalı eğitim kapalı"
-            description="Okulunuzda servisle gelen öğrenciler varsa Genel Ayarlar'dan taşımalı eğitimi açın; bu sayfa ve panodaki görevli bilgisi görünür olur."
-            action={
-              can('settings.manage') && (
-                <Link to="/ayarlar">
-                  <Button icon={<Settings2 className="size-4" />}>Genel Ayarlar</Button>
-                </Link>
-              )
-            }
-          />
-        </Card>
-      </>
+      <Card>
+        <EmptyState
+          icon={<Bus className="size-6" />}
+          title="Okulunuzda taşımalı eğitim var mı?"
+          description="Açarsanız servisle gelen öğrenciler için sabah, öğle ve akşam görevlilerini gün gün belirlersiniz; görevliler panoda o günün nöbet kartında görünür."
+          action={can('settings.manage') ? <TransportSwitch label="Taşımalı eğitimi aç" /> : undefined}
+        />
+      </Card>
     );
   }
 
@@ -297,39 +297,6 @@ export function Transport() {
 
   return (
     <>
-      <PageHeader
-        title="Taşımalı Eğitim"
-        description="Servisle gelen öğrenciler için her gün görevlendirilen nöbetçi öğretmenler. Okulunuzun aylık servis nöbet çizelgesini Excel'den yükleyin ya da gün gün seçin; pano o günün görevlilerini nöbet kartında gösterir."
-        actions={
-          <ExcelButtons
-            basePath={path}
-            module="Servis Nöbet Çizelgesi"
-            period={monthLabel(month)}
-            canImport={editable}
-            onFile={setFile}
-            query={`month=${month}`}
-          />
-        }
-      />
-
-      <div className="mb-4 grid gap-3 sm:grid-cols-3">
-        {[
-          { icon: Sunrise, title: 'Sabah', text: 'Servisten inen öğrencileri karşılar, okula alır.' },
-          { icon: Utensils, title: 'Öğle', text: 'Yemek dağıtımını ve öğrencileri kontrol eder.' },
-          { icon: Sunset, title: 'Akşam', text: 'Öğrencileri servislere bindirip gönderir.' },
-        ].map((x) => (
-          <div key={x.title} className="flex items-start gap-3 rounded-2xl bg-surface p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] ring-1 ring-slate-900/[0.06]">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 ring-1 ring-amber-100">
-              <x.icon className="size-4" />
-            </span>
-            <div>
-              <div className="text-sm font-semibold text-ink">{x.title}</div>
-              <div className="text-xs text-slate-500">{x.text}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
       {!editable && (
         <div className="mb-4">
           <Alert tone="blue">Bu bölümü görüntüleyebilirsiniz; değişiklik yapma yetkiniz yok.</Alert>
@@ -337,12 +304,12 @@ export function Transport() {
       )}
 
       <Card className="overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-amber-50/80 to-surface px-5 py-3.5">
-          <div className="flex items-center gap-3">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-amber-500 text-white">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200/70 bg-amber-50/60 px-5 py-3.5">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white">
               <Bus className="size-4" />
             </span>
-            <div>
+            <div className="min-w-0">
               <h2 className="text-sm font-semibold text-ink">{monthLabel(month)} · Servis nöbetçileri</h2>
               <p className="text-xs text-slate-500">
                 {filledCount(month, byDate.keys())} gün dolu · listede önce o günün nöbetçileri, sonra yıl içinde en az nöbet tutanlar gelir
@@ -350,6 +317,15 @@ export function Transport() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {SHIFTS.map((x) => (
+              <span key={x.title} className="inline-flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 text-xs text-amber-900 ring-1 ring-amber-200">
+                <x.icon className="size-3.5 text-amber-600" />
+                <strong className="font-semibold">{x.title}</strong> {x.text}
+              </span>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {can('settings.manage') && <TransportSwitch label="Açık" compact />}
             {editable && (
               <Button size="sm" variant="secondary" icon={<Wand2 className="size-4" />} onClick={() => setAutoFill(true)}>
                 Adil dağıt
@@ -366,7 +342,6 @@ export function Transport() {
                 }}
               />
             )}
-            <MonthNav month={month} onMonth={setMonth} />
           </div>
         </div>
         {list.isLoading ? (
@@ -403,7 +378,6 @@ export function Transport() {
         assigned={new Map([...byDate].map(([d, l]) => [d, l.length]))}
         holidays={holidays}
       />
-      <TransportImport file={file} onClose={() => setFile(null)} onSaved={setMonth} />
     </>
   );
 }

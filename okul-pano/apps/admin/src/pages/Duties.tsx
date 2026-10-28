@@ -1,9 +1,9 @@
 import { dutySchema, holidayFullName, WEEKDAY_NAMES, WEEKDAY_SHORT } from '@okulpano/shared';
 import clsx from 'clsx';
-import { CalendarDays, CopyPlus, ShieldCheck, UserCog } from 'lucide-react';
+import { Bus, CalendarDays, CopyPlus, ShieldCheck, UserCog } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { TransportToggle } from './duties/TransportToggle.tsx';
+import { useSearchParams } from 'react-router-dom';
 import { CrudPage } from '../components/CrudPage.tsx';
 import { ExcelButtons } from '../components/ExcelButtons.tsx';
 import { ExcelImportDialog, NewTeachersOption, type ImportPreview } from '../components/ExcelImportDialog.tsx';
@@ -11,7 +11,8 @@ import { useToast } from '../components/Toast.tsx';
 import { Badge, Card, Field, Input, Select } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
-import { nameMap, useList, useSchoolPath, type Duty, type Teacher } from '../lib/data.ts';
+import { nameMap, useList, useSchool, useSchoolPath, type Duty, type Teacher } from '../lib/data.ts';
+import { TransportImport, TransportView, useTransportMonth } from './Transport.tsx';
 import { ClearMonthButton, currentMonth, filledCount, MonthNav, monthLabel, SupervisorCalendar, type DutySupervisor } from './duties/calendar.tsx';
 import { MonthChoice, type MonthResolution } from './duties/MonthChoice.tsx';
 
@@ -66,12 +67,23 @@ function DayBar({ value, onChange, counts }: { value: number; onChange: (d: numb
   );
 }
 
-type View = 'duties' | 'supervisor';
+type View = 'duties' | 'supervisor' | 'transport';
+/** Adresteki ?bolum= ile açılacak sekme (eski /tasimali adresi buraya yönlenir) */
+const VIEW_PARAM: Record<string, View> = { mudur: 'supervisor', tasimali: 'transport' };
 
-function ViewTabs({ view, onView, counts }: { view: View; onView: (v: View) => void; counts: { duties: number; supervisor: string } }) {
+function ViewTabs({
+  view,
+  onView,
+  counts,
+}: {
+  view: View;
+  onView: (v: View) => void;
+  counts: { duties: number; supervisor: string; transport: string | null };
+}) {
   const tabs: { value: View; label: string; hint: string; icon: typeof ShieldCheck }[] = [
     { value: 'duties', label: 'Nöbet yerleri ve öğretmenler', hint: `${counts.duties} nöbet`, icon: ShieldCheck },
     { value: 'supervisor', label: 'Nöbetçi müdür yardımcısı', hint: counts.supervisor, icon: UserCog },
+    ...(counts.transport !== null ? [{ value: 'transport' as const, label: 'Taşımalı eğitim', hint: counts.transport, icon: Bus }] : []),
   ];
   return (
     <div className="inline-flex w-full flex-wrap gap-1 rounded-2xl bg-surface p-1 shadow-[0_1px_2px_rgba(15,23,42,0.05)] ring-1 ring-slate-200 sm:w-auto">
@@ -261,8 +273,20 @@ export function Duties() {
   const [day, setDay] = useState(() => Math.min(todayWeekday(), 5));
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [month, setMonth] = useState(currentMonth);
-  const [view, setView] = useState<View>('duties');
+  const [params, setParams] = useSearchParams();
+  const [view, setViewState] = useState<View>(() => VIEW_PARAM[params.get('bolum') ?? ''] ?? 'duties');
+  const setView = (v: View) => {
+    setViewState(v);
+    setParams(v === 'duties' ? {} : { bolum: v === 'supervisor' ? 'mudur' : 'tasimali' }, { replace: true });
+  };
+  const [transportFile, setTransportFile] = useState<File | null>(null);
   const { can, schoolId } = useAuth();
+  const school = useSchool();
+  const hasTransport = Boolean(school.data?.settings.hasTransport);
+  const transport = useTransportMonth(month);
+  const transportPath = useSchoolPath('transport-duties');
+  // Taşımalı eğitim sekmesi: açıksa herkes, kapalıyken yalnızca açabilecek olan (ayar yetkisi) görür
+  const showTransport = hasTransport || can('settings.manage');
   const supervisorsPath = useSchoolPath('duty-supervisors');
   const supervisors = useQuery({
     queryKey: [schoolId, 'duty-supervisors', month],
@@ -299,10 +323,8 @@ export function Duties() {
         resource="duties"
         label="Nöbet"
         title="Nöbet Çizelgesi"
-        description="Haftanın her günü için nöbet yerleri ve nöbetçi öğretmenler, tarih tarih nöbetçi müdür yardımcısı. Excel şablonu ve dışa aktarma okulunuzun aylık çizelge düzenindedir; ayı sağdan seçin."
+        description="Nöbet yerleri ve öğretmenler, nöbetçi müdür yardımcısı ve taşımalı eğitim görevlileri tek sayfada. Excel düğmeleri açık olan sekmenin çizelgesiyle çalışır; ayı sağdan seçin."
         tabs={
-          <div className="space-y-3">
-          <TransportToggle />
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <ViewTabs
               view={view}
@@ -310,14 +332,20 @@ export function Duties() {
               counts={{
                 duties: monthDuties.filter((d) => d.weekday <= 5).length,
                 supervisor: `${monthLabel(month)} · ${filledCount(month, (supervisors.data ?? []).map((x) => x.date))} gün dolu`,
+                transport: !showTransport
+                  ? null
+                  : hasTransport
+                    ? `${monthLabel(month)} · ${filledCount(month, (transport.data ?? []).map((x) => x.date))} gün dolu`
+                    : 'Kapalı',
               }}
             />
             <MonthNav month={month} onMonth={setMonth} />
           </div>
-          </div>
         }
         replaceContent={
-          view === 'supervisor' ? (
+          view === 'transport' && showTransport ? (
+            <TransportView month={month} />
+          ) : view === 'supervisor' ? (
             <Card className="overflow-hidden">
               <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 bg-gradient-to-r from-teal-50/80 to-surface px-5 py-3.5">
                 <span className="flex size-9 items-center justify-center rounded-xl bg-teal-600 text-white">
@@ -356,14 +384,27 @@ export function Duties() {
         addLabel="Nöbet ekle"
         reorderable
         headerActions={
-          <ExcelButtons
-            basePath={dutiesPath}
-            module="Nöbet Çizelgesi"
-            period={monthLabel(month)}
-            canImport={can('duties.manage')}
-            onFile={setExcelFile}
-            query={`month=${month}`}
-          />
+          view === 'transport' && showTransport ? (
+            hasTransport && (
+              <ExcelButtons
+                basePath={transportPath}
+                module="Servis Nöbet Çizelgesi"
+                period={monthLabel(month)}
+                canImport={can('duties.manage')}
+                onFile={setTransportFile}
+                query={`month=${month}`}
+              />
+            )
+          ) : (
+            <ExcelButtons
+              basePath={dutiesPath}
+              module="Nöbet Çizelgesi"
+              period={monthLabel(month)}
+              canImport={can('duties.manage')}
+              onFile={setExcelFile}
+              query={`month=${month}`}
+            />
+          )
         }
         schema={dutySchema}
         toolbar={
@@ -450,6 +491,7 @@ export function Duties() {
         )}
       />
       <DutyExcelImport file={excelFile} onClose={() => setExcelFile(null)} onSaved={setMonth} />
+      <TransportImport file={transportFile} onClose={() => setTransportFile(null)} onSaved={setMonth} />
     </>
   );
 }
