@@ -161,8 +161,8 @@ export function Timetable() {
               value={mode}
               onChange={setMode}
               options={[
-                { value: 'class', label: 'Sınıfa göre' },
-                { value: 'teacher', label: 'Öğretmene göre' },
+                { value: 'class', label: 'Sınıfa Göre' },
+                { value: 'teacher', label: 'Öğretmene Göre' },
               ]}
             />
             {mode === 'class' ? (

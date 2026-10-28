@@ -310,7 +310,7 @@ export function TransportView({ month }: { month: string }) {
               <Bus className="size-4" />
             </span>
             <div className="min-w-0">
-              <h2 className="text-sm font-semibold text-ink">{monthLabel(month)} · Servis nöbetçileri</h2>
+              <h2 className="text-sm font-semibold text-ink">{monthLabel(month)} · Taşıma ve öğle yemeği nöbetçileri</h2>
               <p className="text-xs text-slate-500">
                 {filledCount(month, byDate.keys())} gün dolu · listede önce o günün nöbetçileri, sonra yıl içinde en az nöbet tutanlar gelir
               </p>

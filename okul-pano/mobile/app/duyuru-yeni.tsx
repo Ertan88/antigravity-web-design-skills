@@ -129,7 +129,7 @@ export default function DuyuruYeni() {
         value={kind}
         onChange={setKind}
         options={[
-          { value: 'design', label: 'Hazır şablon' },
+          { value: 'design', label: 'Hazır Şablon' },
           { value: 'image', label: 'Fotoğraf' },
           { value: 'text', label: 'Yazı' },
         ]}

@@ -21,8 +21,8 @@ export default function Nobet() {
           value={tab}
           onChange={setTab}
           options={[
-            { value: 'mine', label: 'Benim nöbetlerim' },
-            { value: 'all', label: 'Kim nerede' },
+            { value: 'mine', label: 'Benim Nöbetlerim' },
+            { value: 'all', label: 'Kim Nerede' },
           ]}
         />
       )}

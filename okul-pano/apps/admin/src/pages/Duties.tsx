@@ -81,9 +81,9 @@ function ViewTabs({
   counts: { duties: number; supervisor: string; transport: string | null };
 }) {
   const tabs: { value: View; label: string; hint: string; icon: typeof ShieldCheck }[] = [
-    { value: 'duties', label: 'Nöbet yerleri ve öğretmenler', hint: `${counts.duties} nöbet`, icon: ShieldCheck },
-    { value: 'supervisor', label: 'Nöbetçi müdür yardımcısı', hint: counts.supervisor, icon: UserCog },
-    ...(counts.transport !== null ? [{ value: 'transport' as const, label: 'Taşımalı eğitim', hint: counts.transport, icon: Bus }] : []),
+    { value: 'duties', label: 'Nöbet Yerleri ve Öğretmenler', hint: `${counts.duties} nöbet`, icon: ShieldCheck },
+    { value: 'supervisor', label: 'Nöbetçi Müdür Yardımcısı', hint: counts.supervisor, icon: UserCog },
+    ...(counts.transport !== null ? [{ value: 'transport' as const, label: 'Taşıma ve Öğle Yemeği Nöbetçileri', hint: counts.transport, icon: Bus }] : []),
   ];
   return (
     <div className="inline-flex w-full flex-wrap gap-1 rounded-2xl bg-surface p-1 shadow-[0_1px_2px_rgba(15,23,42,0.05)] ring-1 ring-slate-200 sm:w-auto">

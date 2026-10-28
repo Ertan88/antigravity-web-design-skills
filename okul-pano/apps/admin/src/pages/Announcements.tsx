@@ -144,7 +144,7 @@ export function Announcements() {
               onChange={setFilter}
               options={[
                 { value: 'all', label: 'Tümü' },
-                { value: 'pending', label: `Onay bekleyenler${pendingCount ? ` (${pendingCount})` : ''}` },
+                { value: 'pending', label: `Onay Bekleyenler${pendingCount ? ` (${pendingCount})` : ''}` },
               ]}
             />
           </div>
@@ -246,7 +246,7 @@ export function Announcements() {
                 { value: 'image', label: <span className="flex items-center gap-1.5"><ImageIcon className="size-4" /> Görsel</span> },
                 { value: 'video', label: <span className="flex items-center gap-1.5"><PlayCircle className="size-4" /> YouTube</span> },
                 { value: 'text', label: <span className="flex items-center gap-1.5"><Type className="size-4" /> Metin</span> },
-                { value: 'design', label: <span className="flex items-center gap-1.5"><LayoutTemplate className="size-4" /> Hazır şablon</span> },
+                { value: 'design', label: <span className="flex items-center gap-1.5"><LayoutTemplate className="size-4" /> Hazır Şablon</span> },
               ]}
             />
 

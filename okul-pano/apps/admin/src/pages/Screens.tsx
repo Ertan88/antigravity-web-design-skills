@@ -216,8 +216,8 @@ export function Screens() {
           onChange={setTab}
           options={[
             { value: 'boards', label: `Panolar${count ? ` (${count})` : ''}` },
-            { value: 'layout', label: 'Pano düzeni' },
-            { value: 'appearance', label: 'Görünüm ve akış' },
+            { value: 'layout', label: 'Pano Düzeni' },
+            { value: 'appearance', label: 'Görünüm ve Akış' },
           ]}
         />
       </div>

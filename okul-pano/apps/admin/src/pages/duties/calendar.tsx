@@ -34,15 +34,18 @@ export const todayIso = () => {
 
 export type DayInfo = { iso: string; day: number; weekday: number };
 
-/** Ayın hafta içi günleri */
-export function schoolDays(month: string): DayInfo[] {
+/** Ayın bütün günleri */
+export function monthDays(month: string): DayInfo[] {
   const [y, m] = month.split('-').map(Number) as [number, number];
   const count = new Date(y, m, 0).getDate();
   return Array.from({ length: count }, (_, i) => {
     const date = new Date(y, m - 1, i + 1);
     return { iso: `${month}-${pad(i + 1)}`, day: i + 1, weekday: ((date.getDay() + 6) % 7) + 1 };
-  }).filter((d) => d.weekday <= 5);
+  });
 }
+
+/** Ayın hafta içi günleri */
+export const schoolDays = (month: string): DayInfo[] => monthDays(month).filter((d) => d.weekday <= 5);
 
 /* ---------- Ortak parçalar ---------- */
 
@@ -87,25 +90,41 @@ export function useHolidays(month: string) {
   return new Map((q.data ?? []).map((h) => [h.date, h]));
 }
 
-/** Takvim ızgarası: geniş ekranda her satır bir hafta (Pzt–Cum), dar ekranda gün kartları alt alta */
+/** Hafta sonu günü: görev yazılmaz, kartta yalnızca "Hafta sonu" yazar */
+function WeekendCell({ day }: { day: DayInfo }) {
+  return (
+    <li className="flex flex-col rounded-2xl bg-slate-100/60 p-2.5 ring-1 ring-slate-200/50 lg:px-2">
+      <div className="flex items-center gap-1.5 px-0.5 text-sm lg:flex-col lg:items-start lg:gap-0">
+        <span className="font-bold text-slate-400 tabular-nums">{day.day}</span>
+        <span className="text-xs font-medium text-slate-400">{WEEKDAY_SHORT[day.weekday]}</span>
+      </div>
+      <div className="flex flex-1 items-center justify-center py-2 text-center text-[11px] leading-tight font-semibold text-slate-400">Hafta sonu</div>
+    </li>
+  );
+}
+
+/** Hafta içi sütunları geniş, hafta sonu sütunları dar (yalnızca "Hafta sonu" yazar) */
+const WEEK_COLUMNS = 'lg:grid-cols-[repeat(5,minmax(0,1fr))_repeat(2,3.5rem)]';
+
+/** Takvim ızgarası: geniş ekranda her satır bir hafta (Pzt–Paz; hafta sonu dar), dar ekranda gün kartları alt alta */
 export function MonthGrid({ month, children }: { month: string; children: (day: DayInfo, isToday: boolean) => ReactNode }) {
-  const days = schoolDays(month);
+  const days = monthDays(month);
   const lead = days[0] ? days[0].weekday - 1 : 0;
   const today = todayIso();
   return (
     <div className="p-3 sm:p-4">
-      <div className="hidden grid-cols-5 gap-2 pb-1.5 lg:grid">
-        {[1, 2, 3, 4, 5].map((d) => (
-          <span key={d} className="px-1 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
-            {WEEKDAY_NAMES[d]}
+      <div className={clsx('hidden gap-2 pb-1.5 lg:grid', WEEK_COLUMNS)}>
+        {[1, 2, 3, 4, 5, 6, 7].map((d) => (
+          <span key={d} className={clsx('truncate px-1 text-[11px] font-semibold tracking-wider uppercase', d > 5 ? 'text-slate-300' : 'text-slate-400')}>
+            {d > 5 ? WEEKDAY_SHORT[d] : WEEKDAY_NAMES[d]}
           </span>
         ))}
       </div>
-      <ol className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,13rem),1fr))] gap-2 lg:grid-cols-5">
+      <ol className={clsx('grid grid-cols-[repeat(auto-fill,minmax(min(100%,13rem),1fr))] gap-2', WEEK_COLUMNS)}>
         {Array.from({ length: lead }, (_, i) => (
           <li key={`b${i}`} className="hidden lg:block" aria-hidden="true" />
         ))}
-        {days.map((d) => children(d, d.iso === today))}
+        {days.map((d) => (d.weekday > 5 ? <WeekendCell key={d.iso} day={d} /> : children(d, d.iso === today)))}
       </ol>
     </div>
   );
@@ -204,7 +223,7 @@ export function SaveMark({ state }: { state: 'idle' | 'saving' | 'saved' }) {
 }
 
 export const fieldClass =
-  'h-9 w-full min-w-0 rounded-xl border-0 bg-surface px-2.5 text-[13px] font-medium text-ink ring-1 ring-slate-200 transition placeholder:text-slate-300 hover:ring-slate-300 focus:ring-2 focus:ring-brand-500 focus:outline-none disabled:bg-transparent disabled:ring-transparent';
+  'h-9 w-full min-w-0 rounded-xl border-0 bg-surface px-2 text-[13px] font-medium text-ink ring-1 ring-slate-200 transition placeholder:text-slate-300 hover:ring-slate-300 focus:ring-2 focus:ring-brand-500 focus:outline-none disabled:bg-transparent disabled:ring-transparent';
 
 /* ---------- Nöbetçi müdür yardımcısı ---------- */
 
