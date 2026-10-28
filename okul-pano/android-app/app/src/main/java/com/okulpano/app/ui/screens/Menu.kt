@@ -81,14 +81,14 @@ import kotlinx.coroutines.launch
 
 private data class MenuItem(val title: String, val subtitle: String?, val icon: ImageVector, val t: Tone = Tone.Primary, val route: String? = null, val badge: Int = 0, val onClick: (() -> Unit)? = null)
 
-private data class ContentKind(val tur: String, val title: String, val subtitle: String, val icon: ImageVector, val permission: String)
+private data class MenuContent(val tur: String, val title: String, val subtitle: String, val icon: ImageVector, val permission: String)
 
 private val CONTENT = listOf(
-  ContentKind("ticker", "Kayan yazı", "Tek satır ekle, kapat", Icons.AutoMirrored.Outlined.ShortText, Perm.TICKER),
-  ContentKind("achievements", "Başarılar ve ayın öğrencisi", "Kamerayla fotoğraf çek, panoya gönder", Icons.Outlined.EmojiEvents, Perm.HIGHLIGHTS),
-  ContentKind("events", "Etkinlik takvimi", "Kulüp ve okul etkinlikleri", Icons.Outlined.Event, Perm.HIGHLIGHTS),
-  ContentKind("exams", "Sınav sayacı", "Sınav ekle ve düzenle", Icons.Outlined.School, Perm.EXAMS),
-  ContentKind("books", "Haftanın kitabı", "Kapağı kamerayla çek", Icons.AutoMirrored.Outlined.MenuBook, Perm.HIGHLIGHTS),
+  MenuContent("ticker", "Kayan yazı", "Tek satır ekle, kapat", Icons.AutoMirrored.Outlined.ShortText, Perm.TICKER),
+  MenuContent("achievements", "Başarılar ve ayın öğrencisi", "Kamerayla fotoğraf çek, panoya gönder", Icons.Outlined.EmojiEvents, Perm.HIGHLIGHTS),
+  MenuContent("events", "Etkinlik takvimi", "Kulüp ve okul etkinlikleri", Icons.Outlined.Event, Perm.HIGHLIGHTS),
+  MenuContent("exams", "Sınav sayacı", "Sınav ekle ve düzenle", Icons.Outlined.School, Perm.EXAMS),
+  MenuContent("books", "Haftanın kitabı", "Kapağı kamerayla çek", Icons.AutoMirrored.Outlined.MenuBook, Perm.HIGHLIGHTS),
 )
 
 /**
