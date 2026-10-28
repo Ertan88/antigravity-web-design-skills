@@ -1,4 +1,4 @@
-import { academicYearOf, isSeminarName, semesterBreak, seminarPeriods, type AcademicCalendarData } from '@okulpano/shared';
+import { academicYearOf, semesterBreak, type AcademicCalendarData } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { CalendarDays, CalendarPlus, GraduationCap, Plus, Sunset, Trash2 } from 'lucide-react';
@@ -210,11 +210,7 @@ export function HolidaysCard() {
                     <span className="min-w-0 flex-1 text-sm text-ink">
                       {r.kind === 'bridge' ? <span className="text-slate-600">{r.near} tatiline bitişik</span> : r.name}
                     </span>
-                    {r.kind === 'holiday' && isSeminarName(r.name) ? (
-                      <Badge tone="amber">Seminer · öğrenciye ders yok, öğretmen okulda</Badge>
-                    ) : (
-                      r.kind === 'holiday' && <Badge tone={SOURCE_BADGE[r.source].tone}>{SOURCE_BADGE[r.source].label}</Badge>
-                    )}
+                    {r.kind === 'holiday' && <Badge tone={SOURCE_BADGE[r.source].tone}>{SOURCE_BADGE[r.source].label}</Badge>}
                     {r.kind === 'half' && <Badge tone="amber">Yarım gün · son zil {savedEnd}</Badge>}
                     {r.kind === 'half' && bridgeDates.has(r.date) && <Badge tone="slate">Olası köprü günü</Badge>}
                     {r.kind === 'bridge' && <Badge tone="slate">Olası köprü günü</Badge>}
@@ -305,10 +301,6 @@ function AcademicYearBox({ canSettings }: { canSettings: boolean }) {
             ...d.breaks.map((b): [string, string] => [b.name, `${dm(b.start)} – ${dm(b.end)}`]),
             ['Yarıyıl tatili', `${dm(semesterBreak(d).start)} – ${dm(semesterBreak(d).end)}`],
             ['Ders yılı biter', dm(d.lessonsEnd)],
-            ...seminarPeriods(d, y.startYear).map((p): [string, string] => [
-              p.start < d.lessonsStart ? 'Öğretmen semineri (yıl başı)' : 'Öğretmen semineri (yıl sonu)',
-              `${dm(p.start)} – ${dm(p.end)}`,
-            ]),
           ];
           return (
             <div key={y.startYear} className="mt-2">

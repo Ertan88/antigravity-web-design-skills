@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { academicHolidays, academicYearOf, isCalendarTitle, parseMebCalendar, SEMINAR, seminarPeriods, semesterBreak, validateAcademicCalendar } from './academicCalendar.ts';
+import { academicHolidays, academicYearOf, isCalendarTitle, parseMebCalendar, seminarPeriods, semesterBreak, validateAcademicCalendar } from './academicCalendar.ts';
 
 // MEB duyurusu üslubu (2025-2026)
 const MEB_2025 = `2025-2026 Eğitim Öğretim Yılı Çalışma Takvimi Açıklandı.
@@ -56,7 +56,7 @@ describe('MEB çalışma takvimi', () => {
     expect(parseMebCalendar(MEB_2025, 2026)).toBeNull();
   });
 
-  it('tatil günleri: ara tatiller, yarıyıl, seminer ve yaz tatili ayrı', () => {
+  it('tatil günleri: ara tatiller, yarıyıl ve yaz tatili; seminer günleri tatil değil', () => {
     const cal = parseMebCalendar(NEWS_2026, 2026)!;
     const days = new Map(academicHolidays(cal, 2026).map((d) => [d.date, d.name]));
     expect(days.get('2026-11-18')).toBe('Birinci Dönem Ara Tatili');
@@ -66,9 +66,9 @@ describe('MEB çalışma takvimi', () => {
     expect(days.has('2027-01-23')).toBe(false);
     expect(semesterBreak(cal)).toEqual({ start: '2027-01-25', end: '2027-02-05' });
     expect(days.has('2027-02-08')).toBe(false);
-    // Ders yılı 25 Haziran'da biter; 28-30 Haziran öğretmenlerin mesleki çalışması (yaz tatili değil), sonra yaz tatili
-    expect(days.get('2027-06-28')).toBe(SEMINAR);
-    expect(days.get('2027-06-30')).toBe(SEMINAR);
+    // Ders yılı 25 Haziran'da biter; 28-30 Haziran öğretmenlerin mesleki çalışması: listede yok, yaz tatili 1 Temmuz'da başlar
+    expect(days.has('2027-06-28')).toBe(false);
+    expect(days.has('2027-06-30')).toBe(false);
     expect(days.get('2027-07-01')).toBe('Yaz Tatili');
     expect(days.get('2027-08-31')).toBe('Yaz Tatili');
     expect(days.has('2027-09-01')).toBe(false);
@@ -81,8 +81,9 @@ describe('MEB çalışma takvimi', () => {
       { start: '2027-06-28', end: '2027-06-30' },
     ]);
     const days = new Map(academicHolidays(cal, 2026).map((d) => [d.date, d.name]));
-    expect(days.get('2026-09-01')).toBe(SEMINAR);
-    expect(days.get('2026-09-11')).toBe(SEMINAR);
+    expect(days.has('2026-09-01')).toBe(false);
+    expect(days.has('2026-09-11')).toBe(false);
+    expect(days.has('2027-06-29')).toBe(false);
     expect(days.has('2026-09-14')).toBe(false);
     expect(days.get('2027-07-01')).toBe('Yaz Tatili');
     // Dersler 1 Eylül'de başlıyorsa yıl başı semineri yok

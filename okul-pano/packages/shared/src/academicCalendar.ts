@@ -23,17 +23,14 @@ export interface AcademicCalendarData {
   /** Ara tatiller (yarıyıl tatili hariç) */
   breaks: AcademicBreak[];
   /**
-   * Öğretmenlerin mesleki çalışma (seminer) dönemleri: öğrenciler için ders yok, öğretmenler okulda. MEB duyurusunda
-   * yazıyorsa oradan; yoksa kuraldan hesaplanır (bkz. seminarPeriods).
+   * Öğretmenlerin mesleki çalışma (seminer) dönemleri. Sistemde gösterilmez ve tatil sayılmaz; yalnızca yaz tatilinin
+   * bu günlere taşmaması için kullanılır. MEB duyurusunda yazıyorsa oradan, yoksa kuraldan (bkz. seminarPeriods).
    */
   seminars?: { start: string; end: string }[];
 }
 
 export const SEMESTER_BREAK = 'Yarıyıl Tatili';
 export const SUMMER_BREAK = 'Yaz Tatili';
-/** Seminer günleri tatil değildir: öğrenciler için ders yok, öğretmenler mesleki çalışmada */
-export const SEMINAR = 'Öğretmenlerin Mesleki Çalışması';
-export const isSeminarName = (name: string) => name === SEMINAR;
 
 /** "2026-2027" */
 export const academicYearLabel = (startYear: number) => `${startYear}-${startYear + 1}`;
@@ -73,10 +70,16 @@ export function seminarPeriods(cal: AcademicCalendarData, startYear: number): { 
   return out;
 }
 
+/** Yaz tatili: yıl sonu seminerinin (öğretmenlerin mesleki çalışması) ertesinden 31 Ağustos'a kadar */
+export function summerBreak(cal: AcademicCalendarData, startYear: number): { start: string; end: string } {
+  const lastSeminarEnd = seminarPeriods(cal, startYear).filter((p) => p.start > cal.lessonsEnd).map((p) => p.end).sort().at(-1);
+  return trimWeekends(addDays(lastSeminarEnd ?? cal.lessonsEnd, 1), `${startYear + 1}-08-31`);
+}
+
 /**
- * Takvimdeki günler: ara tatiller, yarıyıl tatili, öğretmenlerin mesleki çalışması (seminer: öğrenci için ders yok,
- * öğretmen okulda) ve yaz tatili (yıl sonu seminerinin ertesinden 31 Ağustos'a kadar). Eylül'deki seminer o eğitim
- * yılının takviminden gelir. Resmî tatiller (bayramlar) ayrıca hesaplanır ve aynı güne düşerse onların adı görünür.
+ * Takvimdeki tatil günleri: ara tatiller, yarıyıl tatili ve yaz tatili. Öğretmenlerin mesleki çalışma (seminer) günleri
+ * tatil sayılmaz ve listelenmez: yaz tatili yıl sonu seminerinin ertesinde başlar, 31 Ağustos'ta biter; eylülde
+ * derslerden önceki günler de tatil değildir. Resmî tatiller (bayramlar) ayrıca hesaplanır ve aynı güne düşerse onların adı görünür.
  */
 export function academicHolidays(cal: AcademicCalendarData, startYear: number): { date: string; name: string }[] {
   const out: { date: string; name: string }[] = [];
@@ -86,11 +89,7 @@ export function academicHolidays(cal: AcademicCalendarData, startYear: number): 
   for (const b of cal.breaks) range(b.start, b.end, b.name);
   const sem = semesterBreak(cal);
   range(sem.start, sem.end, SEMESTER_BREAK);
-  const seminars = seminarPeriods(cal, startYear);
-  for (const p of seminars) range(p.start, p.end, SEMINAR);
-  // Yaz tatili: ders yılı sonundan (varsa yıl sonu seminerinden) sonra; hafta sonu kenarları dahil, seminer günleri hariç
-  const lastSeminarEnd = seminars.filter((p) => p.start > cal.lessonsEnd).map((p) => p.end).sort().at(-1);
-  const summer = trimWeekends(addDays(lastSeminarEnd ?? cal.lessonsEnd, 1), `${startYear + 1}-08-31`);
+  const summer = summerBreak(cal, startYear);
   range(summer.start, summer.end, SUMMER_BREAK);
   return out;
 }

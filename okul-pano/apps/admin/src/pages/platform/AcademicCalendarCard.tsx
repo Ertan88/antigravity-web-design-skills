@@ -1,4 +1,4 @@
-import { semesterBreak, seminarPeriods, type AcademicCalendarData } from '@okulpano/shared';
+import { semesterBreak, summerBreak, type AcademicCalendarData } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarRange, Check, ExternalLink, Pencil, Plus, RefreshCw, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
@@ -35,11 +35,8 @@ const SOURCE: Record<CalendarRow['source'], { label: string; tone: 'green' | 'bl
 
 /** Takvimin satır satır özeti (karşılaştırmada da kullanılır) */
 function Summary({ data, startYear }: { data: AcademicCalendarData; startYear: number }) {
-  const seminars = seminarPeriods(data, startYear);
-  const seminarRow = (p: { start: string; end: string } | undefined, label: string): [string, string][] =>
-    p ? [[label, p.start === p.end ? d(p.start) : span(p.start, p.end)]] : [];
+  const summer = summerBreak(data, startYear);
   const rows: [string, string][] = [
-    ...seminarRow(seminars.find((p) => p.end < data.lessonsStart), 'Öğretmen semineri (yıl başı)'),
     ['Dersler başlar', d(data.lessonsStart)],
     ...data.breaks.filter((b) => b.start < data.term1End).map((b): [string, string] => [b.name, span(b.start, b.end)]),
     ['Birinci dönem biter', d(data.term1End)],
@@ -47,7 +44,7 @@ function Summary({ data, startYear }: { data: AcademicCalendarData; startYear: n
     ['İkinci dönem başlar', d(data.term2Start)],
     ...data.breaks.filter((b) => b.start > data.term1End).map((b): [string, string] => [b.name, span(b.start, b.end)]),
     ['Ders yılı biter', d(data.lessonsEnd)],
-    ...seminarRow(seminars.find((p) => p.start > data.lessonsEnd), 'Öğretmen semineri (yıl sonu)'),
+    ['Yaz tatili', span(summer.start, summer.end)],
   ];
   return (
     <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
@@ -211,7 +208,7 @@ export function AcademicCalendarCard() {
         open={editing !== null}
         onClose={() => setEditing(null)}
         title={editing ? `${editing.year}-${editing.year + 1} çalışma takvimi` : ''}
-        description="Elle girilen takvim taramayla değişmez. Yarıyıl tatili birinci dönemin bitişi ile ikinci dönemin başlangıcı arasından hesaplanır. Öğretmen semineri (mesleki çalışma) 1 Eylül'den derslerin başlamasına ve ders yılı bitişinden 30 Haziran'a kadar sayılır; tatil değildir."
+        description="Elle girilen takvim taramayla değişmez. Yarıyıl tatili birinci dönemin bitişi ile ikinci dönemin başlangıcı arasından hesaplanır."
         size="lg"
         footer={
           <>
