@@ -1,7 +1,9 @@
 import {
   achievementDesign,
   announcementOnAir,
-  isHalfDayHoliday,
+  addIsoDays,
+  nextSchoolDay,
+  schoolDay,
   isSleepTime,
   quoteOfDay,
   SPECIAL_THEMES,
@@ -17,7 +19,6 @@ import {
   isBirthdayToday,
   isWithinWindow,
   periodLabel,
-  pickSchedule,
   zonedParts,
   labelOf,
   schoolFullName,
@@ -120,15 +121,32 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
   const leaves = state.leaves.filter((l) => l.startDate <= today.isoDate && l.endDate >= today.isoDate);
   const birthdays = state.birthdays.filter((b) => isBirthdayToday(b.monthDay, today));
 
-  const schedule = pickSchedule(state.bellSchedules, today.weekday);
-  // Resmî / dini tatilde (arife yarım gün hariç) zil ve dersler çalışmaz
-  const fullHoliday = (state.holidays ?? []).some((h) => h.date === today.isoDate && !isHalfDayHoliday(h.name));
-  const periods = schedule && !fullHoliday ? schedule.periods : null;
+  // Okul günü: tam gün tatilde zil çalmaz; arifede (yarım gün) dersler halfDayEnd saatinde biter
+  const calendar = { schedules: state.bellSchedules, holidays: state.holidays ?? [], halfDays: state.halfDays ?? [], halfDayEnd: s.halfDayEnd };
+  const day = schoolDay(today.isoDate, calendar);
+  const periods = day.periods.length ? day.periods : null;
   const bell = periods ? computeBellStatus(periods, today.secondsOfDay, s.lunchThresholdMin) : ({ kind: 'off' } as const);
   const lessonPeriod = bell.kind === 'lesson' ? bell.period : bell.kind === 'break' || bell.kind === 'before' ? bell.next : null;
   const lessons = lessonPeriod
     ? state.timetable.filter((e) => e.weekday === today.weekday && e.periodNo === lessonPeriod.no)
     : [];
+  // Dersler bitince ya da tatilde: sonraki ders günü (bayram, hafta sonu ve köprü tatili atlanır)
+  const nextDay = bell.kind === 'after' || bell.kind === 'off' ? nextSchoolDay(today.isoDate, calendar) : null;
+  const nextFirst = nextDay?.periods[0] ?? null;
+  const nextLessons = nextDay && nextFirst ? state.timetable.filter((e) => e.weekday === nextDay.weekday && e.periodNo === nextFirst.no) : [];
+  const tomorrow = schoolDay(addIsoDays(today.isoDate, 1), calendar);
+  const nextLabel = nextDay ? (nextDay.date === tomorrow.date ? 'Yarın' : dayLabel(nextDay.date)) : '';
+  // Kart başlığının yanına kısa ad: bir hafta içindeyse yalnızca gün adı
+  const nextShort = nextDay ? (nextDay.date === tomorrow.date ? 'Yarın' : nextDay.date <= addIsoDays(today.isoDate, 6) ? DAY_NAMES[nextDay.weekday]! : dayLabel(nextDay.date)) : '';
+  const upcoming =
+    bell.kind === 'after' && tomorrow.holiday
+      ? `Yarın tatil · ${tomorrow.holiday}`
+      : bell.kind === 'after' && tomorrow.halfDay
+        ? `Yarın ${tomorrow.halfDay} · yarım gün`
+        : nextDay && nextFirst
+          ? `${nextDay.date === tomorrow.date ? 'Yarın ilk ders' : `Sonraki ders günü: ${nextLabel}`} · ${nextFirst.start}`
+          : null;
+  const bellDay = { holiday: day.holiday, halfDay: day.halfDay, endsAt: day.endsAt, upcoming };
 
   // Yayın akışı: duyurunun günü, saat aralığı ve zilin durumu (ör. yalnızca teneffüste)
   const phase = bell.kind === 'lesson' ? 'lesson' : bell.kind === 'break' ? 'break' : 'other';
@@ -212,7 +230,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
           empty(m, <CakeIcon size={22} />, 'Doğum Günleri', 'Bugün doğum günü olan yok', 'birthday-card')
         );
       case 'bell':
-        return fullHoliday ? null : <BellCard key={m} status={bell} />;
+        return <BellCard key={m} status={bell} day={bellDay} />;
       case 'lessons':
         return lessonPeriod ? (
           <LessonsCard
@@ -221,6 +239,9 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
             heading={bell.kind === 'lesson' ? 'Şu An Derste' : 'Sıradaki Ders'}
             periodTitle={bell.kind === 'lesson' ? periodLabel(lessonPeriod) : `${periodLabel(lessonPeriod)} · ${lessonPeriod.start}`}
           />
+        ) : nextFirst && nextLessons.length ? (
+          // Dersler bitti ya da tatil: sonraki ders gününün ilk dersi (tarihiyle)
+          <LessonsCard key={m} entries={nextLessons} heading="Sıradaki Ders" periodTitle={`${nextShort} · ${nextFirst.start}`} />
         ) : (
           empty(m, <BookIcon size={22} />, 'Şu An Derste', 'Şu an ders yok', 'lessons-card')
         );
@@ -265,9 +286,9 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
       case 'birthdays':
         return birthdays.length > 0;
       case 'bell':
-        return !fullHoliday;
+        return true;
       case 'lessons':
-        return Boolean(lessonPeriod);
+        return Boolean(lessonPeriod) || nextLessons.length > 0;
       case 'achievements':
         return achievementsNow.length > 0;
       case 'events':
@@ -403,7 +424,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
     return (
       <Stage className={`${classes} mode-clock`} style={themeVars} width={stageW} height={stageH}>
         {reporter}
-        <ClockScreen now={now} timezone={school.timezone} bell={bell} schoolName={school.name} schoolType={s.schoolType} logoUrl={school.logoUrl} />
+        <ClockScreen now={now} timezone={school.timezone} bell={bell} day={bellDay} schoolName={school.name} schoolType={s.schoolType} logoUrl={school.logoUrl} />
         {overlays}
       </Stage>
     );
@@ -469,4 +490,13 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
 function StatusReporter({ auth, status }: { auth: DisplayAuth; status: Omit<ScreenLiveStatus, 'at'> }) {
   useStatusReport(auth, status);
   return null;
+}
+
+const DAY_MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+const DAY_NAMES = ['', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+
+/** "2026-11-02" -> "2 Kasım Pazartesi" */
+function dayLabel(iso: string): string {
+  const weekday = ((new Date(`${iso}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
+  return `${Number(iso.slice(8))} ${DAY_MONTHS[Number(iso.slice(5, 7)) - 1]} ${DAY_NAMES[weekday]}`;
 }

@@ -11,6 +11,8 @@ export interface SchoolAccess {
   isActive: boolean;
   role: Role;
   permissions: Permission[];
+  /** Üyelik yok, okulun verdiği süreli destek erişimi (platform yöneticisi) */
+  support?: boolean;
 }
 
 export interface Me {

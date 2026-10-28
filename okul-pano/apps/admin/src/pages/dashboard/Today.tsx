@@ -3,7 +3,7 @@ import {
   countdown,
   formatPersonName,
   isBirthdayToday,
-  isHalfDayHoliday,
+  schoolDay,
   periodLabel,
   pickSchedule,
   zonedParts,
@@ -107,8 +107,10 @@ export function TodaySummary() {
   const leaves = st.leaves.filter((l) => l.startDate <= today.isoDate && l.endDate >= today.isoDate);
   const birthdays = st.birthdays.filter((b) => isBirthdayToday(b.monthDay, today));
   const schedule = pickSchedule(st.bellSchedules, today.weekday);
-  // Resmî / dini tatilde zil çalmaz (arife yarım gün)
-  const periods = schedule && !(holiday && !isHalfDayHoliday(holiday)) ? schedule.periods : null;
+  // Panodaki gibi: tam gün tatilde zil çalmaz, arifede dersler yarım gün saatinde biter
+  const day = schoolDay(today.isoDate, { schedules: st.bellSchedules, holidays: st.holidays ?? [], halfDays: st.halfDays ?? [], halfDayEnd: s.halfDayEnd });
+  const halfDay = day.halfDay;
+  const periods = day.periods.length ? day.periods : null;
   const bell = bellText(periods ? computeBellStatus(periods, today.secondsOfDay, s.lunchThresholdMin) : { kind: 'off' });
 
   return (
@@ -118,6 +120,11 @@ export function TodaySummary() {
         <span className="text-sm text-slate-500">
           {new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', weekday: 'long', timeZone: st.school.timezone }).format(now)}
           {holiday && <span className="ml-2 font-semibold text-rose-600">· {holiday}</span>}
+          {halfDay && (
+            <span className="ml-2 font-semibold text-amber-600">
+              · {halfDay} (yarım gün, son zil {day.endsAt})
+            </span>
+          )}
         </span>
       </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">

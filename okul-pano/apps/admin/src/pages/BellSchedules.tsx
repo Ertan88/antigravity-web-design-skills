@@ -1,9 +1,10 @@
-import { bellScheduleSchema, generatePeriods, pickSchedule, WEEKDAY_NAMES, type Period } from '@okulpano/shared';
+import { bellScheduleSchema, generatePeriods, pickSchedule, WEEKDAY_NAMES, zonedParts, type Period } from '@okulpano/shared';
 import { BellRing, Plus, Trash2, Wand2 } from 'lucide-react';
 import { useState } from 'react';
 import { Alert, Button, Card, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Spinner, WeekdayPicker } from '../components/ui.tsx';
 import { useAuth } from '../lib/auth.tsx';
 import { useList, useResource, useSchool, type BellSchedule } from '../lib/data.ts';
+import { HolidaysCard, useUpcomingHolidays } from './bell/HolidaysCard.tsx';
 import { ScheduleView, useNow, WeekCoverage } from './bell/ScheduleView.tsx';
 import { useForm } from '../lib/form.ts';
 
@@ -169,6 +170,18 @@ export function BellSchedules() {
   const schedules = list.data ?? [];
   const selected = schedules.find((x) => x.id === forcedId) ?? pickSchedule(schedules, day) ?? null;
 
+  // Bugün arife ya da tatilse çizelgenin üstünde not: panoda zil buna göre çalar
+  const upcoming = useUpcomingHolidays();
+  const todayIso = zonedParts(new Date(), school.data?.timezone ?? 'Europe/Istanbul').isoDate;
+  const halfToday = upcoming.data?.halfDays.find((h) => h.date === todayIso);
+  const holidayToday = upcoming.data?.holidays.find((h) => h.date === todayIso);
+  const halfEnd = school.data?.settings.halfDayEnd ?? '13:00';
+  const todayNote = holidayToday
+    ? `Bugün ${holidayToday.name}: panoda zil çalmaz, sıradaki ders olarak tatilden sonraki ilk ders günü görünür.`
+    : halfToday
+      ? `Bugün ${halfToday.name} (yarım gün): panoda son zil ${halfEnd}. Bu saatten sonra başlayan dersler yapılmaz, taşan ders son zilde biter.`
+      : null;
+
   const covered = new Set((list.data ?? []).flatMap((s) => s.weekdays));
   // Aynı günü kapsayan çizelgeler: daha özel olan (az günlü) o gün geçerlidir
   const overrides = [1, 2, 3, 4, 5, 6, 7].flatMap((d) => {
@@ -215,6 +228,11 @@ export function BellSchedules() {
           )
         }
       />
+      {todayNote && (
+        <div className="mb-4">
+          <Alert tone="amber">{todayNote}</Alert>
+        </div>
+      )}
       {overrides.length > 0 && (
         <div className="mb-4">
           <Alert tone="blue">
@@ -287,6 +305,10 @@ export function BellSchedules() {
           )}
         </div>
       )}
+
+      <div className="mt-5">
+        <HolidaysCard />
+      </div>
 
       <Modal
         open={open}

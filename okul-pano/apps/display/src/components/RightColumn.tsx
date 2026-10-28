@@ -4,14 +4,26 @@ import { AutoPager } from './AutoPager.tsx';
 import { useLabel } from './Labels.tsx';
 import { BellIcon, BellWatermarkIcon, BookIcon, CoffeeIcon, UtensilsIcon } from './Icons.tsx';
 
-export function describeBell(status: BellStatus) {
+/** Zil kartının gün bilgisi: tatil, arife (yarım gün) ve sonraki ders günü */
+export interface BellDayContext {
+  /** Bugün tam gün tatilse adı */
+  holiday?: string | null;
+  /** Bugün arifeyse adı (dersler `endsAt` saatinde biter) */
+  halfDay?: string | null;
+  endsAt?: string | null;
+  /** Dersler bitince ya da tatilde: "Yarın tatil · …", "Sonraki ders günü: …" */
+  upcoming?: string | null;
+}
+
+export function describeBell(status: BellStatus, ctx: BellDayContext = {}) {
+  const wish = (name: string) => (/bayram/i.test(name) ? 'İyi bayramlar' : 'İyi tatiller');
   switch (status.kind) {
     case 'lesson':
       return {
         title: periodLabel(status.period),
         caption: 'Dersin bitmesine',
         range: `${status.period.start} – ${status.period.end}`,
-        next: status.next ? `Sıradaki: ${periodLabel(status.next)} · ${status.next.start}` : 'Son ders',
+        next: status.next ? `Sıradaki: ${periodLabel(status.next)} · ${status.next.start}` : ctx.halfDay ? 'Son ders · öğleden sonra tatil' : 'Son ders',
         remaining: status.remainingSec,
         progress: 1 - status.remainingSec / status.totalSec,
         tone: 'lesson',
@@ -31,28 +43,42 @@ export function describeBell(status: BellStatus) {
         title: 'Günaydın!',
         caption: 'Derslerin başlamasına',
         range: `İlk ders ${status.next.start}`,
-        next: `${periodLabel(status.next)} · ${status.next.start} – ${status.next.end}`,
+        next: ctx.halfDay ? `Yarım gün · son zil ${ctx.endsAt}` : `${periodLabel(status.next)} · ${status.next.start} – ${status.next.end}`,
         remaining: status.remainingSec,
         progress: null,
         tone: 'idle',
       };
     case 'after':
+      if (ctx.halfDay) {
+        return {
+          title: 'Öğleden sonra tatil',
+          caption: wish(ctx.halfDay),
+          range: ctx.halfDay,
+          next: ctx.upcoming ?? null,
+          remaining: null,
+          progress: null,
+          tone: 'idle',
+        };
+      }
       return {
         title: 'Dersler sona erdi',
         caption: 'İyi akşamlar',
         range: `Son ders ${status.last.end}'de bitti`,
-        next: null,
+        next: ctx.upcoming ?? null,
         remaining: null,
         progress: null,
         tone: 'idle',
       };
     default:
-      return { title: 'Bugün ders yok', caption: 'İyi tatiller', range: null, next: null, remaining: null, progress: null, tone: 'idle' };
+      if (ctx.holiday) {
+        return { title: 'Bugün tatil', caption: ctx.holiday, range: wish(ctx.holiday), next: ctx.upcoming ?? null, remaining: null, progress: null, tone: 'idle' };
+      }
+      return { title: 'Bugün ders yok', caption: 'İyi tatiller', range: null, next: ctx.upcoming ?? null, remaining: null, progress: null, tone: 'idle' };
   }
 }
 
-export function BellCard({ status }: { status: BellStatus }) {
-  const d = describeBell(status);
+export function BellCard({ status, day }: { status: BellStatus; day?: BellDayContext }) {
+  const d = describeBell(status, day);
   const urgent = d.remaining != null && d.remaining <= 60 && (status.kind === 'lesson' || status.kind === 'break');
   const Glyph = d.tone === 'lunch' ? UtensilsIcon : d.tone === 'break' ? CoffeeIcon : BellIcon;
 
@@ -77,7 +103,8 @@ export function BellCard({ status }: { status: BellStatus }) {
         </div>
       )}
       {(d.range || d.next) && (
-        <div className="bell-foot">
+        // Geri sayım yokken (dersler bitti, tatil) bilgiler alt alta ve tam görünür
+        <div className={`bell-foot${d.remaining == null ? ' is-stack' : ''}`}>
           {d.range && <span className="bell-range">{d.range}</span>}
           {d.next && <span className="bell-next">{d.next}</span>}
         </div>

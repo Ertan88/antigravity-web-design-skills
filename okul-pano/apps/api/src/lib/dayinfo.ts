@@ -23,6 +23,13 @@ export async function effectiveHolidays(db: DB, schoolId: string, from: string, 
   return list.filter(realHoliday).map((h) => ({ date: h.date, name: h.name }));
 }
 
+/** Tam gün tatiller ve arifeler (yarım gün) ayrı ayrı */
+export async function holidaysAndHalfDays(db: DB, schoolId: string, from: string, to: string) {
+  const list = await holidaysInRange(db, schoolId, from, to);
+  const pick = (half: boolean) => list.filter((h) => realHoliday(h) !== half).map((h) => ({ date: h.date, name: h.name }));
+  return { holidays: pick(false), halfDays: pick(true) };
+}
+
 export interface DutyDayEntry {
   dutyId: string;
   area: string;

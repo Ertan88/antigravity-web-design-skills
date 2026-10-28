@@ -90,6 +90,8 @@ export const schools = pgTable('schools', {
   sampleData: jsonb('sample_data').$type<Record<string, string[]>>(),
   /** KVKK: platform yöneticisinin (üye değilse) okul içeriğine erişebileceği son an; okul sahibi verir */
   supportAccessUntil: timestamp('support_access_until', { withTimezone: true }),
+  /** Destek erişiminin verildiği an (platform yöneticisine düşen bildirimin anahtarı) */
+  supportAccessGrantedAt: timestamp('support_access_granted_at', { withTimezone: true }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

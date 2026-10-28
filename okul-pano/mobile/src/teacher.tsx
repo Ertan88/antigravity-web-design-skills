@@ -60,6 +60,11 @@ export function BellHero({ data }: { data: MeToday }) {
       ) : (
         <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800' }}>{day.holiday ? 'İyi tatiller' : h.caption}</Text>
       )}
+      {day.halfDay && (
+        <Text style={{ color: '#fff', opacity: 0.95, fontSize: 13, fontWeight: '700' }}>
+          {day.halfDay} · yarım gün, son zil {day.endsAt}
+        </Text>
+      )}
       {h.progress != null && !day.holiday && (
         <View style={{ height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.25)' }} accessibilityRole="progressbar">
           <View style={{ width: `${Math.min(100, h.progress * 100)}%`, height: 6, borderRadius: 3, backgroundColor: '#fff' }} />

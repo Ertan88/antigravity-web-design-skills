@@ -104,7 +104,7 @@ export async function authRoutes(app: FastifyInstance) {
     const ownIds = new Set(own.map((r) => r.school.id));
     const support = (await db.select().from(schools).where(gt(schools.supportAccessUntil, new Date())).orderBy(asc(schools.name)))
       .filter((s) => !ownIds.has(s.id))
-      .map((school) => ({ school, role: 'owner' as const, permissions: [] as string[], teacherId: null as string | null }));
+      .map((school) => ({ school, role: 'owner' as const, permissions: [] as string[], teacherId: null as string | null, support: true }));
     return [...own, ...support];
   }
 
@@ -139,6 +139,8 @@ export async function authRoutes(app: FastifyInstance) {
         role: r.role,
         permissions: effectivePermissions(r.role, r.permissions),
         teacherId: r.teacherId,
+        /** Üyelik yok, okulun verdiği süreli destek erişimi */
+        support: 'support' in r ? true : undefined,
       })),
     };
   });

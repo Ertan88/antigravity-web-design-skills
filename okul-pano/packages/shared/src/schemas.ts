@@ -116,6 +116,8 @@ export const schoolSettingsSchema = z.object({
   tickerSpeed: z.number().int().min(20).max(300).default(90),
   videoSound: z.boolean().default(false),
   lunchThresholdMin: z.number().int().min(10).max(180).default(30),
+  /** Arifede (yarım gün) derslerin bittiği saat; kamuda arife 13.00'ten itibaren tatildir */
+  halfDayEnd: clock.default('13:00'),
   /** Okulun kendi adlandırdığı başlıklar (kart ve sekme adları); boş olan varsayılanı kullanır */
   labels: z.partialRecord(z.enum(LABEL_KEYS as [LabelKeyT, ...LabelKeyT[]]), z.string().trim().max(60)).default({}),
   /** Okulun varsayılan pano düzeni; yoksa eski göster/gizle ayarlarından türetilir */

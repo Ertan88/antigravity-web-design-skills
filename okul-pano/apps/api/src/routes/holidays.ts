@@ -1,4 +1,4 @@
-import { canonicalHolidayName, holidayFullName, officialHolidays, tidyName } from '@okulpano/shared';
+import { addIsoDays, bridgeDays, canonicalHolidayName, holidayFullName, isHalfDayHoliday, officialHolidays, tidyName, zonedParts } from '@okulpano/shared';
 import { and, asc, eq, gte, lte, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -40,6 +40,22 @@ export async function holidaysInRange(db: DB, schoolId: string, from: string, to
   return [...out.values()].map((h) => ({ ...h, name: holidayFullName(h.date, h.name) })).sort((a, b) => a.date.localeCompare(b.date));
 }
 
+/** Arife resmî kaynaktan geliyorsa yarım gündür; okul aynı güne kendi tatilini eklediyse tam gün sayılır */
+const isHalf = (h: { source: 'official' | 'school'; name: string }) => h.source === 'official' && isHalfDayHoliday(h.name);
+
+export async function upcomingHolidays(db: DB, schoolId: string, from: string, days: number) {
+  const to = addIsoDays(from, days);
+  // Köprü hesabı için aralığın biraz öncesi ve sonrası da gerekir
+  const all = await holidaysInRange(db, schoolId, addIsoDays(from, -7), addIsoDays(to, 7));
+  const full = all.filter((h) => !isHalf(h));
+  const inRange = (d: string) => d >= from && d <= to;
+  return {
+    holidays: full.filter((h) => inRange(h.date)),
+    halfDays: all.filter((h) => isHalf(h) && inRange(h.date)).map((h) => ({ date: h.date, name: h.name })),
+    bridges: bridgeDays(from, to, full),
+  };
+}
+
 export async function holidayRoutes(app: FastifyInstance) {
   const { db, bus } = app.deps;
   const base = '/api/schools/:schoolId/holidays';
@@ -51,6 +67,15 @@ export async function holidayRoutes(app: FastifyInstance) {
     if (!month || !MONTH_RE.test(month)) throw badRequest('Ay YYYY-AA biçiminde olmalı.');
     const [from, to] = monthRange(month);
     return holidaysInRange(db, req.ctx.schoolId, from, to);
+  });
+
+  /**
+   * Yaklaşan tatiller (bugünden itibaren): tam gün tatiller, arifeler (yarım gün) ve olası köprü günleri.
+   * Köprü günü kendiliğinden tatil sayılmaz; idari izin ilan edilirse okul "tatil olarak işaretle" der.
+   */
+  app.get(`${base}/upcoming`, read, async (req) => {
+    const today = zonedParts(new Date(), req.ctx.school.timezone).isoDate;
+    return upcomingHolidays(db, req.ctx.schoolId, today, 150);
   });
 
   app.post(base, write, async (req, reply) => {

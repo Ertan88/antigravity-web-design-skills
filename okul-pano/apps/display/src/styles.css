@@ -1775,6 +1775,18 @@ p {
   text-overflow: ellipsis;
 }
 
+/* Dersler bitti / tatil: tatil adı ve sonraki ders günü alt alta, kısaltılmadan */
+.bell-foot.is-stack {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.bell-foot.is-stack .bell-next {
+  white-space: normal;
+  font-size: 16px;
+}
+
 /* İlerleme çubuğu: dolu kısmın başından ucuna doğru tekrar tekrar akan parıltı */
 .bell-progress div {
   position: relative;

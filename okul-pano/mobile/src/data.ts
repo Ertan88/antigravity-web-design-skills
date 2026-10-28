@@ -24,6 +24,9 @@ export interface MeToday {
   lunchThresholdMin: number;
   bellSchedules: BellScheduleLike[];
   holidays: { date: string; name: string }[];
+  /** Arifeler (yarım gün): dersler halfDayEnd saatinde biter */
+  halfDays?: { date: string; name: string }[];
+  halfDayEnd?: string;
   lessons: { weekday: number; periodNo: number; className: string; subject: string }[];
   leaves: { id: string; startDate: string; endDate: string; note: string | null; status: 'approved' | 'pending' | 'rejected' }[];
   week: {

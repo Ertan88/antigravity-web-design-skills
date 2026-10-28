@@ -36,8 +36,10 @@ export interface DisplayState {
   duties: { id: string; weekday: number; area: string; teacherName: string }[];
   /** Tarihe bağlı nöbetçi müdür yardımcıları (bugünden itibaren bir hafta) */
   dutySupervisors: { date: string; name: string }[];
-  /** Resmi / dini ve okulun tatilleri (bugünden itibaren bir hafta) */
+  /** Tam gün tatiller: resmi / dini ve okulun tatilleri (bugünden itibaren üç hafta) */
   holidays: { date: string; name: string }[];
+  /** Arifeler (yarım gün): dersler `settings.halfDayEnd` saatinde biter */
+  halfDays?: { date: string; name: string }[];
   /** Taşımalı öğrenci görevlileri (bugünden itibaren bir hafta) */
   transportDuties: { date: string; teacherNames: string[] }[];
   leaves: { id: string; teacherName: string; startDate: string; endDate: string }[];

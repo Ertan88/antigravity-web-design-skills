@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { upcomingHolidays } from '../src/routes/holidays.ts';
 import { client, createTestApp, expectStatus, login, multipartBody, SUPER, type TestCtx } from './helpers.ts';
 
 let t: TestCtx;
@@ -367,6 +368,16 @@ describe('nöbet çizelgesi Excel', () => {
       { id: null, date: '2026-10-28', name: 'Cumhuriyet Bayramı Arifesi', source: 'official' },
       { id: expect.any(String), date: '2026-10-29', name: '29 Ekim Cumhuriyet Bayramı', source: 'school' },
     ]);
+
+    // Yaklaşan tatiller: arife yarım gün, 30 Ekim cuma olası köprü günü; köprü tatil yapılınca öneri kalkar
+    const up = await upcomingHolidays(t.database.db, schoolId, '2026-10-20', 20);
+    expect(up.halfDays).toEqual([{ date: '2026-10-28', name: 'Cumhuriyet Bayramı Arifesi' }]);
+    expect(up.bridges).toEqual([{ date: '2026-10-30', near: '29 Ekim Cumhuriyet Bayramı' }]);
+    expectStatus(await owner.post(path('holidays'), { date: '2026-10-30', name: 'İdari İzin (Köprü Günü)' }), 201);
+    expect((await upcomingHolidays(t.database.db, schoolId, '2026-10-20', 20)).bridges).toEqual([]);
+    // Arife tam gün tatil yapılırsa yarım gün listesinden çıkar
+    expectStatus(await owner.post(path('holidays'), { date: '2026-10-28', name: 'Cumhuriyet Bayramı Arifesi' }), 201);
+    expect((await upcomingHolidays(t.database.db, schoolId, '2026-10-20', 20)).halfDays).toEqual([]);
   });
 
   it('bir ayın çizelgesi başka aya kopyalanır ve ay ay temizlenir', async () => {

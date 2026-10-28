@@ -1,22 +1,32 @@
-import { zonedParts } from '@okulpano/shared';
-import { and, desc, eq, gte, lte, or, isNull } from 'drizzle-orm';
+import { schoolFullName, zonedParts } from '@okulpano/shared';
+import { and, desc, eq, gt, gte, lte, or, isNull } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
-import { schoolGuard } from '../context.ts';
-import { achievements, announcements, teacherLeaves, teachers, users } from '../db/schema.ts';
+import { accessUser, schoolGuard } from '../context.ts';
+import { achievements, announcements, memberships, schools, teacherLeaves, teachers, users } from '../db/schema.ts';
 import { dutyDay, dutyGaps } from '../lib/dayinfo.ts';
+import { upcomingHolidays } from './holidays.ts';
 
 export interface PanelNotification {
   /** Okundu bilgisi için kalıcı anahtar */
   key: string;
-  kind: 'approval' | 'returned' | 'approved' | 'month-student' | 'leave-request' | 'duty-gap';
+  kind: 'approval' | 'returned' | 'approved' | 'month-student' | 'leave-request' | 'duty-gap' | 'support-access' | 'bridge-day';
   title: string;
   body: string;
   at: string;
   /** Tıklayınca açılacak panel adresi */
   to: string;
+  /** Tıklayınca önce bu okula geçilir (platform bildirimleri) */
+  schoolId?: string;
 }
 
 const MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+
+const DAYS = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+/** "2026-10-30" -> "30 Ekim Cuma" */
+const dateText = (iso: string) => `${Number(iso.slice(8))} ${MONTHS[Number(iso.slice(5, 7)) - 1]} ${DAYS[new Date(`${iso}T12:00:00Z`).getUTCDay()]}`;
+
+const untilText = (d: Date, timeZone: string) =>
+  new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', timeZone }).format(d);
 
 /**
  * Panelin sağ üstündeki bildirimler: kayıt tutulmaz, o anki duruma göre hesaplanır.
@@ -25,6 +35,31 @@ const MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz'
  */
 export async function notificationRoutes(app: FastifyInstance) {
   const { db } = app.deps;
+
+  /**
+   * Okuldan bağımsız bildirimler. Platform yöneticisine: süreli destek erişimi veren okullar (KVKK). Panel bu listeyi
+   * sık yoklar; liste değişince okul listesini de yeniler, böylece sayfayı yenilemeden okula girilir.
+   */
+  app.get('/api/me/notifications', { preHandler: app.authenticate }, async (req) => {
+    const { sub } = accessUser(req);
+    const [user] = await db.select({ isSuperAdmin: users.isSuperAdmin }).from(users).where(eq(users.id, sub));
+    if (!user?.isSuperAdmin) return [];
+    const own = new Set((await db.select({ id: memberships.schoolId }).from(memberships).where(eq(memberships.userId, sub))).map((r) => r.id));
+    const rows = await db.select().from(schools).where(gt(schools.supportAccessUntil, new Date())).orderBy(desc(schools.supportAccessGrantedAt));
+    return rows
+      .filter((s) => !own.has(s.id))
+      .map(
+        (s): PanelNotification => ({
+          key: `support-access:${s.id}:${s.supportAccessGrantedAt?.getTime() ?? s.supportAccessUntil!.getTime()}`,
+          kind: 'support-access',
+          title: 'Destek erişimi verildi',
+          body: `${schoolFullName(s.name, s.settings?.schoolType)} verilerine ${untilText(s.supportAccessUntil!, s.timezone)} tarihine kadar erişebilirsiniz.`,
+          at: (s.supportAccessGrantedAt ?? new Date()).toISOString(),
+          to: '/',
+          schoolId: s.id,
+        }),
+      );
+  });
 
   app.get('/api/schools/:schoolId/notifications', { preHandler: [app.authenticate, schoolGuard()] }, async (req) => {
     const { schoolId, userId, permissions, school } = req.ctx;
@@ -119,6 +154,22 @@ export async function notificationRoutes(app: FastifyInstance) {
           body: `${gaps.map((g) => `${g.area} (${g.teacherName} izinli)`).join(', ')}: yerine görevlendirme yapın.`,
           at: new Date(`${today}T05:00:00Z`).toISOString(),
           to: '/nobet',
+        });
+      }
+    }
+
+    // Önümüzdeki 3 hafta: bayrama bitişik olası köprü günleri (idari izin ilan edilirse Zil Saatleri › Tatiller'den işaretlenir)
+    if (permissions.includes('duties.manage') && permissions.includes('schedule.manage')) {
+      const today = zonedParts(new Date(), school.timezone).isoDate;
+      const { bridges } = await upcomingHolidays(db, schoolId, today, 21);
+      for (const b of bridges) {
+        out.push({
+          key: `bridge-day:${b.date}`,
+          kind: 'bridge-day',
+          title: 'Olası köprü günü',
+          body: `${dateText(b.date)}, ${b.near} tatiline bitişik. İdari izin ilan edilirse tatil olarak işaretleyin; pano o gün zil çalmaz.`,
+          at: new Date(`${today}T06:00:00Z`).toISOString(),
+          to: '/zil-saatleri?tatiller=1',
         });
       }
     }

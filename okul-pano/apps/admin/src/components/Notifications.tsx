@@ -1,6 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Bell, CheckCircle2, ClipboardCheck, Star, Undo2, type LucideIcon } from 'lucide-react';
+import { Bell, CalendarDays, CalendarX2, CheckCircle2, ClipboardCheck, KeyRound, ShieldAlert, Star, Undo2, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.ts';
@@ -9,11 +9,13 @@ import { timeAgo } from '../lib/format.ts';
 
 interface PanelNotification {
   key: string;
-  kind: 'approval' | 'returned' | 'approved' | 'month-student';
+  kind: 'approval' | 'returned' | 'approved' | 'month-student' | 'leave-request' | 'duty-gap' | 'support-access' | 'bridge-day';
   title: string;
   body: string;
   at: string;
   to: string;
+  /** Tıklayınca önce bu okula geçilir */
+  schoolId?: string;
 }
 
 const ICONS: Record<PanelNotification['kind'], { icon: LucideIcon; tone: string }> = {
@@ -21,7 +23,12 @@ const ICONS: Record<PanelNotification['kind'], { icon: LucideIcon; tone: string 
   returned: { icon: Undo2, tone: 'bg-red-100 text-red-700' },
   approved: { icon: CheckCircle2, tone: 'bg-emerald-100 text-emerald-700' },
   'month-student': { icon: Star, tone: 'bg-brand-100 text-brand-700' },
+  'leave-request': { icon: CalendarX2, tone: 'bg-amber-100 text-amber-700' },
+  'duty-gap': { icon: ShieldAlert, tone: 'bg-red-100 text-red-700' },
+  'support-access': { icon: KeyRound, tone: 'bg-emerald-100 text-emerald-700' },
+  'bridge-day': { icon: CalendarDays, tone: 'bg-amber-100 text-amber-700' },
 };
+const FALLBACK = { icon: Bell, tone: 'bg-slate-100 text-slate-600' };
 
 /** Okunan bildirimler bu tarayıcıda tutulur (bildirimler sunucuda o anki duruma göre hesaplanır) */
 const SEEN_KEY = 'okulpano.seenNotifications';
@@ -45,8 +52,10 @@ function saveSeen(seen: Set<string>) {
  * onaylar (duyuruyu girene), ayın öğrencisi hatırlatması. Tıklayınca ilgili yer açılır.
  */
 export function NotificationBell() {
-  const { schoolId } = useAuth();
+  const { me, schoolId, setSchoolId, reloadMe } = useAuth();
+  const qc = useQueryClient();
   const navigate = useNavigate();
+  const isSuperAdmin = Boolean(me?.user.isSuperAdmin);
   const [open, setOpen] = useState(false);
   const [seen, setSeen] = useState(loadSeen);
   const box = useRef<HTMLDivElement>(null);
@@ -56,7 +65,25 @@ export function NotificationBell() {
     enabled: Boolean(schoolId),
     refetchInterval: 30_000,
   });
-  const items = list.data ?? [];
+  // Platform yöneticisine: okulların verdiği destek erişimi. Sık yoklanır; liste değişince (erişim verildi ya da
+  // kapandı) okul listesi ve Platform sayfası yenilenir, sayfayı yenilemeden okula girilir.
+  const platform = useQuery({
+    queryKey: ['me', 'notifications'],
+    queryFn: () => api<PanelNotification[]>('/api/me/notifications'),
+    enabled: isSuperAdmin,
+    refetchInterval: 10_000,
+  });
+  const platformKeys = platform.data?.map((n) => n.key).join('|');
+  const lastKeys = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (platformKeys === undefined) return;
+    if (lastKeys.current !== undefined && lastKeys.current !== platformKeys) {
+      void reloadMe();
+      void qc.invalidateQueries({ queryKey: ['platform'] });
+    }
+    lastKeys.current = platformKeys;
+  }, [platformKeys, reloadMe, qc]);
+  const items = [...(platform.data ?? []), ...(list.data ?? [])].sort((a, b) => b.at.localeCompare(a.at));
   const unread = items.filter((n) => !seen.has(n.key)).length;
 
   useEffect(() => {
@@ -74,7 +101,7 @@ export function NotificationBell() {
     };
   }, [open]);
 
-  if (!schoolId) return null;
+  if (!schoolId && !isSuperAdmin) return null;
   const markAll = () => {
     const next = new Set([...seen, ...items.map((n) => n.key)]);
     setSeen(next);
@@ -85,6 +112,7 @@ export function NotificationBell() {
     setSeen(next);
     saveSeen(next);
     setOpen(false);
+    if (n.schoolId && n.schoolId !== schoolId) setSchoolId(n.schoolId);
     navigate(n.to);
   };
 
@@ -119,7 +147,7 @@ export function NotificationBell() {
           {items.length ? (
             <ul className="max-h-[26rem] divide-y divide-slate-100 overflow-y-auto">
               {items.map((n) => {
-                const { icon: Icon, tone } = ICONS[n.kind];
+                const { icon: Icon, tone } = ICONS[n.kind] ?? FALLBACK;
                 const isNew = !seen.has(n.key);
                 return (
                   <li key={n.key}>

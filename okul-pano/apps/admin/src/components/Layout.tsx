@@ -21,7 +21,7 @@ function SchoolSwitcher() {
       <SchoolBadge name={school?.name ?? ''} logo={school?.logoUrl ?? null} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-semibold text-ink">{school?.name ?? 'Okul seçin'}</div>
-        <div className="text-xs text-slate-500">{me.schools.length > 1 ? `${me.schools.length} okul` : school ? roleLabel(school.role) : ''}</div>
+        <div className="text-xs text-slate-500">{me.schools.length > 1 ? `${me.schools.length} okul` : school ? (school.support ? 'Destek erişimi' : roleLabel(school.role)) : ''}</div>
       </div>
     </>
   );
@@ -40,7 +40,7 @@ function SchoolSwitcher() {
       >
         {me.schools.map((s) => (
           <option key={s.id} value={s.id}>
-            {s.name}
+            {s.support ? `${s.name} (destek erişimi)` : s.name}
           </option>
         ))}
       </select>

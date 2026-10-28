@@ -1,4 +1,5 @@
-import { computeBellStatus, periodLabel, pickSchedule, sortPeriods, type BellStatus, type Period } from '@okulpano/shared/bell';
+import { computeBellStatus, periodLabel, type BellStatus, type Period } from '@okulpano/shared/bell';
+import { schoolDay } from '@okulpano/shared/schoolDay';
 import { zonedParts, type ZonedParts } from '@okulpano/shared/time';
 import type { MeToday } from './data.ts';
 
@@ -10,6 +11,9 @@ export interface TeacherDay {
   periods: Period[];
   bell: BellStatus;
   holiday: string | null;
+  /** Arife (yarım gün): dersler `endsAt` saatinde biter */
+  halfDay: string | null;
+  endsAt: string | null;
   /** Bugünkü dersleri: saat, sınıf, ders; şu anki işaretli */
   lessons: { period: Period; className: string; subject: string; state: 'past' | 'now' | 'next' | 'later' }[];
 }
@@ -17,9 +21,9 @@ export interface TeacherDay {
 /** Öğretmenin bugünü: zil durumu ve dersleri (panoyla aynı hesap) */
 export function teacherDay(data: MeToday, date: Date): TeacherDay {
   const now = zonedParts(date, data.timezone);
-  const holiday = data.holidays.find((h) => h.date === now.isoDate)?.name ?? null;
-  const schedule = pickSchedule(data.bellSchedules, now.weekday);
-  const periods = schedule && !holiday ? sortPeriods(schedule.periods) : [];
+  // Panoyla aynı hesap: tatilde ders yok, arifede dersler yarım gün saatinde biter
+  const day = schoolDay(now.isoDate, { schedules: data.bellSchedules, holidays: data.holidays, halfDays: data.halfDays ?? [], halfDayEnd: data.halfDayEnd });
+  const { holiday, halfDay, endsAt, periods } = day;
   const bell: BellStatus = periods.length ? computeBellStatus(periods, now.secondsOfDay, data.lunchThresholdMin) : { kind: 'off' };
   const currentNo = bell.kind === 'lesson' ? bell.period.no : null;
   const nextNo = bell.kind === 'lesson' ? (bell.next?.no ?? null) : bell.kind === 'break' || bell.kind === 'before' ? bell.next.no : null;
@@ -38,7 +42,7 @@ export function teacherDay(data: MeToday, date: Date): TeacherDay {
       }
       return { period, className: l.className, subject: l.subject, state };
     });
-  return { now, periods, bell, holiday, lessons };
+  return { now, periods, bell, holiday, halfDay, endsAt, lessons };
 }
 
 const toSec = (hm: string) => Number(hm.slice(0, 2)) * 3600 + Number(hm.slice(3, 5)) * 60;

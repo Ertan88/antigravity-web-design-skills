@@ -39,7 +39,7 @@ import { pairingCode, randomToken, sha256 } from '../lib/crypto.ts';
 import { forbidden, notFound, parse, unauthorized } from '../lib/errors.ts';
 import { feedTitlesNow } from '../lib/rss.ts';
 import { getWeather } from '../lib/weather.ts';
-import { holidaysInRange } from './holidays.ts';
+import { addDays, holidaysAndHalfDays } from '../lib/dayinfo.ts';
 import { DEVICE_TOKEN_PREFIX } from './screens.ts';
 
 const PAIRING_TTL_MS = 10 * 60 * 1000;
@@ -134,7 +134,8 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
         ),
       )
       .orderBy(asc(duties.weekday), asc(duties.sortOrder), asc(duties.area)),
-    holidaysInRange(db, id, today, weekAheadDate),
+    // Sonraki ders gününü bulmak için üç hafta (uzun bayram tatili + köprü günleri)
+    holidaysAndHalfDays(db, id, today, addDays(today, 21)),
     db
       .select({ date: dutySupervisors.date, name: dutySupervisors.name })
       .from(dutySupervisors)
@@ -238,10 +239,8 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
 
   const iso = (d: Date | null) => (d ? d.toISOString() : null);
   const settings = schoolSettingsSchema.parse(school.settings ?? {});
-  // Arife günleri yarım gündür (sabah ders var): panoda tatil sayılmaz
-  const holidays = new Map(
-    holidayRows.filter((h) => !(h.source === 'official' && h.name.endsWith('Arifesi'))).map((h) => [h.date, h.name] as const),
-  );
+  // Arife günleri yarım gündür (sabah ders var): tatil sayılmaz, ayrı listede gider
+  const holidays = new Map(holidayRows.holidays.map((h) => [h.date, h.name] as const));
 
   return {
     serverTime: now.toISOString(),
@@ -262,7 +261,8 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
     exams: examRows.map((e) => ({ ...e, examAt: e.examAt.toISOString() })),
     duties: dutyRows,
     dutySupervisors: supervisorRows,
-    holidays: [...holidays].map(([date, name]) => ({ date, name })).sort((a, b) => a.date.localeCompare(b.date)),
+    holidays: holidayRows.holidays,
+    halfDays: holidayRows.halfDays,
     // Tatil günlerinde taşımalı görevli gösterilmez (eskiden kalmış kayıt olsa da)
     transportDuties: settings.hasTransport ? groupTransport(transportRows).filter((d) => !holidays.has(d.date)) : [],
     leaves: leaveRows,

@@ -1,5 +1,5 @@
 import { formatDuration, splitSchoolName, type BellStatus } from '@okulpano/shared/client';
-import { describeBell } from './RightColumn.tsx';
+import { describeBell, type BellDayContext } from './RightColumn.tsx';
 import { AlertIcon, MegaphoneIcon, SchoolIcon } from './Icons.tsx';
 
 /** Tam ekran saat modu: büyük saat, tarih, zil durumu ve okul */
@@ -7,6 +7,7 @@ export function ClockScreen({
   now,
   timezone,
   bell,
+  day,
   schoolName,
   schoolType,
   logoUrl,
@@ -14,6 +15,7 @@ export function ClockScreen({
   now: Date;
   timezone: string;
   bell: BellStatus;
+  day?: BellDayContext;
   schoolName: string;
   schoolType?: string;
   logoUrl: string | null;
@@ -21,7 +23,7 @@ export function ClockScreen({
   const title = splitSchoolName(schoolName, schoolType);
   const time = new Intl.DateTimeFormat('tr-TR', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: timezone }).format(now);
   const date = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long', timeZone: timezone }).format(now);
-  const d = describeBell(bell);
+  const d = describeBell(bell, day);
   return (
     <div className="clock-screen">
       <div className="clock-screen-school">

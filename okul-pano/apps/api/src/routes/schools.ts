@@ -1,4 +1,4 @@
-import { adminUpdateSchoolSchema, createSchoolSchema, labelsSchema, schoolSettingsSchema, updateSchoolSchema } from '@okulpano/shared';
+import { adminUpdateSchoolSchema, schoolFullName, createSchoolSchema, labelsSchema, schoolSettingsSchema, updateSchoolSchema } from '@okulpano/shared';
 import { and, count, desc, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -6,6 +6,7 @@ import { accessUser, audit, schoolGuard, UUID_RE } from '../context.ts';
 import { announcements, auditLogs, memberships, schools, screens, students, teachers, users } from '../db/schema.ts';
 import { hashPassword } from '../lib/crypto.ts';
 import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
+import { notifyUsers } from '../lib/push.ts';
 import { geocode } from '../lib/weather.ts';
 import { SAMPLE_TABLES, seedSchoolContent, type SampleData } from '../seed-data.ts';
 import { addDefaultTeacherOptions } from './teachers.ts';
@@ -63,8 +64,21 @@ export async function schoolRoutes(app: FastifyInstance) {
     if (req.ctx.isSupport) throw forbidden('Destek erişimini yalnızca okul yöneticisi verebilir.');
     const { hours } = parse(z.object({ hours: z.union([z.literal(0), z.literal(24), z.literal(168)]) }), req.body);
     const until = hours ? new Date(Date.now() + hours * 3600_000) : null;
-    const [updated] = await db.update(schools).set({ supportAccessUntil: until }).where(eq(schools.id, req.ctx.schoolId)).returning();
-    await audit(req, 'update', 'Destek erişimi', req.ctx.schoolId, hours ? `Platform desteğine ${hours === 24 ? '24 saat' : '7 gün'} erişim verildi` : 'Platform desteğinin erişimi kapatıldı');
+    const [updated] = await db
+      .update(schools)
+      .set(until ? { supportAccessUntil: until, supportAccessGrantedAt: new Date() } : { supportAccessUntil: null })
+      .where(eq(schools.id, req.ctx.schoolId))
+      .returning();
+    const span = hours === 24 ? '24 saat' : '7 gün';
+    await audit(req, 'update', 'Destek erişimi', req.ctx.schoolId, hours ? `Platform desteğine ${span} erişim verildi` : 'Platform desteğinin erişimi kapatıldı');
+    // Platform yöneticileri telefonda da haberdar olur; panelde okul listesine kendiliğinden eklenir
+    if (hours) {
+      const admins = await db.select({ id: users.id }).from(users).where(eq(users.isSuperAdmin, true));
+      notifyUsers(app.deps, admins.map((a) => a.id), {
+        title: 'Destek erişimi verildi',
+        body: `${schoolFullName(updated!.name, updated!.settings?.schoolType)} ${span} boyunca verilerine erişim verdi.`,
+      });
+    }
     return publicSchool(updated!);
   });
 

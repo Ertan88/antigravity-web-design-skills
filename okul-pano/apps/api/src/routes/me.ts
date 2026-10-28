@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { accessUser, audit, schoolGuard } from '../context.ts';
 import { bellSchedules, classGroups, pushTokens, teacherLeaves, teachers, timetableEntries } from '../db/schema.ts';
-import { addDays, dutyDay, effectiveHolidays } from '../lib/dayinfo.ts';
+import { addDays, dutyDay, holidaysAndHalfDays } from '../lib/dayinfo.ts';
 import { badRequest, parse } from '../lib/errors.ts';
 import { notifyUsers, usersWithPermission } from '../lib/push.ts';
 
@@ -20,7 +20,6 @@ export async function meRoutes(app: FastifyInstance) {
   app.get('/api/schools/:schoolId/me/today', member, async (req) => {
     const { schoolId, school, teacherId } = req.ctx;
     const today = zonedParts(new Date(), school.timezone).isoDate;
-    const until = addDays(today, 7);
     const settings = schoolSettingsSchema.parse(school.settings ?? {});
     const [teacher] = teacherId
       ? await db.select({ id: teachers.id, fullName: teachers.fullName }).from(teachers).where(eq(teachers.id, teacherId))
@@ -29,7 +28,7 @@ export async function meRoutes(app: FastifyInstance) {
 
     const [bells, holidays, lessons, leaves, days] = await Promise.all([
       db.select().from(bellSchedules).where(eq(bellSchedules.schoolId, schoolId)).orderBy(asc(bellSchedules.sortOrder)),
-      effectiveHolidays(db, schoolId, today, until),
+      holidaysAndHalfDays(db, schoolId, today, addDays(today, 21)),
       teacher
         ? db
             .select({ weekday: timetableEntries.weekday, periodNo: timetableEntries.periodNo, className: classGroups.name, subject: timetableEntries.subject })
@@ -79,7 +78,10 @@ export async function meRoutes(app: FastifyInstance) {
       timezone: school.timezone,
       lunchThresholdMin: settings.lunchThresholdMin,
       bellSchedules: bells.map((b) => ({ id: b.id, name: b.name, weekdays: b.weekdays, periods: b.periods, sortOrder: b.sortOrder })),
-      holidays,
+      holidays: holidays.holidays,
+      /** Arifeler: dersler halfDayEnd saatinde biter */
+      halfDays: holidays.halfDays,
+      halfDayEnd: settings.halfDayEnd,
       lessons,
       leaves: leaves.map((l) => ({ id: l.id, startDate: l.startDate, endDate: l.endDate, note: l.note, status: l.approvalStatus })),
       week,

@@ -147,6 +147,10 @@ describe('deneme süresi', () => {
     expect((await root.post(`/api/schools/${schoolId}/support-access`, { hours: 24 })).statusCode).toBe(403);
     expectStatus(await owner.post(`/api/schools/${schoolId}/support-access`, { hours: 24 }), 200);
     expect((await root.get('/api/me')).json().schools.some((s: { id: string }) => s.id === schoolId)).toBe(true);
+    // Platform yöneticisine bildirim düşer (panel bunu yoklayıp okul listesini kendiliğinden yeniler)
+    const notes = (await root.get('/api/me/notifications')).json() as { kind: string; schoolId: string }[];
+    expect(notes.some((n) => n.kind === 'support-access' && n.schoolId === schoolId)).toBe(true);
+    expect((await owner.get('/api/me/notifications')).json()).toEqual([]);
     expectStatus(await root.post(`/api/schools/${schoolId}/teachers`, { fullName: 'Destek Kaydı' }), 201);
     // Destek erişimindeki platform yöneticisi süreyi kendisi uzatamaz
     expect((await root.post(`/api/schools/${schoolId}/support-access`, { hours: 168 })).statusCode).toBe(403);
@@ -154,6 +158,7 @@ describe('deneme süresi', () => {
     expect(log.some((x) => x.entity === 'Destek erişimi')).toBe(true);
     expectStatus(await owner.post(`/api/schools/${schoolId}/support-access`, { hours: 0 }), 200);
     expect((await root.get(`/api/schools/${schoolId}/teachers`)).statusCode).toBe(403);
+    expect(((await root.get('/api/me/notifications')).json() as { schoolId: string }[]).some((n) => n.schoolId === schoolId)).toBe(false);
 
     expectStatus(await root.patch(`/api/platform/schools/${schoolId}`, { extendTrialDays: 14 }), 200);
     expectStatus(await owner.post(`/api/schools/${schoolId}/teachers`, { fullName: 'Ali Veli' }), 201);
