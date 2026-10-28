@@ -9,6 +9,7 @@ import { Badge, Button, Card, Input, Toggle } from '../../components/ui.tsx';
 import { api } from '../../lib/api.ts';
 import { useAuth } from '../../lib/auth.tsx';
 import { useSchool, useSchoolPath, type School } from '../../lib/data.ts';
+import { formatDate, formatDateLong } from '../../lib/format.ts';
 
 interface Upcoming {
   holidays: { id: string | null; date: string; name: string; source: 'official' | 'meb' | 'school' }[];
@@ -51,9 +52,9 @@ type Row =
   | { kind: 'half'; date: string; name: string }
   | { kind: 'bridge'; date: string; near: string };
 
-const dateText = (iso: string) =>
-  new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', weekday: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));
-const shortText = (iso: string) => new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));
+/** Kısaltmasız, yıl ve gün adıyla: "16 Kasım 2026 Pazartesi" */
+const dateText = formatDateLong;
+const shortText = formatDate;
 const nextDay = (iso: string) => new Date(Date.parse(`${iso}T12:00:00Z`) + 86400_000).toISOString().slice(0, 10);
 /** "Kurban Bayramı 2. Gün" -> "Kurban Bayramı": aynı tatilin günleri tek satırda */
 const groupName = (name: string) => name.replace(/ \d+\. Gün$/, '');
@@ -202,7 +203,7 @@ export function HolidaysCard() {
               <ul className="divide-y divide-slate-100 rounded-xl ring-1 ring-slate-200">
                 {rows.map((r) => (
                   <li key={`${r.kind}-${r.date}`} className={clsx('flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5', r.kind === 'bridge' && 'bg-amber-50/50')}>
-                    <span className="w-44 shrink-0 text-sm font-medium text-slate-700">
+                    <span className="w-60 shrink-0 text-sm font-medium text-slate-700">
                       {r.kind === 'holiday' && r.end ? `${shortText(r.date)} – ${shortText(r.end)}` : dateText(r.date)}
                       {r.kind === 'holiday' && r.days && r.days > 1 && <span className="block text-xs font-normal text-slate-400">{r.days} gün</span>}
                     </span>
@@ -262,8 +263,8 @@ export function HolidaysCard() {
   );
 }
 
-const MONTHS_SHORT = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
-const dm = (iso: string) => `${Number(iso.slice(8))} ${MONTHS_SHORT[Number(iso.slice(5, 7)) - 1]}`;
+/** Kısaltmasız: "16 Kasım 2026" */
+const dm = formatDate;
 
 /**
  * Eğitim yılının MEB takvimi (bu ve varsa gelecek yıl): ders başlangıcı, ara tatiller, yarıyıl, ders yılı sonu.
@@ -297,7 +298,7 @@ function AcademicYearBox({ canSettings }: { canSettings: boolean }) {
           const d = y.data;
           const rows: [string, string][] = [
             ['Dersler başlar', dm(d.lessonsStart)],
-            ...d.breaks.map((b): [string, string] => [b.name.replace(' Dönem', '.').replace('Birinci.', '1.').replace('İkinci.', '2.'), `${dm(b.start)} – ${dm(b.end)}`]),
+            ...d.breaks.map((b): [string, string] => [b.name, `${dm(b.start)} – ${dm(b.end)}`]),
             ['Yarıyıl tatili', `${dm(semesterBreak(d).start)} – ${dm(semesterBreak(d).end)}`],
             ['Ders yılı biter', dm(d.lessonsEnd)],
           ];
@@ -306,9 +307,9 @@ function AcademicYearBox({ canSettings }: { canSettings: boolean }) {
               <div className="text-xs font-bold text-emerald-800">
                 {y.label} eğitim yılı{y.status === 'review' && ' · kontrol ediliyor'}
               </div>
-              <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 text-xs">
+              <dl className="mt-1 space-y-1 text-xs">
                 {rows.map(([k, v]) => (
-                  <div key={k} className="contents">
+                  <div key={k}>
                     <dt className="text-slate-600">{k}</dt>
                     <dd className="font-semibold text-ink tabular-nums">{v}</dd>
                   </div>

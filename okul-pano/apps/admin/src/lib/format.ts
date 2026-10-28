@@ -26,6 +26,13 @@ export function formatDate(isoDate: string | null | undefined): string {
   return isoDate ? dateFmt.format(new Date(`${isoDate}T00:00:00Z`)) : '—';
 }
 
+const longDateFmt = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long', timeZone: 'UTC' });
+
+/** "2026-09-14" -> "14 Eylül 2026 Pazartesi": kısaltmasız, gün adıyla */
+export function formatDateLong(isoDate: string | null | undefined): string {
+  return isoDate ? longDateFmt.format(new Date(`${isoDate}T00:00:00Z`)) : '—';
+}
+
 export function todayIso(): string {
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;

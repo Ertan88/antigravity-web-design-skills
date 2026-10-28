@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useToast } from '../../components/Toast.tsx';
 import { Alert, Badge, Button, Card, Field, IconButton, Input, Modal } from '../../components/ui.tsx';
 import { api } from '../../lib/api.ts';
+import { formatDateLong, formatDateTime } from '../../lib/format.ts';
 
 interface CalendarRow {
   startYear: number;
@@ -22,9 +23,8 @@ interface ScanResult {
   message: string;
 }
 
-const MONTHS = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
-/** "2026-11-16" -> "16 Kas 2026" */
-const d = (iso: string) => `${Number(iso.slice(8))} ${MONTHS[Number(iso.slice(5, 7)) - 1]} ${iso.slice(0, 4)}`;
+/** Tarihler kısaltmasız ve gün adıyla: "16 Kasım 2026 Pazartesi" */
+const d = formatDateLong;
 const span = (a: string, b: string) => `${d(a)} – ${d(b)}`;
 
 const SOURCE: Record<CalendarRow['source'], { label: string; tone: 'green' | 'blue' | 'slate' }> = {
@@ -149,7 +149,7 @@ export function AcademicCalendarCard() {
                   Duyuru <ExternalLink className="size-3" />
                 </a>
               )}
-              {r.checkedAt && <div className="text-xs text-slate-400">Son tarama: {new Date(r.checkedAt).toLocaleString('tr-TR', { dateStyle: 'medium', timeStyle: 'short' })}</div>}
+              {r.checkedAt && <div className="text-xs text-slate-400">Son tarama: {formatDateTime(r.checkedAt)}</div>}
             </div>
             <div className="min-w-0 space-y-3">
               <Summary data={r.data} />

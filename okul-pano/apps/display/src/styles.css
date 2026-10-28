@@ -2559,7 +2559,7 @@ p {
 
 .event-date {
   flex: none;
-  width: 60px;
+  width: 74px;
   height: 60px;
   border-radius: 14px;
   display: flex;
@@ -2578,8 +2578,9 @@ p {
 
 .event-date span {
   margin-top: 3px;
-  font-size: 13px;
+  font-size: 11.5px;
   font-weight: 700;
+  letter-spacing: -0.01em;
   text-transform: uppercase;
   color: color-mix(in srgb, var(--hue) 65%, var(--text));
 }

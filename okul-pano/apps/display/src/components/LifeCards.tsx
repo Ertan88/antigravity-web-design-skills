@@ -46,7 +46,8 @@ export function AchievementsCard({ items }: { items: NonNullable<DisplayState['a
 }
 
 const dayFmt = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', timeZone: 'UTC' });
-const monFmt = new Intl.DateTimeFormat('tr-TR', { month: 'short', timeZone: 'UTC' });
+// Ay adı kısaltılmaz (KASIM, AĞUSTOS)
+const monFmt = new Intl.DateTimeFormat('tr-TR', { month: 'long', timeZone: 'UTC' });
 const wdFmt = new Intl.DateTimeFormat('tr-TR', { weekday: 'long', timeZone: 'UTC' });
 
 /** Kulüp ve etkinlik takvimi: önümüzdeki günler, tarih rozetiyle */
