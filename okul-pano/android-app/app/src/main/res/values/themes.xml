@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Arayüz Compose ile çizilir (MaterialTheme); pencere teması yalnızca açılıştaki zemin rengi içindir -->
+  <style name="Theme.OkulYayin" parent="android:Theme.Material.Light.NoActionBar">
+    <item name="android:windowBackground">@color/window_light</item>
+    <item name="android:statusBarColor">@android:color/transparent</item>
+    <item name="android:navigationBarColor">@android:color/transparent</item>
+  </style>
+
+  <!-- Açılış ekranı: marka renginde logo -->
+  <style name="Theme.OkulYayin.Starting" parent="Theme.SplashScreen">
+    <item name="windowSplashScreenBackground">@color/brand</item>
+    <item name="windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>
+    <item name="postSplashScreenTheme">@style/Theme.OkulYayin</item>
+  </style>
+</resources>
