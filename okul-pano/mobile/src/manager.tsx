@@ -5,16 +5,16 @@ import { useAuth } from './auth.tsx';
 import { useControlCenter, useMeToday } from './data.ts';
 import { clock, timeAgo } from './day.ts';
 import { MenuButton, QuickAdd } from './quick.tsx';
-import { NotificationsButton, SchoolBadge, TodayDutyCard } from './teacher.tsx';
+import { DayBanner, MyDayCard, NotificationsButton } from './teacher.tsx';
 import { colors } from './theme.ts';
-import { Card, Empty, ErrorNote, Icon, ListRow, Loading, Screen, SectionTitle, T } from './ui.tsx';
+import { Banner, Card, Empty, ErrorNote, HomeHeader, ListRow, Loading, Screen, SectionTitle } from './ui.tsx';
 
 function Stat({ value, label, to }: { value: string | number; label: string; to: string }) {
   return (
     <Pressable
       accessibilityRole="button"
       onPress={() => router.push(to as never)}
-      style={({ pressed }) => ({ flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 12, gap: 2, opacity: pressed ? 0.75 : 1 })}
+      style={({ pressed }) => ({ flex: 1, backgroundColor: pressed ? colors.primarySoft : '#fff', borderWidth: 1, borderColor: colors.border, borderRadius: 16, paddingVertical: 14, paddingHorizontal: 14, gap: 2, shadowColor: '#0f172a', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 1 })}
     >
       <Text style={{ fontSize: 24, fontWeight: '800', color: colors.ink, fontVariant: ['tabular-nums'] }}>{value}</Text>
       <Text style={{ fontSize: 12, color: colors.muted }}>{label}</Text>
@@ -80,29 +80,18 @@ export function ManagerHome() {
 
   return (
     <Screen refreshing={center.isRefetching} onRefresh={() => void center.refetch()}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 8 }}>
-        <SchoolBadge name={school?.name ?? 'O'} />
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <T size={12} weight="700" color={colors.primary}>
-            {school?.support ? 'DESTEK ERİŞİMİ' : role === 'owner' ? 'OKUL SAHİBİ' : 'YÖNETİCİ'}
-          </T>
-          <T size={18} weight="800">
-            Merkez
-          </T>
-          <T size={13} color={colors.muted} lines={1}>
-            {c?.holiday ? `Tatil · ${c.holiday}` : (school?.name ?? 'Normal gün')}
-          </T>
-        </View>
+      <HomeHeader eyebrow={school?.support ? 'Destek erişimi' : role === 'owner' ? 'Okul sahibi' : 'Yönetici'} title="Merkez" subtitle={school?.name}>
         <NotificationsButton />
         <MenuButton />
-      </View>
+      </HomeHeader>
       <ErrorNote error={center.error} />
       {!c ? (
         <Loading />
       ) : (
         <>
+          {me.data ? <DayBanner data={me.data} /> : c.holiday ? <Banner icon="sunny-outline" title="Bugün tatil" text={c.holiday} /> : null}
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <Stat value={`${c.screens.online}/${c.screens.total}`} label="pano çevrimiçi" to="/panolar" />
+            <Stat value={`${c.screens.online}/${c.screens.total}`} label="pano açık" to="/panolar" />
             <Stat value={c.pending.announcements + c.pending.leaves} label="onay bekliyor" to="/onaylar" />
             <Stat value={c.onAir} label="içerik yayında" to="/yayin-akisi" />
           </View>
@@ -121,10 +110,10 @@ export function ManagerHome() {
           {/* "Benim günüm" kartı yer kapladığı için öğretmen kaydı olan yöneticide üç hızlı ekleme; diğerleri Menü › İçerik'te */}
           <QuickAdd max={isTeacher ? 3 : 6} />
 
-          {isTeacher && me.data && (
+          {isTeacher && me.data?.teacher && (
             <>
-              <SectionTitle right={<Icon name="person-outline" size={18} color={colors.muted} />}>Benim günüm</SectionTitle>
-              <TodayDutyCard data={me.data} />
+              <SectionTitle>Benim günüm</SectionTitle>
+              <MyDayCard data={me.data} />
             </>
           )}
         </>

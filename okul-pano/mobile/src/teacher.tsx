@@ -3,30 +3,15 @@ import { useEffect } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useAuth } from './auth.tsx';
 import { useInbox, useMeToday, useNow, type MeToday } from './data.ts';
-import { bellHeadline, countdownText, greeting, teacherDay } from './day.ts';
+import { bellHeadline, countdownText, fullDate, greeting, localIso, teacherDay } from './day.ts';
 import { scheduleDutyReminders } from './push.ts';
 import { colors, radius } from './theme.ts';
-import { Card, Empty, Icon, Label, Loading, Screen, SectionTitle, T, type IconName } from './ui.tsx';
+import { Banner, Card, Empty, HeaderButton, HomeHeader, Icon, Label, ListRow, Loading, Screen, SectionTitle, T, type IconName } from './ui.tsx';
 
 /** Sağ üstteki bildirim zili (okunmamış sayısıyla) */
 export function NotificationsButton() {
   const notes = useInbox('unread');
-  const n = notes.data?.unread ?? 0;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={n ? `Bildirimler, ${n} yeni` : 'Bildirimler'}
-      onPress={() => router.push('/bildirimler')}
-      style={{ width: 44, height: 44, borderRadius: 12, borderWidth: 1, borderColor: '#dbe3e8', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' }}
-    >
-      <Icon name="notifications-outline" size={22} />
-      {n > 0 && (
-        <View style={{ position: 'absolute', top: -5, right: -5, minWidth: 19, height: 19, borderRadius: 10, backgroundColor: colors.danger, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
-          <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>{n > 9 ? '9+' : n}</Text>
-        </View>
-      )}
-    </Pressable>
-  );
+  return <HeaderButton icon="notifications-outline" label="Bildirimler" badge={notes.data?.unread ?? 0} onPress={() => router.push('/bildirimler')} />;
 }
 
 /** Logo yerine okulun baş harfi (logo görseli yüklenmemişse de aynı görünür) */
@@ -137,7 +122,7 @@ export function IconTile({ name, tone = 'primary', size = 48 }: { name: IconName
 export function MySchedule({ data }: { data: MeToday }) {
   const now = useNow(30_000);
   const day = teacherDay(data, now);
-  if (!data.teacher) return null;
+  if (!data.teacher || day.holiday) return null;
   return (
     <View style={{ gap: 8 }}>
       <SectionTitle>Bugünkü programım</SectionTitle>
@@ -207,18 +192,9 @@ export function TeacherHome() {
   ];
   return (
     <Screen refreshing={today.isRefetching} onRefresh={() => void today.refetch()}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 8 }}>
-        <SchoolBadge name={school?.name ?? 'O'} />
-        <View style={{ flex: 1 }}>
-          <T size={13} color={colors.muted}>
-            {greeting(now.getHours())},
-          </T>
-          <T size={18} weight="700">
-            {firstName} {today.data?.teacher ? 'Öğretmen' : ''}
-          </T>
-        </View>
+      <HomeHeader eyebrow="Öğretmen" title={`${greeting(now.getHours())}, ${firstName}`} subtitle={[fullDate(localIso(now)), school?.name].filter(Boolean).join(' · ')}>
         <NotificationsButton />
-      </View>
+      </HomeHeader>
       {today.isLoading || !today.data ? (
         <Loading />
       ) : (
@@ -245,11 +221,15 @@ export function TeacherHome() {
                   borderRadius: 16,
                   borderWidth: 1,
                   borderColor: colors.border,
-                  backgroundColor: '#fff',
+                  backgroundColor: pressed ? colors.primarySoft : '#fff',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: 6,
-                  opacity: pressed ? 0.75 : 1,
+                  shadowColor: '#0f172a',
+                  shadowOpacity: 0.04,
+                  shadowRadius: 8,
+                  shadowOffset: { width: 0, height: 2 },
+                  elevation: 1,
                 })}
               >
                 <Icon name={a.icon} size={22} color={colors.primary} />
@@ -264,3 +244,42 @@ export function TeacherHome() {
   );
 }
 
+
+/** Günün durumu bandı: tam gün tatil ya da arife (yarım gün); normal günde görünmez */
+export function DayBanner({ data }: { data: MeToday }) {
+  const now = useNow(60_000);
+  const day = teacherDay(data, now);
+  if (day.holiday) return <Banner icon="sunny-outline" tone="gold" title="Bugün tatil" text={`${day.holiday} · zil çalmıyor, panolar tatil görünümünde`} />;
+  if (day.halfDay) return <Banner icon="partly-sunny-outline" tone="warning" title={`Yarım gün · ${day.halfDay}`} text={`Dersler ${day.endsAt} saatinde biter; öğleden sonra tatil`} />;
+  return null;
+}
+
+/** Öğretmen kaydı olan yöneticinin günü: sıradaki ders ve bugünkü nöbet (tatilde kısa bilgi) */
+export function MyDayCard({ data }: { data: MeToday }) {
+  const now = useNow(60_000);
+  const day = teacherDay(data, now);
+  if (!data.teacher) return null;
+  const current = day.lessons.find((l) => l.state === 'now');
+  const next = day.lessons.find((l) => l.state === 'next');
+  const duty = data.week.find((d) => d.date === data.today)?.duties.find((d) => !d.coveredBy);
+  const lesson = day.holiday
+    ? { title: 'Bugün ders yok', subtitle: day.holiday }
+    : current
+      ? { title: `Şu an: ${current.className} · ${current.subject}`, subtitle: `${current.period.start} – ${current.period.end}` }
+      : next
+        ? { title: `Sıradaki: ${next.className} · ${next.subject}`, subtitle: `${next.period.start} – ${next.period.end}` }
+        : { title: day.lessons.length ? 'Bugünkü dersleriniz bitti' : 'Bugün dersiniz yok', subtitle: 'Haftalık program için dokunun' };
+  return (
+    <Card style={{ paddingVertical: 4, gap: 0 }}>
+      <ListRow icon="time-outline" title={lesson.title} subtitle={lesson.subtitle} onPress={() => router.push('/programim')} />
+      <ListRow
+        icon="shield-checkmark-outline"
+        iconTone={duty && !day.holiday ? 'warning' : 'muted'}
+        title={day.holiday ? 'Bugün nöbet yok' : duty ? `Bugün nöbet: ${duty.area}` : 'Bugün nöbetiniz yok'}
+        subtitle={duty && !day.holiday ? (duty.partners.length ? `Birlikte: ${duty.partners.join(', ')}` : 'Teneffüslerde') : 'Haftanın nöbetleri için dokunun'}
+        onPress={() => router.push('/nobet')}
+        last
+      />
+    </Card>
+  );
+}

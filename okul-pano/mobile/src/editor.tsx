@@ -4,9 +4,9 @@ import { View } from 'react-native';
 import { useAuth } from './auth.tsx';
 import { useAnnouncements, useMeToday, type Announcement } from './data.ts';
 import { MenuButton, QuickAdd } from './quick.tsx';
-import { TodayDutyCard } from './teacher.tsx';
+import { DayBanner, TodayDutyCard } from './teacher.tsx';
 import { colors } from './theme.ts';
-import { Badge, Card, Empty, ListRow, Loading, Screen, SectionTitle, T } from './ui.tsx';
+import { Badge, Card, Empty, HomeHeader, ListRow, Loading, Screen, SectionTitle, T } from './ui.tsx';
 
 function status(a: Announcement): { label: string; tone: 'success' | 'warning' | 'danger' | 'muted' } {
   if (a.approvalStatus === 'pending') return { label: 'Onay bekliyor', tone: 'warning' };
@@ -24,20 +24,10 @@ export function EditorHome() {
   const granted = school?.permissions ?? [];
   return (
     <Screen refreshing={list.isRefetching} onRefresh={() => void list.refetch()}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 8 }}>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <T size={12} weight="700" color={colors.primary}>
-            EDİTÖR
-          </T>
-          <T size={22} weight="800">
-            İçerik
-          </T>
-          <T size={13} color={colors.muted} lines={1}>
-            {school?.name}
-          </T>
-        </View>
+      <HomeHeader eyebrow="Editör" title="İçerik" subtitle={school?.name}>
         <MenuButton />
-      </View>
+      </HomeHeader>
+      {today.data ? <DayBanner data={today.data} /> : null}
 
       <QuickAdd title="Ekle" />
 

@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import { Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth, type AppRole } from '../../src/auth.tsx';
 import { useControlCenter, useInbox } from '../../src/data.ts';
 import { colors } from '../../src/theme.ts';
@@ -46,6 +47,8 @@ const HOME_ICON: Record<AppRole, [IconName, IconName]> = {
 
 export default function TabsLayout() {
   const { role, can, isManager } = useAuth();
+  // Telefonun alt sistem çubuğu (üç düğmeli gezinme) menünün üstüne binmesin
+  const insets = useSafeAreaInsets();
   const center = useControlCenter(isManager && role !== 'platform');
   const inbox = useInbox('unread');
   const pending = (center.data?.pending.announcements ?? 0) + (center.data?.pending.leaves ?? 0);
@@ -54,7 +57,12 @@ export default function TabsLayout() {
   const hide = (name: TabName) => (shown.has(name) ? {} : { tabBarButton: () => null, tabBarItemStyle: { display: 'none' as const } });
   const icon = (name: IconName, active: IconName) =>
     function TabIcon({ focused, color }: { focused: boolean; color: unknown }) {
-      return <Icon name={focused ? active : name} size={23} color={typeof color === 'string' ? color : colors.muted} />;
+      // Seçili sekmede simgenin arkasında hap biçimli gösterge (yalnız renkten daha kolay fark edilir)
+      return (
+        <View style={{ width: 56, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: focused ? colors.primarySoft : 'transparent' }}>
+          <Icon name={focused ? active : name} size={22} color={typeof color === 'string' ? color : colors.muted} />
+        </View>
+      );
     };
   return (
     <Tabs
@@ -62,8 +70,8 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.muted,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
-        tabBarStyle: { height: 64, paddingTop: 6, borderTopColor: colors.border },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '700', marginTop: 2 },
+        tabBarStyle: { height: 66 + insets.bottom, paddingTop: 8, paddingBottom: 8 + insets.bottom, borderTopColor: colors.border, backgroundColor: '#fff' },
         sceneStyle: { backgroundColor: colors.bg },
       }}
     >
@@ -87,7 +95,11 @@ export default function TabsLayout() {
           title: 'Acil',
           ...hide('acil'),
           // Acil sekmesi her zaman kırmızı (diğer sekmelerin rengini değiştirmeden)
-          tabBarIcon: ({ focused }) => <Icon name={focused ? 'warning' : 'warning-outline'} size={23} color={colors.danger} />,
+          tabBarIcon: ({ focused }) => (
+            <View style={{ width: 56, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: focused ? colors.dangerSoft : 'transparent' }}>
+              <Icon name={focused ? 'warning' : 'warning-outline'} size={22} color={colors.danger} />
+            </View>
+          ),
           tabBarLabel: () => <Text style={{ fontSize: 11, fontWeight: '700', color: colors.danger }}>Acil</Text>,
         }}
       />

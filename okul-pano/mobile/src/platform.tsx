@@ -7,7 +7,8 @@ import { useAuth } from './auth.tsx';
 import { useAcademicCalendars, usePlatformSchools, useSignups } from './data.ts';
 import { fullDate, timeAgo } from './day.ts';
 import { colors } from './theme.ts';
-import { Badge, Button, Card, Empty, ErrorNote, ListRow, Loading, Screen, SectionTitle, T } from './ui.tsx';
+import { Badge, Button, Card, Empty, ErrorNote, HomeHeader, ListRow, Loading, Screen, SectionTitle, T } from './ui.tsx';
+import { MenuButton } from './quick.tsx';
 
 function Kpi({ value, label, to }: { value: string | number; label: string; to?: string }) {
   return (
@@ -68,36 +69,9 @@ export function PlatformHome() {
 
   return (
     <Screen refreshing={schools.isRefetching} onRefresh={() => void Promise.all([schools.refetch(), signups.refetch(), calendars.refetch()])}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 8 }}>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <T size={12} weight="700" color={colors.primary}>
-            PLATFORM YÖNETİCİSİ
-          </T>
-          <T size={22} weight="800">
-            Platform
-          </T>
-          <T size={13} color={colors.muted} lines={1}>
-            {me?.user.fullName}
-          </T>
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Hesap menüsü"
-          onPress={() => router.push('/profil')}
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: 12,
-            borderWidth: 1,
-            borderColor: '#dbe3e8',
-            backgroundColor: '#fff',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Text style={{ fontSize: 15, fontWeight: '800', color: colors.ink }}>{initials(me?.user.fullName ?? '')}</Text>
-        </Pressable>
-      </View>
+      <HomeHeader eyebrow="Platform yöneticisi" title="Platform" subtitle={me?.user.fullName}>
+        <MenuButton />
+      </HomeHeader>
       <ErrorNote error={schools.error} />
       {schools.isLoading ? (
         <Loading />

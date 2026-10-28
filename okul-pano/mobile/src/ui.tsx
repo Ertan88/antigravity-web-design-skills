@@ -397,13 +397,26 @@ export const styles = StyleSheet.create({
   body: { paddingHorizontal: 20, paddingTop: 4, gap: 14 },
   footer: { backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12, gap: 8 },
   iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
-  card: { backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 16, gap: 10 },
+  // Hafif derinlik: kenarlık + yumuşak gölge (Android'de düşük yükselti)
+  card: {
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 16,
+    gap: 10,
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
   cardWarning: { borderColor: colors.warningBorder, borderWidth: 1.5 },
   cardDanger: { borderColor: '#ecc8c8', backgroundColor: '#fff' },
   cardPrimary: { backgroundColor: colors.primary, borderColor: colors.primary },
   label: { fontSize: 12, fontWeight: '700', letterSpacing: 0.4 },
-  sectionTitle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
-  sectionTitleText: { fontSize: 16, fontWeight: '700', color: colors.ink },
+  sectionTitle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, marginBottom: -2, paddingHorizontal: 2 },
+  sectionTitleText: { fontSize: 16, fontWeight: '700', color: colors.ink, letterSpacing: -0.1 },
   button: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: 16 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, minHeight: 40, maxWidth: '100%', borderRadius: radius.pill, backgroundColor: '#fff', borderWidth: 1, borderColor: '#dbe3e8' },
   chipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
@@ -429,5 +442,80 @@ export function confirm(title: string, message: string, ok = 'Evet', destructive
       { text: 'Vazgeç', style: 'cancel', onPress: () => resolve(false) },
       { text: ok, style: destructive ? 'destructive' : 'default', onPress: () => resolve(true) },
     ], { cancelable: true, onDismiss: () => resolve(false) }),
+  );
+}
+
+/**
+ * Ana sayfaların başlığı (bütün rollerde aynı): küçük rol etiketi, büyük başlık, alt satır (en çok iki satır, kesilmez)
+ * ve sağda yuvarlatılmış kare düğmeler.
+ */
+export function HomeHeader({ eyebrow, title, subtitle, children }: { eyebrow: string; title: string; subtitle?: string | null; children?: ReactNode }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingTop: 10, paddingBottom: 2 }}>
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        <Text style={{ fontSize: 12, fontWeight: '800', letterSpacing: 0.9, color: colors.primaryDark }} numberOfLines={1}>
+          {eyebrow.toLocaleUpperCase('tr-TR')}
+        </Text>
+        <Text style={{ fontSize: 27, fontWeight: '800', letterSpacing: -0.5, color: colors.ink }} numberOfLines={1} accessibilityRole="header">
+          {title}
+        </Text>
+        {subtitle ? (
+          <Text style={{ fontSize: 14, color: colors.muted, lineHeight: 19 }} numberOfLines={2}>
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+      {children ? <View style={{ flexDirection: 'row', gap: 8, paddingTop: 4 }}>{children}</View> : null}
+    </View>
+  );
+}
+
+/** Başlıktaki yuvarlatılmış kare düğme (bildirim, menü) */
+export function HeaderButton({ icon, label, onPress, badge }: { icon: IconName; label: string; onPress: () => void; badge?: number }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={badge ? `${label}, ${badge} yeni` : label}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        width: 44,
+        height: 44,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: pressed ? colors.primarySoft : '#fff',
+        alignItems: 'center',
+        justifyContent: 'center',
+      })}
+    >
+      <Icon name={icon} size={22} />
+      {badge ? (
+        <View style={{ position: 'absolute', top: -5, right: -5, minWidth: 20, height: 20, borderRadius: 10, backgroundColor: colors.danger, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, borderWidth: 2, borderColor: colors.bg }}>
+          <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>{badge > 9 ? '9+' : badge}</Text>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}
+
+/** Renkli bilgi bandı (tatil, arife, uyarı): solda simge kutusu, başlık ve açıklama */
+export function Banner({ icon, title, text, tone = 'gold', right }: { icon: IconName; title: string; text?: string | null; tone?: 'gold' | 'warning' | 'primary' | 'danger'; right?: ReactNode }) {
+  const t = {
+    gold: { bg: colors.goldSoft, border: '#f1dfae', fg: colors.gold },
+    warning: { bg: colors.warningSoft, border: colors.warningBorder, fg: colors.warning },
+    primary: { bg: colors.primarySoft, border: '#cfe3ea', fg: colors.primary },
+    danger: { bg: colors.dangerSoft, border: '#f2c4c4', fg: colors.danger },
+  }[tone];
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: t.bg, borderColor: t.border, borderWidth: 1, borderRadius: radius.lg, padding: 14 }}>
+      <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#ffffffaa', alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name={icon} size={21} color={t.fg} />
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={{ fontSize: 15, fontWeight: '700', color: colors.ink }}>{title}</Text>
+        {text ? <Text style={{ fontSize: 13, color: colors.muted, marginTop: 1 }}>{text}</Text> : null}
+      </View>
+      {right}
+    </View>
   );
 }
