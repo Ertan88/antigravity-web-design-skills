@@ -39,6 +39,8 @@
       </intent-filter>
     </activity>
 
+    <receiver android:name=".platform.DutyReminderReceiver" android:exported="false" />
+
     <provider
       android:name="androidx.core.content.FileProvider"
       android:authorities="${applicationId}.files"

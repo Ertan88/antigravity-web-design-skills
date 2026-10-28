@@ -122,6 +122,9 @@ fun TeacherHome() {
   val nav = LocalNav.current
   val today = rememberToday(state)
   val now = rememberTicker(60_000)
+  val context = androidx.compose.ui.platform.LocalContext.current
+  // Nöbet günlerinde ilk dersten 15 dakika önce telefona yerel hatırlatma
+  LaunchedEffect(today.data) { today.data?.let { com.okulpano.app.platform.DutyReminders.schedule(context, it) } }
   val first = state.me?.user?.fullName?.substringBefore(' ').orEmpty()
   val hour = now.atZone(java.time.ZoneId.of(today.data?.timezone ?: "Europe/Istanbul")).hour
   AppScaffold(
