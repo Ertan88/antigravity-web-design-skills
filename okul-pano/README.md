@@ -141,9 +141,11 @@ Panel `https://alanadiniz/admin/`, pano `https://alanadiniz/display/`, mobil uyg
   "Sıradaki Ders" tatilden sonraki ilk ders gününü gösterir. Arifede (Ramazan, Kurban, Cumhuriyet Bayramı) dersler okulun
   belirlediği son zilde (varsayılan 13:00) biter. Bayrama bitişik 1–2 iş günü "olası köprü günü" olarak önerilir; idari izin
   ilan edilirse tek tıkla tatil yapılır.
+- **Bildirimler** (panelde sağ üstteki zil › Tüm bildirimler; mobilde Bildirimler): okunanlar da 180 gün saklanır, okundu
+  bilgisi her cihazda aynıdır. İşi biten bildirimler (duyuru onaylandı, nöbet dolduruldu) "Tamamlandı" olarak geçmişte kalır.
 - **KVKK ve destek erişimi:** platform yöneticisi Platform sayfasında okulların yalnızca abonelik bilgilerini görür; okul verilerine
   ancak üye olduğu okulda ya da okul sahibinin **Genel Ayarlar › Destek erişimi** bölümünden verdiği süreli (24 saat / 7 gün)
-  erişimle girer; erişim verilince panelde bildirim düşer ve okul sayfa yenilenmeden listeye gelir. Kendi okulunuzda okul sahibi olmak için `PLATFORM_OWNER_SCHOOLS=okul-kisa-adi` (virgülle birden çok) yazın.
+  erişimle girer; erişim verilince, kapatılınca ya da süresi dolunca panelde bildirim düşer ve okul sayfa yenilenmeden listeye gelir. Kendi okulunuzda okul sahibi olmak için `PLATFORM_OWNER_SCHOOLS=okul-kisa-adi` (virgülle birden çok) yazın.
 
 ## Başlıklar
 

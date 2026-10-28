@@ -488,6 +488,37 @@ export const storedFiles = pgTable(
 );
 
 /** Telefon bildirimleri: kullanıcının mobil cihazlarının Expo push anahtarları */
+/**
+ * Panel bildirim kutusu: okunanlar da saklanır (Bildirimler sayfasında geçmiş). Durumdan hesaplanan bildirimler
+ * (onay bekleyen duyuru, boş nöbet…) anahtarıyla bir kez yazılır; iş bitince "çözüldü" işaretlenir.
+ * Olay bildirimleri (destek erişimi verildi / kapatıldı) olduğu anda yazılır. 180 günden eskiler silinir.
+ */
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: pk(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Bildirimin ait olduğu okul; platform bildirimlerinde boş */
+    schoolId: uuid('school_id').references(() => schools.id, { onDelete: 'cascade' }),
+    /** Aynı bildirimin tekrar yazılmaması için anahtar (kullanıcı başına tekil) */
+    key: text('key').notNull(),
+    kind: text('kind').notNull(),
+    title: text('title').notNull(),
+    body: text('body').notNull(),
+    /** Tıklayınca açılacak panel adresi */
+    link: text('link').notNull().default('/'),
+    /** Tıklayınca önce geçilecek okul (platform bildirimleri) */
+    openSchoolId: uuid('open_school_id'),
+    createdAt: createdAt(),
+    readAt: timestamp('read_at', { withTimezone: true }),
+    /** Durum ortadan kalktı (duyuru onaylandı, nöbet dolduruldu…) */
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  },
+  (t) => [uniqueIndex('notifications_user_key_uq').on(t.userId, t.key), index('notifications_user_created_idx').on(t.userId, t.createdAt)],
+);
+
 export const pushTokens = pgTable(
   'push_tokens',
   {

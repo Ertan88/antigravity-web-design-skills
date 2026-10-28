@@ -23,7 +23,10 @@ export default function Onaylar() {
   const names = new Map((teachers.data ?? []).map((t) => [t.id, t.fullName]));
   const total = pendingAnn.length + pendingLeaves.length;
   const refresh = () =>
-    Promise.all(['announcements', 'leaves', 'control-center', 'notifications'].map((k) => qc.invalidateQueries({ queryKey: [school?.id, k] })));
+    Promise.all([
+      ...['announcements', 'leaves', 'control-center'].map((k) => qc.invalidateQueries({ queryKey: [school?.id, k] })),
+      qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === school?.id && String(q.queryKey[1]).startsWith('inbox') }),
+    ]);
 
   return (
     <Screen

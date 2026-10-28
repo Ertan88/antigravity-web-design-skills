@@ -148,6 +148,13 @@
       "when": 1793800000000,
       "tag": "0020_support_access_granted",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793900000000,
+      "tag": "0021_notifications",
+      "breakpoints": true
     }
   ]
 }

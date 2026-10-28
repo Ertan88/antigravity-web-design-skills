@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useEffect } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useAuth } from './auth.tsx';
-import { useMeToday, useNotifications, useNow, type MeToday } from './data.ts';
+import { useInbox, useMeToday, useNow, type MeToday } from './data.ts';
 import { bellHeadline, countdownText, greeting, teacherDay } from './day.ts';
 import { scheduleDutyReminders } from './push.ts';
 import { colors, radius } from './theme.ts';
@@ -10,8 +10,8 @@ import { Card, Empty, Icon, Label, Loading, Screen, SectionTitle, T, type IconNa
 
 /** Sağ üstteki bildirim zili (okunmamış sayısıyla) */
 export function NotificationsButton() {
-  const notes = useNotifications();
-  const n = notes.data?.length ?? 0;
+  const notes = useInbox('unread');
+  const n = notes.data?.unread ?? 0;
   return (
     <Pressable
       accessibilityRole="button"

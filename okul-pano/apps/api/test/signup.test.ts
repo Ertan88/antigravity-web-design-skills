@@ -148,9 +148,20 @@ describe('deneme süresi', () => {
     expectStatus(await owner.post(`/api/schools/${schoolId}/support-access`, { hours: 24 }), 200);
     expect((await root.get('/api/me')).json().schools.some((s: { id: string }) => s.id === schoolId)).toBe(true);
     // Platform yöneticisine bildirim düşer (panel bunu yoklayıp okul listesini kendiliğinden yeniler)
-    const notes = (await root.get('/api/me/notifications')).json() as { kind: string; schoolId: string }[];
-    expect(notes.some((n) => n.kind === 'support-access' && n.schoolId === schoolId)).toBe(true);
-    expect((await owner.get('/api/me/notifications')).json()).toEqual([]);
+    const inbox = (await root.get('/api/me/inbox')).json() as { items: { id: string; kind: string; schoolId?: string; readAt: string | null }[]; unread: number };
+    const granted = inbox.items.find((n) => n.kind === 'support-access' && n.schoolId === schoolId)!;
+    expect(granted.readAt).toBeNull();
+    expect((await owner.get('/api/me/inbox')).json().items).toEqual([]);
+    // KVKK: destek erişimindeyken okulun bildirimleri platform yöneticisinin kutusuna yazılmaz
+    const supportBox = (await root.get(`/api/schools/${schoolId}/inbox`)).json() as { items: { kind: string }[] };
+    expect(supportBox.items.every((n) => n.kind.startsWith('support-'))).toBe(true);
+    // Okunan bildirim kutuda kalır; okunmadı yapılabilir, silinebilir
+    expect((await root.post('/api/me/inbox/read', { ids: [granted.id] })).statusCode).toBe(204);
+    const afterRead = (await root.get('/api/me/inbox?filter=read')).json() as { items: { id: string; readAt: string | null }[]; unread: number };
+    expect(afterRead.items.find((n) => n.id === granted.id)?.readAt).not.toBeNull();
+    expect(((await root.get('/api/me/inbox?filter=unread')).json() as { items: { id: string }[] }).items.some((n) => n.id === granted.id)).toBe(false);
+    expect((await root.post(`/api/me/inbox/${granted.id}/unread`)).statusCode).toBe(204);
+    expect((await owner.post(`/api/me/inbox/${granted.id}/unread`)).statusCode).toBe(404);
     expectStatus(await root.post(`/api/schools/${schoolId}/teachers`, { fullName: 'Destek Kaydı' }), 201);
     // Destek erişimindeki platform yöneticisi süreyi kendisi uzatamaz
     expect((await root.post(`/api/schools/${schoolId}/support-access`, { hours: 168 })).statusCode).toBe(403);
@@ -158,7 +169,10 @@ describe('deneme süresi', () => {
     expect(log.some((x) => x.entity === 'Destek erişimi')).toBe(true);
     expectStatus(await owner.post(`/api/schools/${schoolId}/support-access`, { hours: 0 }), 200);
     expect((await root.get(`/api/schools/${schoolId}/teachers`)).statusCode).toBe(403);
-    expect(((await root.get('/api/me/notifications')).json() as { schoolId: string }[]).some((n) => n.schoolId === schoolId)).toBe(false);
+    // Erişim kapatılınca da bildirim düşer; "verildi" bildirimi geçmişte kalır
+    const kinds = ((await root.get('/api/me/inbox')).json() as { items: { kind: string }[] }).items.map((n) => n.kind);
+    expect(kinds).toEqual(expect.arrayContaining(['support-revoked', 'support-access']));
+    expect(kinds.indexOf('support-revoked')).toBeLessThan(kinds.indexOf('support-access'));
 
     expectStatus(await root.patch(`/api/platform/schools/${schoolId}`, { extendTrialDays: 14 }), 200);
     expectStatus(await owner.post(`/api/schools/${schoolId}/teachers`, { fullName: 'Ali Veli' }), 201);

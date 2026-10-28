@@ -3,10 +3,11 @@ import { and, count, desc, eq, gte, inArray, isNull, lte, or, sql } from 'drizzl
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { accessUser, audit, schoolGuard, UUID_RE } from '../context.ts';
-import { announcements, auditLogs, memberships, schools, screens, students, teachers, users } from '../db/schema.ts';
+import { announcements, auditLogs, memberships, notifications, schools, screens, students, teachers, users } from '../db/schema.ts';
 import { hashPassword } from '../lib/crypto.ts';
 import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
 import { notifyUsers } from '../lib/push.ts';
+import { addToInbox, untilText } from './notifications.ts';
 import { geocode } from '../lib/weather.ts';
 import { SAMPLE_TABLES, seedSchoolContent, type SampleData } from '../seed-data.ts';
 import { addDefaultTeacherOptions } from './teachers.ts';
@@ -64,20 +65,42 @@ export async function schoolRoutes(app: FastifyInstance) {
     if (req.ctx.isSupport) throw forbidden('Destek erişimini yalnızca okul yöneticisi verebilir.');
     const { hours } = parse(z.object({ hours: z.union([z.literal(0), z.literal(24), z.literal(168)]) }), req.body);
     const until = hours ? new Date(Date.now() + hours * 3600_000) : null;
+    const wasOpen = (req.ctx.school.supportAccessUntil?.getTime() ?? 0) > Date.now();
+    const now = new Date();
     const [updated] = await db
       .update(schools)
-      .set(until ? { supportAccessUntil: until, supportAccessGrantedAt: new Date() } : { supportAccessUntil: null })
+      .set(until ? { supportAccessUntil: until, supportAccessGrantedAt: now } : { supportAccessUntil: null })
       .where(eq(schools.id, req.ctx.schoolId))
       .returning();
     const span = hours === 24 ? '24 saat' : '7 gün';
     await audit(req, 'update', 'Destek erişimi', req.ctx.schoolId, hours ? `Platform desteğine ${span} erişim verildi` : 'Platform desteğinin erişimi kapatıldı');
-    // Platform yöneticileri telefonda da haberdar olur; panelde okul listesine kendiliğinden eklenir
-    if (hours) {
-      const admins = await db.select({ id: users.id }).from(users).where(eq(users.isSuperAdmin, true));
-      notifyUsers(app.deps, admins.map((a) => a.id), {
-        title: 'Destek erişimi verildi',
-        body: `${schoolFullName(updated!.name, updated!.settings?.schoolType)} ${span} boyunca verilerine erişim verdi.`,
-      });
+
+    // Platform yöneticilerine (bu okulun üyesi olmayanlara) bildirim: panelde kutuya, telefonda anlık
+    if (hours || wasOpen) {
+      const members = await db.select({ id: memberships.userId }).from(memberships).where(eq(memberships.schoolId, req.ctx.schoolId));
+      const memberIds = new Set(members.map((m) => m.id));
+      const admins = (await db.select({ id: users.id }).from(users).where(eq(users.isSuperAdmin, true))).map((a) => a.id).filter((id) => !memberIds.has(id));
+      const name = schoolFullName(updated!.name, updated!.settings?.schoolType);
+      const note = until
+        ? {
+            key: `support-access:${updated!.id}:${now.getTime()}`,
+            kind: 'support-access',
+            title: 'Destek erişimi verildi',
+            body: `${name} verilerine ${untilText(until, updated!.timezone)} tarihine kadar erişebilirsiniz.`,
+            to: '/',
+            openSchoolId: updated!.id,
+          }
+        : {
+            key: `support-revoked:${updated!.id}:${now.getTime()}`,
+            kind: 'support-revoked',
+            title: 'Destek erişimi kapatıldı',
+            body: `${name} verilerine erişiminizi kapattı.`,
+            to: '/platform',
+          };
+      await addToInbox(db, admins, note);
+      // KVKK: erişim kapanınca platform yöneticilerinin kutusunda bu okula ait bildirim kalmaz
+      if (!until && admins.length) await db.delete(notifications).where(and(eq(notifications.schoolId, req.ctx.schoolId), inArray(notifications.userId, admins)));
+      notifyUsers(app.deps, admins, { title: note.title, body: note.body });
     }
     return publicSchool(updated!);
   });

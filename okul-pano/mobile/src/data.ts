@@ -2,7 +2,7 @@ import type { BellScheduleLike } from '@okulpano/shared/bell';
 import type { ScreenLiveStatus } from '@okulpano/shared/control';
 import type { AnnouncementDesign } from '@okulpano/shared/designs';
 import type { EmergencyType } from '@okulpano/shared/emergency';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { api } from './api.ts';
 import { useAuth, useSchoolPath } from './auth.tsx';
@@ -108,13 +108,24 @@ export interface DutyDay {
   candidates: { teacherId: string; fullName: string; monthCount: number }[];
 }
 
-export interface PanelNotification {
+/** Bildirim kutusu (panelle ortak): okunanlar da saklanır, okundu bilgisi her cihazda aynıdır */
+export interface InboxItem {
+  id: string;
   key: string;
-  kind: 'approval' | 'returned' | 'approved' | 'month-student' | 'leave-request' | 'duty-gap';
+  kind: string;
   title: string;
   body: string;
   at: string;
   to: string;
+  readAt: string | null;
+  /** Durum ortadan kalktı (duyuru onaylandı, nöbet dolduruldu…) */
+  resolvedAt: string | null;
+}
+export interface InboxPage {
+  items: InboxItem[];
+  unread: number;
+  total: number;
+  nextBefore: string | null;
 }
 
 /* ---------- Sorgular ---------- */
@@ -137,7 +148,18 @@ export const useScreens = (fast = false) => useSchoolQuery<Screen[]>('screens', 
 export const useAnnouncements = () => useSchoolQuery<Announcement[]>('announcements', { refetchInterval: 60_000 });
 export const useLeaves = (enabled = true) => useSchoolQuery<Leave[]>('leaves', { enabled });
 export const useMyLeaves = () => useSchoolQuery<Leave[]>('me/leaves');
-export const useNotifications = () => useSchoolQuery<PanelNotification[]>('notifications', { refetchInterval: 60_000 });
+export const useInbox = (filter: 'all' | 'unread' = 'all') => useSchoolQuery<InboxPage>(`inbox?filter=${filter}&limit=50`, { refetchInterval: 60_000 });
+
+/** Okundu / okunmadı / sil; sonrasında kutu ve zil tazelenir */
+export function useInboxActions() {
+  const { school } = useAuth();
+  const qc = useQueryClient();
+  const refresh = () => qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === school?.id && String(q.queryKey[1]).startsWith('inbox') });
+  const read = useMutation({ mutationFn: (body: { ids?: string[]; all?: true; schoolId?: string }) => api('/api/me/inbox/read', { method: 'POST', body }), onSuccess: refresh });
+  const unread = useMutation({ mutationFn: (id: string) => api(`/api/me/inbox/${id}/unread`, { method: 'POST' }), onSuccess: refresh });
+  const remove = useMutation({ mutationFn: (id: string) => api(`/api/me/inbox/${id}`, { method: 'DELETE' }), onSuccess: refresh });
+  return { read, unread, remove, readAll: () => read.mutate({ all: true, ...(school ? { schoolId: school.id } : {}) }) };
+}
 export const useTeachers = (enabled = true) => useSchoolQuery<{ id: string; fullName: string; isActive: boolean }[]>('teachers', { enabled });
 
 export function useDutyDay(date?: string) {

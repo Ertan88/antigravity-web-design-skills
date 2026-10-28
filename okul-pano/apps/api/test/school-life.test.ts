@@ -95,6 +95,12 @@ describe('onay akışı', () => {
     expect((await owner.post(path(`announcements/${b.id}/reject`), {})).statusCode).toBe(400);
     const rejected = (await owner.post(path(`announcements/${b.id}/reject`), { note: 'Tarih hatalı' })).json() as { approvalStatus: string; reviewNote: string };
     expect(rejected).toMatchObject({ approvalStatus: 'rejected', reviewNote: 'Tarih hatalı' });
+    // Bildirim kutusu: iş bitince "onay bekleyen duyuru" çözülür ve okundu sayılır, geçmişte kalır
+    type Inbox = { items: { key: string; kind: string; readAt: string | null; resolvedAt: string | null }[]; unread: number };
+    const box = (await owner.get(path('inbox'))).json() as Inbox;
+    const done = box.items.find((n) => n.key.startsWith(`approval:${b.id}`));
+    expect(done).toMatchObject({ kind: 'approval', readAt: expect.any(String), resolvedAt: expect.any(String) });
+    expect(((await owner.get(path('inbox?filter=unread'))).json() as Inbox).items.some((n) => n.key === done!.key)).toBe(false);
     expect(await titles(hol.token)).not.toContain('Yanlış duyuru');
     const returned = ((await editor.get(path('notifications'))).json() as { kind: string; body: string; to: string }[]).find((n) => n.kind === 'returned');
     expect(returned).toMatchObject({ body: '“Yanlış duyuru”: Tarih hatalı', to: `/duyurular?duzenle=${b.id}` });
