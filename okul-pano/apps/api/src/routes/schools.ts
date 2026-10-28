@@ -39,7 +39,11 @@ export async function schoolRoutes(app: FastifyInstance) {
   app.patch('/api/schools/:schoolId', { preHandler: [app.authenticate, schoolGuard('settings.manage')] }, async (req) => {
     const body = parse(updateSchoolSchema, req.body);
     const { settings, ...profile } = body;
-    const merged = settings ? schoolSettingsSchema.parse({ ...req.ctx.school.settings, ...settings }) : undefined;
+    // Yalnızca gönderilen ayarlar değişir: şemadaki varsayılanlar gönderilmeyen ayarları (okul türü, kayan yazı
+    // kaynakları…) sıfırlamasın
+    const sent = Object.keys(((req.body ?? {}) as { settings?: object }).settings ?? {});
+    const changes = settings ? Object.fromEntries(Object.entries(settings).filter(([k]) => sent.includes(k))) : undefined;
+    const merged = changes ? schoolSettingsSchema.parse({ ...req.ctx.school.settings, ...changes }) : undefined;
     const [updated] = await db
       .update(schools)
       .set({ ...profile, ...(merged ? { settings: merged } : {}) })

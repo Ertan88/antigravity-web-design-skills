@@ -98,7 +98,15 @@ export function registerResource<S extends ZodType>(app: FastifyInstance, cfg: R
 
   app.put(`${base}/:id`, write, async (req) => {
     const id = idParam(req);
-    const row = toRow(parse(cfg.schema, req.body), req);
+    // Formda olmayan sıra ve yayın durumu korunur: yoksa şemanın varsayılanı (sıra 0, yayında) kaydı geri alırdı
+    const body = { ...((req.body ?? {}) as Record<string, unknown>) };
+    const keep = (['sortOrder', 'isActive'] as const).filter((k) => cols[k] && !(k in body));
+    if (keep.length) {
+      const [current] = (await db.select().from(t as PgTable).where(scoped(req, id))) as Record<string, unknown>[];
+      if (!current) throw notFound();
+      for (const k of keep) body[k] = current[k];
+    }
+    const row = toRow(parse(cfg.schema, body), req);
     await checkRefs(req, row);
     await cfg.validate?.(req, row, id);
     const [updated] = (await db
