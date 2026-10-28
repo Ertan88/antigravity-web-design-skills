@@ -1,4 +1,4 @@
-import { EMERGENCY_INFO, emergencySchema } from '@okulpano/shared';
+import { EMERGENCY_INFO, emergencySchema, schoolFullName } from '@okulpano/shared';
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { audit, schoolGuard } from '../context.ts';
@@ -33,7 +33,7 @@ export async function emergencyRoutes(app: FastifyInstance) {
     // Okuldaki herkesin telefonuna: uyarıyı başlatan hariç
     notifyUsers(app.deps, (await schoolMembers(app.deps, req.ctx.schoolId)).filter((id) => id !== req.ctx.userId), {
       title: `ACİL DURUM: ${EMERGENCY_INFO[body.type].label}`,
-      body: emergency.message ?? `${req.ctx.school.name} panolarında acil durum uyarısı başlatıldı.`,
+      body: emergency.message ?? `${schoolFullName(req.ctx.school.name, req.ctx.school.settings?.schoolType)} panolarında acil durum uyarısı başlatıldı.`,
       url: '/acil',
     });
     return emergency;

@@ -58,7 +58,7 @@ export function EventsCard({ items, todayIso }: { items: NonNullable<DisplayStat
       </div>
       <AutoPager
         items={items}
-        rowHeight={118}
+        rowHeight={104}
         keyOf={(e) => e.id}
         render={(e) => {
           const d = new Date(`${e.date}T00:00:00Z`);

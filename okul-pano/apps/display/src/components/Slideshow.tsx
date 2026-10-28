@@ -1,4 +1,4 @@
-import { isWithinWindow, parseYouTubeUrl, youTubeThumbnail, type DisplayAnnouncement } from '@okulpano/shared/client';
+import { isWithinWindow, parseYouTubeUrl, splitSchoolName, youTubeThumbnail, type DisplayAnnouncement } from '@okulpano/shared/client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DesignSlide } from '@okulpano/slides';
 import { MegaphoneIcon, SchoolIcon } from './Icons.tsx';
@@ -208,10 +208,12 @@ export function Slideshow({ announcements, now, defaultDurationSec, videoSound, 
   }, [slides, index, count]);
 
   if (!slide) {
+    const title = splitSchoolName(schoolName, schoolType);
     return (
       <section className="card slideshow slideshow-empty">
         {logoUrl ? <img src={logoUrl} alt="" className="welcome-logo" /> : <SchoolIcon size={140} className="welcome-icon" />}
-        <div className="welcome-title">{schoolName}</div>
+        <div className="welcome-title">{title.name}</div>
+        {title.type && <div className="welcome-type">{title.type}</div>}
         <div className="welcome-sub">Hoş geldiniz</div>
       </section>
     );

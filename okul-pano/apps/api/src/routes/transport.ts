@@ -1,4 +1,4 @@
-import { clearMonthSchema, normalizeName, tidyName, transportAutoFillSchema, transportDaySchema, transportImportSchema, trCompare, WEEKDAY_NAMES, zonedParts } from '@okulpano/shared';
+import { clearMonthSchema, normalizeName, tidyName, transportAutoFillSchema, transportDaySchema, transportImportSchema, trCompare, WEEKDAY_NAMES, zonedParts, schoolFullName } from '@okulpano/shared';
 import { and, asc, eq, gte, inArray, lte } from 'drizzle-orm';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { audit, schoolGuard } from '../context.ts';
@@ -368,7 +368,7 @@ export async function transportRoutes(app: FastifyInstance) {
     const days = new Map<string, string[]>();
     for (const r of rows) days.set(r.date, [...(days.get(r.date) ?? []), r.teacherName]);
     return buildTransportWorkbook({
-      schoolName: school.name,
+      schoolName: schoolFullName(school.name, school.settings?.schoolType),
       teachers: roster.rows.filter((t) => t.isActive).map((t) => t.fullName).sort(trCompare),
       year: Number(month.slice(0, 4)),
       month: Number(month.slice(5, 7)),

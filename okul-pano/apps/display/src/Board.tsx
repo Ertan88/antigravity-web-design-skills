@@ -20,6 +20,8 @@ import {
   pickSchedule,
   zonedParts,
   labelOf,
+  schoolFullName,
+  splitSchoolName,
   type LabelKey,
 } from '@okulpano/shared/client';
 import type { CSSProperties, ReactNode } from 'react';
@@ -67,7 +69,7 @@ function useSplash(ready: boolean) {
 }
 
 /** Sütunda kalan alanı dolduran kartlar (listeler) */
-const GROW = new Set<BoardModule>(['duties', 'lessons', 'events']);
+const GROW = new Set<BoardModule>(['duties', 'lessons']);
 
 export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthorized: () => void }) {
   const { state, connection, lastUpdated, offsetMs, identifying, remote, power } = useDisplayData(auth, onUnauthorized);
@@ -349,7 +351,8 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         {reporter}
         <div className="splash">
           <BrandMark size={120} className="splash-mark" />
-          <div className="splash-title">{school.name}</div>
+          <div className="splash-title">{splitSchoolName(school.name, s.schoolType).name}</div>
+          {splitSchoolName(school.name, s.schoolType).type && <div className="splash-slogan">{splitSchoolName(school.name, s.schoolType).type}</div>}
           <div className="splash-sub">Okulyayın deneme süresi sona erdi. Okul yönetimi panelden aboneliği başlatabilir.</div>
         </div>
       </Stage>
@@ -444,7 +447,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         {rightCards.length > 0 && <aside className="col col-right">{rightCards}</aside>}
       </main>
 
-      <Ticker items={ticker.length ? ticker : [`${school.name} · İyi dersler dileriz`]} speed={s.tickerSpeed} />
+      <Ticker items={ticker.length ? ticker : [`${schoolFullName(school.name, s.schoolType)} · İyi dersler dileriz`]} speed={s.tickerSpeed} />
 
       {overlays}
 

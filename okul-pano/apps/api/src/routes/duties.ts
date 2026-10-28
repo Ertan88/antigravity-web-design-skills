@@ -10,6 +10,7 @@ import {
   trCompare,
   WEEKDAY_NAMES,
   zonedParts,
+  schoolFullName,
 } from '@okulpano/shared';
 import { z } from 'zod';
 import { and, asc, desc, eq, gte, inArray, lte, notInArray, sql, type SQL } from 'drizzle-orm';
@@ -377,7 +378,7 @@ export async function dutyRoutes(app: FastifyInstance) {
     return { removed: del.length };
   });
 
-  async function workbook(req: { ctx: { schoolId: string; school: { name: string; timezone: string } }; query: unknown }, withData: boolean) {
+  async function workbook(req: { ctx: { schoolId: string; school: { name: string; timezone: string; settings?: { schoolType?: string } | null } }; query: unknown }, withData: boolean) {
     const { schoolId, school } = req.ctx;
     const { month: q } = req.query as { month?: string };
     if (q && !MONTH_RE.test(q)) throw badRequest('Ay YYYY-AA biçiminde olmalı.');
@@ -399,7 +400,7 @@ export async function dutyRoutes(app: FastifyInstance) {
     const days = new Map<number, { area: string; teacherName: string }[]>();
     if (withData) for (const r of rows) days.set(r.weekday, [...(days.get(r.weekday) ?? []), { area: r.area, teacherName: r.teacherName }]);
     return buildDutiesWorkbook({
-      schoolName: school.name,
+      schoolName: schoolFullName(school.name, school.settings?.schoolType),
       teachers: roster.rows.filter((t) => t.isActive).map((t) => t.fullName).sort(trCompare),
       areas: areaOrder(rows.length ? rows : areaRows),
       // Okul nöbet çizelgesi hafta içi günlerinden oluşur

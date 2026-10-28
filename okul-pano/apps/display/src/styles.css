@@ -58,8 +58,16 @@ body,
   height: 100%;
   background: #000;
   overflow: hidden;
-  cursor: none;
+  cursor: default;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Pano yalnızca izlenir: fare imleci görünür ama tıklama, seçme ya da videoya müdahale olmaz */
+.stage,
+.stage * {
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .viewport {
@@ -870,6 +878,15 @@ p {
   letter-spacing: -0.03em;
   padding: 0 40px;
   text-wrap: balance;
+}
+
+.welcome-type {
+  margin-top: 6px;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
 }
 
 .welcome-sub {
@@ -2442,7 +2459,9 @@ p {
 
 /* ---------- Okul hayatı kartları ---------- */
 .achievements-card { --hue: #f59e0b; --hue-2: #f59e0b; flex: none; }
-.events-card { --hue: #0ea5e9; --hue-2: #0ea5e9; }
+.events-card { --hue: #0ea5e9; --hue-2: #0ea5e9; flex: none; }
+/* Etkinlikler tek tek döner: kart küçük kalır, nöbetçi kartına yer kalır */
+.events-card .pager-body { flex: none; height: 104px; }
 .book-card { --hue: #10b981; --hue-2: #10b981; flex: none; }
 
 .achievement {
@@ -2464,8 +2483,8 @@ p {
 }
 
 .achievement-photo {
-  width: 92px;
-  height: 92px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   border: 3px solid color-mix(in srgb, var(--hue) 70%, transparent);
 }
@@ -2483,7 +2502,7 @@ p {
 }
 
 .achievement-name {
-  font-size: 27px;
+  font-size: 25px;
   font-weight: 800;
   line-height: 1.15;
 }
@@ -2512,6 +2531,10 @@ p {
   font-size: 17px;
   color: var(--muted);
   line-height: 1.3;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .event-row {

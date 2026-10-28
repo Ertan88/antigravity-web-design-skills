@@ -110,7 +110,6 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
   const windowed = (startsAt: PgColumn, endsAt: PgColumn) =>
     and(or(isNull(endsAt), gt(endsAt, now)), or(isNull(startsAt), lte(startsAt, weekAhead)));
 
-  const monthAheadDate = zonedParts(new Date(now.getTime() + 30 * 86400_000), tz).isoDate;
   const settingsEarly = schoolSettingsSchema.parse(school.settings ?? {});
 
   const [examRows, dutyRows, holidayRows, supervisorRows, transportRows, leaveRows, birthdayRows, annRows, tickerRows, bellRows, ttRows, achievementRows, eventRows, bookRows, rssRows, subRows] = await Promise.all([
@@ -215,9 +214,10 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
     db
       .select()
       .from(schoolEvents)
-      .where(and(eq(schoolEvents.schoolId, id), eq(schoolEvents.isActive, true), gte(schoolEvents.date, today), lte(schoolEvents.date, monthAheadDate)))
+      // Yaklaşan bütün etkinlikler (uzak tarihliler de); geçmiş olanlar gösterilmez
+      .where(and(eq(schoolEvents.schoolId, id), eq(schoolEvents.isActive, true), gte(schoolEvents.date, today)))
       .orderBy(asc(schoolEvents.date), asc(schoolEvents.time))
-      .limit(20),
+      .limit(100),
     db
       .select()
       .from(books)

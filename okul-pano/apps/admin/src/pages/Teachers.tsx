@@ -18,82 +18,7 @@ import { TeacherCard } from './teachers/TeacherCard.tsx';
 type Sort = 'name-asc' | 'name-desc' | 'surname-asc';
 type Form = { fullName: string; branchId: string; titleId: string; isActive: boolean };
 const NO_BRANCH = '__none__';
-const emptyForm = (keep?: Partial<Form>): Form => ({ fullName: '', branchId: keep?.branchId ?? '', titleId: keep?.titleId ?? '', isActive: true });
-
-/* ---------- Ekleme bloğu: elle ekle + Excel'den yükle ---------- */
-
-function AddBlock({ onManual, onFile, onTemplate }: { onManual: () => void; onFile: (f: File) => void; onTemplate: () => void }) {
-  const input = useRef<HTMLInputElement>(null);
-  const [drag, setDrag] = useState(false);
-  return (
-    <div className="mb-6 grid gap-3 md:grid-cols-2">
-      <Card className="flex items-center gap-4 p-4">
-        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
-          <UserPlus className="size-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold">Elle ekle</h2>
-          <p className="text-xs text-slate-500">Ad soyad, branş ve ünvanı girerek tek tek ekleyin.</p>
-        </div>
-        <Button onClick={onManual}>Öğretmen ekle</Button>
-      </Card>
-
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => input.current?.click()}
-        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && input.current?.click()}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDrag(true);
-        }}
-        onDragLeave={() => setDrag(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDrag(false);
-          const f = e.dataTransfer.files[0];
-          if (f) onFile(f);
-        }}
-        className={clsx(
-          'flex cursor-pointer items-center gap-4 rounded-2xl border-2 border-dashed p-4 transition-colors',
-          drag ? 'border-brand-500 bg-brand-50' : 'border-slate-200 bg-surface hover:border-brand-300 hover:bg-brand-50/40',
-        )}
-      >
-        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-          <FileSpreadsheet className="size-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold">Excel'den yükle</h2>
-          <p className="text-xs text-slate-500">
-            .xlsx dosyasını sürükleyin ya da seçin.{' '}
-            <button
-              type="button"
-              className="font-semibold text-brand-600 hover:text-brand-700"
-              onClick={(e) => {
-                e.stopPropagation();
-                onTemplate();
-              }}
-            >
-              Örnek şablonu indir
-            </button>
-          </p>
-        </div>
-        <Upload className="size-5 shrink-0 text-slate-400" />
-        <input
-          ref={input}
-          type="file"
-          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) onFile(f);
-            e.target.value = '';
-          }}
-        />
-      </div>
-    </div>
-  );
-}
+const emptyForm = (): Form => ({ fullName: '', branchId: '', titleId: '', isActive: true });
 
 /* ---------- Sayfa ---------- */
 
@@ -120,6 +45,8 @@ export function Teachers() {
   const [managing, setManaging] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
   const [downloading, setDownloading] = useState<'template' | 'export' | null>(null);
+  const [drag, setDrag] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   const all = list.data ?? [];
   const sortedBranches = useMemo(() => [...(branches.data ?? [])].sort((a, b) => trCompare(a.name, b.name)), [branches.data]);
@@ -152,8 +79,8 @@ export function Teachers() {
     }
   };
 
-  const openNew = (keep?: Partial<Form>) => {
-    form.reset(emptyForm(keep));
+  const openNew = () => {
+    form.reset(emptyForm());
     setEditing('new');
   };
   const openEdit = (t: Teacher) => {
@@ -174,8 +101,8 @@ export function Teachers() {
       else await ops.create.mutateAsync(payload);
       void qc.invalidateQueries({ queryKey: [schoolId, 'teacher-branches'] });
       void qc.invalidateQueries({ queryKey: [schoolId, 'teacher-titles'] });
-      // Hızlı giriş: aynı branş ve ünvanla bir sonrakine geç
-      if (andNext) openNew({ branchId: form.values.branchId, titleId: form.values.titleId });
+      // Hızlı giriş: boş formla bir sonrakine geç
+      if (andNext) openNew();
       else setEditing(null);
     } catch (err) {
       form.fail(err);
@@ -199,23 +126,70 @@ export function Teachers() {
       <PageHeader
         title="Öğretmen Kadrosu"
         description="Nöbet çizelgesi, izinler ve ders programında seçilen öğretmenler. Excel'den toplu yükleyebilir, listeyi Excel'e aktarabilirsiniz."
-        actions={
-          <>
-            {editable && (
-              <Button variant="secondary" icon={<Tags className="size-4" />} onClick={() => setManaging(true)}>
-                Branş ve ünvanlar
-              </Button>
-            )}
-            <Button variant="secondary" icon={<FileDown className="size-4" />} loading={downloading === 'export'} disabled={!all.length} onClick={() => void download('export')}>
-              Excel'e aktar
-            </Button>
-          </>
-        }
       />
 
-      {editable && <AddBlock onManual={() => openNew()} onFile={setImportFile} onTemplate={() => void download('template')} />}
-
       <Card>
+        {/* Bütün işlemler tek araç çubuğunda; Excel dosyası buraya sürüklenip bırakılabilir */}
+        <div
+          className={clsx(
+            'flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-3 transition-colors sm:px-5',
+            drag ? 'bg-brand-50 ring-2 ring-brand-400 ring-inset' : 'bg-slate-50/70',
+          )}
+          onDragOver={(e) => {
+            if (!editable) return;
+            e.preventDefault();
+            setDrag(true);
+          }}
+          onDragLeave={() => setDrag(false)}
+          onDrop={(e) => {
+            if (!editable) return;
+            e.preventDefault();
+            setDrag(false);
+            const f = e.dataTransfer.files[0];
+            if (f) setImportFile(f);
+          }}
+        >
+          {editable && (
+            <>
+              <Button size="sm" icon={<UserPlus className="size-4" />} onClick={() => openNew()}>
+                Manuel ekle
+              </Button>
+              <Button size="sm" variant="secondary" icon={<Upload className="size-4" />} onClick={() => fileInput.current?.click()}>
+                Excel'den yükle
+              </Button>
+              <input
+                ref={fileInput}
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                className="hidden"
+                aria-label="Excel dosyası seç"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) setImportFile(f);
+                  e.target.value = '';
+                }}
+              />
+            </>
+          )}
+          <Button size="sm" variant="secondary" icon={<FileDown className="size-4" />} loading={downloading === 'export'} disabled={!all.length} onClick={() => void download('export')}>
+            Excel'e aktar
+          </Button>
+          {editable && (
+            <>
+              <Button size="sm" variant="secondary" icon={<FileSpreadsheet className="size-4" />} loading={downloading === 'template'} onClick={() => void download('template')}>
+                Örnek şablon
+              </Button>
+              <Button size="sm" variant="secondary" icon={<Tags className="size-4" />} onClick={() => setManaging(true)}>
+                Branş ve ünvanlar
+              </Button>
+            </>
+          )}
+          {editable && all.length > 0 && (
+            <Button variant="ghost" size="sm" className="ml-auto text-red-600! hover:bg-red-50 hover:text-red-700!" icon={<Trash2 className="size-3.5" />} onClick={() => setDeletingAll(true)}>
+              Tümünü sil
+            </Button>
+          )}
+        </div>
         <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-3 sm:px-5 lg:flex-row lg:items-center">
           <div className="relative lg:w-72">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
@@ -243,11 +217,6 @@ export function Teachers() {
             <span className="text-sm text-slate-500">
               {filtered ? `${visible.length} / ${all.length} öğretmen` : `${all.length} öğretmen`}
             </span>
-            {editable && all.length > 0 && (
-              <Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-50 hover:text-red-700" icon={<Trash2 className="size-3.5" />} onClick={() => setDeletingAll(true)}>
-                Tümünü sil
-              </Button>
-            )}
           </div>
         </div>
 
@@ -258,7 +227,7 @@ export function Teachers() {
             <EmptyState
               icon={<Users className="size-6" />}
               title="Henüz öğretmen eklenmemiş"
-              description="Yukarıdan tek tek ekleyebilir ya da örnek şablonu indirip doldurduktan sonra Excel'den yükleyebilirsiniz."
+              description="Yukarıdaki Manuel ekle düğmesiyle tek tek ekleyebilir ya da örnek şablonu indirip doldurduktan sonra Excel'den yükleyebilirsiniz."
               action={
                 editable && (
                   <Button variant="secondary" icon={<Download className="size-4" />} loading={downloading === 'template'} onClick={() => void download('template')}>

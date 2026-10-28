@@ -1,4 +1,4 @@
-import { normalizeClassName, normalizeName, studentImportSchema, studentSchema, trCompare } from '@okulpano/shared';
+import { normalizeClassName, normalizeName, studentImportSchema, studentSchema, trCompare, schoolFullName } from '@okulpano/shared';
 import { asc, eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -161,7 +161,7 @@ export async function studentRoutes(app: FastifyInstance) {
 
   app.get(`${base}/template`, read, async (req, reply) => {
     const classes = await loadClasses(db, req.ctx.schoolId);
-    const buf = await buildStudentsWorkbook({ classes: classes.rows.map((c) => c.name), schoolName: req.ctx.school.name });
+    const buf = await buildStudentsWorkbook({ classes: classes.rows.map((c) => c.name), schoolName: schoolFullName(req.ctx.school.name, req.ctx.school.settings?.schoolType) });
     return sendXlsx(reply, buf, 'ogrenci-sablonu.xlsx');
   });
 
@@ -187,7 +187,7 @@ export async function studentRoutes(app: FastifyInstance) {
     );
     const buf = await buildStudentsWorkbook({
       classes: classes.rows.map((c) => c.name),
-      schoolName: req.ctx.school.name,
+      schoolName: schoolFullName(req.ctx.school.name, req.ctx.school.settings?.schoolType),
       rows: rows.map((r) => ({
         fullName: r.fullName,
         birthDate: r.birthDate,

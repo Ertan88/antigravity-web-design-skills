@@ -7,6 +7,7 @@ import {
   teacherSchema,
   tidyName,
   trCompare,
+  schoolFullName,
 } from '@okulpano/shared';
 import { and, count, eq, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
@@ -167,7 +168,7 @@ export async function teacherRoutes(app: FastifyInstance) {
       optionNames(db, teacherBranches, req.ctx.schoolId),
       optionNames(db, teacherTitles, req.ctx.schoolId),
     ]);
-    const buf = await buildTeachersWorkbook({ branches, titles, schoolName: req.ctx.school.name });
+    const buf = await buildTeachersWorkbook({ branches, titles, schoolName: schoolFullName(req.ctx.school.name, req.ctx.school.settings?.schoolType) });
     return sendXlsx(reply, buf, 'ogretmen-sablonu.xlsx');
   });
 
@@ -181,7 +182,7 @@ export async function teacherRoutes(app: FastifyInstance) {
       branches,
       titles,
       rows: rows.map((r) => ({ fullName: r.fullName, branch: r.branch, title: r.title, isActive: r.isActive })),
-      schoolName: req.ctx.school.name,
+      schoolName: schoolFullName(req.ctx.school.name, req.ctx.school.settings?.schoolType),
     });
     return sendXlsx(reply, buf, exportFileName('ogretmenler', req.ctx.school.name));
   });

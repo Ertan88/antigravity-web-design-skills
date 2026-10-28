@@ -355,6 +355,18 @@ export function Modal({
   footer?: ReactNode;
   size?: 'md' | 'lg' | 'xl';
 }) {
+  // Dışarı tıklama sayacı: uyarıyı yeniden gösterir; sallanma içeriği yeniden kurmadan sınıfla yapılır
+  const [nudge, setNudge] = useState(0);
+  const [shaking, setShaking] = useState(false);
+  useEffect(() => {
+    if (!open) setNudge(0);
+  }, [open]);
+  useEffect(() => {
+    if (!nudge) return;
+    setShaking(true);
+    const t = setTimeout(() => setShaking(false), 320);
+    return () => clearTimeout(t);
+  }, [nudge]);
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -370,13 +382,20 @@ export function Modal({
   if (!open) return null;
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6">
-      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]" onClick={onClose} />
+      {/* Dışarı tıklamak pencereyi kapatmaz (yazılanlar kaybolmasın): pencere kısaca sallanır ve nasıl kapanacağı söylenir */}
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]" onClick={() => setNudge((n) => n + 1)} />
+      {nudge > 0 && (
+        <div key={nudge} role="status" className="animate-toast pointer-events-none absolute top-4 left-1/2 z-10 -translate-x-1/2 rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-lg">
+          Kapatmak için Vazgeç ya da ✕ düğmesini kullanın
+        </div>
+      )}
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
         className={clsx(
           'relative flex max-h-[92vh] w-full flex-col rounded-t-2xl bg-surface shadow-2xl sm:rounded-2xl',
+          shaking && 'animate-nudge',
           size === 'md' && 'sm:max-w-lg',
           size === 'lg' && 'sm:max-w-2xl',
           size === 'xl' && 'sm:max-w-4xl',

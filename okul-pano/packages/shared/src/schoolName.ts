@@ -63,3 +63,9 @@ export function splitSchoolName(fullName: string, schoolType?: string | null): {
   }
   return { name, type: null };
 }
+
+/** Okulun tam adı türüyle birlikte (ör. "Atatürk" + "Mesleki ve Teknik Anadolu Lisesi"); belgelerde ve başlıklarda */
+export function schoolFullName(fullName: string, schoolType?: string | null): string {
+  const t = splitSchoolName(fullName, schoolType);
+  return t.type ? `${t.name} ${t.type}` : t.name;
+}

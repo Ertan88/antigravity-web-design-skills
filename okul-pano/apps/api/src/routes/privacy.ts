@@ -1,4 +1,4 @@
-import { deleteSchoolSchema, schoolSettingsSchema } from '@okulpano/shared';
+import { deleteSchoolSchema, schoolSettingsSchema, schoolFullName } from '@okulpano/shared';
 import { eq, inArray, getTableColumns } from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
@@ -125,7 +125,7 @@ ul{padding-left:22px}footer{margin-top:16px;color:#475569;font-size:13px;text-al
   });
 
   app.get('/api/schools/:schoolId/privacy-template', { preHandler: [app.authenticate, schoolGuard('settings.manage')] }, async (req) => ({
-    text: privacyTemplate(req.ctx.school.name, env.DATA_REGION),
+    text: privacyTemplate(schoolFullName(req.ctx.school.name, req.ctx.school.settings?.schoolType), env.DATA_REGION),
   }));
 
   /** Okulun bütün verisi tek dosyada (veri taşınabilirliği). Şifre özetleri ve cihaz anahtarları yer almaz. */
