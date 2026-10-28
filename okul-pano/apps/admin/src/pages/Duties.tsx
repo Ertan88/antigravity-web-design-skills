@@ -1,4 +1,4 @@
-import { dutySchema, holidayFullName, WEEKDAY_NAMES, WEEKDAY_SHORT } from '@okulpano/shared';
+import { dutySchema, holidayFullName, labelOf, WEEKDAY_NAMES, WEEKDAY_SHORT, type Labels } from '@okulpano/shared';
 import clsx from 'clsx';
 import { Bus, CalendarDays, CopyPlus, ShieldCheck, UserCog } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -75,15 +75,17 @@ function ViewTabs({
   view,
   onView,
   counts,
+  labels,
 }: {
+  labels: Labels | undefined;
   view: View;
   onView: (v: View) => void;
   counts: { duties: number; supervisor: string; transport: string | null };
 }) {
   const tabs: { value: View; label: string; hint: string; icon: typeof ShieldCheck }[] = [
-    { value: 'duties', label: 'Nöbet Yerleri ve Öğretmenler', hint: `${counts.duties} nöbet`, icon: ShieldCheck },
-    { value: 'supervisor', label: 'Nöbetçi Müdür Yardımcısı', hint: counts.supervisor, icon: UserCog },
-    ...(counts.transport !== null ? [{ value: 'transport' as const, label: 'Taşıma ve Öğle Yemeği Nöbetçileri', hint: counts.transport, icon: Bus }] : []),
+    { value: 'duties', label: labelOf(labels, 'dutyPlaces'), hint: `${counts.duties} nöbet`, icon: ShieldCheck },
+    { value: 'supervisor', label: labelOf(labels, 'supervisor'), hint: counts.supervisor, icon: UserCog },
+    ...(counts.transport !== null ? [{ value: 'transport' as const, label: labelOf(labels, 'transport'), hint: counts.transport, icon: Bus }] : []),
   ];
   return (
     <div className="inline-flex w-full flex-wrap gap-1 rounded-2xl bg-surface p-1 shadow-[0_1px_2px_rgba(15,23,42,0.05)] ring-1 ring-slate-200 sm:w-auto">
@@ -327,6 +329,7 @@ export function Duties() {
         tabs={
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <ViewTabs
+              labels={school.data?.settings.labels}
               view={view}
               onView={setView}
               counts={{
@@ -352,7 +355,7 @@ export function Duties() {
                   <CalendarDays className="size-4" />
                 </span>
                 <div>
-                  <h2 className="text-sm font-semibold text-ink">{monthLabel(month)} · Nöbetçi müdür yardımcısı</h2>
+                  <h2 className="text-sm font-semibold text-ink">{monthLabel(month)} · {labelOf(school.data?.settings.labels, 'supervisor')}</h2>
                   <p className="text-xs text-slate-500">İsmi yazıp çıkın, kendiliğinden kaydedilir. Panoda o günün ismi nöbetçi öğretmenler kartında görünür.</p>
                 </div>
                 {can('duties.manage') && (supervisors.data?.length ?? 0) > 0 && (

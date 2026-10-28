@@ -1,12 +1,14 @@
 import type { ReactNode } from 'react';
 import { countdown, formatPersonName, type DisplayState } from '@okulpano/shared/client';
 import { AutoPager } from './AutoPager.tsx';
+import { useLabel } from './Labels.tsx';
 import { CakeIcon, CapIcon, HourglassIcon, ShieldIcon, UserMinusIcon } from './Icons.tsx';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
 export function ExamCard({ exams, now, timezone }: { exams: DisplayState['exams']; now: Date; timezone: string }) {
   const [first, ...rest] = exams;
+  const title = useLabel('exams');
   if (!first) return null;
   const c = countdown(Date.parse(first.examAt), now.getTime());
   const examDate = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: timezone });
@@ -15,7 +17,7 @@ export function ExamCard({ exams, now, timezone }: { exams: DisplayState['exams'
     <section className="card exam-card">
       <HourglassIcon className="card-watermark watermark-exam" size={210} strokeWidth={1.4} />
       <div className="card-label">
-        <CapIcon size={22} /> Sınav Sayacı
+        <CapIcon size={22} /> {title}
         <span className="card-label-aside">{examDate.format(new Date(first.examAt))}</span>
       </div>
       <div className="exam-title">{first.title}</div>
@@ -67,10 +69,13 @@ export function DutyCard({
   /** Bugün tatilse adı: nöbet listesi yerine gösterilir */
   holiday: string | null;
 }) {
+  // Panoda kısa ad; okul kendi başlığını verdiyse o
+  const supervisorLabel = useLabel('supervisor', 'Nöbetçi Müdür Yrd.');
+  const transportLabel = useLabel('transport');
   return (
     <section className="card list-card duty-card">
       <div className="card-label">
-        <ShieldIcon size={22} /> Nöbetçi Öğretmenler
+        <ShieldIcon size={22} /> {useLabel('dutyCard')}
       </div>
       {holiday ? (
         <div className="duty-holiday">
@@ -95,13 +100,13 @@ export function DutyCard({
         <div className="duty-extras">
           {supervisor && (
             <div className="duty-extra">
-              <span className="duty-extra-label">Nöbetçi Müdür Yrd.</span>
+              <span className="duty-extra-label">{supervisorLabel}</span>
               <span className="duty-extra-name">{supervisor}</span>
             </div>
           )}
           {transport.length > 0 && (
             <div className="duty-extra duty-extra-transport">
-              <span className="duty-extra-label">Taşıma ve Öğle Yemeği Nöbetçileri</span>
+              <span className="duty-extra-label">{transportLabel}</span>
               <span className="duty-extra-name">{transport.join(' · ')}</span>
             </div>
           )}
@@ -127,7 +132,7 @@ export function LeaveCard({ leaves }: { leaves: DisplayState['leaves'] }) {
   return (
     <section className="card list-card leave-card">
       <div className="card-label">
-        <UserMinusIcon size={22} /> İzinli Öğretmenler
+        <UserMinusIcon size={22} /> {useLabel('leaves')}
       </div>
       <AutoPager
         items={leaves}
@@ -144,7 +149,7 @@ export function BirthdayCard({ birthdays, nameFormat }: { birthdays: DisplayStat
   return (
     <section className="card list-card birthday-card">
       <div className="card-label">
-        <CakeIcon size={22} /> İyi ki doğdun!
+        <CakeIcon size={22} /> {useLabel('birthdays')}
       </div>
       <AutoPager
         items={birthdays}

@@ -1,4 +1,5 @@
 import { BOARD_MODULES } from './layout.ts';
+import { LABEL_KEYS, type LabelKey as LabelKeyT } from './labels.ts';
 import { DESIGN_PALETTE_IDS, DESIGN_TEMPLATE_IDS } from './designs.ts';
 import { EMERGENCY_TYPES } from './emergency.ts';
 import { SCREEN_COMMANDS } from './control.ts';
@@ -115,6 +116,8 @@ export const schoolSettingsSchema = z.object({
   tickerSpeed: z.number().int().min(20).max(300).default(90),
   videoSound: z.boolean().default(false),
   lunchThresholdMin: z.number().int().min(10).max(180).default(30),
+  /** Okulun kendi adlandırdığı başlıklar (kart ve sekme adları); boş olan varsayılanı kullanır */
+  labels: z.partialRecord(z.enum(LABEL_KEYS as [LabelKeyT, ...LabelKeyT[]]), z.string().trim().max(60)).default({}),
   /** Okulun varsayılan pano düzeni; yoksa eski göster/gizle ayarlarından türetilir */
   layout: boardLayoutSchema.nullable().default(null),
   /** KVKK aydınlatma metni: okulun kendi metni, herkese açık /aydinlatma/<okul> adresinde yayınlanır */
@@ -122,6 +125,11 @@ export const schoolSettingsSchema = z.object({
 });
 export type SchoolSettings = z.infer<typeof schoolSettingsSchema>;
 export const defaultSchoolSettings: SchoolSettings = schoolSettingsSchema.parse({});
+
+/** Başlıklar: yalnızca başlıkları düzenleme yetkisiyle kaydedilir (okul ayarlarından ayrı) */
+export const labelsSchema = z.object({
+  labels: z.partialRecord(z.enum(LABEL_KEYS as [LabelKeyT, ...LabelKeyT[]]), z.string().trim().max(60, 'Başlık en çok 60 karakter olabilir')),
+});
 
 export const updateSchoolSchema = z.object({
   name: required('Okul adı', 120, 2).optional(),

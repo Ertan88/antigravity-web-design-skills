@@ -1,6 +1,7 @@
 import { type DisplayState } from '@okulpano/shared/client';
 import { useEffect, useState } from 'react';
 import { AutoPager } from './AutoPager.tsx';
+import { useLabel } from './Labels.tsx';
 import { CalendarIcon, LibraryIcon, TrophyIcon } from './Icons.tsx';
 
 /** Birden fazla kayıt varsa sırayla döner (her biri büyük ve okunaklı görünsün diye tek tek) */
@@ -53,7 +54,7 @@ export function EventsCard({ items, todayIso }: { items: NonNullable<DisplayStat
   return (
     <section className="card list-card events-card">
       <div className="card-label">
-        <CalendarIcon size={22} /> Etkinlik Takvimi
+        <CalendarIcon size={22} /> {useLabel('events')}
       </div>
       <AutoPager
         items={items}
@@ -86,7 +87,7 @@ export function BookCard({ book }: { book: NonNullable<DisplayState['books']>[nu
   return (
     <section className="card book-card">
       <div className="card-label">
-        <LibraryIcon size={22} /> Haftanın Kitabı
+        <LibraryIcon size={22} /> {useLabel('book')}
       </div>
       <div className="book">
         <div className="book-cover">{book.coverUrl ? <img src={book.coverUrl} alt="" /> : <LibraryIcon size={44} />}</div>

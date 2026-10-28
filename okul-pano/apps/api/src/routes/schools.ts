@@ -1,4 +1,4 @@
-import { adminUpdateSchoolSchema, createSchoolSchema, schoolSettingsSchema, updateSchoolSchema } from '@okulpano/shared';
+import { adminUpdateSchoolSchema, createSchoolSchema, labelsSchema, schoolSettingsSchema, updateSchoolSchema } from '@okulpano/shared';
 import { and, count, desc, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -50,6 +50,18 @@ export async function schoolRoutes(app: FastifyInstance) {
       .where(eq(schools.id, req.ctx.schoolId))
       .returning();
     await audit(req, 'update', 'Okul ayarları', req.ctx.schoolId, updated!.name);
+    bus.contentChanged(req.ctx.schoolId);
+    return publicSchool(updated!);
+  });
+
+  /** Kart ve sekme başlıkları: okul ayarlarından ayrı yetkiyle (Başlıkları düzenleme) */
+  app.put('/api/schools/:schoolId/labels', { preHandler: [app.authenticate, schoolGuard('labels.manage')] }, async (req) => {
+    const { labels } = parse(labelsSchema, req.body);
+    // Boş bırakılan başlık kaydedilmez: varsayılan kullanılır
+    const clean = Object.fromEntries(Object.entries(labels).filter(([, v]) => v && v.trim()));
+    const settings = schoolSettingsSchema.parse({ ...req.ctx.school.settings, labels: clean });
+    const [updated] = await db.update(schools).set({ settings }).where(eq(schools.id, req.ctx.schoolId)).returning();
+    await audit(req, 'update', 'Başlıklar', req.ctx.schoolId, Object.keys(clean).length ? `${Object.keys(clean).length} başlık özelleştirildi` : 'Başlıklar varsayılana döndü');
     bus.contentChanged(req.ctx.schoolId);
     return publicSchool(updated!);
   });

@@ -19,6 +19,8 @@ import {
   periodLabel,
   pickSchedule,
   zonedParts,
+  labelOf,
+  type LabelKey,
 } from '@okulpano/shared/client';
 import type { CSSProperties, ReactNode } from 'react';
 import type { DisplayAuth } from './api.ts';
@@ -27,6 +29,7 @@ import { GroupCard } from './components/GroupCard.tsx';
 import { Header } from './components/Header.tsx';
 import { ClockScreen } from './components/Remote.tsx';
 import { BrandMark, BrandName } from './components/Brand.tsx';
+import { LabelsContext } from './components/Labels.tsx';
 import { SpecialMark } from './components/SpecialMark.tsx';
 import { BookIcon, CakeIcon, CalendarIcon, CapIcon, LibraryIcon, MonitorIcon, ShieldIcon, TrophyIcon, UserMinusIcon, WifiOffIcon } from './components/Icons.tsx';
 import { AchievementsCard, BookCard, EventsCard } from './components/LifeCards.tsx';
@@ -168,17 +171,27 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
   // Düzende olup o gün içeriği olmayan kartlar kısa bir notla görünür (ayar kapalıysa hiç görünmez)
   const empty = (m: BoardModule, icon: ReactNode, title: string, message: string, className: string) =>
     s.showEmptyCards ? <EmptyCard key={m} icon={icon} title={title} message={message} className={className} /> : null;
+  const label = (key: LabelKey) => labelOf(s.labels, key);
+  // Kartlar okulun başlıklarını kullanır (Panel › Başlıklar)
   const renderModule = (m: BoardModule): ReactNode => {
+    const node = renderCard(m);
+    return node ? (
+      <LabelsContext.Provider key={m} value={s.labels}>
+        {node}
+      </LabelsContext.Provider>
+    ) : null;
+  };
+  const renderCard = (m: BoardModule): ReactNode => {
     switch (m) {
       case 'exams':
         return state.exams.length > 0 ? (
           <ExamCard key={m} exams={state.exams} now={now} timezone={school.timezone} />
         ) : (
-          empty(m, <CapIcon size={22} />, 'Sınav Sayacı', 'Yaklaşan sınav yok', 'exam-card')
+          empty(m, <CapIcon size={22} />, label('exams'), 'Yaklaşan sınav yok', 'exam-card')
         );
       case 'duties':
         return !hasContent(m) ? (
-          empty(m, <ShieldIcon size={22} />, 'Nöbetçi Öğretmenler', 'Bugün nöbet çizelgesi yok', 'duty-card')
+          empty(m, <ShieldIcon size={22} />, label('dutyCard'), 'Bugün nöbet çizelgesi yok', 'duty-card')
         ) : (
           <DutyCard
             key={m}
@@ -189,7 +202,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
           />
         );
       case 'leaves':
-        return leaves.length > 0 ? <LeaveCard key={m} leaves={leaves} /> : empty(m, <UserMinusIcon size={22} />, 'İzinli Öğretmenler', 'Bugün izinli öğretmen yok', 'leave-card');
+        return leaves.length > 0 ? <LeaveCard key={m} leaves={leaves} /> : empty(m, <UserMinusIcon size={22} />, label('leaves'), 'Bugün izinli öğretmen yok', 'leave-card');
       case 'birthdays':
         return birthdays.length > 0 ? (
           <BirthdayCard key={m} birthdays={birthdays} nameFormat={s.birthdayNameFormat} />
@@ -219,10 +232,10 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         return events.length ? (
           <EventsCard key={m} items={events} todayIso={today.isoDate} />
         ) : (
-          empty(m, <CalendarIcon size={22} />, 'Etkinlik Takvimi', 'Yaklaşan etkinlik yok', 'events-card')
+          empty(m, <CalendarIcon size={22} />, label('events'), 'Yaklaşan etkinlik yok', 'events-card')
         );
       case 'book':
-        return book ? <BookCard key={m} book={book} /> : empty(m, <LibraryIcon size={22} />, 'Haftanın Kitabı', 'Bu hafta kitap seçilmedi', 'book-card');
+        return book ? <BookCard key={m} book={book} /> : empty(m, <LibraryIcon size={22} />, label('book'), 'Bu hafta kitap seçilmedi', 'book-card');
     }
   };
   // Birleşik kart: içindekilerden içeriği olanlar aynı yerde sırayla döner; hiçbirinde içerik yoksa

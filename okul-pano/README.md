@@ -138,6 +138,12 @@ Panel `https://alanadiniz/admin/`, pano `https://alanadiniz/display/`, mobil uyg
 - **Davet:** okul sahibi kullanıcı eklerken "Davet bağlantısı gönder"i seçer; kişi şifresini bağlantıdan kendisi belirler.
   Mobil uygulamada kayıt yoktur; giriş ekranındaki bağlantı web'deki kayıt sayfasını açar.
 
+## Başlıklar
+
+Panel › **Başlıklar**: panodaki kart adları (Nöbetçi Öğretmenler, Sınav Sayacı…) ve Nöbet Çizelgesi sekmeleri okulun kullandığı
+adlarla değiştirilebilir (ör. "Servis Nöbetçileri"); boş bırakılan başlık varsayılanı kullanır. Okul sahibi, yönetici ve
+"Başlıkları düzenleme" yetkisi verilen kullanıcılar değiştirebilir; platform yöneticisi her okulda.
+
 ## KVKK
 
 - **Aydınlatma metni:** her okul kendi metnini **Okul Ayarları › Kişisel veriler (KVKK)** bölümünde yazar

@@ -18,6 +18,7 @@ export const PERMISSIONS = {
   'schedule.manage': 'Zil saatleri ve ders programı',
   'screens.manage': 'Ekranlar',
   'settings.manage': 'Okul ayarları',
+  'labels.manage': 'Başlıkları düzenleme',
   'users.manage': 'Kullanıcılar ve yetkiler',
 } as const;
 

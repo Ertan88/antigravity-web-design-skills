@@ -27,6 +27,7 @@ const Leaves = page(() => import('./pages/Leaves.tsx'), 'Leaves');
 const Platform = page(() => import('./pages/Platform.tsx'), 'Platform');
 const Screens = page(() => import('./pages/Screens.tsx'), 'Screens');
 const Settings = page(() => import('./pages/Settings.tsx'), 'Settings');
+const Labels = page(() => import('./pages/Labels.tsx'), 'Labels');
 const Students = page(() => import('./pages/Students.tsx'), 'Students');
 const Teachers = page(() => import('./pages/Teachers.tsx'), 'Teachers');
 const Ticker = page(() => import('./pages/Ticker.tsx'), 'Ticker');
@@ -109,6 +110,7 @@ export function App() {
         <Route path="ekranlar" element={needsSchool(<Guard permission="screens.manage"><Screens /></Guard>)} />
         <Route path="kullanicilar" element={needsSchool(<Guard permission="users.manage"><Users /></Guard>)} />
         <Route path="ayarlar" element={needsSchool(<Guard permission="settings.manage"><Settings /></Guard>)} />
+        <Route path="basliklar" element={needsSchool(<Guard permission="labels.manage"><Labels /></Guard>)} />
         <Route path="gecmis" element={needsSchool(<Guard permission="users.manage"><Audit /></Guard>)} />
         <Route path="hesap" element={<Account />} />
         <Route path="platform" element={me.user.isSuperAdmin ? <Platform /> : null} />

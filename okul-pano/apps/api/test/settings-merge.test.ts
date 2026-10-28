@@ -53,3 +53,21 @@ describe('öğrenci listesini temizle', () => {
     expect((await root.get(`${base}/students`)).json()).toEqual([]);
   });
 });
+
+describe('başlıklar', () => {
+  it('yalnızca yetkisi olan değiştirir; diğer ayarlar korunur', async () => {
+    const mk = async (email: string, permissions: string[]) => {
+      expectStatus(await root.post(`${base}/members`, { email, fullName: 'Editör', role: 'editor', permissions, password: 'EditorSifre42' }), 201);
+      return client(t.app, (await login(t.app, email, 'EditorSifre42')).token);
+    };
+    const plain = await mk('duz@deneme.test', ['duties.manage']);
+    const labeler = await mk('baslik@deneme.test', ['labels.manage']);
+    expect((await plain.put(`${base}/labels`, { labels: { transport: 'Servis Nöbetçileri' } })).statusCode).toBe(403);
+    const res = await labeler.put(`${base}/labels`, { labels: { transport: 'Servis Nöbetçileri', exams: '  ' } });
+    expectStatus(res, 200);
+    expect(res.json().settings.labels).toEqual({ transport: 'Servis Nöbetçileri' });
+    expect(res.json().settings.schoolType).toBe('Fen Lisesi');
+    // Ayar yetkisi olmayan başlık editörü okul ayarlarını değiştiremez
+    expect((await labeler.patch(base, { settings: { schoolType: 'x' } })).statusCode).toBe(403);
+  });
+});
