@@ -120,7 +120,7 @@ export default function Izin() {
       {(mine.data ?? []).length ? (
         <Card style={{ paddingVertical: 4, gap: 0 }}>
           {mine.data!.slice(0, 10).map((l, i) => (
-            <View key={l.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: '#eef2f5' }}>
+            <View key={l.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: '#f1efea' }}>
               <T weight="600" style={{ flex: 1 }}>
                 {l.startDate === l.endDate ? dayTitle(l.startDate) : `${dayTitle(l.startDate, { day: 'numeric', month: 'long' })} – ${dayTitle(l.endDate, { day: 'numeric', month: 'long' })}`}
               </T>

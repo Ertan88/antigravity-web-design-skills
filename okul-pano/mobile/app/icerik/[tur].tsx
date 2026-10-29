@@ -195,7 +195,7 @@ export default function Icerik() {
                 {photo && (
                   <Image
                     source={{ uri: photo }}
-                    style={{ width: 52, height: 52, borderRadius: 10, backgroundColor: '#eef2f5' }}
+                    style={{ width: 52, height: 52, borderRadius: 10, backgroundColor: '#f1efea' }}
                     accessibilityIgnoresInvertColors
                   />
                 )}
@@ -340,7 +340,7 @@ function Editor({ kind, row, path, onDone }: { kind: Kind; row: Row | null; path
               {url ? (
                 <Image
                   source={{ uri: url }}
-                  style={{ width: 160, height: (160 * f.aspect[1]) / f.aspect[0], borderRadius: 12, backgroundColor: '#eef2f5' }}
+                  style={{ width: 160, height: (160 * f.aspect[1]) / f.aspect[0], borderRadius: 12, backgroundColor: '#f1efea' }}
                   accessibilityLabel={f.label}
                 />
               ) : (

@@ -1,5 +1,6 @@
 import { DESIGN_PALETTES, designTemplate, type AnnouncementDesign } from '@okulpano/shared/designs';
-import { Image, Text, View } from 'react-native';
+import { Image, View } from 'react-native';
+import { Text } from './text.tsx';
 import { absoluteUrl } from './api.ts';
 import type { Announcement } from './data.ts';
 import { Icon } from './ui.tsx';

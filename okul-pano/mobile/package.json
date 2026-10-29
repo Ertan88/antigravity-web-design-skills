@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@expo-google-fonts/plus-jakarta-sans": "^0.4.2",
     "@expo/metro-runtime": "~58.0.15",
     "@expo/vector-icons": "^15.0.2",
     "@tanstack/react-query": "^5.104.5",
@@ -22,6 +23,7 @@
     "expo-camera": "~58.0.14",
     "expo-constants": "~58.0.13",
     "expo-device": "~58.0.5",
+    "expo-font": "~58.0.11",
     "expo-haptics": "~58.0.7",
     "expo-image-picker": "~58.0.10",
     "expo-linking": "~58.0.14",

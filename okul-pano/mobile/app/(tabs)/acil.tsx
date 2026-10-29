@@ -2,7 +2,8 @@ import { EMERGENCY_INFO, EMERGENCY_TYPES, type EmergencyType } from '@okulpano/s
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Platform, Pressable, Text, View } from 'react-native';
+import { Animated, Platform, Pressable, View } from 'react-native';
+import { Text } from '../../src/text.tsx';
 import { api } from '../../src/api.ts';
 import { useAuth, useSchoolPath } from '../../src/auth.tsx';
 import { useControlCenter } from '../../src/data.ts';
@@ -133,11 +134,11 @@ function HoldButton({ label, sub, onComplete, tone = 'red' }: { label: string; s
     setHolding(false);
     Animated.timing(progress, { toValue: 0, duration: 200, useNativeDriver: false }).start();
   };
-  const bg = tone === 'red' ? colors.danger : '#1f2937';
+  const bg = tone === 'red' ? colors.danger : '#1c1917';
   const ring = progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
   return (
-    <View style={{ width: 220, height: 220, borderRadius: 110, backgroundColor: tone === 'red' ? colors.dangerSoft : '#e5e7eb', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+    <View style={{ width: 220, height: 220, borderRadius: 110, backgroundColor: tone === 'red' ? colors.dangerSoft : '#ebe8e2', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
       <Animated.View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: ring, backgroundColor: tone === 'red' ? '#f8b4b4' : '#9ca3af' }} />
       <Pressable
         accessibilityRole="button"

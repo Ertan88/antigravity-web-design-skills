@@ -1,9 +1,18 @@
 import { QueryClient, QueryClientProvider, useIsFetching } from '@tanstack/react-query';
 import * as Notifications from 'expo-notifications';
 import { router, Stack, useSegments } from 'expo-router';
+import {
+  PlusJakartaSans_400Regular,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+  PlusJakartaSans_800ExtraBold,
+  useFonts,
+} from '@expo-google-fonts/plus-jakarta-sans';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Image, Platform, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Image, Platform, StyleSheet, View } from 'react-native';
+import { Text } from '../src/text.tsx';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../src/auth.tsx';
 import { registerForPush } from '../src/push.ts';
@@ -63,7 +72,7 @@ function BrandSplash({ finishing, onHidden }: { finishing: boolean; onHidden: ()
 }
 
 /** Oturum yoksa giriş ekranına, varsa uygulamaya yönlendirir; telefon bildirimlerini kaydeder */
-function Gate() {
+function Gate({ fontsReady }: { fontsReady: boolean }) {
   const { status, school } = useAuth();
   const segments = useSegments();
   const onLogin = segments[0] === 'login';
@@ -80,7 +89,7 @@ function Gate() {
       clearTimeout(b);
     };
   }, []);
-  const splashFinishing = status !== 'loading' && minDone && (fetching === 0 || maxDone);
+  const splashFinishing = status !== 'loading' && fontsReady && minDone && (fetching === 0 || maxDone);
   const hideSplash = useRef(() => setSplashHidden(true)).current;
 
   useEffect(() => {
@@ -104,7 +113,7 @@ function Gate() {
 
   return (
     <View style={{ flex: 1 }}>
-      {status !== 'loading' && (
+      {status !== 'loading' && fontsReady && (
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="login" />
@@ -118,13 +127,21 @@ function Gate() {
 }
 
 export default function RootLayout() {
+  // Yazı tipi yüklenemezse (ör. bozuk dosya) uygulama sistem yazı tipiyle açılır
+  const [fontsLoaded, fontError] = useFonts({
+    PlusJakartaSans_400Regular,
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+    PlusJakartaSans_800ExtraBold,
+  });
   const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 10_000 } } }));
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={client}>
         <AuthProvider>
           <StatusBar style="dark" />
-          <Gate />
+          <Gate fontsReady={fontsLoaded || Boolean(fontError)} />
         </AuthProvider>
       </QueryClientProvider>
     </SafeAreaProvider>

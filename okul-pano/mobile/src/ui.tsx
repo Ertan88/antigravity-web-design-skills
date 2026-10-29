@@ -1,26 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useRef, type ComponentProps, type ReactNode } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Easing,
-  Platform,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  View,
-  type StyleProp,
-  type TextInputProps,
-  type ViewStyle,
-} from 'react-native';
+import { ActivityIndicator, Alert, Animated, Easing, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
+import { Text, TextInput } from './text.tsx';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, radius, space } from './theme.ts';
+import { colors, radius, space, tiles, type TileTone } from './theme.ts';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -55,7 +39,7 @@ export function Screen({
   tone?: 'default' | 'danger';
   scroll?: boolean;
 }) {
-  const bg = tone === 'danger' ? '#fff7f7' : colors.bg;
+  const bg = tone === 'danger' ? '#fff5f6' : colors.bg;
   const body = <View style={styles.body}>{children}</View>;
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: bg }]} edges={['top', 'left', 'right']}>
@@ -63,7 +47,7 @@ export function Screen({
         <View style={styles.header}>
           {back && (
             <Pressable accessibilityRole="button" accessibilityLabel="Geri" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} style={styles.iconButton}>
-              <Icon name="chevron-back" size={24} />
+              <Icon name="chevron-back" size={22} />
             </Pressable>
           )}
           <View style={{ flex: 1, minWidth: 0, paddingLeft: back ? 0 : space.xs }}>
@@ -145,7 +129,7 @@ export function Button({
   style?: StyleProp<ViewStyle>;
 }) {
   const v = BUTTONS[variant];
-  const h = size === 'sm' ? 40 : size === 'lg' ? 56 : 50;
+  const h = size === 'sm' ? 40 : size === 'lg' ? 56 : 52;
   return (
     <Pressable
       accessibilityRole="button"
@@ -159,14 +143,14 @@ export function Button({
       ]}
     >
       {loading ? <ActivityIndicator color={v.fg} /> : icon ? <Icon name={icon} size={size === 'sm' ? 17 : 20} color={v.fg} /> : null}
-      <Text style={{ color: v.fg, fontSize: size === 'sm' ? 14 : 16, fontWeight: '700' }}>{children}</Text>
+      <Text style={{ color: v.fg, fontSize: size === 'sm' ? 14 : 15.5, fontWeight: '700' }}>{children}</Text>
     </Pressable>
   );
 }
 
 const BUTTONS: Record<ButtonVariant, { bg: string; fg: string; border: string }> = {
   primary: { bg: colors.primary, fg: '#fff', border: colors.primary },
-  secondary: { bg: '#fff', fg: colors.ink, border: '#dbe3e8' },
+  secondary: { bg: '#fff', fg: colors.ink, border: colors.borderStrong },
   danger: { bg: colors.danger, fg: '#fff', border: colors.danger },
   success: { bg: colors.success, fg: '#fff', border: colors.success },
   ghost: { bg: 'transparent', fg: colors.primary, border: 'transparent' },
@@ -181,7 +165,7 @@ export function Chip({ label, selected, onPress, icon }: { label: string; select
       onPress={onPress}
       style={[styles.chip, selected && styles.chipSelected]}
     >
-      {icon && <Icon name={icon} size={16} color={selected ? '#fff' : colors.primary} />}
+      {icon && <Icon name={icon} size={16} color={selected ? '#fff' : colors.ink} />}
       <Text style={{ flexShrink: 1, fontSize: 14, fontWeight: selected ? '700' : '600', color: selected ? '#fff' : colors.ink }} numberOfLines={1}>
         {label}
       </Text>
@@ -243,7 +227,7 @@ export function Field({ label, error, help, ...input }: TextInputProps & { label
       <Text style={styles.fieldLabel}>{label}</Text>
       <TextInput
         accessibilityLabel={label}
-        placeholderTextColor="#94a3b8"
+        placeholderTextColor={colors.subtle}
         {...input}
         style={[styles.input, input.multiline && { height: undefined, minHeight: 92, paddingTop: 12, textAlignVertical: 'top' }, error ? { borderColor: colors.danger } : null, input.style]}
       />
@@ -259,7 +243,7 @@ export function ToggleRow({ label, description, value, onChange }: { label: stri
         <Text style={{ fontSize: 15, fontWeight: '600', color: colors.ink }}>{label}</Text>
         {description && <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>{description}</Text>}
       </View>
-      <Switch value={value} onValueChange={onChange} trackColor={{ true: colors.primary, false: '#cbd5dc' }} thumbColor="#fff" accessibilityLabel={label} />
+      <Switch value={value} onValueChange={onChange} trackColor={{ true: colors.success, false: colors.borderStrong }} thumbColor="#fff" accessibilityLabel={label} />
     </View>
   );
 }
@@ -291,7 +275,7 @@ export function ListRow({
         </View>
       )}
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ fontSize: 15, fontWeight: '700', color: colors.ink }} numberOfLines={2}>
+        <Text style={{ fontSize: 15, fontWeight: '700', color: colors.ink, letterSpacing: -0.1 }} numberOfLines={2}>
           {title}
         </Text>
         {subtitle ? (
@@ -313,16 +297,17 @@ export function ListRow({
   );
 }
 
+/** Liste simgelerinin pastel kutuları (bento kutularıyla aynı aile) */
 export const ICON_TONES = {
-  primary: { bg: colors.primarySoft, fg: colors.primary },
+  primary: { bg: '#e0f2fe', fg: '#0369a1' },
   warning: { bg: colors.warningSoft, fg: colors.warning },
   danger: { bg: colors.dangerSoft, fg: colors.danger },
   gold: { bg: colors.goldSoft, fg: colors.gold },
-  muted: { bg: '#eef2f5', fg: colors.muted },
+  muted: { bg: colors.primarySoft, fg: colors.muted },
 } as const;
 
 export function Badge({ children, tone = 'muted' }: { children: ReactNode; tone?: 'muted' | 'success' | 'warning' | 'danger' | 'primary' }) {
-  const t = { muted: ['#eef2f5', colors.muted], success: [colors.successSoft, colors.success], warning: [colors.warningSoft, '#9a3412'], danger: [colors.dangerSoft, colors.danger], primary: [colors.primarySoft, colors.primary] }[tone];
+  const t = { muted: [colors.primarySoft, colors.muted], success: [colors.successSoft, colors.success], warning: [colors.warningSoft, '#9a3412'], danger: [colors.dangerSoft, colors.danger], primary: ['#e0f2fe', '#0369a1'] }[tone];
   return (
     <View style={{ backgroundColor: t[0], borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start' }}>
       <Text style={{ color: t[1], fontSize: 12, fontWeight: '700' }}>{children}</Text>
@@ -333,7 +318,9 @@ export function Badge({ children, tone = 'muted' }: { children: ReactNode; tone?
 export function Empty({ icon = 'checkmark-circle-outline', title, text }: { icon?: IconName; title: string; text?: string }) {
   return (
     <View style={{ alignItems: 'center', paddingVertical: 28, gap: 8 }}>
-      <Icon name={icon} size={36} color={colors.faint} />
+      <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+        <Icon name={icon} size={30} color={colors.faint} />
+      </View>
       <Text style={{ fontSize: 16, fontWeight: '700', color: colors.ink, textAlign: 'center' }}>{title}</Text>
       {text && <Text style={{ fontSize: 14, color: colors.muted, textAlign: 'center', maxWidth: 300 }}>{text}</Text>}
     </View>
@@ -341,7 +328,7 @@ export function Empty({ icon = 'checkmark-circle-outline', title, text }: { icon
 }
 
 /** Belirsiz süreli ilerleme çubuğu: bir parça soldan sağa akar */
-export function ProgressBar({ color = colors.primary, track = colors.primarySoft, width = 220 }: { color?: string; track?: string; width?: number }) {
+export function ProgressBar({ color = colors.ink, track = colors.border, width = 220 }: { color?: string; track?: string; width?: number }) {
   const x = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const loop = Animated.loop(Animated.timing(x, { toValue: 1, duration: 1100, easing: Easing.inOut(Easing.quad), useNativeDriver: true }));
@@ -390,48 +377,36 @@ export function ErrorNote({ error }: { error: unknown }) {
 
 export const styles = StyleSheet.create({
   screen: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingTop: 8, paddingBottom: 8, minHeight: 56 },
-  title: { fontSize: 26, fontWeight: '800', color: colors.ink, letterSpacing: -0.3 },
-  titleSmall: { fontSize: 18, fontWeight: '700', color: colors.ink },
-  subtitle: { fontSize: 13, color: colors.muted, marginTop: 1 },
-  body: { paddingHorizontal: 20, paddingTop: 4, gap: 14 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, minHeight: 60 },
+  title: { fontSize: 30, fontWeight: '800', color: colors.ink, letterSpacing: -0.9 },
+  titleSmall: { fontSize: 19, fontWeight: '800', color: colors.ink, letterSpacing: -0.4 },
+  subtitle: { fontSize: 13.5, color: colors.faint, marginTop: 1, fontWeight: '500' },
+  body: { paddingHorizontal: 16, paddingTop: 4, gap: 12 },
   footer: { backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12, gap: 8 },
-  iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
-  // Hafif derinlik: kenarlık + yumuşak gölge (Android'de düşük yükselti)
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 16,
-    gap: 10,
-    shadowColor: '#0f172a',
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
-  },
-  cardWarning: { borderColor: colors.warningBorder, borderWidth: 1.5 },
-  cardDanger: { borderColor: '#ecc8c8', backgroundColor: '#fff' },
+  iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: '#fff', borderWidth: 1, borderColor: colors.border },
+  // Düz bento kutusu: beyaz zemin, ince sıcak kenarlık, gölgesiz
+  card: { backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 18, gap: 10 },
+  cardWarning: { borderColor: colors.warningBorder, backgroundColor: '#fffaf5' },
+  cardDanger: { borderColor: '#fecdd3', backgroundColor: '#fff' },
   cardPrimary: { backgroundColor: colors.primary, borderColor: colors.primary },
   label: { fontSize: 12, fontWeight: '700', letterSpacing: 0.4 },
-  sectionTitle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, marginBottom: -2, paddingHorizontal: 2 },
-  sectionTitleText: { fontSize: 16, fontWeight: '700', color: colors.ink, letterSpacing: -0.1 },
-  button: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: 16 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, minHeight: 40, maxWidth: '100%', borderRadius: radius.pill, backgroundColor: '#fff', borderWidth: 1, borderColor: '#dbe3e8' },
+  sectionTitle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, marginBottom: -2, paddingHorizontal: 4 },
+  sectionTitleText: { fontSize: 17, fontWeight: '800', color: colors.ink, letterSpacing: -0.4 },
+  button: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: radius.pill, borderWidth: 1, paddingHorizontal: 20 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 15, minHeight: 42, maxWidth: '100%', borderRadius: radius.pill, backgroundColor: '#fff', borderWidth: 1, borderColor: colors.border },
   chipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
   choiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between' },
-  choice: { padding: 12, borderRadius: radius.md, borderWidth: 1, borderColor: '#dbe3e8', backgroundColor: '#fff', minHeight: 48, justifyContent: 'center' },
-  choiceOn: { borderWidth: 2, borderColor: colors.primary, backgroundColor: colors.primarySoft },
-  segmented: { flexDirection: 'row', backgroundColor: '#e4eaee', borderRadius: 12, padding: 4 },
-  segment: { flex: 1, height: 40, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  choice: { padding: 14, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: '#fff', minHeight: 52, justifyContent: 'center' },
+  choiceOn: { borderWidth: 2, borderColor: colors.ink, backgroundColor: colors.primarySoft },
+  segmented: { flexDirection: 'row', backgroundColor: '#ece9e3', borderRadius: radius.pill, padding: 4 },
+  segment: { flex: 1, height: 40, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   segmentOn: { backgroundColor: '#fff' },
-  fieldLabel: { fontSize: 13, fontWeight: '600', color: colors.ink },
-  input: { height: 50, borderRadius: 12, borderWidth: 1, borderColor: colors.borderStrong, paddingHorizontal: 14, fontSize: 16, backgroundColor: '#fff', color: colors.ink },
+  fieldLabel: { fontSize: 13, fontWeight: '700', color: colors.ink },
+  input: { height: 52, borderRadius: radius.md, borderWidth: 1, borderColor: colors.borderStrong, paddingHorizontal: 16, fontSize: 16, backgroundColor: '#fff', color: colors.ink },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 },
-  listRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, minHeight: 56 },
-  listRowBorder: { borderBottomWidth: 1, borderBottomColor: '#eef2f5' },
-  iconBox: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  listRow: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 13, minHeight: 60 },
+  listRowBorder: { borderBottomWidth: 1, borderBottomColor: colors.divider },
+  iconBox: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
 });
 
 /** Geri alınamayan işlemlerden önce onay (web'de tarayıcının onay penceresi) */
@@ -445,32 +420,70 @@ export function confirm(title: string, message: string, ok = 'Evet', destructive
   );
 }
 
-/**
- * Ana sayfaların başlığı (bütün rollerde aynı): küçük rol etiketi, büyük başlık, alt satır (en çok iki satır, kesilmez)
- * ve sağda yuvarlatılmış kare düğmeler.
- */
-export function HomeHeader({ eyebrow, title, subtitle, children }: { eyebrow: string; title: string; subtitle?: string | null; children?: ReactNode }) {
+/** Ad soyaddan iki harf (Ayşe Yılmaz → AY); ad yoksa okul adından */
+export function initials(name?: string | null): string {
+  const parts = (name ?? '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  const pick = parts.length === 1 ? parts[0].slice(0, 2) : parts[0][0] + parts[parts.length - 1][0];
+  return pick.toLocaleUpperCase('tr-TR');
+}
+
+const AVATAR_COLORS = ['#6366f1', '#0ea5e9', '#14b8a6', '#f59e0b', '#ec4899', '#8b5cf6', '#22c55e'];
+
+/** Yuvarlak baş harf rozeti; rengi isimden türetilir, her kullanıcıda sabit kalır */
+export function Avatar({ name, size = 44 }: { name?: string | null; size?: number }) {
+  const key = (name ?? '').split('').reduce((a, c) => a + c.charCodeAt(0), 0);
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingTop: 10, paddingBottom: 2 }}>
-      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-        <Text style={{ fontSize: 12, fontWeight: '800', letterSpacing: 0.9, color: colors.primaryDark }} numberOfLines={1}>
-          {eyebrow.toLocaleUpperCase('tr-TR')}
-        </Text>
-        <Text style={{ fontSize: 27, fontWeight: '800', letterSpacing: -0.5, color: colors.ink }} numberOfLines={1} accessibilityRole="header">
-          {title}
-        </Text>
-        {subtitle ? (
-          <Text style={{ fontSize: 14, color: colors.muted, lineHeight: 19 }} numberOfLines={2}>
-            {subtitle}
-          </Text>
-        ) : null}
-      </View>
-      {children ? <View style={{ flexDirection: 'row', gap: 8, paddingTop: 4 }}>{children}</View> : null}
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: AVATAR_COLORS[key % AVATAR_COLORS.length], alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ color: '#fff', fontWeight: '800', fontSize: size * 0.36 }}>{initials(name)}</Text>
     </View>
   );
 }
 
-/** Başlıktaki yuvarlatılmış kare düğme (bildirim, menü) */
+/**
+ * Ana sayfaların başlığı (bütün rollerde aynı): solda baş harf rozeti, okul adı ve rol; sağda yuvarlak
+ * düğmeler; altında iki satırlık büyük başlık (ikinci satır soluk).
+ */
+export function HomeHeader({
+  name,
+  school,
+  role,
+  title,
+  titleMuted,
+  children,
+}: {
+  name?: string | null;
+  school?: string | null;
+  role: string;
+  title: string;
+  titleMuted?: string | null;
+  children?: ReactNode;
+}) {
+  return (
+    <View style={{ gap: 18, paddingTop: 8 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <Avatar name={name} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          {school ? (
+            <Text style={{ fontSize: 13, color: colors.faint, fontWeight: '600' }} numberOfLines={1}>
+              {school}
+            </Text>
+          ) : null}
+          <Text style={{ fontSize: 16, color: colors.ink, fontWeight: '800', letterSpacing: -0.2 }} numberOfLines={1}>
+            {role}
+          </Text>
+        </View>
+        {children ? <View style={{ flexDirection: 'row', gap: 8 }}>{children}</View> : null}
+      </View>
+      <Text style={{ fontSize: 34, lineHeight: 38, fontWeight: '800', letterSpacing: -1.2, color: colors.ink }} accessibilityRole="header">
+        {title}
+        {titleMuted ? <Text style={{ color: colors.subtle }}>{`\n${titleMuted}`}</Text> : null}
+      </Text>
+    </View>
+  );
+}
+
+/** Başlıktaki yuvarlak düğme (bildirim, menü); okunmamış varsa sayılı kırmızı rozet */
 export function HeaderButton({ icon, label, onPress, badge }: { icon: IconName; label: string; onPress: () => void; badge?: number }) {
   return (
     <Pressable
@@ -480,7 +493,7 @@ export function HeaderButton({ icon, label, onPress, badge }: { icon: IconName; 
       style={({ pressed }) => ({
         width: 44,
         height: 44,
-        borderRadius: 14,
+        borderRadius: 22,
         borderWidth: 1,
         borderColor: colors.border,
         backgroundColor: pressed ? colors.primarySoft : '#fff',
@@ -488,9 +501,9 @@ export function HeaderButton({ icon, label, onPress, badge }: { icon: IconName; 
         justifyContent: 'center',
       })}
     >
-      <Icon name={icon} size={22} />
+      <Icon name={icon} size={21} />
       {badge ? (
-        <View style={{ position: 'absolute', top: -5, right: -5, minWidth: 20, height: 20, borderRadius: 10, backgroundColor: colors.danger, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, borderWidth: 2, borderColor: colors.bg }}>
+        <View style={{ position: 'absolute', top: -3, right: -3, minWidth: 19, height: 19, borderRadius: 10, backgroundColor: colors.danger, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, borderWidth: 2, borderColor: colors.bg }}>
           <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>{badge > 9 ? '9+' : badge}</Text>
         </View>
       ) : null}
@@ -498,24 +511,104 @@ export function HeaderButton({ icon, label, onPress, badge }: { icon: IconName; 
   );
 }
 
-/** Renkli bilgi bandı (tatil, arife, uyarı): solda simge kutusu, başlık ve açıklama */
+const BANNER_TILES = { gold: 'sun', warning: 'peach', primary: 'sky', danger: 'rose' } as const;
+
+/** Renkli bilgi bandı (tatil, arife, uyarı): pastel zemin, solda dolu renkli simge kutusu */
 export function Banner({ icon, title, text, tone = 'gold', right }: { icon: IconName; title: string; text?: string | null; tone?: 'gold' | 'warning' | 'primary' | 'danger'; right?: ReactNode }) {
-  const t = {
-    gold: { bg: colors.goldSoft, border: '#f1dfae', fg: colors.gold },
-    warning: { bg: colors.warningSoft, border: colors.warningBorder, fg: colors.warning },
-    primary: { bg: colors.primarySoft, border: '#cfe3ea', fg: colors.primary },
-    danger: { bg: colors.dangerSoft, border: '#f2c4c4', fg: colors.danger },
-  }[tone];
+  const t = tiles[BANNER_TILES[tone]];
+  const iconBg = { gold: '#f59e0b', warning: '#f97316', primary: '#0284c7', danger: '#e11d48' }[tone];
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: t.bg, borderColor: t.border, borderWidth: 1, borderRadius: radius.lg, padding: 14 }}>
-      <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#ffffffaa', alignItems: 'center', justifyContent: 'center' }}>
-        <Icon name={icon} size={21} color={t.fg} />
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: t.bg, borderRadius: radius.lg, padding: 16 }}>
+      <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: iconBg, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name={icon} size={24} color="#fff" />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ fontSize: 15, fontWeight: '700', color: colors.ink }}>{title}</Text>
-        {text ? <Text style={{ fontSize: 13, color: colors.muted, marginTop: 1 }}>{text}</Text> : null}
+        <Text style={{ fontSize: 16, fontWeight: '800', color: t.fg, letterSpacing: -0.2 }}>{title}</Text>
+        {text ? <Text style={{ fontSize: 13, fontWeight: '600', color: t.sub, marginTop: 2 }}>{text}</Text> : null}
       </View>
       {right}
     </View>
   );
+}
+
+/**
+ * Bento kutusu: renkli zemin, üstte simgeli küçük etiket, büyük rakam ve açıklama. Dokunulabiliyorsa sağ üstte
+ * ok rozeti görünür. children rakamın altına eklenir (ör. pano listesi).
+ */
+export function Tile({
+  tone = 'paper',
+  icon,
+  label,
+  value,
+  unit,
+  caption,
+  headline,
+  onPress,
+  children,
+  style,
+  big,
+}: {
+  tone?: TileTone;
+  icon?: IconName;
+  label: string;
+  value?: string | number;
+  unit?: string;
+  caption?: string | null;
+  /** Rakam yerine kısa büyük başlık (ör. sınıf adı, nöbet yeri) */
+  headline?: string;
+  onPress?: () => void;
+  children?: ReactNode;
+  style?: StyleProp<ViewStyle>;
+  big?: boolean;
+}) {
+  const t = tiles[tone];
+  const body = (
+    <>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: onPress ? 30 : 0 }}>
+        {icon && <Icon name={icon} size={16} color={t.sub} />}
+        <Text style={{ fontSize: 13, fontWeight: '700', color: t.sub, flexShrink: 1 }} numberOfLines={1}>
+          {label}
+        </Text>
+      </View>
+      {value != null && (
+        <Text style={{ marginTop: 10, fontSize: big ? 46 : 38, lineHeight: big ? 50 : 42, fontWeight: '800', letterSpacing: -1.6, color: t.fg }} numberOfLines={1}>
+          {value}
+          {unit ? <Text style={{ fontSize: big ? 22 : 19, color: t.sub, letterSpacing: -0.5 }}>{unit}</Text> : null}
+        </Text>
+      )}
+      {headline ? (
+        <Text style={{ marginTop: 10, fontSize: 24, lineHeight: 28, fontWeight: '800', letterSpacing: -0.8, color: t.fg }} numberOfLines={2}>
+          {headline}
+        </Text>
+      ) : null}
+      {caption ? (
+        <Text style={{ marginTop: 4, fontSize: 13, fontWeight: '700', color: t.fg }} numberOfLines={2}>
+          {caption}
+        </Text>
+      ) : null}
+      {children}
+      {onPress && (
+        <View style={{ position: 'absolute', top: 14, right: 14, width: 28, height: 28, borderRadius: 14, backgroundColor: t.chip, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="arrow-forward" size={15} color={t.fg} />
+        </View>
+      )}
+    </>
+  );
+  const box: StyleProp<ViewStyle> = [
+    { backgroundColor: t.bg, borderRadius: radius.xl, padding: 16, minHeight: 132, overflow: 'hidden' },
+    tone === 'paper' && { borderWidth: 1, borderColor: colors.border },
+    style,
+  ];
+  return onPress ? (
+    <Pressable accessibilityRole="button" accessibilityLabel={[label, value, unit, headline, caption].filter((x) => x != null && x !== '').join(' ')} onPress={onPress} style={({ pressed }) => [box, { opacity: pressed ? 0.88 : 1, transform: [{ scale: pressed ? 0.985 : 1 }] }]}>
+      {body}
+    </Pressable>
+  ) : (
+    <View style={box}>{body}</View>
+  );
+}
+
+/** Bento satırı: kutuları eşit genişlikte yan yana dizer */
+export function BentoRow({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  return <View style={[{ flexDirection: 'row', gap: 10, alignItems: 'stretch' }, style]}>{children}</View>;
 }

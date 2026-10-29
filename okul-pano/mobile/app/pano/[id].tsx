@@ -160,7 +160,7 @@ function RoundButton({ icon, label, onPress, primary, disabled }: { icon: IconNa
         justifyContent: 'center',
         backgroundColor: primary ? colors.primary : '#fff',
         borderWidth: 1,
-        borderColor: primary ? colors.primary : '#dbe3e8',
+        borderColor: primary ? colors.primary : '#e7e3dc',
         opacity: disabled ? 0.4 : pressed ? 0.75 : 1,
       })}
     >

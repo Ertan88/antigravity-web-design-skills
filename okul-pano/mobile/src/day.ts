@@ -118,3 +118,8 @@ export const dateSpan = (a: string, b: string) => (a === b ? fullDate(a) : `${fu
 export function localIso(d: Date = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+
+/** Ana sayfa başlığı: "2026-10-29" → ["Perşembe,", "29 Ekim"] */
+export function homeTitle(iso: string): [string, string] {
+  return [`${dayTitle(iso, { weekday: 'long' })},`, dayTitle(iso, { day: 'numeric', month: 'long' })];
+}

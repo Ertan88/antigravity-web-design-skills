@@ -1,7 +1,8 @@
 import type { Permission } from '@okulpano/shared/permissions';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Platform, Text, View } from 'react-native';
+import { Platform, View } from 'react-native';
+import { Text } from '../../src/text.tsx';
 import { useAuth, type AppRole } from '../../src/auth.tsx';
 import { useInbox, useMyLeaves } from '../../src/data.ts';
 import { initials, useOpenSchool } from '../../src/platform.tsx';

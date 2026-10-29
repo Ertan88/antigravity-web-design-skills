@@ -1,37 +1,15 @@
 import { academicYearOf } from '@okulpano/shared/academicCalendar';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { Text } from './text.tsx';
 import { api } from './api.ts';
 import { useAuth } from './auth.tsx';
 import { useAcademicCalendars, usePlatformSchools, useSignups } from './data.ts';
-import { fullDate, timeAgo } from './day.ts';
+import { fullDate, homeTitle, localIso, timeAgo } from './day.ts';
 import { colors } from './theme.ts';
-import { Badge, Button, Card, Empty, ErrorNote, HomeHeader, ListRow, Loading, Screen, SectionTitle, T } from './ui.tsx';
+import { Badge, BentoRow, Button, Card, Empty, ErrorNote, HomeHeader, ListRow, Loading, Screen, SectionTitle, T, Tile } from './ui.tsx';
 import { MenuButton } from './quick.tsx';
-
-function Kpi({ value, label, to }: { value: string | number; label: string; to?: string }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      disabled={!to}
-      onPress={() => to && router.push(to as never)}
-      style={({ pressed }) => ({
-        flex: 1,
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: 16,
-        padding: 12,
-        gap: 2,
-        opacity: pressed ? 0.75 : 1,
-      })}
-    >
-      <Text style={{ fontSize: 24, fontWeight: '800', color: colors.ink, fontVariant: ['tabular-nums'] }}>{value}</Text>
-      <Text style={{ fontSize: 12, color: colors.muted }}>{label}</Text>
-    </Pressable>
-  );
-}
 
 /** Kendi okuluna (süper kullanıcı) ya da destek erişimi süren bir okula geçer */
 export function useOpenSchool() {
@@ -69,7 +47,7 @@ export function PlatformHome() {
 
   return (
     <Screen refreshing={schools.isRefetching} onRefresh={() => void Promise.all([schools.refetch(), signups.refetch(), calendars.refetch()])}>
-      <HomeHeader eyebrow="Platform yöneticisi" title="Platform" subtitle={me?.user.fullName}>
+      <HomeHeader name={me?.user.fullName} school="Platform" role="Platform yöneticisi" title={homeTitle(localIso())[0]} titleMuted={homeTitle(localIso())[1]}>
         <MenuButton />
       </HomeHeader>
       <ErrorNote error={schools.error} />
@@ -77,11 +55,31 @@ export function PlatformHome() {
         <Loading />
       ) : (
         <>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <Kpi value={list.filter((s) => s.isActive).length} label="etkin okul" to="/okullar" />
-            <Kpi value={trials.length} label="denemede" to="/okullar" />
-            <Kpi value={waiting.length} label="kayıt bekliyor" />
-          </View>
+          <BentoRow>
+            <Tile tone="ink" icon="business-outline" label="Okullar" value={list.filter((s) => s.isActive).length} caption="etkin okul" onPress={() => router.push('/okullar')} style={{ flex: 1.15 }} big>
+              {/* Paket dağılımı ve toplam pano: koyu kutunun alt yarısı */}
+              <View style={{ marginTop: 16, gap: 9 }}>
+                {(
+                  [
+                    ['Pro', list.filter((s) => s.isActive && s.plan === 'pro').length, '#a78bfa'],
+                    ['Temel', list.filter((s) => s.isActive && s.plan === 'basic').length, '#38bdf8'],
+                    ['Deneme', trials.length, '#fbbf24'],
+                    ['Pano', list.reduce((n, s) => n + s.screenCount, 0), '#4ade80'],
+                  ] as const
+                ).map(([label, n, dot]) => (
+                  <View key={label} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: dot }} />
+                    <Text style={{ flex: 1, fontSize: 12.5, fontWeight: '600', color: '#fff' }}>{label}</Text>
+                    <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#fff', fontVariant: ['tabular-nums'] }}>{n}</Text>
+                  </View>
+                ))}
+              </View>
+            </Tile>
+            <View style={{ flex: 1, gap: 10 }}>
+              <Tile tone="sky" icon="hourglass-outline" label="Deneme" value={trials.length} caption={ending.length ? `${ending.length} tanesi bu hafta bitiyor` : 'okul denemede'} onPress={() => router.push('/okullar')} style={{ flex: 1 }} />
+              <Tile tone={waiting.length ? 'peach' : 'paper'} icon="person-add-outline" label="Kayıt" value={waiting.length} caption={waiting.length ? 'onay bekliyor' : 'bekleyen yok'} style={{ flex: 1 }} />
+            </View>
+          </BentoRow>
 
           {own.length > 0 && (
             <>

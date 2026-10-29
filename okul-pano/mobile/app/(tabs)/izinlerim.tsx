@@ -46,7 +46,7 @@ export default function Izinlerim() {
             return (
               <View
                 key={l.id}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: '#eef2f5' }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: '#f1efea' }}
               >
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <T weight="700">

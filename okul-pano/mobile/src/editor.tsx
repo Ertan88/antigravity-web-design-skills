@@ -4,9 +4,10 @@ import { View } from 'react-native';
 import { useAuth } from './auth.tsx';
 import { useAnnouncements, useMeToday, type Announcement } from './data.ts';
 import { MenuButton, QuickAdd } from './quick.tsx';
-import { DayBanner, TodayDutyCard } from './teacher.tsx';
+import { DayBanner, NotificationsButton, TodayDutyCard } from './teacher.tsx';
+import { homeTitle, localIso } from './day.ts';
 import { colors } from './theme.ts';
-import { Badge, Card, Empty, HomeHeader, ListRow, Loading, Screen, SectionTitle, T } from './ui.tsx';
+import { Badge, BentoRow, Card, Empty, HomeHeader, ListRow, Loading, Screen, SectionTitle, T, Tile } from './ui.tsx';
 
 function status(a: Announcement): { label: string; tone: 'success' | 'warning' | 'danger' | 'muted' } {
   if (a.approvalStatus === 'pending') return { label: 'Onay bekliyor', tone: 'warning' };
@@ -22,12 +23,27 @@ export function EditorHome() {
   const today = useMeToday();
   const mine = (list.data ?? []).filter((a) => a.createdBy === me?.user.id).slice(0, 5);
   const granted = school?.permissions ?? [];
+  const all = (list.data ?? []).filter((a) => a.createdBy === me?.user.id);
+  const counts = {
+    live: all.filter((a) => status(a).tone === 'success').length,
+    pending: all.filter((a) => a.approvalStatus === 'pending').length,
+    rejected: all.filter((a) => a.approvalStatus === 'rejected').length,
+  };
+  const [day, date] = homeTitle(localIso());
   return (
     <Screen refreshing={list.isRefetching} onRefresh={() => void list.refetch()}>
-      <HomeHeader eyebrow="Editör" title="İçerik" subtitle={school?.name}>
+      <HomeHeader name={me?.user.fullName} school={school?.name} role="Editör" title={day} titleMuted={date}>
+        <NotificationsButton />
         <MenuButton />
       </HomeHeader>
       {today.data ? <DayBanner data={today.data} /> : null}
+
+      {can('announcements.manage') && !list.isLoading && (
+        <BentoRow>
+          <Tile tone="mint" icon="radio-outline" label="Yayında" value={counts.live} caption="duyurum" onPress={() => router.push('/duyurular')} style={{ flex: 1 }} />
+          <Tile tone={counts.pending ? 'peach' : 'paper'} icon="hourglass-outline" label="Onayda" value={counts.pending} caption={counts.rejected ? `${counts.rejected} düzeltme istendi` : 'bekleyen'} onPress={() => router.push('/duyurular')} style={{ flex: 1 }} />
+        </BentoRow>
+      )}
 
       <QuickAdd title="Ekle" />
 
@@ -60,13 +76,13 @@ export function EditorHome() {
 
       {isTeacher && today.data && <TodayDutyCard data={today.data} />}
 
-      <Card style={{ gap: 8, borderStyle: 'dashed' }}>
+      <Card style={{ gap: 8, backgroundColor: 'transparent', borderStyle: 'dashed', borderColor: colors.borderStrong }}>
         <T size={13} weight="700" color={colors.muted}>
           Yetkileriniz (okul yöneticisi verdi)
         </T>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
           {granted.map((p) => (
-            <Badge key={p} tone="primary">
+            <Badge key={p}>
               {PERMISSIONS[p]}
             </Badge>
           ))}

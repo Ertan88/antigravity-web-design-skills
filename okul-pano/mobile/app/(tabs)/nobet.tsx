@@ -2,7 +2,8 @@ import { normalizeName } from '@okulpano/shared/teachers';
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { Text } from '../../src/text.tsx';
 import { api } from '../../src/api.ts';
 import { useAuth, useSchoolPath } from '../../src/auth.tsx';
 import { useDutyDay, useMeToday, type DutyDay } from '../../src/data.ts';
@@ -56,10 +57,10 @@ function MyDuties() {
                 paddingVertical: 8,
                 borderRadius: 12,
                 alignItems: 'center',
-                backgroundColor: on ? colors.primary : d.holiday ? '#f1f5f8' : '#fff',
+                backgroundColor: on ? colors.primary : d.holiday ? '#f0ede8' : '#fff',
                 borderWidth: 1,
                 borderStyle: d.holiday ? 'dashed' : 'solid',
-                borderColor: on ? colors.primary : d.holiday ? '#c6d1d9' : colors.border,
+                borderColor: on ? colors.primary : d.holiday ? '#dcd7cf' : colors.border,
               }}
             >
               <Text style={{ fontSize: 11, color: on ? '#fff' : colors.muted, fontWeight: '600' }}>{WEEKDAY_SHORT[d.weekday]}</Text>
@@ -137,7 +138,7 @@ function MyDuties() {
 
 function Pill({ children, tone = 'muted' }: { children: React.ReactNode; tone?: 'muted' | 'warning' }) {
   return (
-    <View style={{ backgroundColor: tone === 'warning' ? colors.warningSoft : '#f1f5f8', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+    <View style={{ backgroundColor: tone === 'warning' ? colors.warningSoft : '#f0ede8', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
       <Text style={{ fontSize: 12, color: tone === 'warning' ? '#9a3412' : colors.ink }}>{children}</Text>
     </View>
   );
@@ -191,7 +192,7 @@ function AllDuties() {
           <SectionTitle>{offset ? 'Yarın kim nerede' : 'Bugün kim nerede'}</SectionTitle>
           <Card style={{ paddingVertical: 4, gap: 0 }}>
             {areas.map((list, i) => (
-              <View key={list[0]!.dutyId} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: '#eef2f5' }}>
+              <View key={list[0]!.dutyId} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: '#f1efea' }}>
                 <T weight="600" style={{ flex: 1 }}>
                   {list[0]!.area}
                 </T>

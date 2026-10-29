@@ -1,6 +1,7 @@
 import { periodLabel, sortPeriods } from '@okulpano/shared/bell';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '../src/text.tsx';
 import { useMeToday, useNow } from '../src/data.ts';
 import { teacherDay, WEEKDAY_LONG, WEEKDAY_SHORT } from '../src/day.ts';
 import { colors } from '../src/theme.ts';
@@ -82,7 +83,7 @@ export default function Programim() {
                   paddingVertical: 11,
                   paddingHorizontal: 14,
                   borderTopWidth: i ? 1 : 0,
-                  borderTopColor: '#eef2f5',
+                  borderTopColor: '#f1efea',
                   backgroundColor: state === 'now' ? colors.primarySoft : '#fff',
                   opacity: state === 'past' || cut ? 0.5 : 1,
                 }}

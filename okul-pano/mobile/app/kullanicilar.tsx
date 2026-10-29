@@ -138,7 +138,7 @@ function EditMember({ m, path, isOwner, onDone }: { m: Member; path: string; isO
   });
   const remove = useMutation({ mutationFn: () => api(`${path}/${m.id}`, { method: 'DELETE' }), onSuccess: onDone });
   return (
-    <View style={{ gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#eef2f5' }}>
+    <View style={{ gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f1efea' }}>
       <RoleEditor role={role} permissions={permissions} onRole={setRole} onPermissions={setPermissions} canAssignAdmin={isOwner} />
       <ErrorNote error={save.error ?? remove.error} />
       <View style={{ flexDirection: 'row', gap: 8 }}>

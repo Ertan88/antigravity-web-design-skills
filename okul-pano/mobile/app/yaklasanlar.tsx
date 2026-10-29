@@ -48,7 +48,7 @@ export default function Yaklasanlar() {
               upcomingExams.map((e, i) => (
                 <View
                   key={e.id}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: '#eef2f5' }}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: '#f1efea' }}
                 >
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <T weight="700">{e.title}</T>
@@ -70,7 +70,7 @@ export default function Yaklasanlar() {
           <Card style={{ paddingVertical: 4, gap: 0 }}>
             {upcomingEvents.length ? (
               upcomingEvents.map((e, i) => (
-                <View key={e.id} style={{ paddingVertical: 12, gap: 2, borderTopWidth: i ? 1 : 0, borderTopColor: '#eef2f5' }}>
+                <View key={e.id} style={{ paddingVertical: 12, gap: 2, borderTopWidth: i ? 1 : 0, borderTopColor: '#f1efea' }}>
                   <T weight="700">{e.title}</T>
                   <T size={13} color={colors.muted}>
                     {[fullDate(e.date), e.time, e.place, e.organizer].filter(Boolean).join(' · ')}

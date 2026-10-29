@@ -42,7 +42,7 @@ export default function Tatiller() {
               {holidays.map((h, i) => {
                 const days = Math.round((Date.parse(h.end) - Date.parse(h.start)) / 86400_000) + 1;
                 return (
-                  <View key={`${h.start}-${h.name}`} style={{ paddingVertical: 12, gap: 4, borderTopWidth: i ? 1 : 0, borderTopColor: '#eef2f5' }}>
+                  <View key={`${h.start}-${h.name}`} style={{ paddingVertical: 12, gap: 4, borderTopWidth: i ? 1 : 0, borderTopColor: '#f1efea' }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <T weight="700" style={{ flex: 1 }}>
                         {h.name}
@@ -68,7 +68,7 @@ export default function Tatiller() {
               <SectionTitle>Yarım günler (arife)</SectionTitle>
               <Card style={{ paddingVertical: 4, gap: 0 }}>
                 {q.data!.halfDays.map((h, i) => (
-                  <View key={h.date} style={{ paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: '#eef2f5' }}>
+                  <View key={h.date} style={{ paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: '#f1efea' }}>
                     <T weight="700">{h.name}</T>
                     <T size={13} color={colors.muted}>
                       {fullDate(h.date)} · öğleden sonra tatil
@@ -84,7 +84,7 @@ export default function Tatiller() {
               <SectionTitle>Olası köprü günleri</SectionTitle>
               <Card style={{ paddingVertical: 4, gap: 0 }}>
                 {q.data!.bridges.map((b, i) => (
-                  <View key={b.date} style={{ paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: '#eef2f5' }}>
+                  <View key={b.date} style={{ paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: '#f1efea' }}>
                     <T weight="700">{fullDate(b.date)}</T>
                     <T size={13} color={colors.muted}>
                       {b.near} ile tatil arasında kalıyor · idari izin ilan edilirse tatil olur

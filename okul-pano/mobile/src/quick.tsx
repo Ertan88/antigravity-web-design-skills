@@ -1,6 +1,7 @@
 import type { Permission } from '@okulpano/shared/permissions';
 import { router } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { Text } from './text.tsx';
 import { useAuth } from './auth.tsx';
 import { colors } from './theme.ts';
 import { HeaderButton, Icon, SectionTitle, type IconName } from './ui.tsx';
@@ -14,7 +15,40 @@ const QUICK: { label: string; icon: IconName; to: string; permission: Permission
   { label: 'Kitap', icon: 'book-outline', to: '/icerik/books?yeni=1', permission: 'highlights.manage' },
 ];
 
-/** Hızlı ekle: yetkiye göre içerik türleri; ilki (genelde duyuru) vurgulu. Kalanlar Menü › İçerik'te. */
+/** Yuvarlak hap bağlantılar; ilki koyu (birincil işlem) */
+export function ChipLinks({ items }: { items: { label: string; icon: IconName; to: string }[] }) {
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+      {items.map((q, i) => {
+        const first = i === 0;
+        return (
+          <Pressable
+            key={q.to}
+            accessibilityRole="button"
+            onPress={() => router.push(q.to as never)}
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              height: 46,
+              paddingHorizontal: 16,
+              borderRadius: 23,
+              borderWidth: 1,
+              borderColor: first ? colors.ink : colors.border,
+              backgroundColor: first ? colors.ink : pressed ? colors.primarySoft : '#fff',
+              opacity: pressed && first ? 0.85 : 1,
+            })}
+          >
+            <Icon name={q.icon} size={18} color={first ? '#fff' : colors.ink} />
+            <Text style={{ fontSize: 14, fontWeight: '700', color: first ? '#fff' : colors.ink }}>{q.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Hızlı ekle: yetkiye göre içerik türleri; ilki (genelde duyuru) koyu. Kalanlar Menü › İçerik'te. */
 export function QuickAdd({ max = 6, title = 'Hızlı ekle' }: { max?: number; title?: string }) {
   const { can } = useAuth();
   const items = QUICK.filter((q) => can(q.permission)).slice(0, max);
@@ -22,44 +56,7 @@ export function QuickAdd({ max = 6, title = 'Hızlı ekle' }: { max?: number; ti
   return (
     <View style={{ gap: 10 }}>
       <SectionTitle>{title}</SectionTitle>
-      {/* Satırlar üçerli: son satırda eksik kalan yerler boş kutuyla doldurulur, düğmeler hep aynı genişlikte */}
-      {Array.from({ length: Math.ceil(items.length / 3) }, (_, r) => items.slice(r * 3, r * 3 + 3)).map((row, r) => (
-        <View key={r} style={{ flexDirection: 'row', gap: 10 }}>
-          {row.map((q, j) => {
-            const first = r === 0 && j === 0;
-            return (
-              <Pressable
-                key={q.label}
-                accessibilityRole="button"
-                onPress={() => router.push(q.to as never)}
-                style={({ pressed }) => ({
-                  flex: 1,
-                  height: 78,
-                  borderRadius: 16,
-                  borderWidth: 1,
-                  borderColor: first ? colors.primary : colors.border,
-                  backgroundColor: first ? colors.primary : '#fff',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                  opacity: pressed ? 0.85 : 1,
-                  shadowColor: '#0f172a',
-                  shadowOpacity: first ? 0.12 : 0.04,
-                  shadowRadius: 8,
-                  shadowOffset: { width: 0, height: 2 },
-                  elevation: first ? 2 : 1,
-                })}
-              >
-                <Icon name={q.icon} size={22} color={first ? '#fff' : colors.primary} />
-                <Text style={{ fontSize: 13, fontWeight: '700', color: first ? '#fff' : colors.ink }}>{q.label}</Text>
-              </Pressable>
-            );
-          })}
-          {Array.from({ length: 3 - row.length }, (_, k) => (
-            <View key={`bos${k}`} style={{ flex: 1 }} />
-          ))}
-        </View>
-      ))}
+      <ChipLinks items={items} />
     </View>
   );
 }

@@ -1,39 +1,60 @@
 import { EMERGENCY_INFO } from '@okulpano/shared/emergency';
 import { router } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { Text } from './text.tsx';
 import { useAuth } from './auth.tsx';
-import { useControlCenter, useMeToday } from './data.ts';
-import { clock, timeAgo } from './day.ts';
+import { useControlCenter, useMeToday, type ControlCenter } from './data.ts';
+import { clock, homeTitle, localIso, timeAgo } from './day.ts';
 import { MenuButton, QuickAdd } from './quick.tsx';
 import { DayBanner, MyDayCard, NotificationsButton } from './teacher.tsx';
-import { colors } from './theme.ts';
-import { Banner, Card, Empty, ErrorNote, HomeHeader, ListRow, Loading, Screen, SectionTitle } from './ui.tsx';
+import { tiles } from './theme.ts';
+import { Banner, BentoRow, Card, ErrorNote, HomeHeader, ListRow, Loading, Screen, SectionTitle, Tile } from './ui.tsx';
 
-function Stat({ value, label, to }: { value: string | number; label: string; to: string }) {
+/** Koyu pano kutusu: kaç pano açık, kapalı olanlar adlarıyla ve en son ne zaman görüldükleriyle */
+function ScreensTile({ screens }: { screens: ControlCenter['screens'] }) {
+  const t = tiles.ink;
+  const shown = screens.offline.slice(0, 4);
+  const more = screens.offline.length - shown.length;
   return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={() => router.push(to as never)}
-      style={({ pressed }) => ({ flex: 1, backgroundColor: pressed ? colors.primarySoft : '#fff', borderWidth: 1, borderColor: colors.border, borderRadius: 16, paddingVertical: 14, paddingHorizontal: 14, gap: 2, shadowColor: '#0f172a', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 1 })}
-    >
-      <Text style={{ fontSize: 24, fontWeight: '800', color: colors.ink, fontVariant: ['tabular-nums'] }}>{value}</Text>
-      <Text style={{ fontSize: 12, color: colors.muted }}>{label}</Text>
-    </Pressable>
+    <Tile tone="ink" icon="tv-outline" label="Panolar" value={screens.online} unit={`/${screens.total}`} caption="çevrimiçi" onPress={() => router.push('/panolar')} style={{ flex: 1 }} big>
+      <View style={{ marginTop: 14, gap: 9 }}>
+        {screens.total === 0 ? (
+          <Text style={{ fontSize: 12.5, fontWeight: '600', color: t.sub }}>Henüz pano eklenmedi</Text>
+        ) : shown.length === 0 ? (
+          <Row dot="#4ade80" name="Hepsi açık" />
+        ) : (
+          shown.map((s) => <Row key={s.id} dot="#f43f5e" name={s.name} when={s.lastSeenAt ? timeAgo(s.lastSeenAt) : 'hiç'} />)
+        )}
+        {more > 0 && <Text style={{ fontSize: 12, fontWeight: '700', color: t.sub }}>+{more} pano daha</Text>}
+      </View>
+    </Tile>
   );
 }
 
-/** Yöneticinin ana ekranı: kontrol merkezi (tasarım 7) */
+function Row({ dot, name, when }: { dot: string; name: string; when?: string }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: dot }} />
+      <Text style={{ flex: 1, fontSize: 12.5, fontWeight: '600', color: '#fff' }} numberOfLines={1}>
+        {name}
+      </Text>
+      {when ? <Text style={{ fontSize: 11, fontWeight: '600', color: tiles.ink.sub }}>{when.replace(' önce', '')}</Text> : null}
+    </View>
+  );
+}
+
+/** Yöneticinin ana ekranı: bento kontrol merkezi */
 export function ManagerHome() {
-  const { school, role, isTeacher } = useAuth();
+  const { me: account, school, role, isTeacher } = useAuth();
   const center = useControlCenter();
   const me = useMeToday();
   const c = center.data;
+  const [day, date] = homeTitle(c?.today ?? localIso());
+  const pending = c ? c.pending.announcements + c.pending.leaves : 0;
 
+  // Pano ve onay durumu kutularda; listede yalnızca kutulara sığmayan işler kalır
   const attention = c
     ? [
-        ...(c.emergency
-          ? [{ key: 'emergency', icon: 'warning' as const, tone: 'danger' as const, title: `Acil durum sürüyor: ${EMERGENCY_INFO[c.emergency.type].label}`, subtitle: `${clock(c.emergency.startedAt)} · ${c.emergency.startedBy ?? ''}`, to: '/acil' }]
-          : []),
         ...c.dutyGaps.map((g) => ({
           key: `gap-${g.dutyId}`,
           icon: 'shield-checkmark-outline' as const,
@@ -42,26 +63,6 @@ export function ManagerHome() {
           subtitle: `${g.teacherName} bugün izinli · yerine atayın`,
           to: '/nobet',
         })),
-        ...c.screens.offline.map((s) => ({
-          key: `screen-${s.id}`,
-          icon: 'tv-outline' as const,
-          tone: 'warning' as const,
-          title: `${s.name} panosu çevrimdışı`,
-          subtitle: s.lastSeenAt ? `Son görülme ${timeAgo(s.lastSeenAt)} · elektrik ya da internet kontrol edilmeli` : 'Hiç bağlanmadı',
-          to: `/pano/${s.id}`,
-        })),
-        ...(c.pending.announcements + c.pending.leaves > 0
-          ? [
-              {
-                key: 'pending',
-                icon: 'checkmark-done-outline' as const,
-                tone: 'primary' as const,
-                title: `${c.pending.announcements + c.pending.leaves} içerik onay bekliyor`,
-                subtitle: [c.pending.announcements ? `${c.pending.announcements} duyuru` : null, c.pending.leaves ? `${c.pending.leaves} izin` : null].filter(Boolean).join(' · '),
-                to: '/onaylar',
-              },
-            ]
-          : []),
         ...(c.endingToday.length
           ? [
               {
@@ -77,10 +78,9 @@ export function ManagerHome() {
       ]
     : [];
 
-
   return (
     <Screen refreshing={center.isRefetching} onRefresh={() => void center.refetch()}>
-      <HomeHeader eyebrow={school?.support ? 'Destek erişimi' : role === 'owner' ? 'Okul sahibi' : 'Yönetici'} title="Merkez" subtitle={school?.name}>
+      <HomeHeader name={account?.user.fullName} school={school?.name} role={school?.support ? 'Destek erişimi' : role === 'owner' ? 'Okul sahibi' : 'Yönetici'} title={day} titleMuted={date}>
         <NotificationsButton />
         <MenuButton />
       </HomeHeader>
@@ -89,26 +89,41 @@ export function ManagerHome() {
         <Loading />
       ) : (
         <>
-          {me.data ? <DayBanner data={me.data} /> : c.holiday ? <Banner icon="sunny-outline" title="Bugün tatil" text={c.holiday} /> : null}
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <Stat value={`${c.screens.online}/${c.screens.total}`} label="pano açık" to="/panolar" />
-            <Stat value={c.pending.announcements + c.pending.leaves} label="onay bekliyor" to="/onaylar" />
-            <Stat value={c.onAir} label="içerik yayında" to="/yayin-akisi" />
-          </View>
+          {c.emergency && (
+            <Pressable accessibilityRole="button" onPress={() => router.push('/acil')}>
+              <Banner tone="danger" icon="warning" title={`Acil durum sürüyor: ${EMERGENCY_INFO[c.emergency.type].label}`} text={[clock(c.emergency.startedAt), c.emergency.startedBy].filter(Boolean).join(' · ')} />
+            </Pressable>
+          )}
+          {me.data ? <DayBanner data={me.data} /> : c.holiday ? <Banner icon="sunny" title="Bugün tatil" text={`${c.holiday} · zil çalmıyor`} /> : null}
 
-          <SectionTitle>İlgilenmeniz gerekenler</SectionTitle>
-          <Card style={{ paddingVertical: 4 }}>
-            {attention.length ? (
-              attention.map((a, i) => (
-                <ListRow key={a.key} icon={a.icon} iconTone={a.tone} title={a.title} subtitle={a.subtitle} onPress={() => router.push(a.to as never)} last={i === attention.length - 1} />
-              ))
-            ) : (
-              <Empty icon="checkmark-circle-outline" title="Her şey yolunda" text="Boş nöbet, kapalı pano ya da bekleyen onay yok." />
-            )}
-          </Card>
+          <BentoRow>
+            <ScreensTile screens={c.screens} />
+            <View style={{ flex: 1, gap: 10 }}>
+              <Tile
+                tone={pending ? 'peach' : 'paper'}
+                icon="checkmark-done-outline"
+                label="Onay"
+                value={pending}
+                caption={pending ? [c.pending.announcements ? `${c.pending.announcements} duyuru` : null, c.pending.leaves ? `${c.pending.leaves} izin` : null].filter(Boolean).join(' · ') : 'bekleyen yok'}
+                onPress={() => router.push('/onaylar')}
+                style={{ flex: 1 }}
+              />
+              <Tile tone="mint" icon="radio-outline" label="Yayında" value={c.onAir} caption="içerik" onPress={() => router.push('/yayin-akisi')} style={{ flex: 1 }} />
+            </View>
+          </BentoRow>
 
-          {/* "Benim günüm" kartı yer kapladığı için öğretmen kaydı olan yöneticide üç hızlı ekleme; diğerleri Menü › İçerik'te */}
-          <QuickAdd max={isTeacher ? 3 : 6} />
+          {attention.length > 0 && (
+            <>
+              <SectionTitle>İlgilenmeniz gerekenler</SectionTitle>
+              <Card style={{ paddingVertical: 4 }}>
+                {attention.map((a, i) => (
+                  <ListRow key={a.key} icon={a.icon} iconTone={a.tone} title={a.title} subtitle={a.subtitle} onPress={() => router.push(a.to as never)} last={i === attention.length - 1} />
+                ))}
+              </Card>
+            </>
+          )}
+
+          <QuickAdd />
 
           {isTeacher && me.data?.teacher && (
             <>
