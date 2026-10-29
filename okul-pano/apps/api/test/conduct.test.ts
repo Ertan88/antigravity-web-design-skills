@@ -169,7 +169,8 @@ describe('gözlem', () => {
     await vi.waitFor(() => expect(sentPushes.filter((p) => p.to.includes(TOKEN))).toHaveLength(1));
     const pushed = sentPushes.filter((p) => p.to.includes(TOKEN));
     expect(pushed[0]!.message).toMatchObject({ title: 'Rehberlik uyarısı', url: '/rehberlik' });
-    expect(pushed[0]!.message.body).toMatch(/Can Demir \(9-A\) son 7 günde 2 eksi/);
+    // Kilit ekranında öğrencinin adı görünmez
+    expect(pushed[0]!.message.body).toBe('Yeni rehberlik uyarısı var.');
     expectStatus(await give(teachers[2]!), 200);
     await new Promise((r) => setTimeout(r, 100));
     expect(sentPushes.filter((p) => p.to.includes(TOKEN))).toHaveLength(1);

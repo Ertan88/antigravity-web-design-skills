@@ -134,11 +134,6 @@ export async function checkConductAlerts(deps: AppDeps, school: { id: string; se
   for (const m of minus) byStudent.set(m.studentId, [...(byStudent.get(m.studentId) ?? []), m]);
   const hit = [...byStudent].filter(([, ls]) => ls.reduce((t, l) => t + l.n, 0) >= rule.minus);
   if (!hit.length) return 0;
-  const names = await deps.db
-    .select({ id: students.id, fullName: students.fullName, className: classGroups.name })
-    .from(students)
-    .leftJoin(classGroups, eq(classGroups.id, students.classGroupId))
-    .where(inArray(students.id, hit.map(([id]) => id)));
   const recipients = await alertRecipients(deps, school.id);
   for (const [studentId, labels] of hit) {
     const count = labels.reduce((t, l) => t + l.n, 0);
@@ -147,13 +142,13 @@ export async function checkConductAlerts(deps: AppDeps, school: { id: string; se
       .map((l) => (l.n > 1 ? `${l.label} ×${l.n}` : l.label))
       .join(', ');
     await deps.db.insert(conductAlerts).values({ schoolId: school.id, studentId, minusCount: count, windowDays: rule.days, summary });
-    const st = names.find((n) => n.id === studentId);
-    notifyUsers(deps, recipients, {
-      title: 'Rehberlik uyarısı',
-      body: `${st?.fullName ?? 'Bir öğrenci'}${st?.className ? ` (${st.className})` : ''} son ${rule.days} günde ${count} eksi aldı.`,
-      url: '/rehberlik',
-    });
   }
+  // Bildirim kilit ekranında görünür: öğrencinin adı ve ayrıntılar yazılmaz, yalnızca uygulamada görülür
+  notifyUsers(deps, recipients, {
+    title: 'Rehberlik uyarısı',
+    body: hit.length > 1 ? `${hit.length} yeni rehberlik uyarısı var.` : 'Yeni rehberlik uyarısı var.',
+    url: '/rehberlik',
+  });
   return hit.length;
 }
 
