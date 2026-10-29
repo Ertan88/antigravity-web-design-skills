@@ -1,14 +1,14 @@
 import type { Permission } from '@okulpano/shared/permissions';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Platform, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 import { Text } from '../../src/text.tsx';
 import { useAuth, type AppRole } from '../../src/auth.tsx';
 import { useInbox, useMyLeaves } from '../../src/data.ts';
-import { initials, useOpenSchool } from '../../src/platform.tsx';
+import { useOpenSchool } from '../../src/platform.tsx';
 import { registerForPush } from '../../src/push.ts';
-import { colors } from '../../src/theme.ts';
-import { Badge, Button, Card, Chip, ListRow, Screen, SectionTitle, T, type IconName } from '../../src/ui.tsx';
+import { colors, radius, tiles, type TileTone } from '../../src/theme.ts';
+import { Avatar, Badge, BentoRow, Card, Chip, Icon, ListRow, Screen, SectionTitle, T, type IconName } from '../../src/ui.tsx';
 
 interface Item {
   title: string;
@@ -42,6 +42,76 @@ const CONTENT: { tur: string; title: string; subtitle: string; icon: IconName; p
   { tur: 'exams', title: 'Sınav sayacı', subtitle: 'Sınav ekle ve düzenle', icon: 'school-outline', permission: 'exams.manage' },
   { tur: 'books', title: 'Haftanın kitabı', subtitle: 'Kapağı kamerayla çek', icon: 'book-outline', permission: 'highlights.manage' },
 ];
+
+const TILE_CYCLE: TileTone[] = ['sky', 'peach', 'mint', 'lilac', 'sun', 'rose'];
+
+/** Koyu profil kutusu: renkli baş harf rozeti, ad, e-posta, rol hapları ve okul; dokununca profil bilgileri */
+function ProfileTile({ name, email, school, badges }: { name: string; email: string; school?: string | null; badges: string[] }) {
+  const t = tiles.ink;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${name}, profil bilgilerim`}
+      onPress={() => router.push('/hesap/profil')}
+      style={({ pressed }) => ({ backgroundColor: t.bg, borderRadius: radius.xl, padding: 18, gap: 16, opacity: pressed ? 0.92 : 1 })}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+        <Avatar name={name} size={58} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ fontSize: 20, fontWeight: '800', letterSpacing: -0.5, color: '#fff' }} numberOfLines={1}>
+            {name}
+          </Text>
+          <Text style={{ fontSize: 13, fontWeight: '500', color: t.sub, marginTop: 2 }} numberOfLines={1}>
+            {email}
+          </Text>
+        </View>
+        <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: t.chip, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="arrow-forward" size={16} color="#fff" />
+        </View>
+      </View>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+        {badges.map((b, i) => (
+          <View key={b} style={{ backgroundColor: i === 0 ? '#fde68a' : t.chip, borderRadius: radius.pill, paddingHorizontal: 11, paddingVertical: 5 }}>
+            <Text style={{ fontSize: 12, fontWeight: '800', color: i === 0 ? '#713f12' : '#fff' }}>{b}</Text>
+          </View>
+        ))}
+        {school ? (
+          <Text style={{ flexShrink: 1, fontSize: 12.5, fontWeight: '600', color: t.sub, marginLeft: 4 }} numberOfLines={1}>
+            {school}
+          </Text>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
+
+/** Menünün öne çıkan bölümündeki renkli kutu: simge, başlık ve kısa açıklama */
+function MenuTile({ item, tone }: { item: Item; tone: TileTone }) {
+  const t = tiles[tone];
+  const onPress = item.onPress ?? (item.to ? () => router.push(item.to as never) : undefined);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={[item.title, item.subtitle].filter(Boolean).join(', ')}
+      onPress={onPress}
+      style={({ pressed }) => ({ flex: 1, backgroundColor: t.bg, borderRadius: radius.lg, padding: 14, minHeight: 124, gap: 12, opacity: pressed ? 0.88 : 1, transform: [{ scale: pressed ? 0.985 : 1 }] })}
+    >
+      <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: t.chip, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name={item.icon} size={20} color={t.fg} />
+      </View>
+      <View style={{ gap: 3 }}>
+        <Text style={{ fontSize: 15, lineHeight: 19, fontWeight: '800', letterSpacing: -0.3, color: t.fg }} numberOfLines={2}>
+          {item.title}
+        </Text>
+        {item.subtitle ? (
+          <Text style={{ fontSize: 12, lineHeight: 16, fontWeight: '600', color: t.sub }} numberOfLines={2}>
+            {item.subtitle}
+          </Text>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
 
 /**
  * Menü: role göre bölümler (okul yönetimi, içerik, öğretmen araçları, okul) ve herkes için Hesabım
@@ -208,31 +278,21 @@ export default function Menu() {
 
   const schoolChoices = role === 'platform' ? [] : (me?.schools ?? []);
 
+  // Rolün ilk bölümü renkli kutular hâlinde (en sık kullanılanlar; tek kalan kutu tam genişlikte), geri kalanı liste
+  const [featured, ...rest] = sections;
+
   return (
     <Screen title="Menü" back={role !== 'teacher'}>
-      <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16 }}>{initials(me?.user.fullName ?? '')}</Text>
-        </View>
-        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <T size={17} weight="800" lines={1}>
-            {me?.user.fullName}
-          </T>
-          <T size={13} color={colors.muted} lines={1}>
-            {me?.user.email}
-          </T>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-            <Badge tone={role === 'platform' ? 'primary' : 'muted'}>{ROLE_LABEL[role]}</Badge>
-            {isTeacher && role !== 'teacher' && role !== 'platform' && <Badge tone="muted">Öğretmen</Badge>}
-            {school?.support && role !== 'platform' && <Badge tone="warning">Destek erişimi</Badge>}
-          </View>
-          {role !== 'platform' && school && (
-            <T size={12} color={colors.muted} lines={1}>
-              {school.name}
-            </T>
-          )}
-        </View>
-      </Card>
+      <ProfileTile
+        name={me?.user.fullName ?? ''}
+        email={me?.user.email ?? ''}
+        school={role !== 'platform' ? school?.name : null}
+        badges={[
+          ROLE_LABEL[role],
+          ...(isTeacher && role !== 'teacher' && role !== 'platform' ? ['Öğretmen'] : []),
+          ...(school?.support && role !== 'platform' ? ['Destek erişimi'] : []),
+        ]}
+      />
 
       {schoolChoices.length > 1 && (
         <>
@@ -245,7 +305,20 @@ export default function Menu() {
         </>
       )}
 
-      {sections.map((s) => (
+      {featured && featured !== sections[sections.length - 1] && (
+        <View style={{ gap: 10 }}>
+          <SectionTitle>{featured.title}</SectionTitle>
+          {Array.from({ length: Math.ceil(featured.items.length / 2) }, (_, r) => featured.items.slice(r * 2, r * 2 + 2)).map((row, r) => (
+            <BentoRow key={r}>
+              {row.map((it, j) => (
+                <MenuTile key={it.title} item={it} tone={TILE_CYCLE[(r * 2 + j) % TILE_CYCLE.length]} />
+              ))}
+            </BentoRow>
+          ))}
+        </View>
+      )}
+
+      {(featured === sections[sections.length - 1] ? sections : rest).map((s) => (
         <View key={s.title} style={{ gap: 6 }}>
           <SectionTitle>{s.title}</SectionTitle>
           <Card style={{ paddingVertical: 4, gap: 0 }}>
@@ -271,9 +344,14 @@ export default function Menu() {
         </T>
       )}
 
-      <Button variant="secondary" icon="log-out-outline" onPress={() => void signOut()} style={{ borderColor: '#f5c2c2' }}>
-        Çıkış yap
-      </Button>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void signOut()}
+        style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 54, borderRadius: radius.pill, backgroundColor: pressed ? '#fecdd3' : colors.dangerSoft, marginTop: 4 })}
+      >
+        <Icon name="log-out-outline" size={20} color={colors.danger} />
+        <Text style={{ fontSize: 15.5, fontWeight: '800', color: colors.danger }}>Çıkış yap</Text>
+      </Pressable>
     </Screen>
   );
 }
