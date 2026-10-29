@@ -21,7 +21,7 @@ function SchoolSwitcher() {
       <SchoolBadge name={school?.name ?? ''} logo={school?.logoUrl ?? null} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-semibold text-ink">{school?.name ?? 'Okul seçin'}</div>
-        <div className="text-xs text-slate-500">{me.schools.length > 1 ? `${me.schools.length} okul` : school ? (school.support ? 'Destek erişimi' : roleLabel(school.role)) : ''}</div>
+        <div className="text-xs text-slate-500">{me.schools.length > 1 ? `${me.schools.length} okul` : school ? (school.support ? 'Destek erişimi' : roleLabel(school)) : ''}</div>
       </div>
     </>
   );
@@ -57,7 +57,7 @@ function SchoolBadge({ name, logo }: { name: string; logo: string | null }) {
   );
 }
 
-const roleLabel = (r: string) => ({ owner: 'Okul sahibi', admin: 'Yönetici', editor: 'Editör' })[r] ?? r;
+const roleLabel = (s: { role: string; teacherId?: string | null }) => ({ owner: 'Okul sahibi', admin: 'Yönetici', editor: s.teacherId ? 'Öğretmen' : 'Editör' })[s.role] ?? s.role;
 
 const initials = (name: string | undefined) =>
   (name ?? '')

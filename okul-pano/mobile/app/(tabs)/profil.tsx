@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
 import { Text } from '../../src/text.tsx';
-import { useAuth, type AppRole } from '../../src/auth.tsx';
+import { membershipLabel, useAuth, type AppRole } from '../../src/auth.tsx';
 import { useInbox, useMyLeaves } from '../../src/data.ts';
 import { useOpenSchool } from '../../src/platform.tsx';
 import { registerForPush } from '../../src/push.ts';
@@ -135,10 +135,10 @@ export default function Menu() {
     const own = me?.schools.filter((s) => !s.support) ?? [];
     const support = me?.schools.filter((s) => s.support) ?? [];
     sections.push({
-      title: 'Okulum · süper kullanıcı',
+      title: 'Okullarım',
       items: [
         ...own.map(
-          (s): Item => ({ title: s.name, subtitle: 'Okulumu aç · her şey açık', icon: 'swap-horizontal-outline', onPress: () => void openSchool(s.id) }),
+          (s): Item => ({ title: s.name, subtitle: `${membershipLabel(s)} görünümüne geç`, icon: 'swap-horizontal-outline', onPress: () => void openSchool(s.id) }),
         ),
         {
           title: 'Destek erişimi olan okullar',
@@ -353,7 +353,7 @@ export default function Menu() {
 
       {role === 'platform' && (
         <T size={12} color={colors.muted} style={{ textAlign: 'center' }}>
-          Kendi okulunuzda her şey açık. Diğer okullara yalnızca müdürün onayladığı süreli destek erişimiyle girersiniz.
+          Üyesi olduğunuz okullarda üyeliğinizdeki rolle çalışırsınız. Diğer okullara yalnızca müdürün onayladığı süreli destek erişimiyle girersiniz.
         </T>
       )}
 

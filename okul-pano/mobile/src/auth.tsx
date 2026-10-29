@@ -35,7 +35,7 @@ const CONTENT_PERMISSIONS: Permission[] = ['announcements.manage', 'highlights.m
  * Uygulamadaki rol: menüler buna göre kurulur.
  * - platform: platform yöneticisinin kendi görünümü (okullar, abonelikler, MEB takvimi)
  * - owner: okul sahibi (müdür) · admin: yönetici · editor: verilen yetkiler · teacher: öğretmen
- * Platform yöneticisi kendi okulunda okul sahibidir (her şey açık); "Okulumu aç" ile o görünüme geçer.
+ * Platform yöneticisi üyesi olduğu okulda üyeliğindeki rolle (okul sahibi, öğretmen…) çalışır; o görünüme geçebilir.
  */
 export type AppRole = 'platform' | 'owner' | 'admin' | 'editor' | 'teacher';
 
@@ -150,6 +150,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [status, me, schoolId, server, platformMode, loadMe, qc]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+/** Okuldaki üyelik rolü: "Okul sahibi", "Öğretmen"… (platform yöneticisinin okul görünümüne geçişinde) */
+export function membershipLabel(s: SchoolAccess): string {
+  if (s.role === 'owner') return 'Okul sahibi';
+  if (s.role === 'admin') return 'Yönetici';
+  return s.teacherId ? 'Öğretmen' : 'Editör';
 }
 
 export function useAuth(): AuthValue {

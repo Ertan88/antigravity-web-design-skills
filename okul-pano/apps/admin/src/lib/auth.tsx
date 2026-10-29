@@ -11,6 +11,8 @@ export interface SchoolAccess {
   isActive: boolean;
   role: Role;
   permissions: Permission[];
+  /** Bağlı öğretmen kaydı */
+  teacherId?: string | null;
   /** Üyelik yok, okulun verdiği süreli destek erişimi (platform yöneticisi) */
   support?: boolean;
 }

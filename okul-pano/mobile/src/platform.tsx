@@ -4,14 +4,14 @@ import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import { Text } from './text.tsx';
 import { api } from './api.ts';
-import { useAuth } from './auth.tsx';
+import { membershipLabel, useAuth } from './auth.tsx';
 import { useAcademicCalendars, usePlatformSchools, useSignups } from './data.ts';
 import { fullDate, homeTitle, localIso, timeAgo } from './day.ts';
 import { colors } from './theme.ts';
 import { Badge, BentoRow, Button, Card, Empty, ErrorNote, HomeHeader, ListRow, Loading, Screen, SectionTitle, T, Tile } from './ui.tsx';
 import { MenuButton } from './quick.tsx';
 
-/** Kendi okuluna (süper kullanıcı) ya da destek erişimi süren bir okula geçer */
+/** Üyesi olduğu okula (üyelik rolüyle) ya da destek erişimi süren bir okula geçer */
 export function useOpenSchool() {
   const { selectSchool, setPlatformMode } = useAuth();
   return async (id: string) => {
@@ -29,6 +29,10 @@ export function PlatformHome() {
   const calendars = useAcademicCalendars();
   const openSchool = useOpenSchool();
   const qc = useQueryClient();
+  const membership = (id: string) => {
+    const access = me?.schools.find((s) => s.id === id);
+    return access ? membershipLabel(access) : 'Okul';
+  };
   const approve = useMutation({
     mutationFn: (id: string) => api(`/api/platform/signups/${id}/approve`, { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['platform'] }),
@@ -83,14 +87,14 @@ export function PlatformHome() {
 
           {own.length > 0 && (
             <>
-              <SectionTitle>Okulum · süper kullanıcı</SectionTitle>
+              <SectionTitle>Okullarım</SectionTitle>
               <Card style={{ paddingVertical: 4 }}>
                 {own.map((s, i) => (
                   <ListRow
                     key={s.id}
                     icon="swap-horizontal-outline"
                     title={s.name}
-                    subtitle="Okulumu aç · her şey açık"
+                    subtitle={`${membership(s.id)} görünümüne geç`}
                     onPress={() => void openSchool(s.id)}
                     last={i === own.length - 1}
                   />
