@@ -9,6 +9,7 @@ import {
   PlusJakartaSans_800ExtraBold,
   useFonts,
 } from '@expo-google-fonts/plus-jakarta-sans';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, Platform, StyleSheet, View } from 'react-native';
@@ -19,10 +20,13 @@ import { registerForPush } from '../src/push.ts';
 import { colors } from '../src/theme.ts';
 import { ThemeProvider, useThemeMode } from '../src/themeMode.tsx';
 
-/** Açılış ekranı en az bu kadar görünür; ilerleme çubuğu bu sürede dolar */
-const SPLASH_MIN_MS = 2400;
+/** Açılış ekranı en az bu kadar görünür (logo bir an görünsün); ilerleme çubuğu bu sürede dolar */
+const SPLASH_MIN_MS = 900;
 /** İlk ekranın verisi bundan uzun sürerse açılış ekranı yine kapanır */
-const SPLASH_MAX_MS = 8000;
+const SPLASH_MAX_MS = 4000;
+
+// Sistemin açılış ekranı yazı tipleri yüklenene kadar kalır: marka ekranı ilk karede doğru yazı tipiyle çizilir
+void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 /**
  * Açılış ekranı: marka renginde logo, yazı logosu, slogan ve ilerleme çubuğu. Sistemin açılış ekranından
@@ -37,8 +41,8 @@ function BrandSplash({ finishing, onHidden }: { finishing: boolean; onHidden: ()
   useEffect(() => {
     if (!finishing) return;
     Animated.sequence([
-      Animated.timing(fill, { toValue: 1, duration: 250, useNativeDriver: false }),
-      Animated.timing(opacity, { toValue: 0, duration: 250, useNativeDriver: false }),
+      Animated.timing(fill, { toValue: 1, duration: 180, useNativeDriver: false }),
+      Animated.timing(opacity, { toValue: 0, duration: 200, useNativeDriver: false }),
     ]).start(() => onHidden());
   }, [finishing, fill, opacity, onHidden]);
   return (
@@ -47,10 +51,14 @@ function BrandSplash({ finishing, onHidden }: { finishing: boolean; onHidden: ()
     >
       <StatusBar style="light" />
       <Image source={require('../assets/splash-icon.png')} style={{ width: 150, height: 150 }} accessibilityIgnoresInvertColors />
-      <Text style={{ marginTop: 12, fontSize: 38, fontWeight: '800', letterSpacing: -1, color: '#FFFFFF' }}>
+      <Text style={{ marginTop: 14, fontSize: 44, lineHeight: 50, fontWeight: '800', letterSpacing: -1.6, color: '#FFFFFF' }}>
         okul<Text style={{ color: '#F5B83D' }}>yayın</Text>
       </Text>
-      <Text style={{ marginTop: 10, fontSize: 17, fontWeight: '600', color: '#FFFFFF', opacity: 0.9, textAlign: 'center' }}>
+      <Text
+        style={{ marginTop: 8, alignSelf: 'stretch', fontSize: 17, fontWeight: '600', color: '#FFFFFF', opacity: 0.9, textAlign: 'center' }}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+      >
         Okulunuzun Her Anı, Tek Ekranda
       </Text>
       <Text style={{ marginTop: 28, fontSize: 14, color: '#FFFFFF', opacity: 0.75 }}>Yükleniyor…</Text>
@@ -92,6 +100,9 @@ function Gate({ fontsReady }: { fontsReady: boolean }) {
       clearTimeout(b);
     };
   }, []);
+  useEffect(() => {
+    if (fontsReady) void SplashScreen.hideAsync().catch(() => undefined);
+  }, [fontsReady]);
   const splashFinishing = status !== 'loading' && fontsReady && minDone && (fetching === 0 || maxDone);
   const hideSplash = useRef(() => setSplashHidden(true)).current;
 
@@ -132,7 +143,12 @@ function Gate({ fontsReady }: { fontsReady: boolean }) {
           <Stack.Screen name="izin" options={{ presentation: 'modal' }} />
         </Stack>
       )}
-      {!splashHidden && <BrandSplash finishing={splashFinishing} onHidden={hideSplash} />}
+      {!splashHidden &&
+        (fontsReady ? (
+          <BrandSplash finishing={splashFinishing} onHidden={hideSplash} />
+        ) : (
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: '#0E5E66' }]} />
+        ))}
     </View>
   );
 }
