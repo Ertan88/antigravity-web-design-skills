@@ -28,11 +28,23 @@ interface Member {
   invitePending: boolean;
 }
 
-const GRANTABLE = PERMISSION_KEYS.filter((p) => !ADMIN_ONLY_PERMISSIONS.includes(p));
-const ROLE_INFO: Record<'admin' | 'editor', { title: string; text: string }> = {
+// Rehber öğretmen ayrı bir rol olarak seçilir (editör + bütün gözlem kayıtlarını görme yetkisi)
+const GRANTABLE = PERMISSION_KEYS.filter((p) => !ADMIN_ONLY_PERMISSIONS.includes(p) && p !== 'conduct.counsel');
+type FormRole = 'admin' | 'editor' | 'counselor';
+const ROLE_INFO: Record<FormRole, { title: string; text: string }> = {
   admin: { title: 'Yönetici', text: 'Tüm bölümleri düzenler, kullanıcı ekler ve yetki verir.' },
   editor: { title: 'Editör', text: 'Yalnızca aşağıda seçtiğiniz bölümleri düzenleyebilir.' },
+  counselor: { title: 'Rehber öğretmen', text: 'Bütün öğrencilerin gözlem kayıtlarını ve ayın öğrencisi önerilerini görür; ayrıca seçtiğiniz bölümleri düzenler.' },
 };
+
+/** Üyenin paneldeki rol adı: rehber öğretmen yetkisi olan editör "Rehber öğretmen" görünür */
+const formRole = (m: { role: string; permissions: string[] }): FormRole =>
+  m.role === 'admin' ? 'admin' : m.permissions.includes('conduct.counsel') ? 'counselor' : 'editor';
+/** Formdaki rol API'deki role ve yetkilere çevrilir */
+const apiRole = (role: FormRole, permissions: Permission[]) =>
+  role === 'admin'
+    ? { role: 'admin' as const, permissions }
+    : { role: 'editor' as const, permissions: [...permissions.filter((p) => p !== 'conduct.counsel'), ...(role === 'counselor' ? (['conduct.counsel'] as Permission[]) : [])] };
 
 function tempPassword() {
   const alphabet = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -40,7 +52,7 @@ function tempPassword() {
   return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('');
 }
 
-type Form = { email: string; fullName: string; password: string; invite: boolean; role: 'admin' | 'editor'; permissions: Permission[]; teacherId: string };
+type Form = { email: string; fullName: string; password: string; invite: boolean; role: FormRole; permissions: Permission[]; teacherId: string };
 
 /** Kullanıcının bağlı olduğu öğretmen kaydı (mobil uygulama: "Bugün" ve "Nöbetlerim") */
 function TeacherSelect({ value, onChange, teachers, id }: { value: string; onChange: (v: string) => void; teachers: Teacher[]; id?: string }) {
@@ -60,10 +72,10 @@ function RoleAndPermissions({ form }: { form: ReturnType<typeof useForm<Form>> }
   const { values: v, set } = form;
   // Yönetici atama okul sahibinde (müdür); yönetici yalnızca editör ekler
   const { school } = useAuth();
-  const roles = school?.role === 'owner' ? (['editor', 'admin'] as const) : (['editor'] as const);
+  const roles = school?.role === 'owner' ? (['editor', 'counselor', 'admin'] as const) : (['editor', 'counselor'] as const);
   return (
     <>
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid gap-2 sm:grid-cols-3">
         {roles.map((r) => (
           <button
             key={r}
@@ -79,7 +91,7 @@ function RoleAndPermissions({ form }: { form: ReturnType<typeof useForm<Form>> }
           </button>
         ))}
       </div>
-      {v.role === 'editor' && (
+      {v.role !== 'admin' && (
         <div>
           <div className="mb-2 text-sm font-medium text-slate-700">Düzenleyebileceği bölümler</div>
           <div className="grid gap-1.5 sm:grid-cols-2">
@@ -149,7 +161,7 @@ export function Users() {
     setMode('add');
   };
   const openEdit = (m: Member) => {
-    form.reset({ email: m.email, fullName: m.fullName, password: '', invite: false, role: m.role === 'admin' ? 'admin' : 'editor', permissions: m.permissions as Permission[], teacherId: m.teacherId ?? '' });
+    form.reset({ email: m.email, fullName: m.fullName, password: '', invite: false, role: formRole(m), permissions: (m.permissions as Permission[]).filter((p) => p !== 'conduct.counsel'), teacherId: m.teacherId ?? '' });
     setMode(m);
   };
 
@@ -162,8 +174,7 @@ export function Users() {
           fullName: v.fullName,
           password: v.invite ? undefined : v.password || undefined,
           invite: v.invite,
-          role: v.role,
-          permissions: v.permissions,
+          ...apiRole(v.role, v.permissions),
           teacherId: v.teacherId || null,
         });
         if (!payload) return;
@@ -179,7 +190,7 @@ export function Users() {
           toast.success(`${v.fullName} eklendi`);
         }
       } else if (mode) {
-        const payload = form.validate(updateMemberSchema, { role: v.role, permissions: v.permissions });
+        const payload = form.validate(updateMemberSchema, apiRole(v.role, v.permissions));
         if (!payload) return;
         await save.mutateAsync({ id: mode.id, body: payload });
         toast.success('Yetkiler güncellendi');
@@ -218,7 +229,9 @@ export function Users() {
                     <div className="text-slate-500">{m.email}</div>
                   </Td>
                   <Td>
-                    <Badge tone={m.role === 'editor' ? 'slate' : 'blue'}>{{ owner: 'Okul sahibi', admin: 'Yönetici', editor: 'Editör' }[m.role]}</Badge>
+                    <Badge tone={m.role === 'editor' ? (formRole(m) === 'counselor' ? 'green' : 'slate') : 'blue'}>
+                      {m.role === 'owner' ? 'Okul sahibi' : ROLE_INFO[formRole(m)].title}
+                    </Badge>
                   </Td>
                   <Td className="max-w-md">
                     {m.role === 'editor' ? (

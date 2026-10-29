@@ -70,6 +70,8 @@ export interface TeacherOption {
 }
 export interface ClassGroup extends Base {
   name: string;
+  /** Gözlem düzeyi; boşsa sınıf adından anlaşılır */
+  level: 'primary' | 'middle' | 'high' | null;
   sortOrder: number;
 }
 export interface Duty extends Base {
@@ -89,6 +91,8 @@ export interface Leave extends Base {
   approvalStatus: 'approved' | 'pending' | 'rejected';
 }
 export interface Student extends Base {
+  /** Okul numarası: okul içinde benzersiz */
+  schoolNo: string;
   fullName: string;
   classGroupId: string | null;
   birthDate: string;

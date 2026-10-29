@@ -35,6 +35,9 @@ const Teachers = page(() => import('./pages/Teachers.tsx'), 'Teachers');
 const Ticker = page(() => import('./pages/Ticker.tsx'), 'Ticker');
 const Timetable = page(() => import('./pages/Timetable.tsx'), 'Timetable');
 const Users = page(() => import('./pages/Users.tsx'), 'Users');
+const ConductStudents = page(() => import('./pages/Conduct.tsx'), 'ConductStudents');
+const MonthStudent = page(() => import('./pages/Conduct.tsx'), 'MonthStudent');
+const ConductCriteria = page(() => import('./pages/Conduct.tsx'), 'ConductCriteria');
 
 function Guard({ permission, children }: { permission: Permission; children: ReactNode }) {
   const { can } = useAuth();
@@ -104,6 +107,9 @@ export function App() {
         <Route path="tasimali" element={<Navigate to="/nobet?bolum=tasimali" replace />} />
         <Route path="izinler" element={needsSchool(<Guard permission="leaves.manage"><Leaves /></Guard>)} />
         <Route path="ogrenciler" element={needsSchool(<Guard permission="students.manage"><Students /></Guard>)} />
+        <Route path="gozlem" element={needsSchool(<Guard permission="conduct.counsel"><ConductStudents /></Guard>)} />
+        <Route path="ayin-ogrencisi" element={needsSchool(<Guard permission="conduct.counsel"><MonthStudent /></Guard>)} />
+        <Route path="gozlem-kriterleri" element={needsSchool(<Guard permission="conduct.manage"><ConductCriteria /></Guard>)} />
         <Route path="zil-saatleri" element={needsSchool(<Guard permission="schedule.manage"><BellSchedules /></Guard>)} />
         <Route path="ders-programi" element={needsSchool(<Guard permission="schedule.manage"><Timetable /></Guard>)} />
         <Route path="ogretmenler" element={needsSchool(<Guard permission="directory.manage"><Teachers /></Guard>)} />

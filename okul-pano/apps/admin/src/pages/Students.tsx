@@ -12,9 +12,10 @@ import { useAuth } from '../lib/auth.tsx';
 import { nameMap, useList, useSchool, useSchoolPath, type ClassGroup, type Student } from '../lib/data.ts';
 import { formatDate } from '../lib/format.ts';
 
-type Form = { fullName: string; classGroupId: string; birthDate: string };
+type Form = { schoolNo: string; fullName: string; classGroupId: string; birthDate: string };
 
 interface ParsedRow {
+  schoolNo: string;
   fullName: string;
   className: string | null;
   birthDate: string;
@@ -25,7 +26,8 @@ const CLASS = /^(\d{1,2}\s*[-/]?\s*[A-ZÇĞİÖŞÜa-zçğıöşü]{1,2}|anasın
 
 /**
  * Excel'den, Google E-Tablolar'dan ya da e-Okul listesinden kopyalanan satırları çözer.
- * Sütun sırası serbesttir: tarih ve sınıf biçimlerinden tanınır, kalan metin ad soyad kabul edilir.
+ * Sütun sırası serbesttir: tarih ve sınıf biçimlerinden, okul numarası satırdaki ilk sayıdan tanınır,
+ * kalan metin ad soyad kabul edilir.
  */
 function parseRows(text: string): { rows: ParsedRow[]; skipped: number } {
   const rows: ParsedRow[] = [];
@@ -35,6 +37,7 @@ function parseRows(text: string): { rows: ParsedRow[]; skipped: number } {
     const cells = (line.includes('\t') ? line.split('\t') : line.includes(';') ? line.split(';') : line.split(',')).map((c) => c.trim());
     let birthDate: string | null = null;
     let className: string | null = null;
+    let schoolNo: string | null = null;
     const nameParts: string[] = [];
     for (const cell of cells) {
       const d = DATE.exec(cell);
@@ -42,12 +45,14 @@ function parseRows(text: string): { rows: ParsedRow[]; skipped: number } {
         birthDate = d[4] ? `${d[4]}-${d[5]}-${d[6]}` : `${d[3]}-${d[2]!.padStart(2, '0')}-${d[1]!.padStart(2, '0')}`;
       } else if (CLASS.test(cell) && !className) {
         className = normalizeClassName(cell);
-      } else if (cell && !/^\d+$/.test(cell)) {
+      } else if (/^\d+$/.test(cell)) {
+        schoolNo ??= cell;
+      } else if (cell) {
         nameParts.push(cell);
       }
     }
     const fullName = nameParts.join(' ').replace(/\s+/g, ' ').trim();
-    if (birthDate && fullName.length >= 2) rows.push({ fullName, className, birthDate });
+    if (birthDate && schoolNo && fullName.length >= 2) rows.push({ schoolNo, fullName, className, birthDate });
     else skipped++;
   }
   return { rows, skipped };
@@ -55,12 +60,12 @@ function parseRows(text: string): { rows: ParsedRow[]; skipped: number } {
 
 function studentImportMessage(res: { created: number; updated: number; classesCreated: number }): string {
   const parts = [`${res.created} öğrenci eklendi`];
-  if (res.updated) parts.push(`${res.updated} öğrencinin sınıfı güncellendi`);
+  if (res.updated) parts.push(`${res.updated} öğrencinin bilgileri güncellendi`);
   if (res.classesCreated) parts.push(`${res.classesCreated} yeni sınıf oluşturuldu`);
   return parts.join(', ');
 }
 
-type ExcelRow = { fullName: string; className: string | null; birthDate: string };
+type ExcelRow = { schoolNo: string; fullName: string; className: string | null; birthDate: string };
 
 function ExcelImport({ file, onClose }: { file: File | null; onClose: () => void }) {
   const basePath = useSchoolPath('students');
@@ -72,13 +77,14 @@ function ExcelImport({ file, onClose }: { file: File | null; onClose: () => void
       invalidate={['students', 'classes']}
       initialOptions={{ updateExisting: true }}
       columns={[
+        { header: 'Okul no', cell: (r) => <span className="font-semibold tabular-nums">{r.schoolNo}</span> },
         { header: 'Ad soyad', cell: (r) => <span className="font-medium whitespace-nowrap text-ink">{r.fullName}</span> },
         { header: 'Sınıf', cell: (r) => r.className ?? '—' },
         { header: 'Doğum tarihi', cell: (r) => <span className="whitespace-nowrap">{formatDate(r.birthDate)}</span> },
       ]}
       stats={(p) => [
         { label: 'Yeni öğrenci', value: p.totals.new, tone: 'green' },
-        { label: 'Sınıfı değişecek', value: p.totals.update, tone: 'blue' },
+        { label: 'Güncellenecek', value: p.totals.update, tone: 'blue' },
         { label: 'Değişiklik yok', value: p.totals.unchanged, tone: 'slate' },
         { label: 'Atlanacak satır', value: p.totals.skipped, tone: p.totals.skipped ? 'amber' : 'slate' },
       ]}
@@ -88,8 +94,8 @@ function ExcelImport({ file, onClose }: { file: File | null; onClose: () => void
           <Toggle
             checked={o.updateExisting}
             onChange={(v) => set({ updateExisting: v })}
-            label="Kayıtlı öğrencilerin sınıfını güncelle"
-            description="Yeni dönemde sınıf atlayan öğrenciler için açık bırakın. Öğrenci, ad soyad ve doğum tarihiyle tanınır."
+            label="Kayıtlı öğrencilerin bilgilerini güncelle"
+            description="Yeni dönemde sınıf atlayan öğrenciler için açık bırakın. Öğrenci okul numarasıyla tanınır; adı, sınıfı ve doğum tarihi dosyadakiyle güncellenir."
           />
         )
       }
@@ -98,7 +104,7 @@ function ExcelImport({ file, onClose }: { file: File | null; onClose: () => void
       commitLabel={(n) => `${n} öğrenciyi kaydet`}
       commitBody={(p, o) => ({
         updateExisting: o.updateExisting,
-        rows: p.rows.map(({ fullName, className, birthDate }) => ({ fullName, className, birthDate })),
+        rows: p.rows.map(({ schoolNo, fullName, className, birthDate }) => ({ schoolNo, fullName, className, birthDate })),
       })}
       successMessage={studentImportMessage}
     />
@@ -158,11 +164,11 @@ function ImportModal({ open, onClose }: { open: boolean; onClose: () => void }) 
           onChange={(e) => setText(e.target.value)}
           rows={8}
           className="font-mono text-xs"
-          placeholder={'Ayşe Yılmaz\t9-A\t14.03.2010\nMehmet Demir\t9-B\t02.11.2009'}
+          placeholder={'1203\tAyşe Yılmaz\t9-A\t14.03.2010\n1207\tMehmet Demir\t9-B\t02.11.2009'}
           aria-label="Öğrenci listesi"
         />
         <p className="text-xs text-slate-500">
-          Her satırda ad soyad, sınıf (9-A) ve doğum tarihi (GG.AA.YYYY) bulunmalı; sütun sırası önemli değil. Okul numarası gibi sayısal sütunlar yok sayılır.
+          Her satırda okul numarası, ad soyad, sınıf (9-A) ve doğum tarihi (GG.AA.YYYY) bulunmalı; sütun sırası önemli değil. Satırdaki ilk sayı okul numarası kabul edilir.
         </p>
         {text && (
           <div className="rounded-xl ring-1 ring-slate-200">
@@ -173,7 +179,10 @@ function ImportModal({ open, onClose }: { open: boolean; onClose: () => void }) 
             <ul className="divide-y divide-slate-100 text-sm">
               {parsed.rows.slice(0, 5).map((r, i) => (
                 <li key={i} className="flex justify-between gap-3 px-4 py-2">
-                  <span className="font-medium">{r.fullName}</span>
+                  <span className="font-medium">
+                    <span className="mr-2 text-slate-400 tabular-nums">{r.schoolNo}</span>
+                    {r.fullName}
+                  </span>
                   <span className="text-slate-500">
                     {r.className ?? 'sınıfsız'} · {formatDate(r.birthDate)}
                   </span>
@@ -266,10 +275,10 @@ export function Students() {
       <CrudPage<Student, Form>
         resource="students"
         label="Öğrenci"
-        title="Doğum Günleri"
+        title="Öğrenciler"
         description={
           <>
-            Doğum günü olan öğrenciler o gün panoda kutlanır. Gizlilik için varsayılan olarak soyadın yalnızca baş harfi gösterilir (Ayşe Y.); bunu Okul Ayarları'ndan değiştirebilirsiniz.
+            Okul numarası her öğrenci için zorunludur ve okul içinde benzersizdir; gözlem kayıtları ve Excel aktarımı bu numarayla eşleşir. Doğum günü olan öğrenciler o gün panoda kutlanır. Gizlilik için varsayılan olarak soyadın yalnızca baş harfi gösterilir (Ayşe Y.); bunu Okul Ayarları'ndan değiştirebilirsiniz.
             {hidden && <span className="mt-1 block font-medium text-amber-700">Doğum günü alanı şu an pano düzeninde yok (Panolar › Pano düzeni).</span>}
           </>
         }
@@ -303,7 +312,7 @@ export function Students() {
           <div className="flex flex-wrap items-center gap-4">
             <div className="relative w-full max-w-xs">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ad ya da sınıf ara" className="pl-9" aria-label="Öğrenci ara" />
+              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ad, okul no ya da sınıf ara" className="pl-9" aria-label="Öğrenci ara" />
             </div>
             <Toggle checked={onlyToday} onChange={setOnlyToday} label="Yalnızca bugün doğanlar" />
           </div>
@@ -312,10 +321,11 @@ export function Students() {
           rows.filter(
             (r) =>
               (!onlyToday || r.birthDate.slice(5) === todayMd) &&
-              (!needle || `${r.fullName} ${classNames.get(r.classGroupId ?? '') ?? ''}`.toLocaleLowerCase('tr-TR').includes(needle)),
+              (!needle || `${r.schoolNo} ${r.fullName} ${classNames.get(r.classGroupId ?? '') ?? ''}`.toLocaleLowerCase('tr-TR').includes(needle)),
           )
         }
         columns={[
+          { header: 'Okul no', cell: (r) => <span className="font-semibold text-slate-600 tabular-nums">{r.schoolNo}</span> },
           {
             header: 'Ad soyad',
             cell: (r) => (
@@ -332,14 +342,19 @@ export function Students() {
           { header: 'Sınıf', cell: (r) => <span className="text-slate-600">{classNames.get(r.classGroupId ?? '') ?? '—'}</span> },
           { header: 'Doğum tarihi', cell: (r) => <span className="whitespace-nowrap text-slate-600">{formatDate(r.birthDate)}</span> },
         ]}
-        emptyForm={() => ({ fullName: '', classGroupId: '', birthDate: '' })}
-        toForm={(r) => ({ fullName: r.fullName, classGroupId: r.classGroupId ?? '', birthDate: r.birthDate })}
-        toPayload={(f) => ({ fullName: f.fullName, classGroupId: f.classGroupId || null, birthDate: f.birthDate })}
+        emptyForm={() => ({ schoolNo: '', fullName: '', classGroupId: '', birthDate: '' })}
+        toForm={(r) => ({ schoolNo: r.schoolNo, fullName: r.fullName, classGroupId: r.classGroupId ?? '', birthDate: r.birthDate })}
+        toPayload={(f) => ({ schoolNo: f.schoolNo, fullName: f.fullName, classGroupId: f.classGroupId || null, birthDate: f.birthDate })}
         renderForm={({ values: v, set, errors }) => (
           <>
-            <Field label="Ad soyad" error={errors.fullName}>
-              {(id) => <Input id={id} value={v.fullName} onChange={(e) => set('fullName', e.target.value)} invalid={Boolean(errors.fullName)} />}
-            </Field>
+            <div className="grid gap-4 sm:grid-cols-[140px_1fr]">
+              <Field label="Okul no" error={errors.schoolNo}>
+                {(id) => <Input id={id} value={v.schoolNo} inputMode="numeric" onChange={(e) => set('schoolNo', e.target.value)} invalid={Boolean(errors.schoolNo)} />}
+              </Field>
+              <Field label="Ad soyad" error={errors.fullName}>
+                {(id) => <Input id={id} value={v.fullName} onChange={(e) => set('fullName', e.target.value)} invalid={Boolean(errors.fullName)} />}
+              </Field>
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Sınıf" error={errors.classGroupId}>
                 {(id) => (
