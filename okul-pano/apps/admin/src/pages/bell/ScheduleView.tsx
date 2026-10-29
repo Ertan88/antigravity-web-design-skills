@@ -481,7 +481,7 @@ export function ScheduleView({
             <button
               type="button"
               onClick={onEdit}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-900/85 dark:bg-brand-600 dark:hover:bg-brand-500"
+              className="flex flex-1 items-center justify-center gap-2 rounded-full bg-brand-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-500"
             >
               <Pencil className="size-4" /> Çizelgeyi düzenle
             </button>

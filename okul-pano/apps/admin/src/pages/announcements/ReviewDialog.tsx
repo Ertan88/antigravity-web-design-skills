@@ -28,7 +28,7 @@ export function AnnouncementPreview({ row }: { row: Announcement }) {
         </div>
       )}
       {src && (
-        <div className="bg-slate-800 px-4 py-3 text-white">
+        <div className="bg-stone-800 px-4 py-3 text-white">
           <div className="font-semibold">{row.title}</div>
           {row.body && <div className="text-sm opacity-80">{row.body}</div>}
         </div>

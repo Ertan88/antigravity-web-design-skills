@@ -96,7 +96,7 @@ function ViewTabs({
           onClick={() => onView(t.value)}
           className={clsx(
             'flex flex-1 items-center gap-2.5 rounded-xl px-3.5 py-2 text-left transition sm:flex-none',
-            view === t.value ? 'bg-slate-900 text-white shadow-sm dark:bg-brand-600' : 'text-slate-600 hover:bg-slate-50',
+            view === t.value ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50',
           )}
         >
           <t.icon className={clsx('size-4 shrink-0', view === t.value ? 'text-brand-300' : 'text-slate-400')} />

@@ -78,7 +78,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const school = useSchool();
   const settings = school.data?.settings;
   return (
-    <div className="relative flex h-full flex-col overflow-hidden border-r border-slate-200 bg-slate-50 text-slate-600">
+    <div className="relative flex h-full flex-col overflow-hidden border-r border-slate-200 bg-slate-50 text-slate-600 dark:bg-[#161412]">
 
       <div className="relative flex items-center gap-2.5 px-5 pt-5 pb-4">
         <BrandMark className="size-9 shrink-0 drop-shadow-sm" />
@@ -176,7 +176,7 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
   const { pathname } = useLocation();
   const nav = findNav(pathname);
   return (
-    <header className="border-b border-slate-200/70 bg-slate-50/80 backdrop-blur-xl">
+    <header className="border-b border-slate-200/70 bg-slate-50/80 backdrop-blur-xl dark:bg-[#161412]/80">
       <div className="mx-auto flex h-14 w-full max-w-[1680px] items-center gap-3 px-4 sm:px-6 lg:h-16 lg:px-8">
         <button type="button" aria-label="Menüyü aç" className="-ml-1 rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 lg:hidden" onClick={onMenu}>
           <Menu className="size-5" />

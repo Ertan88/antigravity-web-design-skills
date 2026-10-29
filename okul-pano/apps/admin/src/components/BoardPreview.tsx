@@ -38,7 +38,7 @@ export function BoardPreview({ screenId, compact = false, portrait = false }: { 
         {src ? (
           <iframe key={src} src={src} title="Pano önizlemesi" className="absolute inset-0 size-full border-0" allow="autoplay" />
         ) : (
-          <div className="absolute inset-0 animate-pulse bg-slate-800" />
+          <div className="absolute inset-0 animate-pulse bg-stone-800" />
         )}
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">

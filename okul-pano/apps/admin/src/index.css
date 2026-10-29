@@ -59,30 +59,33 @@
  */
 .dark {
   color-scheme: dark;
-  --color-surface: #1a1816;
+  /* Kartlar zeminden belirgin biçimde açık, kenarlıklar görünür */
+  --color-surface: #1f1d1a;
   --color-ink: #f5f3ef;
 
-  --color-slate-50: #0f0e0d;
-  --color-slate-100: #211f1c;
-  --color-slate-200: #2e2b27;
-  --color-slate-300: #3f3a35;
-  --color-slate-400: #78716c;
-  --color-slate-500: #a8a29e;
-  --color-slate-600: #c7c2bc;
-  --color-slate-700: #e0dcd6;
-  --color-slate-800: #efece8;
-  --color-slate-900: #f5f3ef;
+  --color-slate-50: #0c0b0a;
+  --color-slate-100: #2a2723;
+  --color-slate-200: #3a3631;
+  --color-slate-300: #4d4740;
+  --color-slate-400: #8a837b;
+  --color-slate-500: #b0a9a1;
+  --color-slate-600: #cdc8c1;
+  --color-slate-700: #e3dfd9;
+  --color-slate-800: #f0ede9;
 
-  /* Mürekkep düğmeler koyu temada sıcak gri olur (üstündeki beyaz yazı okunur) */
-  --color-brand-50: rgb(255 255 255 / 0.06);
-  --color-brand-100: rgb(255 255 255 / 0.1);
-  --color-brand-200: rgb(255 255 255 / 0.16);
-  --color-brand-300: #78716c;
-  --color-brand-400: #a8a29e;
-  --color-brand-500: #57534e;
-  --color-brand-600: #44403c;
-  --color-brand-700: #e7e5e4;
-  --color-brand-800: #f5f5f4;
+  /*
+   * Mürekkep rengi koyu temada tersine döner: birincil düğme ve seçili menü açık krem zemin + koyu yazı
+   * (bkz. aşağıdaki .dark .bg-brand-* kuralı), mürekkep renkli bağlantılar açık krem.
+   */
+  --color-brand-50: rgb(255 255 255 / 0.07);
+  --color-brand-100: rgb(255 255 255 / 0.12);
+  --color-brand-200: rgb(255 255 255 / 0.2);
+  --color-brand-300: #8a837b;
+  --color-brand-400: #b0a9a1;
+  --color-brand-500: #d6d1ca;
+  --color-brand-600: #ece9e4;
+  --color-brand-700: #ece9e4;
+  --color-brand-800: #f5f3ef;
   --color-brand-900: #fafaf9;
 
   /* Pastel kutular koyu temada koyu zeminli, açık yazılı */
@@ -142,6 +145,12 @@
   --color-rose-100: rgb(244 63 94 / 0.2);
   --color-rose-200: rgb(244 63 94 / 0.3);
   --color-rose-700: #fda4af;
+}
+
+/* Koyu temada açık krem mürekkep zeminin üstündeki "beyaz" yazı koyu olur (sayfalara ayrı sınıf gerekmez) */
+.dark :is(.bg-brand-500, .bg-brand-600, .bg-brand-700):is(.text-white, [class*='text-white/']),
+.dark :is(.bg-brand-500, .bg-brand-600, .bg-brand-700) :is(.text-white, [class*='text-white/']) {
+  color: #1c1917;
 }
 
 @layer base {
