@@ -405,7 +405,7 @@ function EntrySheet({
           onPress={() => void save()}
           style={{ marginTop: 12, height: 50, borderRadius: 25, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', opacity: !pick || busy ? 0.45 : 1 }}
         >
-          <Text style={{ color: colors.onPrimary, fontSize: 15.5, fontWeight: '800' }}>{pick ? `Kaydet · ${signed(pick.points)}` : 'Kriter seçin'}</Text>
+          <Text style={{ color: colors.onPrimary, fontSize: 15.5, fontWeight: '800' }}>{pick ? 'Kaydet' : 'Kriter seçin'}</Text>
         </Pressable>
       </ScrollView>
     </Sheet>

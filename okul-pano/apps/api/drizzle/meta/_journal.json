@@ -176,6 +176,13 @@
       "when": 1794200000000,
       "tag": "0024_conduct_alerts",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1794300000000,
+      "tag": "0025_conduct_other",
+      "breakpoints": true
     }
   ]
 }

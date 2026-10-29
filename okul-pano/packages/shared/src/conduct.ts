@@ -41,7 +41,13 @@ export interface ConductTemplateItem {
 }
 
 const plus = (group: ConductGroup, label: string, points = 1): ConductTemplateItem => ({ group, label, points, noteRequired: false });
-const minus = (group: ConductGroup, label: string, points = -1): ConductTemplateItem => ({ group, label, points, noteRequired: true });
+const minus = (group: ConductGroup, label: string, points = -1): ConductTemplateItem => ({ group, label, points, noteRequired: false });
+/** Listede olmayan durumlar için: ne olduğu notla yazılır */
+export const CONDUCT_OTHER_LABEL = 'Diğer';
+const other = (group: ConductGroup): ConductTemplateItem[] => [
+  { group, label: CONDUCT_OTHER_LABEL, points: 1, noteRequired: true },
+  { group, label: CONDUCT_OTHER_LABEL, points: -1, noteRequired: true },
+];
 
 /** Başlangıç şablonları (okul "Hazır şablonu yükle" ile ekler, sonra istediği gibi değiştirir) */
 export const CONDUCT_TEMPLATES: Record<SchoolLevel, ConductTemplateItem[]> = {
@@ -51,11 +57,13 @@ export const CONDUCT_TEMPLATES: Record<SchoolLevel, ConductTemplateItem[]> = {
     plus('academic', 'Kitap okudu / ek çalışma', 2),
     minus('academic', 'Ödevini getirmedi'),
     minus('academic', 'Ders araç-gereci yok'),
+    ...other('academic'),
     plus('behavior', 'Arkadaşına yardım etti', 2),
     plus('behavior', 'Kurallara uydu'),
     plus('behavior', 'Temiz ve düzenli'),
     minus('behavior', 'Arkadaşını rahatsız etti'),
     minus('behavior', 'Söz almadan konuştu'),
+    ...other('behavior'),
     plus('social', 'Etkinliğe katıldı', 2),
   ],
   middle: [
@@ -65,11 +73,13 @@ export const CONDUCT_TEMPLATES: Record<SchoolLevel, ConductTemplateItem[]> = {
     plus('academic', 'Proje / ek çalışma', 2),
     minus('academic', 'Ödev yapılmadı'),
     minus('academic', 'Materyal yok'),
+    ...other('academic'),
     plus('behavior', 'Arkadaşına yardım', 2),
     plus('behavior', 'Saygılı tutum'),
     plus('behavior', 'Sınıf düzenine katkı'),
     minus('behavior', 'Dersi bölme'),
     minus('behavior', 'Kurala uymama', -2),
+    ...other('behavior'),
     plus('social', 'Kulüp / etkinlik katkısı', 2),
     plus('social', 'Gönüllü görev'),
   ],
@@ -80,11 +90,13 @@ export const CONDUCT_TEMPLATES: Record<SchoolLevel, ConductTemplateItem[]> = {
     plus('academic', 'Proje / araştırma', 2),
     minus('academic', 'Ödev yok'),
     minus('academic', 'Materyal yok'),
+    ...other('academic'),
     plus('behavior', 'Arkadaşına yardım', 2),
     plus('behavior', 'Saygılı'),
     minus('behavior', 'Dersi bölme'),
     minus('behavior', 'Kurala uymama', -2),
     minus('behavior', 'Derse geç kalma'),
+    ...other('behavior'),
     plus('social', 'Kulüp / etkinlik katkısı', 2),
     plus('social', 'Gönüllülük'),
   ],

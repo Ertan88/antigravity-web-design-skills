@@ -61,8 +61,13 @@ describe('gözlem', () => {
     expect((await teachers[0]!.post(`${base}/conduct/criteria/template`, { level: 'middle' })).statusCode).toBe(403);
     const criteria = (await teachers[0]!.get(`${base}/conduct/criteria?level=high`)).json() as { id: string; label: string; points: number; noteRequired: boolean }[];
     plusId = criteria.find((c) => c.label === 'Derse katılım')!.id;
-    minusId = criteria.find((c) => c.points < 0 && c.noteRequired)!.id;
+    minusId = criteria.find((c) => c.points < 0 && c.label === 'Diğer')!.id;
     expect((await owner.get(`${base}/conduct/criteria?level=middle`)).json()).toEqual([]);
+    // Eksilerde not zorunlu değil; listede olmayan durumlar için akademik ve davranışta "Diğer" (artı / eksi, not zorunlu)
+    expect(criteria.filter((c) => c.points < 0 && c.label !== 'Diğer').every((c) => !c.noteRequired)).toBe(true);
+    const others = criteria.filter((c) => c.label === 'Diğer');
+    expect(others).toHaveLength(4);
+    expect(others.every((c) => c.noteRequired)).toBe(true);
   });
 
   it('sınıfın düzeyi adından anlaşılır; hızlı giriş ekranı okul numarası sırasıyla gelir', async () => {

@@ -209,10 +209,11 @@ function StudentCard({ studentId, month, criteria, onClose, readOnly }: { studen
               <div className="mt-3 flex gap-2">
                 <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={picked.noteRequired ? 'Not (zorunlu)' : 'Not (isteğe bağlı)'} maxLength={200} />
                 <Button loading={give.isPending} disabled={picked.noteRequired && !note.trim()} onClick={() => give.mutate()}>
-                  Kaydet {signed(picked.points)}
+                  Kaydet
                 </Button>
               </div>
             )}
+            {picked?.noteRequired && !note.trim() && <div className="mt-2 text-xs font-semibold text-rose-600">"{picked.label}" için kısa bir not yazın.</div>}
           </div>
           )}
 

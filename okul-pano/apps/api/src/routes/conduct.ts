@@ -232,16 +232,18 @@ export async function conductRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
-  /** Hazır şablonu yükle: düzeyin şablonundaki kriterlerden okulda aynı adla olmayanlar eklenir */
+  /** Hazır şablonu yükle: düzeyin şablonundaki kriterlerden okulda olmayanlar eklenir */
   app.post(`${base}/criteria/template`, manage, async (req) => {
     const { level } = parse(z.object({ level: z.enum(SCHOOL_LEVEL_KEYS as [SchoolLevel, ...SchoolLevel[]]) }), req.body);
     const current = await db
-      .select({ label: conductCriteria.label, sortOrder: conductCriteria.sortOrder })
+      .select({ group: conductCriteria.group, label: conductCriteria.label, points: conductCriteria.points, sortOrder: conductCriteria.sortOrder })
       .from(conductCriteria)
       .where(and(eq(conductCriteria.schoolId, req.ctx.schoolId), eq(conductCriteria.level, level)));
-    const have = new Set(current.map((c) => normalizeName(c.label)));
+    // "Diğer" her grupta artı ve eksi olarak bulunur; aynı ad grup ve yönle birlikte ayırt edilir
+    const key = (c: { group: string; label: string; points: number }) => `${c.group}|${Math.sign(c.points)}|${normalizeName(c.label)}`;
+    const have = new Set(current.map(key));
     let order = Math.max(0, ...current.map((c) => c.sortOrder));
-    const add = CONDUCT_TEMPLATES[level].filter((t) => !have.has(normalizeName(t.label)));
+    const add = CONDUCT_TEMPLATES[level].filter((t) => !have.has(key(t)));
     if (add.length) {
       await db.insert(conductCriteria).values(add.map((t) => ({ ...t, level, schoolId: req.ctx.schoolId, sortOrder: ++order })));
       await audit(req, 'create', 'Gözlem kriteri', null, `Hazır şablondan ${add.length} kriter eklendi`);
@@ -443,7 +445,7 @@ export async function conductRoutes(app: FastifyInstance) {
       .orderBy(desc(conductEntries.createdAt));
     const byLabel = new Map<string, { label: string; group: string; points: number; count: number }>();
     for (const e of entries) {
-      const k = `${e.label}|${Math.sign(e.points)}`;
+      const k = `${e.group}|${e.label}|${Math.sign(e.points)}`;
       const cur = byLabel.get(k) ?? { label: e.label, group: e.group, points: 0, count: 0 };
       cur.points += e.points;
       cur.count++;
