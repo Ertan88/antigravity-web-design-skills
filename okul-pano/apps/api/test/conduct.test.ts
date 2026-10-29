@@ -1,5 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { conductEntries } from '../src/db/schema.ts';
+import { sentPushes } from '../src/lib/push.ts';
 import { runConductRetention } from '../src/routes/conduct.ts';
 import { client, createTestApp, expectStatus, login, SUPER, type TestCtx } from './helpers.ts';
 
@@ -13,7 +14,7 @@ let classId: string;
 const ids: Record<string, string> = {};
 
 beforeAll(async () => {
-  t = await createTestApp();
+  t = await createTestApp({ PUSH_URL: 'memory' });
   const root = client(t.app, (await login(t.app, SUPER.email, SUPER.password)).token);
   const res = await root.post('/api/platform/schools', { name: 'Gözlem Lisesi', slug: 'gozlem-lisesi', ownerEmail: 'mudur@gozlem.test', ownerName: 'Müdür Bey', ownerPassword: 'MudurSifre42' });
   expectStatus(res, 201);
@@ -136,6 +137,63 @@ describe('gözlem', () => {
     // Seçimi geri almak panodaki başarıyı da kaldırır
     expectStatus(await owner.del(`${base}/conduct/awards/${after.awards[0].id}`), 200);
     expect(((await owner.get(`${base}/achievements`)).json() as { id: string }[]).some((a) => a.id === award.json().achievementId)).toBe(false);
+  });
+
+  it('dönem göstergesi: bantlar, yalnızca kendi kayıtlarım, Excel', async () => {
+    const r = (await teachers[0]!.get(`${base}/conduct/report?classId=${classId}`)).json();
+    expect(r.class.name).toBe('9-A');
+    const band = (x: { class: { students: { fullName: string; band: string }[] } }) => Object.fromEntries(x.class.students.map((s) => [s.fullName, s.band]));
+    expect(band(r)).toEqual({ 'Can Demir': 'low', 'Ada Yılmaz': 'high', 'Ela Kaya': 'mid' });
+    expect(r.class.counts).toEqual({ high: 1, mid: 1, low: 1, none: 0 });
+    expect(r.class.students.find((s: { fullName: string }) => s.fullName === 'Can Demir')).toMatchObject({ minus: 1, topMinus: expect.any(String) });
+    // Kişi adları göstergede yer almaz
+    expect(JSON.stringify(r)).not.toMatch(/Öğretmen \d/);
+    const mine = (await teachers[0]!.get(`${base}/conduct/report?classId=${classId}&mine=1`)).json();
+    expect(band(mine)).toEqual({ 'Can Demir': 'low', 'Ada Yılmaz': 'high', 'Ela Kaya': 'none' });
+    const other = (await teachers[0]!.get(`${base}/conduct/report?classId=${classId}&term=${r.term === 1 ? 2 : 1}`)).json();
+    expect(other.class.counts.none).toBe(3);
+    const xlsx = await teachers[0]!.get(`${base}/conduct/report.xlsx`);
+    expectStatus(xlsx, 200);
+    expect(xlsx.headers['content-type']).toMatch(/spreadsheetml/);
+    expect((await plain.get(`${base}/conduct/report?classId=${classId}`)).statusCode).toBe(403);
+  });
+
+  it('rehberlik uyarısı: eşik aşılınca rehbere sessizce bildirilir, görüşülene kadar tekrar açılmaz', async () => {
+    const TOKEN = 'ExponentPushToken[rehber-telefonu]';
+    expectStatus(await counselor.post('/api/me/push-tokens', { token: TOKEN, platform: 'android' }), 204);
+    expectStatus(await owner.patch(base, { settings: { conductAlert: { enabled: true, days: 7, minus: 2 } } }), 200);
+    const minus = (await teachers[1]!.get(`${base}/conduct/criteria?level=high`)).json().find((c: { points: number; noteRequired: boolean }) => c.points < 0 && !c.noteRequired)
+      ?? { id: minusId, noteRequired: true };
+    const give = (who: ReturnType<typeof client>) => who.post(`${base}/conduct/entries`, { studentIds: [ids['Can Demir']], criterionId: minus.id, note: 'Gözlem notu' });
+    expectStatus(await give(teachers[1]!), 200);
+    await vi.waitFor(() => expect(sentPushes.filter((p) => p.to.includes(TOKEN))).toHaveLength(1));
+    const pushed = sentPushes.filter((p) => p.to.includes(TOKEN));
+    expect(pushed[0]!.message).toMatchObject({ title: 'Rehberlik uyarısı', url: '/rehberlik' });
+    expect(pushed[0]!.message.body).toMatch(/Can Demir \(9-A\) son 7 günde 2 eksi/);
+    expectStatus(await give(teachers[2]!), 200);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(sentPushes.filter((p) => p.to.includes(TOKEN))).toHaveLength(1);
+
+    // Öğretmenler uyarıları göremez
+    expect((await teachers[0]!.get(`${base}/conduct/alerts`)).statusCode).toBe(403);
+    const list = (await counselor.get(`${base}/conduct/alerts`)).json();
+    expect(list.open).toBe(1);
+    expect(list.alerts[0]).toMatchObject({ minusCount: 2, windowDays: 7, student: { fullName: 'Can Demir', className: '9-A', schoolNo: '2' } });
+    expect((await teachers[0]!.post(`${base}/conduct/alerts/${list.alerts[0].id}/resolve`, {})).statusCode).toBe(403);
+    expectStatus(await counselor.post(`${base}/conduct/alerts/${list.alerts[0].id}/resolve`, { note: 'Öğrenciyle görüşüldü' }), 200);
+    expect((await counselor.post(`${base}/conduct/alerts/${list.alerts[0].id}/resolve`, {})).statusCode).toBe(404);
+    const done = (await owner.get(`${base}/conduct/alerts?status=resolved`)).json();
+    expect(done.open).toBe(0);
+    expect(done.alerts[0]).toMatchObject({ note: 'Öğrenciyle görüşüldü', resolvedByName: 'Rehber Hanım' });
+
+    // Görüşüldükten sonra eşik yeniden aşılırsa yeni uyarı açılır; kapalıyken açılmaz
+    expectStatus(await give(teachers[0]!), 200);
+    expect((await counselor.get(`${base}/conduct/alerts`)).json().open).toBe(1);
+    expectStatus(await owner.patch(base, { settings: { conductAlert: { enabled: false, days: 7, minus: 2 } } }), 200);
+    const open = (await counselor.get(`${base}/conduct/alerts`)).json().alerts[0];
+    expectStatus(await counselor.post(`${base}/conduct/alerts/${open.id}/resolve`, {}), 200);
+    expectStatus(await give(teachers[0]!), 200);
+    expect((await counselor.get(`${base}/conduct/alerts`)).json().open).toBe(0);
   });
 
   it('okul numarası okul içinde benzersiz', async () => {

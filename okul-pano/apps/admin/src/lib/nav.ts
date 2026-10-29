@@ -6,6 +6,8 @@ import {
   CalendarRange,
   CalendarDays,
   ClipboardCheck,
+  Gauge,
+  HeartHandshake,
   ListChecks,
   Star,
   GraduationCap,
@@ -67,6 +69,8 @@ export const NAV: NavGroup[] = [
     items: [
       { to: '/gozlem', label: 'Öğrenci Gözlemleri', icon: ClipboardCheck, permission: 'conduct.counsel' },
       { to: '/ayin-ogrencisi', label: 'Ayın Öğrencisi', icon: Star, permission: 'conduct.counsel' },
+      { to: '/donem-gostergesi', label: 'Dönem Göstergesi', icon: Gauge, permission: 'conduct.counsel' },
+      { to: '/rehberlik', label: 'Rehberlik Uyarıları', icon: HeartHandshake, permission: 'conduct.counsel' },
       { to: '/gozlem-kriterleri', label: 'Gözlem Kriterleri', icon: ListChecks, permission: 'conduct.manage' },
     ],
   },

@@ -5,7 +5,15 @@ import {
   CONDUCT_TEACHER_CAP,
   CONDUCT_TEMPLATES,
   classLevel,
+  CONDUCT_BANDS,
+  conductAlertResolveSchema,
   conductAwardSchema,
+  conductBands,
+  conductTermRange,
+  resolveTerm2Start,
+  schoolSettingsSchema,
+  zonedParts,
+  type ConductTerm,
   conductCriterionSchema,
   conductEntrySchema,
   levelFromClassName,
@@ -22,8 +30,10 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { audit, schoolGuard, UUID_RE, type AppDeps } from '../context.ts';
-import { achievements, classGroups, conductAwards, conductCriteria, conductEntries, schools, students, users } from '../db/schema.ts';
+import { academicCalendars, achievements, classGroups, conductAlerts, conductAwards, conductCriteria, conductEntries, memberships, schools, students, users } from '../db/schema.ts';
 import { badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
+import { newWorkbook, sendXlsx, styleHeader, toBuffer, exportFileName } from '../lib/excel.ts';
+import { notifyUsers, usersWithPermission } from '../lib/push.ts';
 
 /*
  * Gözlem: öğretmenler öğrencilere kriterlere göre artı / eksi verir. Okuldaki bütün öğretmenler (öğretmen kaydına
@@ -84,6 +94,78 @@ async function schoolClasses(deps: AppDeps, schoolId: string) {
   }
   const fallback = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'high';
   return rows.map((r) => ({ ...r, resolvedLevel: classLevel(r, fallback), levelSet: Boolean(r.level) }));
+}
+
+/** Kaydı kimin girdiğini, rehberlik uyarılarını ve görüşme notlarını görebilir mi: idare ve rehber öğretmen */
+const canSeeDetails = (req: FastifyRequest) =>
+  !req.ctx.isSupport && (req.ctx.permissions.includes('conduct.manage') || req.ctx.permissions.includes('conduct.counsel'));
+
+/** Rehberlik uyarısını alacaklar: rehber öğretmenler; okulda rehber yoksa idare */
+async function alertRecipients(deps: AppDeps, schoolId: string): Promise<string[]> {
+  const rows = await deps.db
+    .select({ userId: memberships.userId, role: memberships.role, permissions: memberships.permissions })
+    .from(memberships)
+    .where(eq(memberships.schoolId, schoolId));
+  const counselors = rows.filter((r) => r.role === 'editor' && r.permissions.includes('conduct.counsel')).map((r) => r.userId);
+  return counselors.length ? counselors : usersWithPermission(deps, schoolId, 'conduct.manage');
+}
+
+/**
+ * Eksi girildikten sonra: okulun eşiğini (ör. 7 günde 3 eksi) aşan ve açık uyarısı olmayan öğrenciler için uyarı açılır
+ * ve rehber öğretmene bildirilir. Öğrenci, veli ve öğretmenler bu uyarıyı görmez.
+ */
+export async function checkConductAlerts(deps: AppDeps, school: { id: string; settings: unknown }, studentIds: string[]) {
+  const rule = schoolSettingsSchema.parse(school.settings ?? {}).conductAlert;
+  if (!rule.enabled || !studentIds.length) return 0;
+  const open = await deps.db
+    .select({ studentId: conductAlerts.studentId })
+    .from(conductAlerts)
+    .where(and(eq(conductAlerts.schoolId, school.id), inArray(conductAlerts.studentId, studentIds), sql`${conductAlerts.resolvedAt} is null`));
+  const skip = new Set(open.map((o) => o.studentId));
+  const ids = studentIds.filter((id) => !skip.has(id));
+  if (!ids.length) return 0;
+  const since = new Date(Date.now() - rule.days * 86400_000);
+  const minus = await deps.db
+    .select({ studentId: conductEntries.studentId, label: conductEntries.label, n: sql<number>`count(*)::int` })
+    .from(conductEntries)
+    .where(and(eq(conductEntries.schoolId, school.id), inArray(conductEntries.studentId, ids), lt(conductEntries.points, 0), gte(conductEntries.createdAt, since)))
+    .groupBy(conductEntries.studentId, conductEntries.label);
+  const byStudent = new Map<string, { label: string; n: number }[]>();
+  for (const m of minus) byStudent.set(m.studentId, [...(byStudent.get(m.studentId) ?? []), m]);
+  const hit = [...byStudent].filter(([, ls]) => ls.reduce((t, l) => t + l.n, 0) >= rule.minus);
+  if (!hit.length) return 0;
+  const names = await deps.db
+    .select({ id: students.id, fullName: students.fullName, className: classGroups.name })
+    .from(students)
+    .leftJoin(classGroups, eq(classGroups.id, students.classGroupId))
+    .where(inArray(students.id, hit.map(([id]) => id)));
+  const recipients = await alertRecipients(deps, school.id);
+  for (const [studentId, labels] of hit) {
+    const count = labels.reduce((t, l) => t + l.n, 0);
+    const summary = labels
+      .sort((a, b) => b.n - a.n)
+      .map((l) => (l.n > 1 ? `${l.label} ×${l.n}` : l.label))
+      .join(', ');
+    await deps.db.insert(conductAlerts).values({ schoolId: school.id, studentId, minusCount: count, windowDays: rule.days, summary });
+    const st = names.find((n) => n.id === studentId);
+    notifyUsers(deps, recipients, {
+      title: 'Rehberlik uyarısı',
+      body: `${st?.fullName ?? 'Bir öğrenci'}${st?.className ? ` (${st.className})` : ''} son ${rule.days} günde ${count} eksi aldı.`,
+      url: '/rehberlik',
+    });
+  }
+  return hit.length;
+}
+
+/** Okulun ikinci dönem başlangıcı: ayar > MEB takvimi (okul takibi açıksa) > 1 Şubat */
+async function term2StartFor(deps: AppDeps, settings: unknown, startYear: number) {
+  const s = schoolSettingsSchema.parse(settings ?? {});
+  let meb: string | null = null;
+  if (!s.conductTerm2Start && s.followMebCalendar) {
+    const [cal] = await deps.db.select({ data: academicCalendars.data }).from(academicCalendars).where(eq(academicCalendars.startYear, startYear));
+    meb = cal?.data.term2Start ?? null;
+  }
+  return resolveTerm2Start(startYear, s.conductTerm2Start, meb);
 }
 
 async function userName(deps: AppDeps, userId: string) {
@@ -298,6 +380,7 @@ export async function conductRoutes(app: FastifyInstance) {
       batchId,
       found.length === 1 ? `${found[0]!.fullName}: ${sign}${criterion.points} ${criterion.label}` : `${found.length} öğrenciye ${sign}${criterion.points} ${criterion.label}`,
     );
+    if (criterion.points < 0) await checkConductAlerts(deps, req.ctx.school, ids);
     return { batchId, count: found.length, label: criterion.label, points: criterion.points, names: found.map((s) => s.fullName) };
   });
 
@@ -373,7 +456,7 @@ export async function conductRoutes(app: FastifyInstance) {
     }
     const plus = entries.filter((e) => e.points > 0);
     const minus = entries.filter((e) => e.points < 0);
-    const canSeeAuthors = req.ctx.permissions.includes('conduct.manage') || req.ctx.permissions.includes('conduct.counsel');
+    const canSeeAuthors = canSeeDetails(req);
     return {
       month,
       student,
@@ -393,6 +476,157 @@ export async function conductRoutes(app: FastifyInstance) {
         return { ...e, userName: canSeeAuthors || mine ? e.userName : null, mine };
       }),
     };
+  });
+
+  /* ---------- Dönem göstergesi ---------- */
+
+  /** Dönemin sınıf sınıf göstergesi; `mine`: yalnızca isteyenin kendi kayıtları */
+  async function termReport(req: FastifyRequest, classIds: string[] | null) {
+    const q = parse(
+      z.object({ term: z.enum(['1', '2']).optional(), year: z.coerce.number().int().min(2020).max(2100).optional(), mine: z.enum(['1', '0']).optional() }),
+      req.query ?? {},
+    );
+    const tz = req.ctx.school.timezone;
+    const today = zonedParts(new Date(), tz).isoDate;
+    const startYear = q.year ?? academicYearOf(today);
+    const term2Start = await term2StartFor(deps, req.ctx.school.settings, startYear);
+    const term: ConductTerm = q.term ? (Number(q.term) as ConductTerm) : startYear === academicYearOf(today) && today >= term2Start ? 2 : 1;
+    const range = conductTermRange(startYear, term, term2Start);
+    const mine = q.mine === '1';
+    const classes = (await schoolClasses(deps, req.ctx.schoolId)).filter((c) => !classIds || classIds.includes(c.id));
+    if (!classes.length) throw notFound('Sınıf bulunamadı.');
+    const list = await db
+      .select({ id: students.id, schoolNo: students.schoolNo, fullName: students.fullName, classGroupId: students.classGroupId })
+      .from(students)
+      .where(and(eq(students.schoolId, req.ctx.schoolId), inArray(students.classGroupId, classes.map((c) => c.id))));
+    const where = [
+      eq(conductEntries.schoolId, req.ctx.schoolId),
+      inArray(conductEntries.studentId, list.length ? list.map((s) => s.id) : [randomUUID()]),
+      gte(conductEntries.createdAt, sql`(${range.from}::timestamp AT TIME ZONE ${tz})`),
+      lt(conductEntries.createdAt, sql`(${range.to}::timestamp AT TIME ZONE ${tz})`),
+    ];
+    if (mine) where.push(eq(conductEntries.userId, req.ctx.userId));
+    const entries = await db
+      .select({
+        studentId: conductEntries.studentId,
+        userId: conductEntries.userId,
+        userName: conductEntries.userName,
+        points: conductEntries.points,
+        label: conductEntries.label,
+        month: sql<string>`to_char(${conductEntries.createdAt} AT TIME ZONE ${tz}, 'YYYY-MM')`,
+      })
+      .from(conductEntries)
+      .where(and(...where));
+    const lite = entries.map((e) => ({ studentId: e.studentId, by: e.userId ?? e.userName, points: e.points, label: e.label, month: e.month }));
+    const noOrder = (a: string, b: string) => (/^\d+$/.test(a) && /^\d+$/.test(b) ? Number(a) - Number(b) : trCompare(a, b));
+    return {
+      startYear,
+      term,
+      term2Start,
+      range,
+      mine,
+      classes: classes.map((c) => {
+        const own = list.filter((s) => s.classGroupId === c.id).sort((a, b) => noOrder(a.schoolNo, b.schoolNo));
+        const rows = new Map(conductBands(own.map((s) => s.id), lite, { single: mine }).map((r) => [r.studentId, r]));
+        const studentsOut = own.map(({ classGroupId: _c, ...s }) => ({ ...s, ...rows.get(s.id)! }));
+        const counts = { high: 0, mid: 0, low: 0, none: 0 };
+        for (const r of studentsOut) counts[r.band]++;
+        return { id: c.id, name: c.name, counts, entries: lite.filter((e) => rows.has(e.studentId)).length, students: studentsOut };
+      }),
+    };
+  }
+
+  app.get(`${base}/report`, member, async (req) => {
+    requireRecorder(req);
+    const classId = (req.query as { classId?: string }).classId;
+    if (!classId || !UUID_RE.test(classId)) throw badRequest('Sınıf seçin.');
+    const r = await termReport(req, [classId]);
+    const { classes, ...rest } = r;
+    return { ...rest, class: classes[0]! };
+  });
+
+  /** Excel: seçilen sınıf ya da bütün sınıflar (her sınıf ayrı sayfa) */
+  app.get(`${base}/report.xlsx`, member, async (req, reply) => {
+    requireRecorder(req);
+    const classId = (req.query as { classId?: string }).classId;
+    if (classId && !UUID_RE.test(classId)) throw badRequest('Geçersiz sınıf');
+    const r = await termReport(req, classId ? [classId] : null);
+    const wb = newWorkbook();
+    const used = new Set<string>();
+    for (const c of r.classes) {
+      if (!c.students.length) continue;
+      let name = c.name.replace(/[\\/?*[\]:]/g, '-').slice(0, 28) || 'Sınıf';
+      while (used.has(name)) name += '_';
+      used.add(name);
+      const ws = wb.addWorksheet(name);
+      ws.columns = [
+        { header: 'Okul No', width: 10 },
+        { header: 'Ad Soyad', width: 28 },
+        { header: 'Artı', width: 8 },
+        { header: 'Eksi', width: 8 },
+        { header: 'Öğretmen', width: 10 },
+        { header: 'Öne çıkan', width: 26 },
+        { header: 'Gelişim alanı', width: 26 },
+        { header: 'Gösterge', width: 16 },
+      ];
+      styleHeader(ws);
+      for (const s of c.students) ws.addRow([s.schoolNo, s.fullName, s.plus, s.minus, s.teachers, s.topPlus ?? '', s.topMinus ?? '', CONDUCT_BANDS[s.band]]);
+      ws.addRow([]);
+      ws.addRow([`${r.startYear}-${r.startYear + 1} ${r.term}. dönem${r.mine ? ' · yalnızca kendi kayıtlarım' : ''}. Not önerisi değildir; gözlem kayıtlarına dayalı yardımcı göstergedir.`]);
+    }
+    if (!used.size) wb.addWorksheet('Gösterge').addRow(['Bu dönemde öğrenci bulunamadı.']);
+    await audit(req, 'export', 'Dönem göstergesi', null, `${r.term}. dönem${classId ? ` · ${r.classes[0]?.name}` : ' · tüm sınıflar'}`);
+    return sendXlsx(reply, await toBuffer(wb), exportFileName('donem-gostergesi', req.ctx.school.name));
+  });
+
+  /* ---------- Rehberlik uyarıları ---------- */
+
+  app.get(`${base}/alerts`, member, async (req) => {
+    if (!canSeeDetails(req)) throw forbidden('Rehberlik uyarılarını yalnızca rehber öğretmen ve idare görür.');
+    const resolved = (req.query as { status?: string }).status === 'resolved';
+    const rows = await db
+      .select({
+        id: conductAlerts.id,
+        minusCount: conductAlerts.minusCount,
+        windowDays: conductAlerts.windowDays,
+        summary: conductAlerts.summary,
+        createdAt: conductAlerts.createdAt,
+        resolvedAt: conductAlerts.resolvedAt,
+        resolvedByName: conductAlerts.resolvedByName,
+        note: conductAlerts.note,
+        studentId: students.id,
+        schoolNo: students.schoolNo,
+        fullName: students.fullName,
+        className: classGroups.name,
+      })
+      .from(conductAlerts)
+      .innerJoin(students, eq(students.id, conductAlerts.studentId))
+      .leftJoin(classGroups, eq(classGroups.id, students.classGroupId))
+      .where(and(eq(conductAlerts.schoolId, req.ctx.schoolId), sql`${conductAlerts.resolvedAt} is ${resolved ? sql`not null` : sql`null`}`))
+      .orderBy(desc(resolved ? conductAlerts.resolvedAt : conductAlerts.createdAt))
+      .limit(resolved ? 100 : 500);
+    const [{ open } = { open: 0 }] = await db
+      .select({ open: sql<number>`count(*)::int` })
+      .from(conductAlerts)
+      .where(and(eq(conductAlerts.schoolId, req.ctx.schoolId), sql`${conductAlerts.resolvedAt} is null`));
+    return {
+      open,
+      alerts: rows.map(({ studentId, schoolNo, fullName, className, ...a }) => ({ ...a, student: { id: studentId, schoolNo, fullName, className } })),
+    };
+  });
+
+  app.post(`${base}/alerts/:id/resolve`, member, async (req) => {
+    if (!canSeeDetails(req)) throw forbidden();
+    const id = idParam(req);
+    const { note } = parse(conductAlertResolveSchema, req.body ?? {});
+    const [row] = await db
+      .update(conductAlerts)
+      .set({ resolvedAt: new Date(), resolvedBy: req.ctx.userId, resolvedByName: await userName(deps, req.ctx.userId), note: note?.trim() || null })
+      .where(and(eq(conductAlerts.id, id), eq(conductAlerts.schoolId, req.ctx.schoolId), sql`${conductAlerts.resolvedAt} is null`))
+      .returning({ id: conductAlerts.id });
+    if (!row) throw notFound('Uyarı bulunamadı ya da zaten görüşüldü.');
+    await audit(req, 'update', 'Rehberlik uyarısı', id, 'Görüşüldü');
+    return { ok: true };
   });
 
   /* ---------- Ayın öğrencisi ---------- */
@@ -538,6 +772,7 @@ export async function runConductRetention(deps: AppDeps, today = new Date()) {
       .delete(conductEntries)
       .where(and(eq(conductEntries.schoolId, s.id), lt(conductEntries.createdAt, cutoff)))
       .returning({ id: conductEntries.id });
+    await deps.db.delete(conductAlerts).where(and(eq(conductAlerts.schoolId, s.id), lt(conductAlerts.createdAt, cutoff)));
     deleted += r.length;
   }
   return deleted;

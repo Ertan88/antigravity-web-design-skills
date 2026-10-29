@@ -35,6 +35,7 @@ const SCHOOL_TABLES: Record<string, PgTable & { schoolId: PgColumn }> = {
   gozlemKriterleri: schema.conductCriteria,
   gozlemKayitlari: schema.conductEntries,
   ayinOgrencisi: schema.conductAwards,
+  rehberlikUyarilari: schema.conductAlerts,
   etkinlikGecmisi: schema.auditLogs,
 };
 
@@ -74,7 +75,8 @@ export function privacyTemplate(schoolName: string, dataRegion: string): string 
 # Hangi veriler işlenir
 - Öğretmen ve personel: ad soyad, branş ve unvan, nöbet yeri ve günleri, ders programı, izin tarihleri, panel kullanıcılarının e-posta adresi ve işlem kayıtları
 - Öğrenci: okul numarası, ad soyad (panoda kısaltılmış biçimde, ör. "Ayşe Y."), sınıf, doğum günü (yalnızca gün ve ay)
-- Öğrenci gözlemleri: öğretmenlerin derste ve okulda gözlemlediği davranışlara göre verdiği artı / eksi kayıtları ve kısa notlar (yalnızca öğretmenler, rehber öğretmenler ve okul idaresi görür; panoda gösterilmez, velilerle paylaşılmaz)
+- Öğrenci gözlemleri: öğretmenlerin derste ve okulda gözlemlediği davranışlara göre verdiği artı / eksi kayıtları ve kısa notlar (yalnızca öğretmenler, rehber öğretmenler ve okul idaresi görür; panoda gösterilmez, velilerle paylaşılmaz). Kayıtları kimin girdiğini yalnızca rehber öğretmen ve okul idaresi görür. Dönem sonu göstergesi bu kayıtlardan hesaplanır ve not önerisi değildir.
+- Rehberlik uyarıları: kısa sürede belirli sayıda eksi alan öğrenci için rehber öğretmene giden uyarı ve rehber öğretmenin görüşme notu (yalnızca rehber öğretmen ve okul idaresi görür)
 - Başarılar ve ayın öğrencisi: öğrencinin adı, sınıfı, başarısı ve fotoğrafı (yalnızca velinin açık rızasıyla)
 
 # İşleme amaçları
@@ -87,7 +89,7 @@ export function privacyTemplate(schoolName: string, dataRegion: string): string 
 Veriler KVKK'nın 5. maddesindeki kanunlarda açıkça öngörülme, veri sorumlusunun hukuki yükümlülüğü ve meşru menfaati sebeplerine dayanılarak; öğrenci fotoğrafı ve başarı paylaşımı ise velinin açık rızasıyla işlenir. Açık rıza her zaman geri alınabilir.
 
 # Saklama ve aktarım
-Veriler ${dataRegion} sunucularında saklanır ve okul dışındaki kişilerle paylaşılmaz. Panolar okul binası içinde gösterilir. Hizmet sağlayıcı (Okulyayın) verileri yalnızca okul adına, veri işleyen olarak işler. İçerikler yayın süresi bitince panodan kalkar; öğrenci gözlem kayıtları öğretim yılı sonunda silinir (okul daha kısa ya da uzun bir süre belirleyebilir); okulun aboneliği sona erdiğinde veriler silinir.
+Veriler ${dataRegion} sunucularında saklanır ve okul dışındaki kişilerle paylaşılmaz. Panolar okul binası içinde gösterilir. Hizmet sağlayıcı (Okulyayın) verileri yalnızca okul adına, veri işleyen olarak işler. İçerikler yayın süresi bitince panodan kalkar; öğrenci gözlem kayıtları ve rehberlik uyarıları öğretim yılı sonunda silinir (okul daha kısa ya da uzun bir süre belirleyebilir); okulun aboneliği sona erdiğinde veriler silinir.
 
 # Toplama yöntemi
 Veriler okul idaresince yönetim paneline elektronik ortamda girilerek ya da Excel dosyasıyla aktarılarak toplanır.

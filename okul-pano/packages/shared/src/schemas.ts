@@ -67,6 +67,16 @@ export const schoolSettingsSchema = z.object({
   followMebCalendar: z.boolean().default(true),
   /** Gözlem kayıtlarının saklama süresi (KVKK): öğretim yılı sonunda silinir ya da okul elle siler */
   conductRetention: z.enum(['year', 'keep']).default('year'),
+  /** İkinci dönemin ilk günü ("02-09"); boşsa MEB takviminden, o da yoksa 1 Şubat */
+  conductTerm2Start: z
+    .string()
+    .regex(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/, 'Tarih AA-GG biçiminde olmalı')
+    .nullable()
+    .default(null),
+  /** Rehberlik uyarısı: bir öğrenci `days` gün içinde `minus` eksi alırsa rehber öğretmene sessizce haber verilir */
+  conductAlert: z
+    .object({ enabled: z.boolean().default(true), days: z.number().int().min(1).max(60).default(7), minus: z.number().int().min(1).max(20).default(3) })
+    .default({ enabled: true, days: 7, minus: 3 }),
   theme: z.enum(['dark', 'light']).default('dark'),
   /** Kartların görünümü: klasik (renkli şeritli kartlar), bento (pastel kutular) ya da canlı (dolu parlak kutular) */
   boardStyle: z.enum(['classic', 'bento', 'vivid']).default('classic'),
@@ -664,6 +674,8 @@ export const conductEntrySchema = z.object({
 });
 
 /** Ayın öğrencisi seçimi: panodaki "Ayın öğrencisi" şablonuna gider */
+export const conductAlertResolveSchema = z.object({ note: optionalText(300) });
+
 export const conductAwardSchema = z.object({
   month: monthSchema,
   studentId: id,

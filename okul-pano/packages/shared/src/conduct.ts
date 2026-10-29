@@ -150,3 +150,98 @@ export function monthRange(month: string): { from: string; to: string } {
   const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
   return { from: `${month}-01`, to: `${next}-01` };
 }
+
+/* ---------- Dönem göstergesi ---------- */
+
+export type ConductTerm = 1 | 2;
+export const CONDUCT_BANDS = { high: 'Yüksek', mid: 'Orta', low: 'Gelişime açık', none: 'Kayıt yok' } as const;
+export type ConductBand = keyof typeof CONDUCT_BANDS;
+/** Yüksek bandı: sınıfın üstteki bu oranı */
+export const CONDUCT_HIGH_SHARE = 0.3;
+
+/**
+ * Dönem aralığı. Birinci dönem eğitim yılının başından (1 Eylül) ikinci dönemin ilk gününe, ikinci dönem oradan
+ * sonraki 1 Eylül'e kadar (bitiş hariç). `term2Start` okulun ayarından ya da MEB takviminden gelir.
+ */
+export function conductTermRange(startYear: number, term: ConductTerm, term2Start: string): { from: string; to: string } {
+  return term === 1 ? { from: `${startYear}-09-01`, to: term2Start } : { from: term2Start, to: `${startYear + 1}-09-01` };
+}
+
+/** İkinci dönemin ilk günü: okulun ayarı ("02-09") > MEB takvimi > 1 Şubat */
+export function resolveTerm2Start(startYear: number, override?: string | null, meb?: string | null): string {
+  if (override) return `${startYear + 1}-${override}`;
+  return meb ?? `${startYear + 1}-02-01`;
+}
+
+export interface ConductReportEntry extends ConductEntryLite {
+  /** "2026-10": öğretmen başına sınır her ay ayrı uygulanır */
+  month: string;
+  label: string;
+}
+
+export interface ConductReportRow {
+  studentId: string;
+  plus: number;
+  minus: number;
+  /** Artı ya da eksi veren farklı öğretmen sayısı */
+  teachers: number;
+  balanced: number;
+  /** En çok artı getiren ve en çok eksi getiren kriter */
+  topPlus: string | null;
+  topMinus: string | null;
+  band: ConductBand;
+}
+
+/**
+ * Dönem sonu performans göstergesi. Not önermez; öğrencileri üç banda ayırır:
+ * eksisi artısından fazla olan "gelişime açık"; artıları en az minTeachers öğretmenden gelen ve sınıfın üst %30'unda
+ * olan "yüksek"; diğerleri "orta". Her öğretmenin bir öğrenciye bir ayda etkisi ±cap ile sınırlanır.
+ * `single`: yalnızca tek öğretmenin kendi kayıtları (öğretmen sınırı ve öğretmen sayısı şartı uygulanmaz).
+ */
+export function conductBands(
+  studentIds: readonly string[],
+  entries: readonly ConductReportEntry[],
+  opts: { cap?: number; minTeachers?: number; single?: boolean } = {},
+): ConductReportRow[] {
+  const cap = opts.single ? Infinity : (opts.cap ?? CONDUCT_TEACHER_CAP);
+  const minTeachers = opts.single ? 1 : (opts.minTeachers ?? CONDUCT_MIN_TEACHERS);
+  type Acc = { plus: number; minus: number; slots: Map<string, number>; teachers: Set<string>; positive: Set<string>; labels: Map<string, number> };
+  const acc = new Map<string, Acc>(studentIds.map((id) => [id, { plus: 0, minus: 0, slots: new Map(), teachers: new Set(), positive: new Set(), labels: new Map() }]));
+  for (const e of entries) {
+    const a = acc.get(e.studentId);
+    if (!a) continue;
+    if (e.points > 0) {
+      a.plus += e.points;
+      a.positive.add(e.by);
+    } else a.minus += -e.points;
+    a.teachers.add(e.by);
+    const slot = `${e.by}|${e.month}`;
+    a.slots.set(slot, (a.slots.get(slot) ?? 0) + e.points);
+    const key = `${Math.sign(e.points)}|${e.label}`;
+    a.labels.set(key, (a.labels.get(key) ?? 0) + e.points);
+  }
+  const top = (labels: Map<string, number>, sign: 1 | -1) => {
+    let best: string | null = null;
+    let bestPts = 0;
+    for (const [key, pts] of labels) {
+      if (!key.startsWith(`${sign}|`) || Math.abs(pts) <= bestPts) continue;
+      best = key.slice(key.indexOf('|') + 1);
+      bestPts = Math.abs(pts);
+    }
+    return best;
+  };
+  const rows = [...acc].map(([studentId, a]) => {
+    let balanced = 0;
+    for (const net of a.slots.values()) balanced += Math.max(-cap, Math.min(cap, net));
+    return { studentId, a, balanced };
+  });
+  const sorted = rows.map((r) => r.balanced).sort((x, y) => y - x);
+  const threshold = sorted[Math.max(0, Math.ceil(sorted.length * CONDUCT_HIGH_SHARE) - 1)] ?? 0;
+  return rows.map(({ studentId, a, balanced }) => {
+    let band: ConductBand = 'mid';
+    if (!a.teachers.size) band = 'none';
+    else if (a.minus > a.plus) band = 'low';
+    else if (balanced > 0 && balanced >= threshold && a.positive.size >= minTeachers) band = 'high';
+    return { studentId, plus: a.plus, minus: a.minus, teachers: a.teachers.size, balanced, topPlus: top(a.labels, 1), topMinus: top(a.labels, -1), band };
+  });
+}

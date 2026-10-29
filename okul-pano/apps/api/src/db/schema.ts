@@ -377,6 +377,32 @@ export const conductAwards = pgTable(
   (t) => [uniqueIndex('conduct_awards_uq').on(t.schoolId, t.month, t.studentId)],
 );
 
+/**
+ * Rehberlik uyarısı: öğrenci okulun belirlediği sürede belirlenen sayıda eksi alınca açılır ve rehber öğretmene
+ * bildirilir. Öğrenci için açık uyarı varken yenisi açılmaz; rehber "görüşüldü" işaretleyip isteğe bağlı not bırakır.
+ */
+export const conductAlerts = pgTable(
+  'conduct_alerts',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => students.id, { onDelete: 'cascade' }),
+    minusCount: integer('minus_count').notNull(),
+    windowDays: integer('window_days').notNull(),
+    /** Eksi alınan kriterler: "Dersi bölme ×2, Derse geç kalma" */
+    summary: text('summary').notNull(),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+    resolvedBy: uuid('resolved_by').references(() => users.id, { onDelete: 'set null' }),
+    resolvedByName: text('resolved_by_name'),
+    /** Görüşme notu: yalnızca rehber öğretmen ve idare görür */
+    note: text('note'),
+    createdAt: createdAt(),
+  },
+  (t) => [index('conduct_alerts_school_idx').on(t.schoolId, t.resolvedAt)],
+);
+
 export const exams = pgTable(
   'exams',
   {
