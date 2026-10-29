@@ -8,7 +8,7 @@ import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Field, IconButton
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useSchool, useSchoolPath, type School } from '../lib/data.ts';
-import { timeAgo } from '../lib/format.ts';
+import { formatDateTime } from '../lib/format.ts';
 
 /*
  * Gözlem: öğrencilerin okul ve ders içi davranışlarına göre artı / eksi kayıtları. Öğretmenler mobil uygulamadan
@@ -43,7 +43,8 @@ interface StudentCardData {
   student: { id: string; schoolNo: string; fullName: string; className: string | null };
   totals: { net: number; plus: number; minus: number; plusPoints: number; minusPoints: number; teachers: number };
   byCriterion: { label: string; group: ConductGroup; points: number; count: number }[];
-  entries: { id: string; group: ConductGroup; label: string; points: number; note: string | null; userName: string; createdAt: string; mine: boolean }[];
+  entries: { id: string; group: ConductGroup; label: string; points: number; note: string | null; userName: string | null; createdAt: string; mine: boolean }[];
+  canSeeAuthors: boolean;
 }
 interface Candidates {
   month: string;
@@ -210,11 +211,11 @@ function StudentCard({ studentId, month, criteria, onClose }: { studentId: strin
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-bold">{e.label}</div>
                       <div className="truncate text-xs text-slate-500">
-                        {e.userName}
+                        {e.mine ? 'Siz' : (e.userName ?? 'Bir öğretmen')}
                         {e.note ? ` · “${e.note}”` : ''}
                       </div>
                     </div>
-                    <span className="shrink-0 text-xs text-slate-400">{timeAgo(e.createdAt)}</span>
+                    <span className="shrink-0 text-xs text-slate-400" title={formatDateTime(e.createdAt)}>{formatDateTime(e.createdAt)}</span>
                     {(can('conduct.manage') || e.mine) && <DeleteButton what="Bu kayıt" onConfirm={() => remove.mutate(e.id)} />}
                   </li>
                 ))}

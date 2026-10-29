@@ -373,6 +373,7 @@ export async function conductRoutes(app: FastifyInstance) {
     }
     const plus = entries.filter((e) => e.points > 0);
     const minus = entries.filter((e) => e.points < 0);
+    const canSeeAuthors = req.ctx.permissions.includes('conduct.manage') || req.ctx.permissions.includes('conduct.counsel');
     return {
       month,
       student,
@@ -385,7 +386,12 @@ export async function conductRoutes(app: FastifyInstance) {
         teachers: new Set(entries.map((e) => e.userId ?? e.userName)).size,
       },
       byCriterion: [...byLabel.values()].sort((a, b) => Math.abs(b.points) - Math.abs(a.points)),
-      entries: entries.map(({ userId, ...e }) => ({ ...e, mine: userId === req.ctx.userId })),
+      canSeeAuthors,
+      // Kaydı kimin girdiğini yalnızca idare ve rehber öğretmen görür; öğretmen kendi kayıtlarını tanır
+      entries: entries.map(({ userId, ...e }) => {
+        const mine = userId === req.ctx.userId;
+        return { ...e, userName: canSeeAuthors || mine ? e.userName : null, mine };
+      }),
     };
   });
 

@@ -6,10 +6,12 @@ import { Pressable, View } from 'react-native';
 import { api } from '../../src/api.ts';
 import { useSchoolPath } from '../../src/auth.tsx';
 import { useConductStudent } from '../../src/data.ts';
-import { timeAgo } from '../../src/day.ts';
+import { clock } from '../../src/day.ts';
 import { Text } from '../../src/text.tsx';
 import { colors } from '../../src/theme.ts';
 import { BentoRow, Card, confirm, Empty, ErrorNote, Icon, Loading, Screen, SectionTitle, T, Tile } from '../../src/ui.tsx';
+
+const shortStamp = (iso: string) => `${new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short' }).format(new Date(iso))} ${clock(iso)}`;
 
 const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0');
 const thisMonth = () => {
@@ -106,11 +108,11 @@ export default function StudentCard() {
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={{ fontSize: 14, fontWeight: '700', color: colors.ink }}>{e.label}</Text>
                       <Text style={{ fontSize: 12, color: colors.faint }} numberOfLines={2}>
-                        {e.userName} · {CONDUCT_GROUPS[e.group]}
+                        {e.mine ? 'Siz' : (e.userName ?? 'Bir öğretmen')} · {CONDUCT_GROUPS[e.group]}
                         {e.note ? ` · “${e.note}”` : ''}
                       </Text>
                     </View>
-                    <Text style={{ fontSize: 11, color: colors.subtle, fontWeight: '600' }}>{timeAgo(e.createdAt)}</Text>
+                    <Text style={{ fontSize: 11, color: colors.subtle, fontWeight: '600' }}>{shortStamp(e.createdAt)}</Text>
                     {e.mine && (
                       <Pressable accessibilityRole="button" accessibilityLabel="Kaydı sil" hitSlop={8} onPress={() => void remove(e.id)}>
                         <Icon name="trash-outline" size={17} color={colors.faint} />

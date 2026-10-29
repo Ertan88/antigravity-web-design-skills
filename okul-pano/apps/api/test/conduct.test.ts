@@ -107,6 +107,15 @@ describe('gözlem', () => {
     expect(card.totals).toMatchObject({ net: 6, plus: 3, minus: 0, teachers: 3 });
     expect(card.byCriterion).toEqual([{ label: 'Derse katılım', group: 'academic', points: 6, count: 3 }]);
     expect(card.entries.filter((e: { mine: boolean }) => e.mine)).toHaveLength(1);
+    // Öğretmen başkalarının kaydını görür ama kimin girdiğini göremez
+    expect(card.canSeeAuthors).toBe(false);
+    for (const e of card.entries as { mine: boolean; userName: string | null }[]) expect(e.userName).toBe(e.mine ? 'Öğretmen 2' : null);
+    // İdare ve rehber öğretmen kimin girdiğini görür
+    for (const viewer of [owner, counselor]) {
+      const full = (await viewer.get(`${base}/conduct/students/${ids['Ada Yılmaz']}`)).json();
+      expect(full.canSeeAuthors).toBe(true);
+      expect(full.entries.map((e: { userName: string }) => e.userName).sort()).toEqual(['Öğretmen 1', 'Öğretmen 2', 'Öğretmen 3']);
+    }
   });
 
   it('ayın öğrencisi: en az üç öğretmen şartı; idare seçer, panoya başarı olarak gider', async () => {

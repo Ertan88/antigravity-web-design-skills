@@ -304,7 +304,8 @@ export interface ConductStudentCard {
   student: { id: string; schoolNo: string; fullName: string; className: string | null };
   totals: { net: number; plus: number; minus: number; plusPoints: number; minusPoints: number; teachers: number };
   byCriterion: { label: string; group: ConductGroup; points: number; count: number }[];
-  entries: { id: string; group: ConductGroup; label: string; points: number; note: string | null; userName: string; createdAt: string; mine: boolean }[];
+  entries: { id: string; group: ConductGroup; label: string; points: number; note: string | null; userName: string | null; createdAt: string; mine: boolean }[];
+  canSeeAuthors: boolean;
 }
 
 export const useConductClasses = (enabled = true) => useSchoolQuery<ConductClass[]>('conduct/classes', { enabled });
