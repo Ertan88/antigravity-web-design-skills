@@ -216,7 +216,7 @@ const permissionList = z.array(z.enum(PERMISSION_KEYS as [string, ...string[]]))
 export const createMemberSchema = z.object({
   email: z.email('Geçerli bir e-posta girin'),
   fullName: required('Ad soyad', 80, 2),
-  /** Yeni kullanıcılar için zorunlu; e-posta sistemde varsa yok sayılır. */
+  /** Yeni kullanıcının geçici şifresi (davet yoksa; verilmezse sunucu üretir). E-posta sistemde varsa yok sayılır. */
   password: z.string().min(8, 'Şifre en az 8 karakter olmalı').max(200).optional(),
   role: z.enum(['admin', 'editor']),
   permissions: permissionList.default([]),

@@ -48,6 +48,18 @@ describe('kullanıcı şifreleri', () => {
     expect((await tryLogin('ogretmen@sifre.local', 'BelirliSifre789')).statusCode).toBe(200);
   });
 
+  it('davet yoksa ve şifre verilmezse geçici şifre üretilir ve bir kez döner (mobil uygulama)', async () => {
+    const res = await owner.post(path('members'), { email: 'uretilen@sifre.local', fullName: 'Üretilen Şifre', role: 'editor', permissions: [] });
+    expectStatus(res, 201);
+    const { password, existingUser } = res.json() as { password: string; existingUser: boolean };
+    expect(existingUser).toBe(false);
+    expect(password).toMatch(/^[A-Za-z2-9]{10}$/);
+    expect((await tryLogin('uretilen@sifre.local', password)).statusCode).toBe(200);
+    // Şifre verilince yanıtta şifre dönmez
+    const given = await owner.post(path('members'), { email: 'verilen@sifre.local', fullName: 'Verilen Şifre', password: 'VerilenSifre123', role: 'editor', permissions: [] });
+    expect(given.json().password).toBeUndefined();
+  });
+
   it('sistemde kayıtlı e-posta eklenince girilen şifre kullanılmaz ve bu bildirilir', async () => {
     const res = await owner.post(path('members'), { email: SUPER.email, fullName: 'Kök', password: 'BaskaSifre123', role: 'editor', permissions: [] });
     expectStatus(res, 201);

@@ -77,15 +77,16 @@ export async function memberRoutes(app: FastifyInstance) {
     const email = body.email.toLowerCase();
     let [user] = await db.select().from(users).where(eq(users.email, email));
     const created = !user;
+    // Davet yoksa ve şifre verilmediyse okunaklı geçici şifre üretilir (mobil uygulama) ve yanıtta bir kez döner
+    const generated = !user && !body.invite && !body.password ? readablePassword() : null;
     if (!user) {
-      if (!body.invite && !body.password) throw badRequest('Yeni kullanıcı için geçici bir şifre belirleyin ya da davet gönderin.');
       [user] = await db
         .insert(users)
         .values({
           email,
           fullName: body.fullName,
           // Davetle eklenen kişi şifresini bağlantıdan belirleyene kadar giriş yapamaz
-          passwordHash: body.invite ? INVITE_PENDING : await hashPassword(body.password!),
+          passwordHash: body.invite ? INVITE_PENDING : await hashPassword(body.password ?? generated!),
         })
         .returning();
     }
@@ -119,7 +120,7 @@ export async function memberRoutes(app: FastifyInstance) {
           })
         : null;
     // E-posta sistemde zaten kayıtlıysa girilen geçici şifre kullanılmaz: panel bunu açıkça söyler
-    return reply.status(201).send({ id: m!.id, existingUser: !created, invite });
+    return reply.status(201).send({ id: m!.id, existingUser: !created, invite, ...(generated ? { password: generated } : {}) });
   });
 
   /** Daveti yeniden gönderir (kişi henüz şifresini belirlemediyse): eski bağlantı geçersiz olur */
