@@ -6,14 +6,14 @@ import { useControlCenter, useInbox } from '../../src/data.ts';
 import { colors } from '../../src/theme.ts';
 import { Icon, type IconName } from '../../src/ui.tsx';
 
-type TabName = 'index' | 'onaylar' | 'panolar' | 'nobet' | 'acil' | 'duyurular' | 'izinlerim' | 'okullar' | 'takvim' | 'kutu' | 'profil';
+type TabName = 'index' | 'onaylar' | 'panolar' | 'nobet' | 'acil' | 'duyurular' | 'gozlem' | 'izinlerim' | 'okullar' | 'takvim' | 'kutu' | 'profil';
 
 /**
  * Alt menü role göre kurulur (en çok 5 sekme; geri kalanı profil menüsünde):
  * - Platform yöneticisi: Platform · Okullar · Takvim · Bildirimler
  * - Okul sahibi ve yönetici: Merkez · Onaylar · Panolar · Nöbet · Acil
  * - Editör: İçerik + yetkilerinden gelen sekmeler (Duyurular, Onaylar, Panolar, Nöbet, Acil) + Bildirimler
- * - Öğretmen: Bugün · Nöbetim · Duyurular · İzin · Profil
+ * - Öğretmen: Bugün · Nöbetim · Gözlem · İzin · Profil (Duyurular Menü'de)
  */
 function visibleTabs(role: AppRole, can: (p: Parameters<ReturnType<typeof useAuth>['can']>[0]) => boolean): TabName[] {
   switch (role) {
@@ -32,7 +32,7 @@ function visibleTabs(role: AppRole, can: (p: Parameters<ReturnType<typeof useAut
       return ['index', ...extra.slice(0, 3), 'kutu'];
     }
     default:
-      return ['index', 'nobet', 'duyurular', 'izinlerim', 'profil'];
+      return ['index', 'nobet', 'gozlem', 'izinlerim', 'profil'];
   }
 }
 
@@ -80,6 +80,7 @@ export default function TabsLayout() {
         options={{ title: 'Onaylar', ...hide('onaylar'), tabBarIcon: icon('checkmark-done-outline', 'checkmark-done'), tabBarBadge: pending || undefined }}
       />
       <Tabs.Screen name="duyurular" options={{ title: 'Duyurular', ...hide('duyurular'), tabBarIcon: icon('megaphone-outline', 'megaphone') }} />
+      <Tabs.Screen name="gozlem" options={{ title: 'Gözlem', ...hide('gozlem'), tabBarIcon: icon('clipboard-outline', 'clipboard') }} />
       <Tabs.Screen name="panolar" options={{ title: 'Panolar', ...hide('panolar'), tabBarIcon: icon('tv-outline', 'tv') }} />
       <Tabs.Screen
         name="nobet"

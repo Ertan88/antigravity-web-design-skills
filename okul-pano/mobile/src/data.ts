@@ -273,3 +273,40 @@ function usePlatformQuery<T>(path: string) {
 export const usePlatformSchools = () => usePlatformQuery<PlatformSchool[]>('schools');
 export const useSignups = () => usePlatformQuery<Signup[]>('signups');
 export const useAcademicCalendars = () => usePlatformQuery<CalendarRow[]>('academic-calendars');
+
+/* ---------- Gözlem ---------- */
+
+export type SchoolLevel = 'primary' | 'middle' | 'high';
+export type ConductGroup = 'academic' | 'behavior' | 'social';
+export interface ConductCriterion {
+  id: string;
+  level: SchoolLevel;
+  group: ConductGroup;
+  label: string;
+  points: number;
+  noteRequired: boolean;
+  isActive: boolean;
+}
+export interface ConductClass {
+  id: string;
+  name: string;
+  level: SchoolLevel;
+  students: number;
+}
+export interface ConductClassScreen {
+  month: string;
+  class: { id: string; name: string; level: SchoolLevel };
+  criteria: ConductCriterion[];
+  students: { id: string; schoolNo: string; fullName: string; plus: number; minus: number; net: number }[];
+}
+export interface ConductStudentCard {
+  month: string;
+  student: { id: string; schoolNo: string; fullName: string; className: string | null };
+  totals: { net: number; plus: number; minus: number; plusPoints: number; minusPoints: number; teachers: number };
+  byCriterion: { label: string; group: ConductGroup; points: number; count: number }[];
+  entries: { id: string; group: ConductGroup; label: string; points: number; note: string | null; userName: string; createdAt: string; mine: boolean }[];
+}
+
+export const useConductClasses = (enabled = true) => useSchoolQuery<ConductClass[]>('conduct/classes', { enabled });
+export const useConductClass = (classId: string | null) => useSchoolQuery<ConductClassScreen>(`conduct/classes/${classId}/students`, { enabled: Boolean(classId) });
+export const useConductStudent = (id: string, month: string) => useSchoolQuery<ConductStudentCard>(`conduct/students/${id}?month=${month}`);

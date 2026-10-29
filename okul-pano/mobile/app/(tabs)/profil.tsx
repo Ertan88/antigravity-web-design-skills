@@ -182,6 +182,8 @@ export default function Menu() {
           icon: 'people-outline',
           to: '/kullanicilar',
         },
+        // Öğretmen kaydı olan yöneticide Gözlem "Öğretmen araçlarım"da
+        ...(!isTeacher ? [{ title: 'Gözlem', subtitle: 'Öğrencilere artı / eksi, öğrenci kartları', icon: 'clipboard-outline' as IconName, to: '/gozlem' }] : []),
         ...(role === 'owner' && !school?.support && !me?.user.isSuperAdmin
           ? [
               {
@@ -215,6 +217,10 @@ export default function Menu() {
       title: 'Öğretmen araçlarım',
       items: [
         { title: 'Ders programım ve zil saatleri', subtitle: 'Haftalık program, bugünün zilleri', icon: 'time-outline', to: '/programim' },
+        // Öğretmen görünümünde Gözlem alt menüde; Duyurular buraya taşındı
+        ...(role === 'teacher'
+          ? [{ title: 'Duyurularım', subtitle: 'Gönderdiklerim, onay durumu', icon: 'megaphone-outline' as IconName, to: '/duyurular' }]
+          : [{ title: 'Gözlem', subtitle: 'Öğrencilere artı / eksi, öğrenci kartları', icon: 'clipboard-outline' as IconName, to: '/gozlem' }]),
         ...(role === 'editor'
           ? [{ title: 'Nöbetlerim', subtitle: 'Bu hafta ve yerine görevlendirmeler', icon: 'shield-checkmark-outline' as IconName, to: '/nobet' }]
           : []),
@@ -233,6 +239,10 @@ export default function Menu() {
     sections.push({
       title: 'Okul',
       items: [
+        // Rehber öğretmen (öğretmen kaydı olmayan): Gözlem
+        ...(role === 'editor' && !isTeacher && (can('conduct.counsel') || can('conduct.manage'))
+          ? [{ title: 'Gözlem', subtitle: 'Öğrencilere artı / eksi, öğrenci kartları', icon: 'clipboard-outline' as IconName, to: '/gozlem' }]
+          : []),
         { title: 'Tatil takvimi', subtitle: 'Ara tatil, yarıyıl, bayramlar', icon: 'sunny-outline', to: '/tatiller' },
         { title: 'Sınavlar ve etkinlikler', subtitle: 'Yaklaşan sınav ve etkinlikler', icon: 'school-outline', to: '/yaklasanlar' },
         { title: 'Bugün doğum günü olanlar', subtitle: 'Öğrencilerimiz', icon: 'gift-outline', to: '/dogum-gunleri' },

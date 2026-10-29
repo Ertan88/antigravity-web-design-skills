@@ -195,7 +195,7 @@ export function useDutyReminders(data: MeToday | undefined) {
 
 /** Öğretmenin ana ekranı: zil kutusu, ders ve nöbet kutuları, hızlı işlemler, günün programı */
 export function TeacherHome() {
-  const { me, school } = useAuth();
+  const { me, school, can } = useAuth();
   const today = useMeToday();
   const now = useNow(60_000);
   useDutyReminders(today.data);
@@ -216,7 +216,7 @@ export function TeacherHome() {
       ) : (
         <>
           <BellHero data={today.data} />
-          {!today.data.teacher ? (
+          {!today.data.teacher && can('conduct.counsel') ? null : !today.data.teacher ? (
             <Card tone="warning">
               <T weight="700">Hesabınız bir öğretmen kaydına bağlı değil</T>
               <T size={13} color={colors.muted}>
