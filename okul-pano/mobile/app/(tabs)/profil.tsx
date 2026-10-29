@@ -352,7 +352,7 @@ export default function Menu() {
           value={theme.mode}
           onChange={theme.setMode}
           options={[
-            { value: 'system', label: 'Telefona göre' },
+            { value: 'system', label: 'Sistem' },
             { value: 'light', label: 'Açık' },
             { value: 'dark', label: 'Koyu' },
           ]}

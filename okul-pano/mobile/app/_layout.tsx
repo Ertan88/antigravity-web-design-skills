@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider, useIsFetching } from '@tanstack/react-query';
 import * as Notifications from 'expo-notifications';
-import { router, Stack, usePathname, useSegments } from 'expo-router';
+import { router, Stack, useNavigationContainerRef, useSegments } from 'expo-router';
 import {
   PlusJakartaSans_400Regular,
   PlusJakartaSans_500Medium,
@@ -76,7 +76,7 @@ function BrandSplash({ finishing, onHidden }: { finishing: boolean; onHidden: ()
 function Gate({ fontsReady }: { fontsReady: boolean }) {
   const { status, school } = useAuth();
   const theme = useThemeMode();
-  const pathname = usePathname();
+  const nav = useNavigationContainerRef();
   const segments = useSegments();
   const onLogin = segments[0] === 'login';
   // Açılış ekranı en az SPLASH_MIN_MS görünür; arkada ilk ekranın verisi yüklenir (sonra yuvarlak simge görünmesin)
@@ -114,12 +114,10 @@ function Gate({ fontsReady }: { fontsReady: boolean }) {
     return () => sub.remove();
   }, []);
 
-  // Tema değişince ekranlar yeniden kurulur; değiştirildiği ekrana (Menü) geri dönülür
+  // Tema değişince gezinme yeniden kurulur; açık sekme ve geri yığını aynen geri yüklenir (kullanıcı yerinde kalır)
   useEffect(() => {
-    if (!theme.returnTo) return;
-    const to = theme.returnTo;
-    theme.clearReturn();
-    if (to !== pathname) setTimeout(() => router.push(to as never), 0);
+    const saved = theme.takeNavState();
+    if (saved) setTimeout(() => nav.reset(saved), 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme.key]);
 
@@ -148,13 +146,12 @@ export default function RootLayout() {
     PlusJakartaSans_700Bold,
     PlusJakartaSans_800ExtraBold,
   });
-  const pathname = usePathname();
   const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 10_000 } } }));
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={client}>
         <AuthProvider>
-          <ThemeProvider pathname={pathname}>
+          <ThemeProvider>
             <Gate fontsReady={fontsLoaded || Boolean(fontError)} />
           </ThemeProvider>
         </AuthProvider>

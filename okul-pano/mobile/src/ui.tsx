@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useEffect, useRef, type ComponentProps, type ReactNode } from 'react';
+import { router, usePathname } from 'expo-router';
+import { useEffect, useRef, type ComponentProps, type ComponentRef, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Animated, Easing, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 import { Text, TextInput } from './text.tsx';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { scrollMemory, scrollRestore } from './scroll.ts';
 import { colors, dark, radius, space, tiles, type TileTone } from './theme.ts';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -40,6 +41,9 @@ export function Screen({
   scroll?: boolean;
 }) {
   const bg = tone === 'danger' ? colors.dangerTint : colors.bg;
+  // Kaydırma konumu saklanır; tema değişince ekran yeniden kurulduğunda aynı yere dönülür
+  const path = usePathname();
+  const scroller = useRef<ComponentRef<typeof ScrollView>>(null);
   const body = <View style={styles.body}>{children}</View>;
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: bg }]} edges={['top', 'left', 'right']}>
@@ -63,7 +67,17 @@ export function Screen({
       )}
       {scroll ? (
         <ScrollView
+          ref={scroller}
           style={{ flex: 1 }}
+          scrollEventThrottle={100}
+          onScroll={(e) => scrollMemory.set(path, e.nativeEvent.contentOffset.y)}
+          onContentSizeChange={(_, h) => {
+            const y = scrollMemory.get(path) ?? 0;
+            if (scrollRestore.has(path) && h > y) {
+              scrollRestore.delete(path);
+              scroller.current?.scrollTo({ y, animated: false });
+            }
+          }}
           contentContainerStyle={{ paddingBottom: 32 }}
           keyboardShouldPersistTaps="handled"
           refreshControl={onRefresh ? <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} tintColor={colors.primary} /> : undefined}
