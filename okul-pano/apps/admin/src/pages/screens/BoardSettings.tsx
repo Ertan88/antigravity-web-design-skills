@@ -105,6 +105,22 @@ export function Appearance({ editable }: { editable: boolean }) {
             />
           )}
         </Field>
+        <Field
+          label="Görünüm stili"
+          help="Klasik: renkli şeritli kartlar. Bento: mobil uygulama ve paneldeki gibi pastel kutular. Canlı: dolu, parlak renkli kutular. Koyu ve açık temada da çalışır."
+        >
+          {() => (
+            <Segmented
+              value={s.boardStyle}
+              onChange={(x) => set('boardStyle', x)}
+              options={[
+                { value: 'classic', label: 'Klasik' },
+                { value: 'bento', label: 'Bento' },
+                { value: 'vivid', label: 'Canlı' },
+              ]}
+            />
+          )}
+        </Field>
         <Field label="Hazır renkler">
           {() => (
             <div className="flex flex-wrap gap-2">

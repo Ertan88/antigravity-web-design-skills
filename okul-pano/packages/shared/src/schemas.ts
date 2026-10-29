@@ -65,6 +65,8 @@ export const schoolSettingsSchema = z.object({
   /** MEB çalışma takvimindeki ara tatil, yarıyıl ve yaz tatili okulda da tatil sayılır */
   followMebCalendar: z.boolean().default(true),
   theme: z.enum(['dark', 'light']).default('dark'),
+  /** Kartların görünümü: klasik (renkli şeritli kartlar), bento (pastel kutular) ya da canlı (dolu parlak kutular) */
+  boardStyle: z.enum(['classic', 'bento', 'vivid']).default('classic'),
   primaryColor: hexColor.default('#1f8bad'),
   accentColor: hexColor.default('#f59e0b'),
   /** Özel günlerde (millî bayram, 10 Kasım, bayramlar…) hazır temayı kendiliğinden uygula */

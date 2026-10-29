@@ -314,6 +314,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
   const [stageW, stageH] = portrait ? [STAGE_H, STAGE_W] : [STAGE_W, STAGE_H];
   const classes = [
     'theme-' + s.theme,
+    s.boardStyle && s.boardStyle !== 'classic' ? 'style-' + s.boardStyle : '',
     portrait ? 'orientation-portrait' : '',
     s.highContrast ? 'contrast-high' : '',
     s.textSize === 'large' ? 'text-large' : '',

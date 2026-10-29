@@ -2941,3 +2941,212 @@ p {
   color: var(--chip-text);
 }
 
+
+/* ---------- Görünüm stili: Bento ve Canlı ----------
+ * Klasik görünüm (yukarıdaki kurallar) varsayılandır. Okul panelden "Bento" (mobil uygulama ve panelle aynı
+ * pastel kutular) ya da "Canlı" (dolu, parlak kutular) seçerse kartlar düz renkli kutulara döner.
+ * Her kutu kendi --text / --muted değerini taşır; kartın içindeki yazılar bunları kullandığı için ayrı kural
+ * gerekmez. Koyu / açık tema (theme-*) burada da geçerlidir.
+ */
+.style-bento,
+.style-vivid {
+  font-family: 'Plus Jakarta Sans Variable', 'Inter Variable', system-ui, sans-serif;
+  font-feature-settings: normal;
+  --radius: 34px;
+  --bg-glow-1: transparent;
+  --bg-glow-2: transparent;
+  --shadow: none;
+}
+
+.style-bento.theme-dark,
+.style-vivid.theme-dark {
+  --bg: #0f0e0d;
+  --panel: #1d1b18;
+  --panel-strong: #26231f;
+  --border: rgba(255, 255, 255, 0.07);
+  --text: #f5f3ef;
+  --muted: rgba(245, 243, 239, 0.64);
+  --faint: rgba(245, 243, 239, 0.42);
+}
+
+.style-vivid.theme-dark {
+  --bg: #000;
+  --panel: #141414;
+}
+
+.style-bento.theme-light,
+.style-vivid.theme-light {
+  --bg: #f4f2ee;
+  --panel: #ffffff;
+  --panel-strong: #ece9e3;
+  --border: #e7e3dc;
+  --text: #1c1917;
+  --muted: #57534e;
+  --faint: #8f877c;
+}
+
+.style-vivid.theme-light {
+  --bg: #f5f5f4;
+}
+
+/* Kutu renkleri: --tile (zemin), --text/--muted (yazı), --hue (vurgu: gün kutusu, ilerleme çubuğu, rozet) */
+.style-bento.theme-dark .exam-card { --tile: #2b2240; --text: #ede9fe; --muted: rgba(221, 214, 254, 0.72); --hue: #a78bfa; --hue-2: #a78bfa; }
+.style-bento.theme-dark .duty-card { --tile: #3a2414; --text: #ffedd5; --muted: rgba(254, 215, 170, 0.72); --hue: #fb923c; --hue-2: #fb923c; }
+.style-bento.theme-dark .bell-card { --tile: #3a300c; --text: #fef3c7; --muted: rgba(253, 230, 138, 0.74); --hue: #fbbf24; --hue-2: #fbbf24; }
+.style-bento.theme-dark .lessons-card { --tile: #0d2c3f; --text: #e0f2fe; --muted: rgba(186, 230, 253, 0.72); --hue: #38bdf8; --hue-2: #38bdf8; }
+.style-bento.theme-dark .leave-card { --tile: #3e1422; --text: #ffe4e6; --muted: rgba(254, 205, 211, 0.72); --hue: #fb7185; --hue-2: #fb7185; }
+.style-bento.theme-dark .birthday-card { --tile: #10301e; --text: #dcfce7; --muted: rgba(187, 247, 208, 0.72); --hue: #4ade80; --hue-2: #4ade80; }
+.style-bento.theme-dark :is(.events-card, .achievements-card, .book-card, .empty-card) { --tile: #1d1b18; }
+
+.style-bento.theme-light .exam-card { --tile: #ddd6fe; --text: #3b0764; --muted: rgba(59, 7, 100, 0.72); --hue: #7c3aed; --hue-2: #7c3aed; }
+.style-bento.theme-light .duty-card { --tile: #fed7aa; --text: #7c2d12; --muted: rgba(124, 45, 18, 0.74); --hue: #ea580c; --hue-2: #ea580c; }
+.style-bento.theme-light .bell-card { --tile: #fde68a; --text: #713f12; --muted: rgba(113, 63, 18, 0.76); --hue: #d97706; --hue-2: #d97706; }
+.style-bento.theme-light .lessons-card { --tile: #bae6fd; --text: #0c4a6e; --muted: rgba(12, 74, 110, 0.74); --hue: #0284c7; --hue-2: #0284c7; }
+.style-bento.theme-light .leave-card { --tile: #fecdd3; --text: #881337; --muted: rgba(136, 19, 55, 0.74); --hue: #e11d48; --hue-2: #e11d48; }
+.style-bento.theme-light .birthday-card { --tile: #bbf7d0; --text: #14532d; --muted: rgba(20, 83, 45, 0.74); --hue: #16a34a; --hue-2: #16a34a; }
+.style-bento.theme-light :is(.events-card, .achievements-card, .book-card, .empty-card) { --tile: #ffffff; }
+
+/* Canlı: dolu parlak zemin, beyaz yazı (sarı kutuda koyu yazı); koyu ve açık temada aynı kutular */
+.style-vivid .exam-card { --tile: #7c3aed; --text: #fff; --muted: rgba(255, 255, 255, 0.78); --hue: #fff; --hue-2: #fff; }
+.style-vivid .duty-card { --tile: #ea580c; --text: #fff; --muted: rgba(255, 255, 255, 0.8); --hue: #fff; --hue-2: #fff; }
+.style-vivid .bell-card { --tile: #facc15; --text: #1c1917; --muted: rgba(28, 25, 23, 0.72); --hue: #1c1917; --hue-2: #1c1917; }
+.style-vivid .lessons-card { --tile: #0284c7; --text: #fff; --muted: rgba(255, 255, 255, 0.8); --hue: #fff; --hue-2: #fff; }
+.style-vivid .leave-card { --tile: #e11d48; --text: #fff; --muted: rgba(255, 255, 255, 0.8); --hue: #fff; --hue-2: #fff; }
+.style-vivid .birthday-card { --tile: #16a34a; --text: #fff; --muted: rgba(255, 255, 255, 0.8); --hue: #fff; --hue-2: #fff; }
+.style-vivid :is(.events-card, .achievements-card, .book-card, .empty-card) { --tile: var(--panel); }
+
+/* Kartlar: düz renkli kutu, şeritsiz ve kenarlıksız */
+:is(.style-bento, .style-vivid) .card,
+:is(.style-bento, .style-vivid) .card[class*='-card'] {
+  background: var(--tile, var(--panel));
+  border: 0;
+  color: var(--text);
+}
+
+:is(.style-bento, .style-vivid) .card[class*='-card']::before {
+  display: none;
+}
+
+:is(.style-bento, .style-vivid) .card-label,
+:is(.style-bento, .style-vivid) .card[class*='-card'] .card-label {
+  color: var(--muted);
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+:is(.style-bento, .style-vivid) .card[class*='-card'] .card-label svg {
+  color: var(--text);
+}
+
+/* Kutunun içindeki küçük kutular (sınav birimleri, nöbet satırları, sınıf rozetleri) kutu renginde saydam */
+:is(.style-bento, .style-vivid) .exam-unit {
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  border-color: transparent;
+}
+
+:is(.style-bento, .style-vivid) .exam-unit span {
+  color: var(--muted);
+}
+
+:is(.style-bento, .style-vivid) .exam-unit-days {
+  background: var(--hue);
+}
+
+.style-vivid .exam-card .exam-unit-days strong,
+.style-vivid .exam-card .exam-unit-days span {
+  color: #7c3aed;
+}
+
+:is(.style-bento, .style-vivid) .duty-card .duty-row {
+  --row-hue: var(--hue);
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+:is(.style-bento, .style-vivid) .duty-card .duty-area,
+:is(.style-bento, .style-vivid) .duty-area {
+  color: var(--muted);
+}
+
+:is(.style-bento, .style-vivid) .lessons-card .lesson-class {
+  --row-hue: var(--hue);
+  background: var(--hue);
+  color: var(--tile);
+  box-shadow: none;
+}
+
+:is(.style-bento, .style-vivid) .pager-chip {
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  border-color: transparent;
+}
+
+:is(.style-bento, .style-vivid) .leave-card .person-meta {
+  color: var(--muted);
+}
+
+:is(.style-bento, .style-vivid) .bell-countdown {
+  background: none;
+  color: var(--text);
+}
+
+:is(.style-bento, .style-vivid) .bell-card.urgent .bell-countdown {
+  color: var(--hue);
+}
+
+:is(.style-bento, .style-vivid) .bell-progress {
+  background: color-mix(in srgb, var(--text) 14%, transparent);
+}
+
+:is(.style-bento, .style-vivid) .bell-progress div {
+  background: var(--hue);
+}
+
+:is(.style-bento, .style-vivid) .card[class*='-card'] .pager-dots span.active {
+  background: var(--text);
+}
+
+/* Üst bar: okul rozeti sarı kutu */
+:is(.style-bento, .style-vivid) .school-badge {
+  background: #fde68a;
+  border: 0;
+  border-radius: 30px;
+  color: #713f12;
+}
+
+.style-vivid .school-badge {
+  background: #facc15;
+  color: #1c1917;
+}
+
+/* Duyuru alanı ve kayan yazı */
+:is(.style-bento, .style-vivid) .slideshow {
+  border-radius: 40px;
+}
+
+:is(.style-bento, .style-vivid) .footer {
+  background: var(--panel);
+}
+
+:is(.style-bento, .style-vivid) .footer::before {
+  display: none;
+}
+
+:is(.style-bento, .style-vivid) .ticker-label {
+  background: #fde68a;
+  color: #713f12;
+  clip-path: none;
+  padding-right: 30px;
+}
+
+.style-vivid .ticker-label {
+  background: #facc15;
+  color: #1c1917;
+}
+
+:is(.style-bento, .style-vivid).day-national .ticker-label {
+  background: #e30a17;
+  color: #fff;
+}
+
+:is(.style-bento, .style-vivid) .school-logo-icon {
+  color: inherit;
+}
