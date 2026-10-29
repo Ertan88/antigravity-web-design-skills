@@ -44,6 +44,27 @@ export function Screen({
   // Kaydırma konumu saklanır; tema değişince ekran yeniden kurulduğunda aynı yere dönülür
   const path = usePathname();
   const scroller = useRef<ComponentRef<typeof ScrollView>>(null);
+  const viewH = useRef(0);
+  const contentH = useRef(0);
+  // Konum ancak içerik o konuma kaydırılabilecek kadar uzadığında geri yüklenir; daha önce kaydırılırsa
+  // ScrollView en alttaki uygun yere sıkıştırır ve ekran yukarı kaymış görünür
+  const tryRestore = () => {
+    if (!scrollRestore.has(path) || !viewH.current) return;
+    const y = scrollMemory.get(path) ?? 0;
+    if (contentH.current - viewH.current < y - 1) return;
+    scrollRestore.delete(path);
+    scroller.current?.scrollTo({ y, animated: false });
+  };
+  useEffect(() => {
+    // İçerik bir daha uzamazsa (ör. veri değişti) en geç bir saniye sonra elden gelen en yakın yere kaydırılır
+    if (!scrollRestore.has(path)) return;
+    const t = setTimeout(() => {
+      if (!scrollRestore.has(path)) return;
+      scrollRestore.delete(path);
+      scroller.current?.scrollTo({ y: scrollMemory.get(path) ?? 0, animated: false });
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [path]);
   const body = <View style={styles.body}>{children}</View>;
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: bg }]} edges={['top', 'left', 'right']}>
@@ -70,13 +91,23 @@ export function Screen({
           ref={scroller}
           style={{ flex: 1 }}
           scrollEventThrottle={100}
-          onScroll={(e) => scrollMemory.set(path, e.nativeEvent.contentOffset.y)}
+          onScroll={(e) => {
+            // Geri yükleme beklenirken gelen kaydırma olayları (yeniden kurulumdaki 0 gibi) saklı konumu ezmesin
+            if (!scrollRestore.has(path)) scrollMemory.set(path, e.nativeEvent.contentOffset.y);
+          }}
+          onMomentumScrollEnd={(e) => {
+            if (!scrollRestore.has(path)) scrollMemory.set(path, e.nativeEvent.contentOffset.y);
+          }}
+          onScrollEndDrag={(e) => {
+            if (!scrollRestore.has(path)) scrollMemory.set(path, e.nativeEvent.contentOffset.y);
+          }}
+          onLayout={(e) => {
+            viewH.current = e.nativeEvent.layout.height;
+            tryRestore();
+          }}
           onContentSizeChange={(_, h) => {
-            const y = scrollMemory.get(path) ?? 0;
-            if (scrollRestore.has(path) && h > y) {
-              scrollRestore.delete(path);
-              scroller.current?.scrollTo({ y, animated: false });
-            }
+            contentH.current = h;
+            tryRestore();
           }}
           contentContainerStyle={{ paddingBottom: 32 }}
           keyboardShouldPersistTaps="handled"
