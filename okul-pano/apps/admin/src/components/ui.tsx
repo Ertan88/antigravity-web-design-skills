@@ -22,14 +22,12 @@ import { findNav } from '../lib/nav.ts';
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
 
 const variants: Record<Variant, string> = {
-  primary:
-    'bg-gradient-to-b from-brand-500 to-brand-600 text-white shadow-[0_1px_2px_rgba(19,112,143,0.35),0_4px_12px_-4px_rgba(19,112,143,0.5),inset_0_1px_0_rgba(255,255,255,0.18)] hover:brightness-110',
-  secondary:
-    'bg-surface text-slate-700 ring-1 ring-slate-200 shadow-[0_1px_2px_rgba(15,23,42,0.05)] hover:bg-slate-50 hover:text-ink hover:ring-slate-300',
+  // Düz mürekkep hap düğme (bento): gölge ve geçiş yok
+  primary: 'bg-brand-600 text-white hover:bg-brand-500',
+  secondary: 'bg-surface text-ink ring-1 ring-slate-200 hover:bg-slate-100 hover:ring-slate-300',
   ghost: 'text-slate-600 hover:bg-slate-100 hover:text-ink',
-  danger: 'bg-gradient-to-b from-red-500 to-red-600 text-white shadow-[0_1px_2px_rgba(220,38,38,0.35)] hover:brightness-110',
-  success:
-    'bg-gradient-to-b from-emerald-500 to-emerald-600 text-white shadow-[0_1px_2px_rgba(5,150,105,0.35),0_4px_12px_-4px_rgba(5,150,105,0.5)] hover:brightness-110',
+  danger: 'bg-rose-600 text-white hover:bg-rose-500',
+  success: 'bg-emerald-600 text-white hover:bg-emerald-500',
 };
 
 export function Button({
@@ -46,8 +44,8 @@ export function Button({
     <button
       type="button"
       className={clsx(
-        'inline-flex items-center justify-center gap-2 rounded-xl font-semibold whitespace-nowrap transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100',
-        size === 'sm' ? 'h-8 rounded-lg px-3 text-xs' : 'h-10 px-4 text-sm',
+        'inline-flex items-center justify-center gap-2 rounded-full font-bold whitespace-nowrap transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100',
+        size === 'sm' ? 'h-8 px-3.5 text-xs' : 'h-10 px-5 text-sm',
         variants[variant],
         className,
       )}
@@ -74,7 +72,7 @@ export function IconButton({
       title={label}
       aria-label={label}
       className={clsx(
-        'inline-flex size-9 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-ink disabled:opacity-40',
+        'inline-flex size-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-ink disabled:opacity-40',
         className,
       )}
       {...rest}
@@ -87,7 +85,7 @@ export function IconButton({
 /* ---------- Form alanları ---------- */
 
 const control =
-  'block w-full rounded-xl border-0 bg-surface px-3.5 py-2 text-sm text-ink shadow-[0_1px_2px_rgba(15,23,42,0.04)] ring-1 ring-slate-200 transition placeholder:text-slate-400 hover:ring-slate-300 focus:ring-2 focus:ring-brand-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500';
+  'block w-full rounded-xl border-0 bg-surface px-3.5 py-2 text-sm text-ink ring-1 ring-slate-200 transition placeholder:text-slate-400 hover:ring-slate-300 focus:ring-2 focus:ring-ink focus:outline-none disabled:bg-slate-50 disabled:text-slate-500';
 
 export function Field({
   label,
@@ -105,7 +103,7 @@ export function Field({
   const id = useId();
   return (
     <div className={className}>
-      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-slate-700">
+      <label htmlFor={id} className="mb-1.5 block text-sm font-semibold text-slate-700">
         {label}
       </label>
       {children(id)}
@@ -177,7 +175,7 @@ export function Toggle({
         onClick={() => onChange(!checked)}
         className={clsx(
           'relative mt-0.5 inline-flex h-6 w-11 shrink-0 rounded-full transition-colors',
-          checked ? 'bg-brand-600' : 'bg-slate-300',
+          checked ? 'bg-emerald-500' : 'bg-slate-300',
         )}
       >
         <span
@@ -208,7 +206,7 @@ export function WeekdayPicker({ value, onChange, days = [1, 2, 3, 4, 5, 6, 7] }:
             type="button"
             onClick={() => onChange(on ? value.filter((x) => x !== d) : [...value, d].sort())}
             className={clsx(
-              'h-9 min-w-12 rounded-lg px-2 text-sm font-semibold ring-1 transition-colors',
+              'h-9 min-w-12 rounded-full px-3 text-sm font-bold ring-1 transition-colors',
               on ? 'bg-brand-600 text-white ring-brand-600' : 'bg-surface text-slate-600 ring-slate-200 hover:bg-slate-50',
             )}
           >
@@ -230,15 +228,15 @@ export function Segmented<T extends string | number>({
   options: { value: T; label: ReactNode }[];
 }) {
   return (
-    <div className="inline-flex flex-wrap gap-1 rounded-2xl bg-slate-100/80 p-1 ring-1 ring-slate-200/60">
+    <div className="inline-flex flex-wrap gap-1 rounded-full bg-slate-200/70 p-1">
       {options.map((o) => (
         <button
           key={String(o.value)}
           type="button"
           onClick={() => onChange(o.value)}
           className={clsx(
-            'rounded-xl px-3.5 py-1.5 text-sm font-semibold transition-all',
-            o.value === value ? 'bg-surface text-ink shadow-[0_1px_3px_rgba(15,23,42,0.1)] ring-1 ring-slate-200/60' : 'text-slate-500 hover:text-slate-800',
+            'rounded-full px-4 py-1.5 text-sm font-bold transition-all',
+            o.value === value ? 'bg-surface text-ink shadow-[0_1px_2px_rgba(28,25,23,0.08)]' : 'text-slate-500 hover:text-slate-800',
           )}
         >
           {o.label}
@@ -258,13 +256,13 @@ export function PageHeader({ title, description, actions }: { title: string; des
     <div className="mb-7 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div className="flex min-w-0 items-start gap-4">
         {Icon && (
-          <div className="hidden size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-600 text-white shadow-[0_8px_20px_-8px_rgba(19,112,143,0.7)] sm:flex">
+          <div className={clsx('hidden size-14 shrink-0 items-center justify-center rounded-3xl sm:flex', groupTile(nav?.group))}>
             <Icon className="size-6" />
           </div>
         )}
         <div className="min-w-0">
-          {nav?.group && <div className="mb-0.5 text-xs font-semibold tracking-wider text-brand-600 uppercase">{nav.group}</div>}
-          <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-[26px]">{title}</h1>
+          {nav?.group && <div className="mb-0.5 text-[13px] font-semibold text-slate-500">{nav.group}</div>}
+          <h1 className="text-[28px] leading-tight font-extrabold tracking-[-0.03em] text-ink sm:text-[32px]">{title}</h1>
           {description && <p className="mt-1 max-w-3xl text-sm leading-relaxed text-slate-500">{description}</p>}
         </div>
       </div>
@@ -273,14 +271,18 @@ export function PageHeader({ title, description, actions }: { title: string; des
   );
 }
 
+/** Menü grubuna göre başlık simgesinin pastel kutusu (her bölüm kendi renginde) */
+const GROUP_TILES = ['bg-tile-sky text-tile-sky-ink', 'bg-tile-peach text-tile-peach-ink', 'bg-tile-mint text-tile-mint-ink', 'bg-tile-lilac text-tile-lilac-ink', 'bg-tile-sun text-tile-sun-ink', 'bg-tile-rose text-tile-rose-ink'];
+export function groupTile(group?: string | null): string {
+  if (!group) return 'bg-tile-dark text-white';
+  const n = [...group].reduce((a, c) => a + c.charCodeAt(0), 0);
+  return GROUP_TILES[n % GROUP_TILES.length]!;
+}
+
+/** Düz bento kartı: beyaz zemin, ince sıcak kenarlık, gölgesiz */
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div
-      className={clsx(
-        'rounded-2xl bg-surface shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_30px_-16px_rgba(15,23,42,0.12)] ring-1 ring-slate-900/[0.06]',
-        className,
-      )}
-    >
+    <div className={clsx('rounded-3xl bg-surface ring-1 ring-slate-200', className)}>
       {children}
     </div>
   );
@@ -306,7 +308,7 @@ export function Badge({ tone = 'slate', children, dot }: { tone?: keyof typeof b
 export function EmptyState({ icon, title, description, action }: { icon: ReactNode; title: string; description?: string; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center px-6 py-14 text-center">
-      <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-50 to-brand-100 text-brand-600 ring-1 ring-brand-100">{icon}</div>
+      <div className="mb-4 flex size-16 items-center justify-center rounded-full bg-slate-100 text-slate-500">{icon}</div>
       <h3 className="text-base font-semibold text-ink">{title}</h3>
       {description && <p className="mt-1 max-w-sm text-sm text-slate-500">{description}</p>}
       {action && <div className="mt-5">{action}</div>}
@@ -324,12 +326,12 @@ export function Spinner({ label = 'Yükleniyor…' }: { label?: string }) {
 
 export function Alert({ children, tone = 'amber' }: { children: ReactNode; tone?: 'amber' | 'red' | 'blue' }) {
   const tones = {
-    amber: 'bg-amber-50 text-amber-800 ring-amber-200',
-    red: 'bg-red-50 text-red-800 ring-red-200',
-    blue: 'bg-brand-50 text-brand-900 ring-brand-200',
+    amber: 'bg-tile-sun text-tile-sun-ink ring-transparent',
+    red: 'bg-tile-rose text-tile-rose-ink ring-transparent',
+    blue: 'bg-tile-sky text-tile-sky-ink ring-transparent',
   };
   return (
-    <div className={clsx('flex gap-2.5 rounded-xl p-3.5 text-sm ring-1', tones[tone])}>
+    <div className={clsx('flex gap-2.5 rounded-2xl p-4 text-sm font-medium ring-1', tones[tone])}>
       <AlertTriangle className="mt-0.5 size-4 shrink-0" />
       <div>{children}</div>
     </div>
@@ -383,7 +385,7 @@ export function Modal({
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6">
       {/* Dışarı tıklamak pencereyi kapatmaz (yazılanlar kaybolmasın): pencere kısaca sallanır ve nasıl kapanacağı söylenir */}
-      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]" onClick={() => setNudge((n) => n + 1)} />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setNudge((n) => n + 1)} />
       {nudge > 0 && (
         <div key={nudge} role="status" className="animate-toast pointer-events-none absolute top-4 left-1/2 z-10 -translate-x-1/2 rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-lg">
           Kapatmak için Vazgeç ya da ✕ düğmesini kullanın
@@ -394,7 +396,7 @@ export function Modal({
         aria-modal="true"
         aria-label={title}
         className={clsx(
-          'relative flex max-h-[92vh] w-full flex-col rounded-t-2xl bg-surface shadow-2xl sm:rounded-2xl',
+          'relative flex max-h-[92vh] w-full flex-col rounded-t-3xl bg-surface shadow-2xl sm:rounded-3xl',
           shaking && 'animate-nudge',
           size === 'md' && 'sm:max-w-lg',
           size === 'lg' && 'sm:max-w-2xl',
@@ -403,7 +405,7 @@ export function Modal({
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
           <div>
-            <h2 className="text-base font-semibold text-ink">{title}</h2>
+            <h2 className="text-lg font-extrabold tracking-tight text-ink">{title}</h2>
             {description && <p className="mt-0.5 text-sm text-slate-500">{description}</p>}
           </div>
           <IconButton label="Kapat" onClick={onClose} className="-mr-2 -mt-1">
@@ -411,7 +413,7 @@ export function Modal({
           </IconButton>
         </div>
         <div className="overflow-y-auto px-5 py-5">{children}</div>
-        {footer && <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50/60 px-5 py-3.5 sm:rounded-b-2xl">{footer}</div>}
+        {footer && <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50/60 px-5 py-3.5 sm:rounded-b-3xl">{footer}</div>}
       </div>
     </div>,
     document.body,
@@ -484,7 +486,7 @@ export function DeleteButton({
             ref={box}
             role="dialog"
             aria-label="Silme onayı"
-            className="animate-toast fixed z-[60] w-60 rounded-xl bg-surface p-3 text-left shadow-[0_12px_40px_-8px_rgba(15,23,42,0.35)] ring-1 ring-slate-200"
+            className="animate-toast fixed z-[60] w-60 rounded-2xl bg-surface p-3 text-left shadow-[0_12px_40px_-8px_rgba(15,23,42,0.35)] ring-1 ring-slate-200"
             style={{ top: pos.top, right: pos.right, transform: pos.above ? 'translateY(-100%)' : undefined }}
           >
             <div className="text-sm font-semibold text-ink">{what ? `${what} silinsin mi?` : 'Silinsin mi?'}</div>
@@ -494,7 +496,7 @@ export function DeleteButton({
                 ref={cancel}
                 type="button"
                 onClick={() => setPos(null)}
-                className="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                className="rounded-full px-3 py-1.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
               >
                 Vazgeç
               </button>
@@ -504,7 +506,7 @@ export function DeleteButton({
                   setPos(null);
                   onConfirm();
                 }}
-                className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:brightness-110"
+                className="inline-flex items-center gap-1 rounded-full bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-500"
               >
                 <Trash2 className="size-3.5" /> Sil
               </button>
@@ -523,7 +525,7 @@ export function Table({ head, children }: { head: ReactNode[]; children: ReactNo
     <div className="overflow-x-auto">
       <table className="min-w-full text-sm">
         <thead>
-          <tr className="border-b border-slate-100 text-left text-xs font-semibold tracking-wide text-slate-500 uppercase">
+          <tr className="border-b border-slate-100 text-left text-xs font-bold text-slate-500">
             {head.map((h, i) => (
               <th key={i} className="px-4 py-3 whitespace-nowrap first:pl-5 last:pr-5">
                 {h}

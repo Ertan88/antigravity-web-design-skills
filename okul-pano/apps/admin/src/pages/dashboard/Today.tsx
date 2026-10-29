@@ -66,17 +66,27 @@ function bellText(b: BellStatus): { title: string; detail: string } {
   }
 }
 
-function Box({ icon: Icon, title, to, count, children }: { icon: LucideIcon; title: string; to?: string; count?: number; children: ReactNode }) {
+/** Kutunun simge rengi: her bilgi türü kendi pastel renginde (mobil uygulamayla aynı aile) */
+const TONES = {
+  sky: 'bg-tile-sky text-tile-sky-ink',
+  peach: 'bg-tile-peach text-tile-peach-ink',
+  rose: 'bg-tile-rose text-tile-rose-ink',
+  lilac: 'bg-tile-lilac text-tile-lilac-ink',
+  sun: 'bg-tile-sun text-tile-sun-ink',
+  mint: 'bg-tile-mint text-tile-mint-ink',
+} as const;
+
+function Box({ icon: Icon, title, to, count, tone, children }: { icon: LucideIcon; title: string; to?: string; count?: number; tone: keyof typeof TONES; children: ReactNode }) {
   return (
-    <Card className="flex flex-col p-4">
-      <div className="mb-3 flex items-center gap-2">
-        <span className="flex size-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
-          <Icon className="size-4" />
+    <Card className="flex flex-col p-5">
+      <div className="mb-3 flex items-center gap-2.5">
+        <span className={`flex size-9 items-center justify-center rounded-full ${TONES[tone]}`}>
+          <Icon className="size-[18px]" />
         </span>
-        <h3 className="text-sm font-semibold text-ink">{title}</h3>
-        {count !== undefined && <span className="rounded-full bg-slate-100 px-2 text-xs font-semibold text-slate-500">{count}</span>}
+        <h3 className="text-[15px] font-extrabold tracking-tight text-ink">{title}</h3>
+        {count !== undefined && <span className="rounded-full bg-slate-100 px-2 text-xs font-bold text-slate-500">{count}</span>}
         {to && (
-          <Link to={to} className="ml-auto text-xs font-semibold text-brand-600 hover:text-brand-700">
+          <Link to={to} className="ml-auto rounded-full px-3 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100 hover:text-ink">
             Düzenle
           </Link>
         )}
@@ -116,7 +126,7 @@ export function TodaySummary() {
   return (
     <section>
       <div className="mb-3 flex items-baseline justify-between gap-3">
-        <h2 className="text-lg font-semibold tracking-tight">Bugün</h2>
+        <h2 className="text-xl font-extrabold tracking-tight">Bugün</h2>
         <span className="text-sm text-slate-500">
           {new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', weekday: 'long', timeZone: st.school.timezone }).format(now)}
           {holiday && <span className="ml-2 font-semibold text-rose-600">· {holiday}</span>}
@@ -128,13 +138,13 @@ export function TodaySummary() {
         </span>
       </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        <Box icon={BellRing} title="Zil durumu" to={can('schedule.manage') ? '/zil-saatleri' : undefined}>
-          <div className="text-base font-semibold text-ink">{bell.title}</div>
+        <Box icon={BellRing} tone="sun" title="Zil durumu" to={can('schedule.manage') ? '/zil-saatleri' : undefined}>
+          <div className="text-xl font-extrabold tracking-tight text-ink">{bell.title}</div>
           <div className="text-slate-500">{bell.detail}</div>
           {schedule && <div className="mt-2 text-xs text-slate-400">Çizelge: {schedule.name}</div>}
         </Box>
 
-        <Box icon={ShieldCheck} title="Nöbetçiler" count={duties.length} to={can('duties.manage') ? '/nobet' : undefined}>
+        <Box icon={ShieldCheck} tone="peach" title="Nöbetçiler" count={duties.length} to={can('duties.manage') ? '/nobet' : undefined}>
           {holiday ? (
             <Empty>Tatil: nöbet yok</Empty>
           ) : duties.length ? (
@@ -157,11 +167,11 @@ export function TodaySummary() {
           )}
         </Box>
 
-        <Box icon={UserMinus} title="İzinli öğretmenler" count={leaves.length} to={can('leaves.manage') ? '/izinler' : undefined}>
+        <Box icon={UserMinus} tone="rose" title="İzinli öğretmenler" count={leaves.length} to={can('leaves.manage') ? '/izinler' : undefined}>
           {leaves.length ? (
             <div className="flex flex-wrap gap-1.5">
               {leaves.map((l) => (
-                <span key={l.id} className="rounded-lg bg-rose-50 px-2 py-0.5 font-medium text-rose-700 ring-1 ring-rose-200">
+                <span key={l.id} className="rounded-full bg-tile-rose px-2.5 py-0.5 font-semibold text-tile-rose-ink">
                   {l.teacherName}
                 </span>
               ))}
@@ -171,7 +181,7 @@ export function TodaySummary() {
           )}
         </Box>
 
-        <Box icon={GraduationCap} title="Yaklaşan sınavlar" to={can('exams.manage') ? '/sinavlar' : undefined}>
+        <Box icon={GraduationCap} tone="lilac" title="Yaklaşan sınavlar" to={can('exams.manage') ? '/sinavlar' : undefined}>
           {st.exams.length ? (
             <ul className="space-y-1">
               {st.exams.slice(0, 4).map((e) => (
@@ -186,13 +196,13 @@ export function TodaySummary() {
           )}
         </Box>
 
-        <Box icon={Cake} title="Doğum günleri" count={birthdays.length} to={can('students.manage') ? '/ogrenciler' : undefined}>
+        <Box icon={Cake} tone="mint" title="Doğum günleri" count={birthdays.length} to={can('students.manage') ? '/ogrenciler' : undefined}>
           {birthdays.length ? (
             <div className="flex flex-wrap gap-1.5">
               {birthdays.map((b) => (
-                <span key={b.id} className="rounded-lg bg-amber-50 px-2 py-0.5 font-medium text-amber-800 ring-1 ring-amber-200">
+                <span key={b.id} className="rounded-full bg-tile-sun px-2.5 py-0.5 font-semibold text-tile-sun-ink">
                   {formatPersonName(b.name, s.birthdayNameFormat)}
-                  {b.className && <span className="ml-1 text-amber-600">{b.className}</span>}
+                  {b.className && <span className="ml-1 opacity-70">{b.className}</span>}
                 </span>
               ))}
             </div>
@@ -201,7 +211,7 @@ export function TodaySummary() {
           )}
         </Box>
 
-        <Box icon={MonitorSmartphone} title="Panolar" count={screens.data?.length} to={can('screens.manage') ? '/ekranlar' : undefined}>
+        <Box icon={MonitorSmartphone} tone="sky" title="Panolar" count={screens.data?.length} to={can('screens.manage') ? '/ekranlar' : undefined}>
           {screens.data?.length ? (
             <ul className="space-y-1.5">
               {screens.data.map((x) => (

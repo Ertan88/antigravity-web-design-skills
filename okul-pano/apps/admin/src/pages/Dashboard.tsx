@@ -1,6 +1,7 @@
 import { resolveScreenDisplay } from '@okulpano/shared';
 import { useQuery } from '@tanstack/react-query';
-import { Cake, GraduationCap, Megaphone, MonitorSmartphone, Plus, ShieldCheck, TextCursorInput, UserMinus, Users } from 'lucide-react';
+import clsx from 'clsx';
+import { ArrowUpRight, Cake, GraduationCap, Megaphone, MonitorSmartphone, Plus, ShieldCheck, TextCursorInput, UserMinus, Users } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { BoardPreview } from '../components/BoardPreview.tsx';
@@ -45,20 +46,29 @@ function greeting() {
   return 'İyi akşamlar';
 }
 
-function Stat({ icon, label, value, hint, to }: { icon: ReactNode; label: string; value: ReactNode; hint?: ReactNode; to?: string }) {
+const TILE = {
+  dark: 'bg-tile-dark text-white',
+  mint: 'bg-tile-mint text-tile-mint-ink',
+  sky: 'bg-tile-sky text-tile-sky-ink',
+  lilac: 'bg-tile-lilac text-tile-lilac-ink',
+} as const;
+
+/** Bento kutusu: renkli zemin, simgeli küçük etiket, büyük rakam; dokununca ilgili sayfa */
+function Stat({ icon, label, value, hint, to, tone }: { icon: ReactNode; label: string; value: ReactNode; hint?: ReactNode; to?: string; tone: keyof typeof TILE }) {
   const body = (
-    <Card className="h-full p-4 transition-shadow hover:shadow-md">
-      <div className="flex items-center gap-3">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600">{icon}</div>
-        <div className="min-w-0">
-          <div className="text-xs font-medium text-slate-500">{label}</div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-xl font-bold tracking-tight">{value}</span>
-            {hint && <span className="truncate text-xs font-medium text-amber-600">{hint}</span>}
-          </div>
-        </div>
+    <div className={clsx('group relative flex h-full min-h-36 flex-col rounded-3xl p-5 transition-transform hover:-translate-y-0.5', TILE[tone])}>
+      <div className="flex items-center gap-2 text-[13px] font-bold opacity-75">
+        {icon}
+        {label}
       </div>
-    </Card>
+      <div className="mt-auto pt-4 text-[44px] leading-none font-extrabold tracking-[-0.04em] tabular-nums">{value}</div>
+      {hint && <div className="mt-2 text-[13px] font-bold">{hint}</div>}
+      {to && (
+        <span className="absolute top-4 right-4 flex size-8 items-center justify-center rounded-full bg-white/50 transition group-hover:bg-white/80 dark:bg-white/10">
+          <ArrowUpRight className="size-4" />
+        </span>
+      )}
+    </div>
   );
   return to ? (
     <Link to={to} className="block h-full">
@@ -78,11 +88,13 @@ function PendingApprovals() {
   return (
     <Link
       to="/duyurular"
-      className="flex items-center gap-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 ring-1 ring-amber-200 transition hover:bg-amber-100"
+      className="flex items-center gap-4 rounded-3xl bg-tile-peach px-5 py-4 text-tile-peach-ink transition hover:brightness-[0.98]"
     >
-      <Megaphone className="size-4" />
-      {n} duyuru onayınızı bekliyor
-      <span className="ml-auto text-amber-700">İncele →</span>
+      <span className="flex size-11 items-center justify-center rounded-2xl bg-orange-500 text-white">
+        <Megaphone className="size-5" />
+      </span>
+      <span className="text-[15px] font-extrabold">{n} duyuru onayınızı bekliyor</span>
+      <span className="ml-auto shrink-0 rounded-full bg-white/60 px-3.5 py-1.5 text-sm font-bold whitespace-nowrap dark:bg-white/10">İncele →</span>
     </Link>
   );
 }
@@ -114,23 +126,34 @@ export function Dashboard() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">
+        <h1 className="text-[34px] leading-[1.1] font-extrabold tracking-[-0.04em] sm:text-[42px]">
           {greeting()}, {me?.user.fullName.split(' ')[0]}
+          <span className="block text-slate-400">{new Intl.DateTimeFormat('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}</span>
         </h1>
-        <p className="mt-1 text-sm text-slate-500">{school?.name} panosunun anlık durumu.</p>
+        <p className="mt-2 text-sm font-medium text-slate-500">{school?.name} panosunun anlık durumu.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat icon={<Megaphone className="size-5" />} label="Yayındaki duyuru" value={s?.activeAnnouncements ?? '—'} to="/duyurular" />
         <Stat
-          icon={<MonitorSmartphone className="size-5" />}
-          label="Çevrimiçi ekran"
-          value={s ? `${s.screensOnline} / ${s.screens}` : '—'}
-          hint={s && s.screens > s.screensOnline ? `${s.screens - s.screensOnline} çevrimdışı` : undefined}
+          tone="dark"
+          icon={<MonitorSmartphone className="size-4" />}
+          label="Ekranlar"
+          value={
+            s ? (
+              <>
+                {s.screensOnline}
+                <span className="text-2xl opacity-50">/{s.screens}</span>
+              </>
+            ) : (
+              '—'
+            )
+          }
+          hint={s ? (s.screens > s.screensOnline ? <span className="text-rose-300">{s.screens - s.screensOnline} ekran çevrimdışı</span> : 'hepsi çevrimiçi') : undefined}
           to="/ekranlar"
         />
-        <Stat icon={<Users className="size-5" />} label="Öğretmen" value={s?.teachers ?? '—'} to="/ogretmenler" />
-        <Stat icon={<Cake className="size-5" />} label="Öğrenci" value={s?.students ?? '—'} to="/ogrenciler" />
+        <Stat tone="mint" icon={<Megaphone className="size-4" />} label="Yayında" value={s?.activeAnnouncements ?? '—'} hint="duyuru" to="/duyurular" />
+        <Stat tone="sky" icon={<Users className="size-4" />} label="Öğretmen" value={s?.teachers ?? '—'} hint="kadroda" to="/ogretmenler" />
+        <Stat tone="lilac" icon={<Cake className="size-4" />} label="Öğrenci" value={s?.students ?? '—'} hint="kayıtlı" to="/ogrenciler" />
       </div>
 
       <PendingApprovals />
@@ -138,9 +161,9 @@ export function Dashboard() {
       <TodaySummary />
 
       <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
-        <Card className="p-4 sm:p-5">
+        <Card className="p-5 sm:p-6">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-semibold">Canlı önizleme</h2>
+            <h2 className="text-lg font-extrabold tracking-tight">Canlı önizleme</h2>
             {(screens.data?.length ?? 0) > 0 ? (
               <Segmented
                 value={previewScreen?.id ?? ''}
@@ -162,22 +185,20 @@ export function Dashboard() {
 
         <div className="space-y-6">
           {quick.length > 0 && (
-            <Card className="p-4">
-              <h2 className="mb-3 text-sm font-semibold">Hızlı işlemler</h2>
-              <div className="grid grid-cols-2 gap-2">
-                {quick.map((q) => (
+            <Card className="p-5">
+              <h2 className="mb-3 text-lg font-extrabold tracking-tight">Hızlı işlemler</h2>
+              <div className="flex flex-wrap gap-2">
+                {quick.map((q, i) => (
                   <Link
                     key={q.to}
                     to={q.to}
-                    className="flex flex-col items-start gap-2 rounded-xl p-3 ring-1 ring-slate-200 transition-colors hover:bg-slate-50 hover:ring-brand-200"
+                    className={clsx(
+                      'inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-bold transition-colors',
+                      i === 0 ? 'bg-brand-600 text-white hover:bg-brand-500' : 'bg-surface ring-1 ring-slate-200 hover:bg-slate-100',
+                    )}
                   >
-                    <span className="flex size-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
-                      <q.icon className="size-4" />
-                    </span>
-                    <span className="flex items-center gap-1 text-sm font-semibold">
-                      <Plus className="size-3.5 text-slate-400" />
-                      {q.label}
-                    </span>
+                    {i === 0 ? <Plus className="size-4" /> : <q.icon className="size-4" />}
+                    {q.label}
                   </Link>
                 ))}
               </div>
@@ -185,10 +206,10 @@ export function Dashboard() {
           )}
 
           {can('users.manage') && (
-            <Card className="p-4">
+            <Card className="p-5">
               <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-sm font-semibold">Son hareketler</h2>
-                <Link to="/gecmis" className="text-xs font-semibold text-brand-600">
+                <h2 className="text-lg font-extrabold tracking-tight">Son hareketler</h2>
+                <Link to="/gecmis" className="rounded-full px-3 py-1 text-xs font-bold ring-1 ring-slate-200 hover:bg-slate-100">
                   Tümü
                 </Link>
               </div>

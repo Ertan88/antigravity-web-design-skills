@@ -98,7 +98,7 @@ export function WeekCoverage({
             className={clsx(
               'min-w-0 rounded-2xl px-2 py-2.5 text-left transition sm:px-3',
               active
-                ? 'bg-gradient-to-br from-brand-500 to-brand-600 text-white shadow-[0_10px_24px_-12px_rgba(19,112,143,0.8)]'
+                ? 'bg-brand-600 text-white'
                 : 'bg-slate-50 ring-1 ring-slate-200/80 hover:bg-surface hover:ring-brand-200',
             )}
           >
@@ -406,12 +406,12 @@ export function ScheduleView({
           className={clsx(
             'rounded-2xl p-5 text-white shadow-sm',
             off === 'holiday'
-              ? 'bg-gradient-to-br from-rose-500 to-rose-600'
+              ? 'bg-rose-500'
               : status?.kind === 'break'
-                ? 'bg-gradient-to-br from-emerald-500 to-teal-600'
+                ? 'bg-emerald-500'
                 : off === 'half' && (!isToday || status?.kind === 'after')
-                  ? 'bg-gradient-to-br from-amber-500 to-orange-600'
-                  : 'bg-gradient-to-br from-brand-500 to-brand-600',
+                  ? 'bg-amber-500'
+                  : 'bg-brand-600',
           )}
         >
           <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-white/75 uppercase">

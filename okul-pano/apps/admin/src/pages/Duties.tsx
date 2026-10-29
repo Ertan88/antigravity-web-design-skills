@@ -40,7 +40,7 @@ function DayBar({ value, onChange, counts }: { value: number; onChange: (d: numb
             className={clsx(
               'group relative overflow-hidden rounded-2xl px-2 py-2.5 text-left transition-all sm:px-3.5 sm:py-3',
               active
-                ? 'bg-gradient-to-br from-brand-500 to-brand-600 text-white shadow-[0_10px_24px_-12px_rgba(19,112,143,0.8)]'
+                ? 'bg-brand-600 text-white'
                 : 'bg-slate-50 text-slate-700 ring-1 ring-slate-200/80 hover:bg-surface hover:ring-brand-200',
             )}
           >
@@ -350,7 +350,7 @@ export function Duties() {
             <TransportView month={month} />
           ) : view === 'supervisor' ? (
             <Card className="overflow-hidden">
-              <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 bg-gradient-to-r from-teal-50/80 to-surface px-5 py-3.5">
+              <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 bg-tile-mint/40 px-5 py-3.5">
                 <span className="flex size-9 items-center justify-center rounded-xl bg-teal-600 text-white">
                   <CalendarDays className="size-4" />
                 </span>

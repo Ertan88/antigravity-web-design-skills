@@ -4,21 +4,52 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  /* Kurumsal petrol mavisi (mor / çivit tonları bilinçli olarak kullanılmıyor) */
-  --color-brand-50: #eef8fb;
-  --color-brand-100: #d6eef5;
-  --color-brand-200: #afdcea;
-  --color-brand-300: #7cc4da;
-  --color-brand-400: #46a6c4;
-  --color-brand-500: #1f8bad;
-  --color-brand-600: #13708f;
-  --color-brand-700: #135b74;
-  --color-brand-800: #164b60;
-  --color-brand-900: #173f51;
+  --font-sans: 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /*
+   * "Bento" tasarım sistemi (mobil uygulamayla aynı): sıcak kâğıt zemin, koyu mürekkep ana renk ve bilgiyi
+   * türüne göre ayıran pastel kutular. "brand" mürekkep tonlarıdır (birincil düğme, seçili menü).
+   */
+  --color-brand-50: #f3f1ec;
+  --color-brand-100: #e9e5de;
+  --color-brand-200: #dad4c9;
+  --color-brand-300: #bfb7aa;
+  --color-brand-400: #8f877c;
+  --color-brand-500: #292524;
+  --color-brand-600: #1c1917;
+  --color-brand-700: #1c1917;
+  --color-brand-800: #0c0a09;
+  --color-brand-900: #0c0a09;
+  /* Nötrler sıcak taş tonları (slate sınıfları sayfalarda değişmeden bu renklere döner) */
+  --color-slate-50: #f7f6f3;
+  --color-slate-100: #f0ede8;
+  --color-slate-200: #e7e3dc;
+  --color-slate-300: #d6d1c8;
+  --color-slate-400: #a8a29e;
+  --color-slate-500: #78716c;
+  --color-slate-600: #57534e;
+  --color-slate-700: #44403c;
+  --color-slate-800: #292524;
+  --color-slate-900: #1c1917;
+  /* Bento kutuları: zemin (tile-*) ve üstündeki yazı (tile-*-ink) */
+  --color-tile-sun: #fde68a;
+  --color-tile-sun-ink: #713f12;
+  --color-tile-peach: #fed7aa;
+  --color-tile-peach-ink: #7c2d12;
+  --color-tile-mint: #bbf7d0;
+  --color-tile-mint-ink: #14532d;
+  --color-tile-sky: #bae6fd;
+  --color-tile-sky-ink: #0c4a6e;
+  --color-tile-lilac: #ddd6fe;
+  --color-tile-lilac-ink: #3b0764;
+  --color-tile-rose: #fecdd3;
+  --color-tile-rose-ink: #881337;
+  --color-tile-dark: #1c1917;
   /* Temaya göre değişen yüzey ve yazı renkleri */
   --color-surface: #ffffff;
-  --color-ink: #0f172a;
+  --color-ink: #1c1917;
+  --radius-xl: 0.875rem;
+  --radius-2xl: 1.25rem;
+  --radius-3xl: 1.625rem;
 }
 
 /*
@@ -28,24 +59,46 @@
  */
 .dark {
   color-scheme: dark;
-  --color-surface: #121a2b;
-  --color-ink: #eef2f8;
+  --color-surface: #1a1816;
+  --color-ink: #f5f3ef;
 
-  --color-slate-50: #0b1120;
-  --color-slate-100: #1a2335;
-  --color-slate-200: #273249;
-  --color-slate-300: #354159;
-  --color-slate-400: #66748c;
-  --color-slate-500: #8f9db3;
-  --color-slate-600: #b3bfd0;
-  --color-slate-700: #d3dae5;
-  --color-slate-800: #e6ebf2;
+  --color-slate-50: #0f0e0d;
+  --color-slate-100: #211f1c;
+  --color-slate-200: #2e2b27;
+  --color-slate-300: #3f3a35;
+  --color-slate-400: #78716c;
+  --color-slate-500: #a8a29e;
+  --color-slate-600: #c7c2bc;
+  --color-slate-700: #e0dcd6;
+  --color-slate-800: #efece8;
+  --color-slate-900: #f5f3ef;
 
-  --color-brand-50: rgb(31 139 173 / 0.14);
-  --color-brand-100: rgb(31 139 173 / 0.22);
-  --color-brand-200: rgb(31 139 173 / 0.34);
-  --color-brand-700: #7cc4da;
-  --color-brand-900: #d6eef5;
+  /* Mürekkep düğmeler koyu temada sıcak gri olur (üstündeki beyaz yazı okunur) */
+  --color-brand-50: rgb(255 255 255 / 0.06);
+  --color-brand-100: rgb(255 255 255 / 0.1);
+  --color-brand-200: rgb(255 255 255 / 0.16);
+  --color-brand-300: #78716c;
+  --color-brand-400: #a8a29e;
+  --color-brand-500: #57534e;
+  --color-brand-600: #44403c;
+  --color-brand-700: #e7e5e4;
+  --color-brand-800: #f5f5f4;
+  --color-brand-900: #fafaf9;
+
+  /* Pastel kutular koyu temada koyu zeminli, açık yazılı */
+  --color-tile-sun: #3a2e0c;
+  --color-tile-sun-ink: #fde68a;
+  --color-tile-peach: #3d2412;
+  --color-tile-peach-ink: #fed7aa;
+  --color-tile-mint: #10301e;
+  --color-tile-mint-ink: #bbf7d0;
+  --color-tile-sky: #0d2b3e;
+  --color-tile-sky-ink: #bae6fd;
+  --color-tile-lilac: #26193f;
+  --color-tile-lilac-ink: #ddd6fe;
+  --color-tile-rose: #3e1422;
+  --color-tile-rose-ink: #fecdd3;
+  --color-tile-dark: #000000;
 
   --color-emerald-50: rgb(16 185 129 / 0.13);
   --color-emerald-100: rgb(16 185 129 / 0.2);
@@ -104,7 +157,7 @@
   }
 
   :focus-visible {
-    @apply outline-2 outline-offset-2 outline-brand-500;
+    @apply outline-2 outline-offset-2 outline-ink;
   }
 }
 

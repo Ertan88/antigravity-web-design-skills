@@ -26,10 +26,10 @@ function SchoolSwitcher() {
     </>
   );
   if (me.schools.length === 1) {
-    return <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-2.5 ring-1 ring-slate-200/70">{body}</div>;
+    return <div className="flex items-center gap-3 rounded-2xl bg-surface p-2.5 ring-1 ring-slate-200">{body}</div>;
   }
   return (
-    <label className="relative flex items-center gap-3 rounded-2xl bg-slate-50 p-2.5 ring-1 ring-slate-200/70 transition hover:ring-slate-300 focus-within:ring-brand-400">
+    <label className="relative flex items-center gap-3 rounded-2xl bg-surface p-2.5 ring-1 ring-slate-200 transition hover:ring-slate-300 focus-within:ring-ink">
       {body}
       <ChevronsUpDown className="size-4 text-slate-400" />
       <select
@@ -51,7 +51,7 @@ function SchoolSwitcher() {
 function SchoolBadge({ name, logo }: { name: string; logo: string | null }) {
   if (logo) return <img src={logo} alt="" className="size-10 shrink-0 rounded-xl bg-surface object-contain p-0.5" />;
   return (
-    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 text-sm font-bold text-white shadow-md shadow-brand-600/30">
+    <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-tile-sun text-sm font-extrabold text-tile-sun-ink">
       {name.trim().charAt(0).toLocaleUpperCase('tr-TR') || <School className="size-4" />}
     </div>
   );
@@ -69,8 +69,8 @@ const initials = (name: string | undefined) =>
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   clsx(
-    'group relative flex items-center gap-3 rounded-xl px-3 py-2 text-[13.5px] font-medium transition-all',
-    isActive ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-100' : 'text-slate-600 hover:bg-slate-100 hover:text-ink',
+    'group relative flex items-center gap-3 rounded-full px-3.5 py-2 text-[13.5px] font-semibold transition-all',
+    isActive ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-200/60 hover:text-ink',
   );
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
@@ -78,9 +78,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const school = useSchool();
   const settings = school.data?.settings;
   return (
-    <div className="relative flex h-full flex-col overflow-hidden border-r border-slate-200/70 bg-surface text-slate-600">
-      {/* Hafif arka plan ışıltısı */}
-      <div className="pointer-events-none absolute -top-28 -left-28 size-72 rounded-full bg-brand-500/10 blur-3xl" />
+    <div className="relative flex h-full flex-col overflow-hidden border-r border-slate-200 bg-slate-50 text-slate-600">
 
       <div className="relative flex items-center gap-2.5 px-5 pt-5 pb-4">
         <BrandMark className="size-9 shrink-0 drop-shadow-sm" />
@@ -98,14 +96,13 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           if (!items.length) return null;
           return (
             <div key={group.title || 'root'}>
-              {group.title && <div className="px-3 pb-1.5 text-[10.5px] font-semibold tracking-[0.12em] text-slate-400 uppercase">{group.title}</div>}
+              {group.title && <div className="px-3.5 pb-1.5 text-xs font-bold text-slate-400">{group.title}</div>}
               <div className="space-y-0.5">
                 {items.map((item) => (
                   <NavLink key={item.to} to={item.to} end={item.to === '/'} onClick={onNavigate} className={navLinkClass}>
                     {({ isActive }) => (
                       <>
-                        {isActive && <span className="absolute top-1/2 -left-3 h-5 w-1 -translate-y-1/2 rounded-r-full bg-brand-500" />}
-                        <item.icon className={clsx('size-[18px] shrink-0 transition-colors', isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-slate-600')} />
+                        <item.icon className={clsx('size-[18px] shrink-0 transition-colors', isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-600')} />
                         <span className="truncate">{item.label}</span>
                       </>
                     )}
@@ -117,17 +114,17 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         })}
         {me?.user.isSuperAdmin && (
           <div>
-            <div className="px-3 pb-1.5 text-[10.5px] font-semibold tracking-[0.12em] text-slate-400 uppercase">Platform</div>
+            <div className="px-3.5 pb-1.5 text-xs font-bold text-slate-400">Platform</div>
             <NavLink to="/platform" end onClick={onNavigate} className={navLinkClass}>
-              <Building2 className="size-[18px] text-slate-400" /> Okullar ve Abonelikler
+              <Building2 className="size-[18px]" /> Okullar ve Abonelikler
             </NavLink>
           </div>
         )}
       </nav>
-      <div className="relative border-t border-slate-200/70 p-3">
+      <div className="relative border-t border-slate-200 p-3">
         <div className="flex items-center gap-1">
-          <NavLink to="/hesap" onClick={onNavigate} className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl px-2 py-2 transition hover:bg-slate-100">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-600 text-xs font-bold text-white ring-2 ring-surface">
+          <NavLink to="/hesap" onClick={onNavigate} className="flex min-w-0 flex-1 items-center gap-2.5 rounded-2xl px-2 py-2 transition hover:bg-slate-200/60">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-tile-sky text-xs font-extrabold text-tile-sky-ink">
               {initials(me?.user.fullName)}
             </div>
             <div className="min-w-0 flex-1">
@@ -140,7 +137,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             title="Çıkış yap"
             aria-label="Çıkış yap"
             onClick={() => void logout()}
-            className="flex size-9 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-ink"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-200/60 hover:text-ink"
           >
             <LogOut className="size-[18px]" />
           </button>
@@ -170,7 +167,7 @@ function ThemeToggle() {
         )}
       />
       <Sun className={clsx('relative z-10 ml-1.5 size-4 transition-colors', dark ? 'text-slate-400' : 'text-amber-500')} />
-      <Moon className={clsx('relative z-10 ml-auto mr-1.5 size-4 transition-colors', dark ? 'text-brand-400' : 'text-slate-400')} />
+      <Moon className={clsx('relative z-10 ml-auto mr-1.5 size-4 transition-colors', dark ? 'text-sky-300' : 'text-slate-400')} />
     </button>
   );
 }
@@ -179,7 +176,7 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
   const { pathname } = useLocation();
   const nav = findNav(pathname);
   return (
-    <header className="border-b border-slate-200/60 bg-surface/75 backdrop-blur-xl">
+    <header className="border-b border-slate-200/70 bg-slate-50/80 backdrop-blur-xl">
       <div className="mx-auto flex h-14 w-full max-w-[1680px] items-center gap-3 px-4 sm:px-6 lg:h-16 lg:px-8">
         <button type="button" aria-label="Menüyü aç" className="-ml-1 rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 lg:hidden" onClick={onMenu}>
           <Menu className="size-5" />
@@ -211,15 +208,13 @@ export function Layout() {
 
   return (
     <div className="relative min-h-dvh lg:pl-72">
-      {/* İçerik alanının üstünde hafif renk geçişi */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-80 bg-[radial-gradient(60%_100%_at_30%_0%,rgba(59,130,246,0.10),transparent)]" />
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 lg:block">
         <Sidebar />
       </aside>
 
       {open && (
         <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
           <aside className="absolute inset-y-0 left-0 w-72 max-w-[85vw] shadow-2xl">
             <button
               type="button"

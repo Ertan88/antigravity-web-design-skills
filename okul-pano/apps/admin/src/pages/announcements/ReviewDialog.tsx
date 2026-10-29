@@ -21,7 +21,7 @@ export function AnnouncementPreview({ row }: { row: Announcement }) {
       {src ? (
         <img src={src} alt="" className="aspect-video w-full object-contain" />
       ) : (
-        <div className="flex aspect-video flex-col justify-center gap-3 bg-gradient-to-br from-brand-700 to-brand-500 p-8 text-white">
+        <div className="flex aspect-video flex-col justify-center gap-3 bg-tile-dark p-8 text-white">
           <Megaphone className="size-8 opacity-80" />
           <div className="text-2xl font-bold">{row.title}</div>
           {row.body && <div className="text-base opacity-90">{row.body}</div>}
