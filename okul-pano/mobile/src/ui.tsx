@@ -250,12 +250,15 @@ export function Field({ label, error, help, ...input }: TextInputProps & { label
   return (
     <View style={{ gap: 6 }}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput
-        accessibilityLabel={label}
-        placeholderTextColor={colors.subtle}
-        {...input}
-        style={[styles.input, input.multiline && { height: undefined, minHeight: 92, paddingTop: 12, textAlignVertical: 'top' }, error ? { borderColor: colors.danger } : null, input.style]}
-      />
+      {/* Kutu yuvarlak köşelerle kırpılır: sistemin doldurma / seçim zemini köşelerden taşmaz */}
+      <View style={{ borderRadius: radius.md, overflow: 'hidden' }}>
+        <TextInput
+          accessibilityLabel={label}
+          placeholderTextColor={colors.subtle}
+          {...input}
+          style={[styles.input, input.multiline && { height: undefined, minHeight: 92, paddingTop: 12, textAlignVertical: 'top' }, error ? { borderColor: colors.danger } : null, input.style]}
+        />
+      </View>
       {error ? <Text style={{ color: colors.danger, fontSize: 13 }}>{error}</Text> : help ? <Text style={{ color: colors.faint, fontSize: 12 }}>{help}</Text> : null}
     </View>
   );

@@ -39,7 +39,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const system = useColorScheme();
   const nav = useNavigationContainerRef();
   const [mode, setModeState] = useState<ThemeMode | null>(null);
-  // Yumuşak geçiş: eski temanın zemin renginde bir perde ekranı kısaca örter, yeni tema altından açılır
+  // Yumuşak geçiş: yeni tema eski temanın zemin renginde yarı saydam bir perdenin altından hızla belirir
   const veil = useRef(new Animated.Value(0)).current;
   const [veilColor, setVeilColor] = useState<string | null>(null);
 
@@ -68,12 +68,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const setMode = useCallback(
     (m: ThemeMode) => {
       void storage.set(KEY, m === 'system' ? null : m);
-      if (m === mode) return;
-      // Önce perde eski zemin renginde yavaşça kapanır, sonra tema değişir (bkz. aşağıdaki açılış)
-      setVeilColor(colors.bg);
-      Animated.timing(veil, { toValue: 1, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: true }).start(() => setModeState(m));
+      setModeState(m);
     },
-    [mode, veil],
+    [],
   );
 
   // Tema değişti (elle ya da sistemden): perde yeni ekranlar kurulduktan sonra açılır. Çizimden önce
@@ -82,12 +79,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const from = previousBg;
     previousBg = null;
     if (!from) return;
-    setVeilColor((c) => c ?? from);
-    veil.setValue(1);
-    const t = setTimeout(() => {
-      Animated.timing(veil, { toValue: 0, duration: 360, easing: Easing.inOut(Easing.quad), useNativeDriver: true }).start(() => setVeilColor(null));
-    }, 90);
-    return () => clearTimeout(t);
+    setVeilColor(from);
+    veil.setValue(0.65);
+    const anim = Animated.timing(veil, { toValue: 0, duration: 260, easing: Easing.out(Easing.quad), useNativeDriver: true });
+    anim.start(() => setVeilColor(null));
+    return () => anim.stop();
   }, [isDark, veil]);
   const takeNavState = useCallback(() => {
     const s = savedNav;

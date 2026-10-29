@@ -1,5 +1,22 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { AndroidConfig, withAndroidStyles } = require('expo/config-plugins');
+
+/**
+ * Android otomatik doldurma (kayıtlı e-posta / şifre) kutuyu köşeli sarı bir zeminle boyar; yuvarlak kutuların
+ * dışına taşar. Bu vurgu saydam yapılır (doldurma çalışmaya devam eder).
+ */
+function withoutAutofillHighlight(config) {
+  return withAndroidStyles(config, (c) => {
+    c.modResults = AndroidConfig.Styles.assignStylesValue(c.modResults, {
+      add: true,
+      parent: AndroidConfig.Styles.getAppThemeGroup(),
+      name: 'android:autofilledHighlight',
+      value: '@android:color/transparent',
+    });
+    return c;
+  });
+}
 
 /**
  * app.json'daki ayarlara derleme ortamından gelenleri ekler (anahtarlar depoya yazılmaz):
@@ -9,9 +26,9 @@ const path = require('node:path');
 module.exports = ({ config }) => {
   const firebase = path.join(__dirname, 'google-services.json');
   const projectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
-  return {
+  return withoutAutofillHighlight({
     ...config,
     android: { ...config.android, ...(fs.existsSync(firebase) ? { googleServicesFile: './google-services.json' } : {}) },
     extra: { ...config.extra, ...(projectId ? { eas: { projectId } } : {}) },
-  };
+  });
 };
