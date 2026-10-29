@@ -83,8 +83,8 @@ export default function Programim() {
                   paddingVertical: 11,
                   paddingHorizontal: 14,
                   borderTopWidth: i ? 1 : 0,
-                  borderTopColor: '#f1efea',
-                  backgroundColor: state === 'now' ? colors.primarySoft : '#fff',
+                  borderTopColor: colors.divider,
+                  backgroundColor: state === 'now' ? colors.primarySoft : colors.card,
                   opacity: state === 'past' || cut ? 0.5 : 1,
                 }}
               >

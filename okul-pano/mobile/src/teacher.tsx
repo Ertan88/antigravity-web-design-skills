@@ -20,7 +20,7 @@ export function NotificationsButton() {
 export function SchoolBadge({ name, size = 44 }: { name: string; size?: number }) {
   return (
     <View style={{ width: size, height: size, borderRadius: 12, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ color: '#fff', fontWeight: '800', fontSize: size * 0.42 }}>{name.trim().charAt(0).toLocaleUpperCase('tr-TR')}</Text>
+      <Text style={{ color: colors.onPrimary, fontWeight: '800', fontSize: size * 0.42 }}>{name.trim().charAt(0).toLocaleUpperCase('tr-TR')}</Text>
     </View>
   );
 }
@@ -157,7 +157,7 @@ export function MySchedule({ data }: { data: MeToday }) {
                 paddingHorizontal: 16,
                 borderTopWidth: i ? 1 : 0,
                 borderTopColor: colors.divider,
-                backgroundColor: l.state === 'now' ? tiles.sky.bg : '#fff',
+                backgroundColor: l.state === 'now' ? tiles.sky.bg : colors.card,
                 opacity: l.state === 'past' ? 0.55 : 1,
               }}
             >

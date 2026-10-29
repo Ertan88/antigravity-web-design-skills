@@ -57,18 +57,18 @@ function MyDuties() {
                 paddingVertical: 8,
                 borderRadius: 12,
                 alignItems: 'center',
-                backgroundColor: on ? colors.primary : d.holiday ? '#f0ede8' : '#fff',
+                backgroundColor: on ? colors.primary : d.holiday ? colors.primarySoft : colors.card,
                 borderWidth: 1,
                 borderStyle: d.holiday ? 'dashed' : 'solid',
-                borderColor: on ? colors.primary : d.holiday ? '#dcd7cf' : colors.border,
+                borderColor: on ? colors.primary : d.holiday ? colors.borderStrong : colors.border,
               }}
             >
-              <Text style={{ fontSize: 11, color: on ? '#fff' : colors.muted, fontWeight: '600' }}>{WEEKDAY_SHORT[d.weekday]}</Text>
-              <Text style={{ fontSize: 18, fontWeight: '800', color: on ? '#fff' : colors.ink }}>{Number(d.date.slice(8))}</Text>
+              <Text style={{ fontSize: 11, color: on ? colors.onPrimary : colors.muted, fontWeight: '600' }}>{WEEKDAY_SHORT[d.weekday]}</Text>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: on ? colors.onPrimary : colors.ink }}>{Number(d.date.slice(8))}</Text>
               {d.holiday ? (
-                <Text style={{ fontSize: 9, fontWeight: '800', color: on ? '#fff' : colors.faint }}>TATİL</Text>
+                <Text style={{ fontSize: 9, fontWeight: '800', color: on ? colors.onPrimary : colors.faint }}>TATİL</Text>
               ) : (
-                <View style={{ width: 6, height: 6, borderRadius: 3, marginTop: 3, backgroundColor: has ? (on ? '#fff' : colors.warning) : 'transparent' }} />
+                <View style={{ width: 6, height: 6, borderRadius: 3, marginTop: 3, backgroundColor: has ? (on ? colors.onPrimary : colors.warning) : 'transparent' }} />
               )}
             </Pressable>
           );
@@ -138,8 +138,8 @@ function MyDuties() {
 
 function Pill({ children, tone = 'muted' }: { children: React.ReactNode; tone?: 'muted' | 'warning' }) {
   return (
-    <View style={{ backgroundColor: tone === 'warning' ? colors.warningSoft : '#f0ede8', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
-      <Text style={{ fontSize: 12, color: tone === 'warning' ? '#9a3412' : colors.ink }}>{children}</Text>
+    <View style={{ backgroundColor: tone === 'warning' ? colors.warningSoft : colors.primarySoft, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+      <Text style={{ fontSize: 12, color: tone === 'warning' ? colors.warning : colors.ink }}>{children}</Text>
     </View>
   );
 }
@@ -192,7 +192,7 @@ function AllDuties() {
           <SectionTitle>{offset ? 'Yarın kim nerede' : 'Bugün kim nerede'}</SectionTitle>
           <Card style={{ paddingVertical: 4, gap: 0 }}>
             {areas.map((list, i) => (
-              <View key={list[0]!.dutyId} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: '#f1efea' }}>
+              <View key={list[0]!.dutyId} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: colors.divider }}>
                 <T weight="600" style={{ flex: 1 }}>
                   {list[0]!.area}
                 </T>
@@ -249,7 +249,7 @@ function GapCard({ day, gap, canAssign }: { day: DutyDay; gap: DutyDay['entries'
             Önerilenler · o gün nöbeti olmayan, bu ay en az nöbet tutanlar
           </T>
           {day.candidates.slice(0, 4).map((c) => (
-            <View key={c.teacherId} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12, backgroundColor: '#f6f9fa' }}>
+            <View key={c.teacherId} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12, backgroundColor: colors.primarySoft }}>
               <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
                 <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 12 }}>
                   {c.fullName

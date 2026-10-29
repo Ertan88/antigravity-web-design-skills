@@ -68,7 +68,7 @@ export default function TabsLayout() {
         tabBarInactiveTintColor: colors.subtle,
         tabBarLabelStyle: { fontSize: 11, fontFamily: fontFor('700'), marginTop: 3 },
         tabBarBadgeStyle: { backgroundColor: colors.danger, fontSize: 10, fontFamily: fontFor('800') },
-        tabBarStyle: { height: 74 + insets.bottom, paddingTop: 8, paddingBottom: 8 + insets.bottom, borderTopColor: colors.border, backgroundColor: '#fffffff2' },
+        tabBarStyle: { height: 74 + insets.bottom, paddingTop: 8, paddingBottom: 8 + insets.bottom, borderTopColor: colors.border, backgroundColor: colors.card },
         sceneStyle: { backgroundColor: colors.bg },
       }}
     >

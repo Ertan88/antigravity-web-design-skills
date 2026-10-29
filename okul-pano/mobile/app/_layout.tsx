@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider, useIsFetching } from '@tanstack/react-query';
 import * as Notifications from 'expo-notifications';
-import { router, Stack, useSegments } from 'expo-router';
+import { router, Stack, usePathname, useSegments } from 'expo-router';
 import {
   PlusJakartaSans_400Regular,
   PlusJakartaSans_500Medium,
@@ -17,6 +17,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../src/auth.tsx';
 import { registerForPush } from '../src/push.ts';
 import { colors } from '../src/theme.ts';
+import { ThemeProvider, useThemeMode } from '../src/themeMode.tsx';
 
 /** Açılış ekranı en az bu kadar görünür; ilerleme çubuğu bu sürede dolar */
 const SPLASH_MIN_MS = 2400;
@@ -74,6 +75,8 @@ function BrandSplash({ finishing, onHidden }: { finishing: boolean; onHidden: ()
 /** Oturum yoksa giriş ekranına, varsa uygulamaya yönlendirir; telefon bildirimlerini kaydeder */
 function Gate({ fontsReady }: { fontsReady: boolean }) {
   const { status, school } = useAuth();
+  const theme = useThemeMode();
+  const pathname = usePathname();
   const segments = useSegments();
   const onLogin = segments[0] === 'login';
   // Açılış ekranı en az SPLASH_MIN_MS görünür; arkada ilk ekranın verisi yüklenir (sonra yuvarlak simge görünmesin)
@@ -111,10 +114,20 @@ function Gate({ fontsReady }: { fontsReady: boolean }) {
     return () => sub.remove();
   }, []);
 
+  // Tema değişince ekranlar yeniden kurulur; değiştirildiği ekrana (Menü) geri dönülür
+  useEffect(() => {
+    if (!theme.returnTo) return;
+    const to = theme.returnTo;
+    theme.clearReturn();
+    if (to !== pathname) setTimeout(() => router.push(to as never), 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [theme.key]);
+
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <StatusBar style={theme.isDark ? 'light' : 'dark'} />
       {status !== 'loading' && fontsReady && (
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+        <Stack key={theme.key} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="login" />
           <Stack.Screen name="duyuru-yeni" options={{ presentation: 'modal' }} />
@@ -135,13 +148,15 @@ export default function RootLayout() {
     PlusJakartaSans_700Bold,
     PlusJakartaSans_800ExtraBold,
   });
+  const pathname = usePathname();
   const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 10_000 } } }));
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={client}>
         <AuthProvider>
-          <StatusBar style="dark" />
-          <Gate fontsReady={fontsLoaded || Boolean(fontError)} />
+          <ThemeProvider pathname={pathname}>
+            <Gate fontsReady={fontsLoaded || Boolean(fontError)} />
+          </ThemeProvider>
         </AuthProvider>
       </QueryClientProvider>
     </SafeAreaProvider>

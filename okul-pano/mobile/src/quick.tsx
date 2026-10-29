@@ -35,12 +35,12 @@ export function ChipLinks({ items }: { items: { label: string; icon: IconName; t
               borderRadius: 23,
               borderWidth: 1,
               borderColor: first ? colors.ink : colors.border,
-              backgroundColor: first ? colors.ink : pressed ? colors.primarySoft : '#fff',
+              backgroundColor: first ? colors.ink : pressed ? colors.primarySoft : colors.card,
               opacity: pressed && first ? 0.85 : 1,
             })}
           >
-            <Icon name={q.icon} size={18} color={first ? '#fff' : colors.ink} />
-            <Text style={{ fontSize: 14, fontWeight: '700', color: first ? '#fff' : colors.ink }}>{q.label}</Text>
+            <Icon name={q.icon} size={18} color={first ? colors.onPrimary : colors.ink} />
+            <Text style={{ fontSize: 14, fontWeight: '700', color: first ? colors.onPrimary : colors.ink }}>{q.label}</Text>
           </Pressable>
         );
       })}

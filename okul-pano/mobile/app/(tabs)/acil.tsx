@@ -138,7 +138,7 @@ function HoldButton({ label, sub, onComplete, tone = 'red' }: { label: string; s
   const ring = progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
   return (
-    <View style={{ width: 220, height: 220, borderRadius: 110, backgroundColor: tone === 'red' ? colors.dangerSoft : '#ebe8e2', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+    <View style={{ width: 220, height: 220, borderRadius: 110, backgroundColor: tone === 'red' ? colors.dangerSoft : colors.border, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
       <Animated.View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: ring, backgroundColor: tone === 'red' ? '#f8b4b4' : '#9ca3af' }} />
       <Pressable
         accessibilityRole="button"

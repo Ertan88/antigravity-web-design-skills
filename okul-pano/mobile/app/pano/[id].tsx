@@ -158,13 +158,13 @@ function RoundButton({ icon, label, onPress, primary, disabled }: { icon: IconNa
         borderRadius: 23,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: primary ? colors.primary : '#fff',
+        backgroundColor: primary ? colors.primary : colors.card,
         borderWidth: 1,
-        borderColor: primary ? colors.primary : '#e7e3dc',
+        borderColor: primary ? colors.primary : colors.border,
         opacity: disabled ? 0.4 : pressed ? 0.75 : 1,
       })}
     >
-      <Icon name={icon} size={20} color={primary ? '#fff' : colors.ink} />
+      <Icon name={icon} size={20} color={primary ? colors.onPrimary : colors.ink} />
     </Pressable>
   );
 }

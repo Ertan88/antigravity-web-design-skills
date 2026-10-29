@@ -59,7 +59,7 @@ function BoardRow({ s }: { s: Board }) {
           <T weight="700" size={16}>
             {s.name}
           </T>
-          <T size={13} color={s.online ? colors.muted : '#9a3412'} lines={1}>
+          <T size={13} color={s.online ? colors.muted : colors.warning} lines={1}>
             {status}
           </T>
           <T size={12} color={colors.faint}>

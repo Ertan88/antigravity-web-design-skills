@@ -90,7 +90,7 @@ export default function YayinAkisi() {
           {rows.map((a, i) => {
             const endsToday = a.endsAt && Date.parse(a.endsAt) <= endOfToday.getTime() && tab === 'live';
             return (
-              <View key={a.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderTopWidth: i ? 1 : 0, borderTopColor: '#f1efea' }}>
+              <View key={a.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderTopWidth: i ? 1 : 0, borderTopColor: colors.divider }}>
                 {editable && tab === 'live' && (
                   <View style={{ gap: 2 }}>
                     <Pressable accessibilityRole="button" accessibilityLabel="Yukarı taşı" disabled={i === 0} onPress={() => void move(i, -1)} style={{ padding: 4, opacity: i === 0 ? 0.25 : 1 }}>
@@ -126,7 +126,7 @@ export default function YayinAkisi() {
                   </T>
                 </View>
                 {editable && tab !== 'ended' && (
-                  <Switch value={a.isActive} onValueChange={() => void toggle(a)} trackColor={{ true: colors.primary, false: '#dcd7cf' }} thumbColor="#fff" accessibilityLabel={`${a.title} yayında`} />
+                  <Switch value={a.isActive} onValueChange={() => void toggle(a)} trackColor={{ true: colors.primary, false: colors.borderStrong }} thumbColor="#fff" accessibilityLabel={`${a.title} yayında`} />
                 )}
               </View>
             );

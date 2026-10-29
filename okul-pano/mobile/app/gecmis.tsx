@@ -35,7 +35,7 @@ export default function Gecmis() {
             <SectionTitle>{fullDate(d)}</SectionTitle>
             <Card style={{ paddingVertical: 4, gap: 0 }}>
               {rows.map((r, i) => (
-                <View key={r.id} style={{ flexDirection: 'row', gap: 10, paddingVertical: 10, borderTopWidth: i ? 1 : 0, borderTopColor: '#f1efea' }}>
+                <View key={r.id} style={{ flexDirection: 'row', gap: 10, paddingVertical: 10, borderTopWidth: i ? 1 : 0, borderTopColor: colors.divider }}>
                   <T size={13} color={colors.muted} style={{ width: 44, fontVariant: ['tabular-nums'] }}>
                     {clock(r.createdAt)}
                   </T>

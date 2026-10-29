@@ -4,7 +4,7 @@ import { useEffect, useRef, type ComponentProps, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Animated, Easing, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 import { Text, TextInput } from './text.tsx';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, radius, space, tiles, type TileTone } from './theme.ts';
+import { colors, dark, radius, space, tiles, type TileTone } from './theme.ts';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -39,7 +39,7 @@ export function Screen({
   tone?: 'default' | 'danger';
   scroll?: boolean;
 }) {
-  const bg = tone === 'danger' ? '#fff5f6' : colors.bg;
+  const bg = tone === 'danger' ? colors.dangerTint : colors.bg;
   const body = <View style={styles.body}>{children}</View>;
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: bg }]} edges={['top', 'left', 'right']}>
@@ -148,12 +148,23 @@ export function Button({
   );
 }
 
+// Getter: renkler temaya göre değiştiği için her çizimde güncel değer okunur
 const BUTTONS: Record<ButtonVariant, { bg: string; fg: string; border: string }> = {
-  primary: { bg: colors.primary, fg: '#fff', border: colors.primary },
-  secondary: { bg: '#fff', fg: colors.ink, border: colors.borderStrong },
-  danger: { bg: colors.danger, fg: '#fff', border: colors.danger },
-  success: { bg: colors.success, fg: '#fff', border: colors.success },
-  ghost: { bg: 'transparent', fg: colors.primary, border: 'transparent' },
+  get primary() {
+    return { bg: colors.primary, fg: colors.onPrimary, border: colors.primary };
+  },
+  get secondary() {
+    return { bg: colors.card, fg: colors.ink, border: colors.borderStrong };
+  },
+  get danger() {
+    return { bg: '#e11d48', fg: '#fff', border: '#e11d48' };
+  },
+  get success() {
+    return { bg: colors.success, fg: dark ? '#0f0e0d' : '#fff', border: colors.success };
+  },
+  get ghost() {
+    return { bg: 'transparent', fg: colors.primary, border: 'transparent' };
+  },
 };
 
 /** Seçilebilir küçük düğme (şablon, süre, görünüm seçimi) */
@@ -165,8 +176,8 @@ export function Chip({ label, selected, onPress, icon }: { label: string; select
       onPress={onPress}
       style={[styles.chip, selected && styles.chipSelected]}
     >
-      {icon && <Icon name={icon} size={16} color={selected ? '#fff' : colors.ink} />}
-      <Text style={{ flexShrink: 1, fontSize: 14, fontWeight: selected ? '700' : '600', color: selected ? '#fff' : colors.ink }} numberOfLines={1}>
+      {icon && <Icon name={icon} size={16} color={selected ? colors.onPrimary : colors.ink} />}
+      <Text style={{ flexShrink: 1, fontSize: 14, fontWeight: selected ? '700' : '600', color: selected ? colors.onPrimary : colors.ink }} numberOfLines={1}>
         {label}
       </Text>
     </Pressable>
@@ -299,15 +310,25 @@ export function ListRow({
 
 /** Liste simgelerinin pastel kutuları (bento kutularıyla aynı aile) */
 export const ICON_TONES = {
-  primary: { bg: '#e0f2fe', fg: '#0369a1' },
-  warning: { bg: colors.warningSoft, fg: colors.warning },
-  danger: { bg: colors.dangerSoft, fg: colors.danger },
-  gold: { bg: colors.goldSoft, fg: colors.gold },
-  muted: { bg: colors.primarySoft, fg: colors.muted },
-} as const;
+  get primary() {
+    return { bg: colors.infoSoft, fg: colors.info };
+  },
+  get warning() {
+    return { bg: colors.warningSoft, fg: colors.warning };
+  },
+  get danger() {
+    return { bg: colors.dangerSoft, fg: colors.danger };
+  },
+  get gold() {
+    return { bg: colors.goldSoft, fg: colors.gold };
+  },
+  get muted() {
+    return { bg: colors.primarySoft, fg: colors.muted };
+  },
+};
 
 export function Badge({ children, tone = 'muted' }: { children: ReactNode; tone?: 'muted' | 'success' | 'warning' | 'danger' | 'primary' }) {
-  const t = { muted: [colors.primarySoft, colors.muted], success: [colors.successSoft, colors.success], warning: [colors.warningSoft, '#9a3412'], danger: [colors.dangerSoft, colors.danger], primary: ['#e0f2fe', '#0369a1'] }[tone];
+  const t = { muted: [colors.primarySoft, colors.muted], success: [colors.successSoft, colors.success], warning: [colors.warningSoft, colors.warning], danger: [colors.dangerSoft, colors.danger], primary: [colors.infoSoft, colors.info] }[tone];
   return (
     <View style={{ backgroundColor: t[0], borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start' }}>
       <Text style={{ color: t[1], fontSize: 12, fontWeight: '700' }}>{children}</Text>
@@ -375,39 +396,46 @@ export function ErrorNote({ error }: { error: unknown }) {
   );
 }
 
-export const styles = StyleSheet.create({
+/** Ortak stiller; tema değişince refreshStyles ile yeni renklerle yeniden kurulur */
+const makeStyles = () =>
+  StyleSheet.create({
   screen: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, minHeight: 60 },
   title: { fontSize: 30, fontWeight: '800', color: colors.ink, letterSpacing: -0.9 },
   titleSmall: { fontSize: 19, fontWeight: '800', color: colors.ink, letterSpacing: -0.4 },
   subtitle: { fontSize: 13.5, color: colors.faint, marginTop: 1, fontWeight: '500' },
   body: { paddingHorizontal: 16, paddingTop: 4, gap: 12 },
-  footer: { backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12, gap: 8 },
-  iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: '#fff', borderWidth: 1, borderColor: colors.border },
+  footer: { backgroundColor: colors.card, borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12, gap: 8 },
+  iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
   // Düz bento kutusu: beyaz zemin, ince sıcak kenarlık, gölgesiz
   card: { backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 18, gap: 10 },
-  cardWarning: { borderColor: colors.warningBorder, backgroundColor: '#fffaf5' },
-  cardDanger: { borderColor: '#fecdd3', backgroundColor: '#fff' },
+  cardWarning: { borderColor: colors.warningBorder, backgroundColor: colors.warningTint },
+  cardDanger: { borderColor: colors.dangerBorder, backgroundColor: colors.card },
   cardPrimary: { backgroundColor: colors.primary, borderColor: colors.primary },
   label: { fontSize: 12, fontWeight: '700', letterSpacing: 0.4 },
   sectionTitle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, marginBottom: -2, paddingHorizontal: 4 },
   sectionTitleText: { fontSize: 17, fontWeight: '800', color: colors.ink, letterSpacing: -0.4 },
   button: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: radius.pill, borderWidth: 1, paddingHorizontal: 20 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 15, minHeight: 42, maxWidth: '100%', borderRadius: radius.pill, backgroundColor: '#fff', borderWidth: 1, borderColor: colors.border },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 15, minHeight: 42, maxWidth: '100%', borderRadius: radius.pill, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
   chipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
   choiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between' },
-  choice: { padding: 14, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: '#fff', minHeight: 52, justifyContent: 'center' },
+  choice: { padding: 14, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, minHeight: 52, justifyContent: 'center' },
   choiceOn: { borderWidth: 2, borderColor: colors.ink, backgroundColor: colors.primarySoft },
-  segmented: { flexDirection: 'row', backgroundColor: '#ece9e3', borderRadius: radius.pill, padding: 4 },
+  segmented: { flexDirection: 'row', backgroundColor: colors.primarySoft, borderRadius: radius.pill, padding: 4 },
   segment: { flex: 1, height: 40, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  segmentOn: { backgroundColor: '#fff' },
+  segmentOn: { backgroundColor: colors.card },
   fieldLabel: { fontSize: 13, fontWeight: '700', color: colors.ink },
-  input: { height: 52, borderRadius: radius.md, borderWidth: 1, borderColor: colors.borderStrong, paddingHorizontal: 16, fontSize: 16, backgroundColor: '#fff', color: colors.ink },
+  input: { height: 52, borderRadius: radius.md, borderWidth: 1, borderColor: colors.borderStrong, paddingHorizontal: 16, fontSize: 16, backgroundColor: colors.card, color: colors.ink },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 },
   listRow: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 13, minHeight: 60 },
   listRowBorder: { borderBottomWidth: 1, borderBottomColor: colors.divider },
   iconBox: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-});
+  });
+
+export const styles = makeStyles();
+export function refreshStyles() {
+  Object.assign(styles, makeStyles());
+}
 
 /** Geri alınamayan işlemlerden önce onay (web'de tarayıcının onay penceresi) */
 export function confirm(title: string, message: string, ok = 'Evet', destructive = true): Promise<boolean> {
@@ -496,7 +524,7 @@ export function HeaderButton({ icon, label, onPress, badge }: { icon: IconName; 
         borderRadius: 22,
         borderWidth: 1,
         borderColor: colors.border,
-        backgroundColor: pressed ? colors.primarySoft : '#fff',
+        backgroundColor: pressed ? colors.primarySoft : colors.card,
         alignItems: 'center',
         justifyContent: 'center',
       })}

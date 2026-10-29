@@ -8,7 +8,8 @@ import { useInbox, useMyLeaves } from '../../src/data.ts';
 import { useOpenSchool } from '../../src/platform.tsx';
 import { registerForPush } from '../../src/push.ts';
 import { colors, radius, tiles, type TileTone } from '../../src/theme.ts';
-import { Avatar, Badge, BentoRow, Card, Chip, Icon, ListRow, Screen, SectionTitle, T, type IconName } from '../../src/ui.tsx';
+import { Avatar, Badge, BentoRow, Card, Chip, Icon, ListRow, Screen, SectionTitle, Segmented, T, type IconName } from '../../src/ui.tsx';
+import { useThemeMode } from '../../src/themeMode.tsx';
 
 interface Item {
   title: string;
@@ -120,6 +121,7 @@ function MenuTile({ item, tone }: { item: Item; tone: TileTone }) {
 export default function Menu() {
   const { me, school, role, can, isTeacher, selectSchool, setPlatformMode, signOut } = useAuth();
   const openSchool = useOpenSchool();
+  const theme = useThemeMode();
   const inbox = useInbox('unread');
   const leaves = useMyLeaves();
   const [push, setPush] = useState<string | null>(null);
@@ -344,10 +346,23 @@ export default function Menu() {
         </T>
       )}
 
+      <View style={{ gap: 10 }}>
+        <SectionTitle>Görünüm</SectionTitle>
+        <Segmented
+          value={theme.mode}
+          onChange={theme.setMode}
+          options={[
+            { value: 'system', label: 'Telefona göre' },
+            { value: 'light', label: 'Açık' },
+            { value: 'dark', label: 'Koyu' },
+          ]}
+        />
+      </View>
+
       <Pressable
         accessibilityRole="button"
         onPress={() => void signOut()}
-        style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 54, borderRadius: radius.pill, backgroundColor: pressed ? '#fecdd3' : colors.dangerSoft, marginTop: 4 })}
+        style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 54, borderRadius: radius.pill, backgroundColor: pressed ? colors.dangerBorder : colors.dangerSoft, marginTop: 4 })}
       >
         <Icon name="log-out-outline" size={20} color={colors.danger} />
         <Text style={{ fontSize: 15.5, fontWeight: '800', color: colors.danger }}>Çıkış yap</Text>
