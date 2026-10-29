@@ -215,9 +215,9 @@ describe('içerik doğrulama', () => {
     const c = client(t.app, ownerToken);
     const res = await c.post(`/api/schools/${schoolA}/students/import`, {
       rows: [
-        { fullName: 'Ada Yılmaz', className: '7-c', birthDate: '2013-03-14' },
-        { fullName: 'Can Demir', className: '7-C', birthDate: '2013-11-02' },
-        { fullName: 'Ela Kaya', className: null, birthDate: '2012-05-20' },
+        { schoolNo: '501', fullName: 'Ada Yılmaz', className: '7-c', birthDate: '2013-03-14' },
+        { schoolNo: '502', fullName: 'Can Demir', className: '7-C', birthDate: '2013-11-02' },
+        { schoolNo: '503', fullName: 'Ela Kaya', className: null, birthDate: '2012-05-20' },
       ],
     });
     expectStatus(res, 200);
@@ -225,8 +225,11 @@ describe('içerik doğrulama', () => {
     const classes = (await c.get(`/api/schools/${schoolA}/classes`)).json();
     expect(classes.filter((k: { name: string }) => k.name === '7-C')).toHaveLength(1);
 
-    const bad = await c.post(`/api/schools/${schoolA}/students/import`, { rows: [{ fullName: 'X Y', birthDate: '14.03.2013' }] });
+    const bad = await c.post(`/api/schools/${schoolA}/students/import`, { rows: [{ schoolNo: '9', fullName: 'X Y', birthDate: '14.03.2013' }] });
     expect(bad.statusCode).toBe(400);
+    // Okul numarası zorunlu
+    const noNo = await c.post(`/api/schools/${schoolA}/students/import`, { rows: [{ fullName: 'X Y', birthDate: '2013-03-14' }] });
+    expect(noNo.statusCode).toBe(400);
   });
 
   it('yalnızca gerçek görsel dosyalarını kabul eder', async () => {

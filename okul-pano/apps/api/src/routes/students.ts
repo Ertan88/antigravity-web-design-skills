@@ -12,8 +12,8 @@ import { registerResource } from './crud.ts';
 
 type Tx = Parameters<Parameters<DB['transaction']>[0]>[0];
 
-/** Aynı öğrenci: ad soyad (Türkçe büyük/küçük harf duyarsız) + doğum tarihi. Aynı isimli iki öğrenci karışmaz. */
-const studentKey = (fullName: string, birthDate: string) => `${normalizeName(fullName)}|${birthDate}`;
+/** Aynı öğrenci: okul numarası (büyük/küçük harf duyarsız). Aynı isimli iki öğrenci karışmaz. */
+const studentKey = (schoolNo: string) => schoolNo.trim().toLocaleUpperCase('tr-TR');
 const classKey = (name: string) => normalizeName(normalizeClassName(name));
 
 async function loadClasses(db: DB | Tx, schoolId: string) {
@@ -23,6 +23,11 @@ async function loadClasses(db: DB | Tx, schoolId: string) {
     .where(eq(classGroups.schoolId, schoolId))
     .orderBy(asc(classGroups.sortOrder), asc(classGroups.name));
   return { rows, byKey: new Map(rows.map((c) => [classKey(c.name), c])), byId: new Map(rows.map((c) => [c.id, c])) };
+}
+
+/** Kayıttaki ad, doğum tarihi ya da sınıf dosyadakinden farklı mı (ad karşılaştırması Türkçe büyük/küçük harf duyarsız) */
+function differs(a: { fullName: string; birthDate: string; classGroupId: string | null }, b: { fullName: string; birthDate: string; classGroupId: string | null }) {
+  return normalizeName(a.fullName) !== normalizeName(b.fullName) || a.birthDate !== b.birthDate || (b.classGroupId !== null && a.classGroupId !== b.classGroupId);
 }
 
 export async function studentRoutes(app: FastifyInstance) {
@@ -53,7 +58,7 @@ export async function studentRoutes(app: FastifyInstance) {
 
   /**
    * Toplu içe aktarma (Excel önizlemesinden ya da yapıştırılan listeden). Eksik sınıflar oluşturulur;
-   * aynı ad ve doğum tarihli öğrenci varsa yeni kayıt açılmaz, sınıfı güncellenir.
+   * aynı okul numaralı öğrenci varsa yeni kayıt açılmaz, adı, sınıfı ve doğum tarihi güncellenir.
    */
   app.post(`${base}/import`, write, async (req) => {
     const { rows, updateExisting } = parse(studentImportSchema, req.body);
@@ -76,25 +81,29 @@ export async function studentRoutes(app: FastifyInstance) {
       }
 
       const current = await tx
-        .select({ id: students.id, fullName: students.fullName, birthDate: students.birthDate, classGroupId: students.classGroupId })
+        .select({ id: students.id, schoolNo: students.schoolNo, fullName: students.fullName, birthDate: students.birthDate, classGroupId: students.classGroupId })
         .from(students)
         .where(eq(students.schoolId, schoolId));
-      const byKey = new Map(current.map((s) => [studentKey(s.fullName, s.birthDate), s]));
+      const byKey = new Map(current.map((s) => [studentKey(s.schoolNo), s]));
 
       const inserts: (typeof students.$inferInsert)[] = [];
       let updated = 0;
       let unchanged = 0;
       const handled = new Set<string>();
       for (const r of rows) {
-        const key = studentKey(r.fullName, r.birthDate);
+        const key = studentKey(r.schoolNo);
         if (handled.has(key)) continue;
         handled.add(key);
         const classGroupId = r.className ? (classes.byKey.get(classKey(r.className))?.id ?? null) : null;
+        const fullName = r.fullName.trim().replace(/\s+/g, ' ');
         const existing = byKey.get(key);
         if (!existing) {
-          inserts.push({ schoolId, fullName: r.fullName.trim().replace(/\s+/g, ' '), birthDate: r.birthDate, classGroupId });
-        } else if (updateExisting && classGroupId && classGroupId !== existing.classGroupId) {
-          await tx.update(students).set({ classGroupId }).where(eq(students.id, existing.id));
+          inserts.push({ schoolId, schoolNo: r.schoolNo, fullName, birthDate: r.birthDate, classGroupId });
+        } else if (updateExisting && differs(existing, { fullName, birthDate: r.birthDate, classGroupId })) {
+          await tx
+            .update(students)
+            .set({ fullName, birthDate: r.birthDate, classGroupId: classGroupId ?? existing.classGroupId })
+            .where(eq(students.id, existing.id));
           updated++;
         } else {
           unchanged++;
@@ -116,20 +125,20 @@ export async function studentRoutes(app: FastifyInstance) {
     const [classes, current] = await Promise.all([
       loadClasses(db, schoolId),
       db
-        .select({ fullName: students.fullName, birthDate: students.birthDate, classGroupId: students.classGroupId })
+        .select({ schoolNo: students.schoolNo, fullName: students.fullName, birthDate: students.birthDate, classGroupId: students.classGroupId })
         .from(students)
         .where(eq(students.schoolId, schoolId)),
     ]);
-    const byKey = new Map(current.map((s) => [studentKey(s.fullName, s.birthDate), s]));
+    const byKey = new Map(current.map((s) => [studentKey(s.schoolNo), s]));
     const newClasses = new Map<string, string>();
     const seen = new Map<string, number>();
     const issues = [...parsed.issues];
 
     const rows = parsed.rows.flatMap((r) => {
-      const key = studentKey(r.fullName, r.birthDate);
+      const key = studentKey(r.schoolNo);
       const first = seen.get(key);
       if (first !== undefined) {
-        issues.push({ row: r.row, message: `${r.fullName} dosyada iki kez var (ilk: ${first}. satır); bu satır atlanacak` });
+        issues.push({ row: r.row, message: `${r.schoolNo} numarası dosyada iki kez var (ilk: ${first}. satır); bu satır atlanacak` });
         return [];
       }
       seen.set(key, r.row);
@@ -138,7 +147,7 @@ export async function studentRoutes(app: FastifyInstance) {
       const existing = byKey.get(key);
       const status: 'new' | 'update' | 'unchanged' = !existing
         ? 'new'
-        : r.className && (!cls || cls.id !== existing.classGroupId)
+        : (r.className && (!cls || cls.id !== existing.classGroupId)) || differs(existing, { fullName: r.fullName, birthDate: r.birthDate, classGroupId: existing.classGroupId })
           ? 'update'
           : 'unchanged';
       return [{ ...r, status }];
@@ -171,7 +180,7 @@ export async function studentRoutes(app: FastifyInstance) {
     const [classes, rows] = await Promise.all([
       loadClasses(db, schoolId),
       db
-        .select({ fullName: students.fullName, birthDate: students.birthDate, classGroupId: students.classGroupId })
+        .select({ schoolNo: students.schoolNo, fullName: students.fullName, birthDate: students.birthDate, classGroupId: students.classGroupId })
         .from(students)
         .where(eq(students.schoolId, schoolId)),
     ]);
@@ -189,6 +198,7 @@ export async function studentRoutes(app: FastifyInstance) {
       classes: classes.rows.map((c) => c.name),
       schoolName: schoolFullName(req.ctx.school.name, req.ctx.school.settings?.schoolType),
       rows: rows.map((r) => ({
+        schoolNo: r.schoolNo,
         fullName: r.fullName,
         birthDate: r.birthDate,
         className: r.classGroupId ? (classes.byId.get(r.classGroupId)?.name ?? null) : null,

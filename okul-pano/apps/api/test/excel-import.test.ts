@@ -68,7 +68,8 @@ describe('öğrenci Excel', () => {
       [104, 'Ece', 'Sarı', 7, 'A', '31.02.2013'],
       [105, 'Kerem', 'Uçar', 7, 'A', null],
       [106, 'Zeynep', 'Koç', 7, 'A', '01.01.1950'],
-      [107, 'elif', 'YILMAZ', 7, 'A', '14/03/2013'],
+      // Aynı okul numarası dosyada iki kez: ikinci satır atlanır
+      [101, 'elif', 'YILMAZ', 7, 'A', '14/03/2013'],
     ]);
     const res = await preview('students', buf);
     expectStatus(res, 200);
@@ -89,14 +90,14 @@ describe('öğrenci Excel', () => {
 
   it('içe aktarır; tekrar yüklemek çift kayıt açmaz, sınıf değişikliğini günceller', async () => {
     const rows = [
-      { fullName: 'Elif Yılmaz', className: '7-A', birthDate: '2013-03-14' },
-      { fullName: 'Can Demir', className: '7-B', birthDate: '2012-11-02' },
+      { schoolNo: '101', fullName: 'Elif Yılmaz', className: '7-A', birthDate: '2013-03-14' },
+      { schoolNo: '102', fullName: 'Can Demir', className: '7-B', birthDate: '2012-11-02' },
     ];
     expect((await owner.post(path('students/import'), { rows })).json()).toEqual({ created: 2, updated: 0, unchanged: 0, classesCreated: 1 });
     const again = await owner.post(path('students/import'), { rows: [{ ...rows[0], className: '8/a' }, rows[1]] });
     expect(again.json()).toEqual({ created: 0, updated: 1, unchanged: 1, classesCreated: 1 });
-    // Aynı isimli ama farklı doğum tarihli öğrenci ayrı kişidir
-    const twin = await owner.post(path('students/import'), { rows: [{ fullName: 'Elif Yılmaz', className: '7-A', birthDate: '2013-05-01' }] });
+    // Aynı isimli ama farklı okul numaralı öğrenci ayrı kişidir
+    const twin = await owner.post(path('students/import'), { rows: [{ schoolNo: '150', fullName: 'Elif Yılmaz', className: '7-A', birthDate: '2013-05-01' }] });
     expect(twin.json().created).toBe(1);
     const list = (await owner.get(path('students'))).json() as { fullName: string }[];
     expect(list.filter((s) => s.fullName === 'Elif Yılmaz')).toHaveLength(2);
@@ -107,18 +108,18 @@ describe('öğrenci Excel', () => {
     expectStatus(tpl, 200);
     expect(tpl.headers['content-disposition']).toContain('ogrenci-sablonu.xlsx');
     const { wb, ws } = await readSheet(tpl.rawPayload, 'Öğrenciler');
-    expect(ws.getRow(1).values).toEqual([undefined, 'Ad Soyad', 'Sınıf', 'Doğum Tarihi']);
-    expect(ws.getCell('B2').dataValidation).toMatchObject({ type: 'list' });
-    expect(ws.getCell('C2').dataValidation).toMatchObject({ type: 'date' });
+    expect(ws.getRow(1).values).toEqual([undefined, 'Okul No', 'Ad Soyad', 'Sınıf', 'Doğum Tarihi']);
+    expect(ws.getCell('C2').dataValidation).toMatchObject({ type: 'list' });
+    expect(ws.getCell('D2').dataValidation).toMatchObject({ type: 'date' });
     expect(wb.getWorksheet('Listeler')!.getColumn(1).values.filter(Boolean)).toEqual(['7-A', '7-B', '8-A']);
 
     const exp = await owner.get(path('students/export'));
     expect(exp.headers['content-disposition']).toMatch(/ogrenciler-yunus-emre-ortaokulu-\d{4}-\d{2}-\d{2}\.xlsx/);
     const sheet = (await readSheet(exp.rawPayload, 'Öğrenciler')).ws;
-    const names = sheet.getSheetValues().slice(2).map((r) => (r as ExcelJS.CellValue[]).slice(1, 3).join(' '));
-    expect(names).toEqual(['Elif Yılmaz 7-A', 'Can Demir 7-B', 'Elif Yılmaz 8-A']);
-    expect(sheet.getCell('C2').value).toBeInstanceOf(Date);
-    expect(sheet.getCell('C2').numFmt).toBe('dd.mm.yyyy');
+    const names = sheet.getSheetValues().slice(2).map((r) => (r as ExcelJS.CellValue[]).slice(1, 4).join(' '));
+    expect(names).toEqual(['150 Elif Yılmaz 7-A', '102 Can Demir 7-B', '101 Elif Yılmaz 8-A']);
+    expect(sheet.getCell('D2').value).toBeInstanceOf(Date);
+    expect(sheet.getCell('D2').numFmt).toBe('dd.mm.yyyy');
 
     const roundtrip = await preview('students', exp.rawPayload);
     expect(roundtrip.json().totals).toEqual({ new: 0, update: 0, unchanged: 3, skipped: 0 });
@@ -434,6 +435,6 @@ describe('nöbet çizelgesi Excel', () => {
     const buf = await xlsx([['Nöbet Yeri', 'Pazartesi', 'Salı'], ['Bahçe', 'Ayşe Demir', null]]);
     expect((await preview('duties', buf, token)).statusCode).toBe(403);
     expect((await client(t.app, token).post(path('duties/import'), { mode: 'merge', weekdays: [1], rows: [] })).statusCode).toBe(403);
-    expect((await preview('students', await xlsx([['Ad Soyad', 'Doğum Tarihi'], ['X Y', '01.01.2012']]), token)).statusCode).toBe(200);
+    expect((await preview('students', await xlsx([['Okul No', 'Ad Soyad', 'Doğum Tarihi'], ['5', 'X Y', '01.01.2012']]), token)).statusCode).toBe(200);
   });
 });

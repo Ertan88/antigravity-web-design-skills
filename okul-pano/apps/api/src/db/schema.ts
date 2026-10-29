@@ -1,4 +1,4 @@
-import type { AcademicCalendarData, AnnouncementDesign, BoardLayout, EmergencyType, Period, SchoolSettings, ScreenDisplay } from '@okulpano/shared';
+import type { AcademicCalendarData, AnnouncementDesign, BoardLayout, ConductGroup, EmergencyType, Period, SchoolLevel, SchoolSettings, ScreenDisplay } from '@okulpano/shared';
 import { sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
@@ -160,6 +160,8 @@ export const classGroups = pgTable(
     id: pk(),
     schoolId: schoolId(),
     name: text('name').notNull(),
+    /** Okul düzeyi (gözlem kriter şablonu için); boşsa sınıf adından anlaşılır (9-A → lise) */
+    level: text('level').$type<SchoolLevel>(),
     sortOrder: sortOrder(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -295,13 +297,84 @@ export const students = pgTable(
   {
     id: pk(),
     schoolId: schoolId(),
+    /** Okul numarası: okul içinde benzersiz; aynı adlı öğrencileri ayırır, Excel aktarımında eşleştirme anahtarıdır */
+    schoolNo: text('school_no').notNull(),
     fullName: text('full_name').notNull(),
     classGroupId: uuid('class_group_id').references(() => classGroups.id, { onDelete: 'set null' }),
     birthDate: date('birth_date', { mode: 'string' }).notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [index('students_school_idx').on(t.schoolId)],
+  (t) => [index('students_school_idx').on(t.schoolId), uniqueIndex('students_school_no_uq').on(t.schoolId, t.schoolNo)],
+);
+
+/** Gözlem kriterleri: okul düzeyine göre ayrı şablon (artı / eksi puanlı davranışlar) */
+export const conductCriteria = pgTable(
+  'conduct_criteria',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    level: text('level').$type<SchoolLevel>().notNull(),
+    group: text('group').$type<ConductGroup>().notNull(),
+    label: text('label').notNull(),
+    /** Artı ya da eksi puan (0 olamaz) */
+    points: integer('points').notNull(),
+    /** Not yazmak zorunlu mu (eksi puanlarda varsayılan açık) */
+    noteRequired: boolean('note_required').notNull().default(false),
+    isActive: isActive(),
+    sortOrder: sortOrder(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index('conduct_criteria_school_idx').on(t.schoolId, t.level)],
+);
+
+/**
+ * Gözlem kayıtları: öğretmenin bir öğrenciye verdiği artı / eksi. Kriter adı ve puanı kayıt anındaki hâliyle
+ * saklanır (kriter sonradan değişse ya da silinse de geçmiş bozulmaz). Toplu girişler aynı batch_id'yi taşır.
+ */
+export const conductEntries = pgTable(
+  'conduct_entries',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => students.id, { onDelete: 'cascade' }),
+    criterionId: uuid('criterion_id').references(() => conductCriteria.id, { onDelete: 'set null' }),
+    group: text('group').$type<ConductGroup>().notNull(),
+    label: text('label').notNull(),
+    points: integer('points').notNull(),
+    note: text('note'),
+    /** Kaydı giren kullanıcı; hesabı silinse de adı kalır */
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    userName: text('user_name').notNull(),
+    batchId: uuid('batch_id').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('conduct_entries_student_idx').on(t.studentId, t.createdAt),
+    index('conduct_entries_school_idx').on(t.schoolId, t.createdAt),
+    index('conduct_entries_batch_idx').on(t.batchId),
+  ],
+);
+
+/** Ayın öğrencisi seçimleri (idare seçer); panoya giden başarı kaydıyla bağlı */
+export const conductAwards = pgTable(
+  'conduct_awards',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    /** "2026-10" */
+    month: text('month').notNull(),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => students.id, { onDelete: 'cascade' }),
+    achievementId: uuid('achievement_id').references(() => achievements.id, { onDelete: 'set null' }),
+    selectedBy: text('selected_by').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('conduct_awards_uq').on(t.schoolId, t.month, t.studentId)],
 );
 
 export const exams = pgTable(

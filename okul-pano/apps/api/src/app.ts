@@ -16,6 +16,7 @@ import { DisplayBus } from './lib/events.ts';
 import { DbStorage, LocalStorage, type FileStorage } from './lib/storage.ts';
 import { UUID_RE } from './context.ts';
 import { academicCalendarRoutes } from './routes/academicCalendar.ts';
+import { conductRoutes, runConductRetention } from './routes/conduct.ts';
 import { authRoutes } from './routes/auth.ts';
 import { contentRoutes } from './routes/content.ts';
 import { dutyRoutes } from './routes/duties.ts';
@@ -114,11 +115,13 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   await app.register(privacyRoutes);
   await app.register(signupRoutes);
   await app.register(academicCalendarRoutes);
+  await app.register(conductRoutes);
 
   // Deneme süresi hatırlatmaları: açılıştan kısa süre sonra ve saatte bir (testlerde elle çağrılır)
   if (env.NODE_ENV !== 'test') {
     const run = () => {
       void runTrialReminders(deps).catch((err) => app.log.error(err, 'deneme hatırlatması'));
+      void runConductRetention(deps).catch((err) => app.log.error(err, 'gözlem saklama süresi'));
       // MEB çalışma takvimi: haziran ortasından itibaren yayımlanır; her yıl için günde bir deneme
       if (deps.env.MEB_INDEX_URLS) void runMebCalendarJob(deps).catch((err) => app.log.error(err, 'MEB çalışma takvimi'));
     };

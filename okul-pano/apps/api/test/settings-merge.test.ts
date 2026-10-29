@@ -50,7 +50,7 @@ describe('kaydedilen ayarlar geri dönmez', () => {
 
 describe('öğrenci listesini temizle', () => {
   it('onay olmadan silmez, onayla hepsini siler', async () => {
-    expectStatus(await owner.post(`${base}/students`, { fullName: 'Deniz Ak', birthDate: '2012-05-04' }), 201);
+    expectStatus(await owner.post(`${base}/students`, { schoolNo: '77', fullName: 'Deniz Ak', birthDate: '2012-05-04' }), 201);
     expect((await owner.post(`${base}/students/delete-all`, {})).statusCode).toBe(400);
     expect((await owner.post(`${base}/students/delete-all`, { confirm: 'delete-all' })).json()).toEqual({ deleted: 1 });
     expect((await owner.get(`${base}/students`)).json()).toEqual([]);

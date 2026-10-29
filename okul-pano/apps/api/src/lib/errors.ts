@@ -40,7 +40,12 @@ export function errorHandler(err: FastifyError | Error, req: FastifyRequest, rep
     return reply.status(err.statusCode).send({ error: err.code, message: err.message });
   }
   const code = pgCode(err);
-  if (code === '23505') return reply.status(409).send({ error: 'conflict', message: 'Bu kayıt zaten mevcut.' });
+  if (code === '23505') {
+    // Benzersizlik ihlali: bilinen kısıtlar için ne çakıştığı söylenir
+    const constraint = (err as { constraint?: string; cause?: { constraint?: string } }).constraint ?? (err as { cause?: { constraint?: string } }).cause?.constraint;
+    const message = constraint === 'students_school_no_uq' ? 'Bu okul numarası başka bir öğrencide kayıtlı.' : 'Bu kayıt zaten mevcut.';
+    return reply.status(409).send({ error: 'conflict', message });
+  }
   if (code === '23503') return reply.status(409).send({ error: 'conflict', message: 'İlişkili kayıt bulunamadı ya da kullanımda.' });
 
   const status = (err as FastifyError).statusCode;

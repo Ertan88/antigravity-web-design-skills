@@ -6,6 +6,7 @@ import { SCREEN_COMMANDS } from './control.ts';
 import { z } from 'zod';
 import { validatePeriods } from './bell.ts';
 import { PERMISSION_KEYS } from './permissions.ts';
+import { CONDUCT_GROUP_KEYS, SCHOOL_LEVEL_KEYS, type ConductGroup, type SchoolLevel } from './conduct.ts';
 import { parseYouTubeUrl } from './youtube.ts';
 
 /*
@@ -64,6 +65,8 @@ export const schoolSettingsSchema = z.object({
   hasTransport: z.boolean().default(false),
   /** MEB çalışma takvimindeki ara tatil, yarıyıl ve yaz tatili okulda da tatil sayılır */
   followMebCalendar: z.boolean().default(true),
+  /** Gözlem kayıtlarının saklama süresi (KVKK): öğretim yılı sonunda silinir ya da okul elle siler */
+  conductRetention: z.enum(['year', 'keep']).default('year'),
   theme: z.enum(['dark', 'light']).default('dark'),
   /** Kartların görünümü: klasik (renkli şeritli kartlar), bento (pastel kutular) ya da canlı (dolu parlak kutular) */
   boardStyle: z.enum(['classic', 'bento', 'vivid']).default('classic'),
@@ -470,7 +473,13 @@ export const leaveSchema = z
   })
   .refine((v) => v.endDate >= v.startDate, { path: ['endDate'], message: 'Bitiş tarihi başlangıçtan önce olamaz' });
 
+/** Okul numarası: okul içinde benzersiz (e-Okul numarası gibi); harf, rakam ve tire */
+export const schoolNoSchema = required('Okul no', 20)
+  .transform((v) => v.replace(/\s+/g, ''))
+  .pipe(z.string().regex(/^[0-9A-Za-zÇĞİÖŞÜçğıöşü-]+$/, 'Okul no yalnızca harf, rakam ve tire içerebilir'));
+
 export const studentSchema = z.object({
+  schoolNo: schoolNoSchema,
   fullName: required('Ad soyad', 80, 2),
   classGroupId: id.nullable().optional(),
   birthDate: isoDate,
@@ -481,6 +490,7 @@ export const studentImportSchema = z.object({
   rows: z
     .array(
       z.object({
+        schoolNo: schoolNoSchema,
         fullName: required('Ad soyad', 80, 2),
         className: optionalText(20),
         birthDate: isoDate,
@@ -488,7 +498,7 @@ export const studentImportSchema = z.object({
     )
     .min(1, 'İçe aktarılacak satır yok')
     .max(5000, 'Tek seferde en fazla 5000 öğrenci aktarılabilir'),
-  /** Aynı ad ve doğum tarihli öğrenci varsa sınıfı güncellenir; kapalıysa dokunulmaz */
+  /** Aynı okul numaralı öğrenci varsa adı, sınıfı ve doğum tarihi güncellenir; kapalıysa dokunulmaz */
   updateExisting: z.boolean().default(true),
 });
 
@@ -628,3 +638,36 @@ export const pushTokenSchema = z.object({
 
 /** Okulun silinmesi: yanlışlıkla silinmesin diye okulun kısa adı yazılarak onaylanır */
 export const deleteSchoolSchema = z.object({ confirmSlug: z.string().trim().min(1, 'Onay için okulun kısa adını yazın') });
+
+/* ---------- Gözlem (öğrenci davranış takibi) ---------- */
+
+export const conductCriterionSchema = z.object({
+  level: z.enum(SCHOOL_LEVEL_KEYS as [SchoolLevel, ...SchoolLevel[]]),
+  group: z.enum(CONDUCT_GROUP_KEYS as [ConductGroup, ...ConductGroup[]]),
+  label: required('Kriter adı', 60, 2),
+  points: z
+    .number()
+    .int()
+    .min(-5, 'Puan en az −5 olabilir')
+    .max(5, 'Puan en fazla +5 olabilir')
+    .refine((n) => n !== 0, 'Puan 0 olamaz'),
+  noteRequired: z.boolean().default(false),
+  isActive: z.boolean().default(true),
+});
+export type ConductCriterionInput = z.infer<typeof conductCriterionSchema>;
+
+/** Bir ya da birden çok öğrenciye aynı kriterle puan (toplu giriş aynı kayıt grubunu taşır, birlikte geri alınır) */
+export const conductEntrySchema = z.object({
+  studentIds: z.array(id).min(1, 'Öğrenci seçin').max(200, 'Tek seferde en fazla 200 öğrenci'),
+  criterionId: id,
+  note: optionalText(200),
+});
+
+/** Ayın öğrencisi seçimi: panodaki "Ayın öğrencisi" şablonuna gider */
+export const conductAwardSchema = z.object({
+  month: monthSchema,
+  studentId: id,
+  title: optionalText(80),
+  description: optionalText(200),
+  photoUrl: optionalText(500),
+});

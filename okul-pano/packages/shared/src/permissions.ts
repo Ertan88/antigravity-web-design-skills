@@ -20,6 +20,9 @@ export const PERMISSIONS = {
   'settings.manage': 'Okul ayarları',
   'labels.manage': 'Başlıkları düzenleme',
   'users.manage': 'Kullanıcılar ve yetkiler',
+  'conduct.manage': 'Gözlem kriterleri ve ayın öğrencisi',
+  /** Rehber öğretmen: bütün öğrencilerin gözlem kayıtlarını görür (panelde "Rehber öğretmen" rolü olarak verilir) */
+  'conduct.counsel': 'Rehber öğretmen (bütün gözlem kayıtları)',
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;

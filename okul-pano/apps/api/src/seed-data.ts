@@ -174,7 +174,7 @@ export async function seedSchoolContent(
     STUDENT_NAMES.map((fullName, i) => {
       const year = i < 3 ? 2008 : 2008 + (i % 3); // 2008 artık yıl: 29 Şubat'ta da geçerli tarih
       const birthDate = i < 3 ? `${year}-${today.monthDay}` : `${year}-${String((i % 12) + 1).padStart(2, '0')}-${String((i % 27) + 1).padStart(2, '0')}`;
-      return { schoolId, fullName, classGroupId: classRows[i % classRows.length]!.id, birthDate };
+      return { schoolId, schoolNo: String(101 + i), fullName, classGroupId: classRows[i % classRows.length]!.id, birthDate };
     }),
   ).returning({ id: students.id }));
 
