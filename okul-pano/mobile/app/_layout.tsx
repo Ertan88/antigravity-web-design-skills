@@ -21,9 +21,9 @@ import { colors } from '../src/theme.ts';
 import { ThemeProvider, useThemeMode } from '../src/themeMode.tsx';
 
 /** Açılış ekranı en az bu kadar görünür (logo bir an görünsün); ilerleme çubuğu bu sürede dolar */
-const SPLASH_MIN_MS = 900;
+const SPLASH_MIN_MS = 300;
 /** İlk ekranın verisi bundan uzun sürerse açılış ekranı yine kapanır */
-const SPLASH_MAX_MS = 4000;
+const SPLASH_MAX_MS = 2500;
 
 // Sistemin açılış ekranı yazı tipleri yüklenene kadar kalır: marka ekranı ilk karede doğru yazı tipiyle çizilir
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -41,8 +41,8 @@ function BrandSplash({ finishing, onHidden }: { finishing: boolean; onHidden: ()
   useEffect(() => {
     if (!finishing) return;
     Animated.sequence([
-      Animated.timing(fill, { toValue: 1, duration: 180, useNativeDriver: false }),
-      Animated.timing(opacity, { toValue: 0, duration: 200, useNativeDriver: false }),
+      Animated.timing(fill, { toValue: 1, duration: 120, useNativeDriver: false }),
+      Animated.timing(opacity, { toValue: 0, duration: 180, useNativeDriver: false }),
     ]).start(() => onHidden());
   }, [finishing, fill, opacity, onHidden]);
   return (
@@ -154,6 +154,7 @@ function Gate({ fontsReady }: { fontsReady: boolean }) {
 }
 
 export default function RootLayout() {
+  // Telefonda yazı tipleri uygulamaya gömülüdür (expo-font eklentisi) ve hemen hazırdır; web'de indirilir.
   // Yazı tipi yüklenemezse (ör. bozuk dosya) uygulama sistem yazı tipiyle açılır
   const [fontsLoaded, fontError] = useFonts({
     PlusJakartaSans_400Regular,

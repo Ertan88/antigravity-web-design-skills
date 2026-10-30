@@ -70,15 +70,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Platform yöneticisi açılışta platform görünümündedir; okuluna geçince hatırlanır
   const [platformMode, setPlatformModeState] = useState(true);
 
-  const loadMe = useCallback(async (preferred: string | null) => {
-    const data = await api<Me>('/api/me');
+  const applyMe = useCallback((data: Me, preferred: string | null) => {
     setMe(data);
     const pick =
       data.schools.find((s) => s.id === preferred) ?? data.schools.find((s) => s.id === data.lastSchoolId) ?? data.schools[0] ?? null;
     setSchoolId(pick?.id ?? null);
-    await session.setSchool(pick?.id ?? null);
     setStatus('signedIn');
+    return pick?.id ?? null;
   }, []);
+
+  const loadMe = useCallback(
+    async (preferred: string | null) => {
+      const data = await api<Me>('/api/me');
+      const picked = applyMe(data, preferred);
+      await Promise.all([session.setSchool(picked), session.setMe(JSON.stringify(data))]);
+    },
+    [applyMe],
+  );
 
   useEffect(() => {
     session.onSignedOut(() => {
@@ -86,17 +94,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setStatus('signedOut');
     });
     void (async () => {
-      const s = await session.load();
+      const [s, mode] = await Promise.all([session.load(), storage.get(PLATFORM_KEY)]);
       setServer(s.server);
-      setPlatformModeState((await storage.get(PLATFORM_KEY)) !== 'school');
+      setPlatformModeState(mode !== 'school');
       if (!s.hasSession || !s.server) return setStatus('signedOut');
+      // Son bilinen kullanıcı bilgisiyle ekran hemen açılır; güncel bilgi arkada gelir (yetki değiştiyse ekran yenilenir)
+      let cached: Me | null = null;
+      try {
+        cached = s.me ? (JSON.parse(s.me) as Me) : null;
+      } catch {
+        cached = null;
+      }
+      if (cached?.user && Array.isArray(cached.schools)) applyMe(cached, s.schoolId);
       try {
         await loadMe(s.schoolId);
       } catch {
-        setStatus('signedOut');
+        // Bağlantı yoksa saklanan bilgiyle devam edilir; oturum geçersizse (401) api() zaten çıkış yapar
+        if (!cached) setStatus('signedOut');
       }
     })();
-  }, [loadMe]);
+  }, [loadMe, applyMe]);
 
   const value = useMemo<AuthValue>(() => {
     const school = me?.schools.find((s) => s.id === schoolId) ?? null;

@@ -9,7 +9,7 @@ import { storage } from './storage.ts';
 export const DEFAULT_SERVER =
   process.env.EXPO_PUBLIC_API_URL ?? (Platform.OS === 'web' && typeof location !== 'undefined' ? location.origin : '');
 
-const KEYS = { server: 'okulpano.server', refresh: 'okulpano.refresh', school: 'okulpano.school' } as const;
+const KEYS = { server: 'okulpano.server', refresh: 'okulpano.refresh', school: 'okulpano.school', me: 'okulpano.me' } as const;
 
 export class ApiError extends Error {
   constructor(
@@ -28,9 +28,16 @@ let onSignedOut: (() => void) | null = null;
 
 export const session = {
   async load() {
-    server = (await storage.get(KEYS.server)) ?? DEFAULT_SERVER;
-    refreshToken = await storage.get(KEYS.refresh);
-    return { server, hasSession: Boolean(refreshToken), schoolId: await storage.get(KEYS.school) };
+    // Şifreli depodan okumalar birlikte yapılır (her biri telefonda ayrı bir şifre çözme)
+    const [savedServer, savedRefresh, schoolId, me] = await Promise.all([storage.get(KEYS.server), storage.get(KEYS.refresh), storage.get(KEYS.school), storage.get(KEYS.me)]);
+    server = savedServer ?? DEFAULT_SERVER;
+    refreshToken = savedRefresh;
+    return { server, hasSession: Boolean(refreshToken), schoolId, me };
+  },
+  /** Son bilinen kullanıcı bilgisi: açılışta ağı beklemeden ekran çizilir, arkada tazelenir */
+  async setMe(json: string | null) {
+    // Şifreli depo büyük değerlerde yavaşlar ve iOS'ta sınır var; çok okullu hesaplarda saklanmaz
+    await storage.set(KEYS.me, json && json.length <= 2000 ? json : null).catch(() => undefined);
   },
   get server() {
     return server;
@@ -46,6 +53,8 @@ export const session = {
     accessToken = access;
     refreshToken = refresh;
     await storage.set(KEYS.refresh, refresh);
+    // Oturum kapanınca saklanan kullanıcı bilgisi de silinir
+    if (!refresh) await storage.set(KEYS.me, null).catch(() => undefined);
   },
   async setSchool(id: string | null) {
     await storage.set(KEYS.school, id);
