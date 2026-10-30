@@ -186,8 +186,6 @@ export interface TeacherDutyDay {
   }[];
   /** Taşımalı öğrenci görevi (servis, öğle yemeği): birlikte görevli olanlar */
   transport: { partners: string[] } | null;
-  /** O gün nöbetçi olan diğer öğretmenler ve yerleri */
-  others: { name: string; area: string }[];
 }
 
 /**
@@ -263,11 +261,6 @@ export async function teacherDutyDays(db: DB, schoolId: string, teacherId: strin
             };
           }),
       transport: transportMine && !holiday ? { partners: dayTransport.filter((t) => t.teacherId !== teacherId).map((t) => t.teacherName) } : null,
-      others: holiday
-        ? []
-        : entries
-            .filter((e) => e.onDuty && e.onDuty.id !== teacherId && !mine.some((m) => m.area.toLocaleLowerCase('tr-TR') === e.area.toLocaleLowerCase('tr-TR')))
-            .map((e) => ({ name: e.onDuty!.name, area: e.area })),
     });
   }
   return out;

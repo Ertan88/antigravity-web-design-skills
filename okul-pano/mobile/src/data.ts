@@ -129,6 +129,7 @@ export interface MyDuties {
   /** soon: ayın son haftası */
   nextMonth: ScheduleStatus & { soon: boolean };
   teacher: boolean;
+  teacherName: string | null;
   days: {
     date: string;
     weekday: number;
@@ -136,7 +137,6 @@ export interface MyDuties {
     supervisor: string | null;
     duties: { dutyId: string; area: string; partners: string[]; substituteFor: string | null; coveredBy: string | null }[];
     transport: { partners: string[] } | null;
-    others: { name: string; area: string }[];
   }[];
 }
 export const useMyDuties = () => useSchoolQuery<MyDuties>('me/duties', { refetchInterval: 10 * 60_000 });

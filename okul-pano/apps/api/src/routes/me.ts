@@ -108,6 +108,7 @@ export async function meRoutes(app: FastifyInstance) {
     const remaining = thisMonth.some((d) => !d.holiday);
     const showNext = Boolean(teacherId) && !remaining && next.entered;
     const days = showNext ? await teacherDutyDays(db, schoolId, teacherId!, addDays(end, 1), monthEnd(nextMonth)) : thisMonth;
+    const [teacher] = teacherId ? await db.select({ fullName: teachers.fullName }).from(teachers).where(eq(teachers.id, teacherId)) : [];
     return {
       today,
       month,
@@ -117,6 +118,8 @@ export async function meRoutes(app: FastifyInstance) {
       // Ayın son haftasında yeni ayın çizelgesi henüz girilmemişse uyarı gösterilir
       nextMonth: { ...next, soon: addDays(today, 7) > end },
       teacher: Boolean(teacherId),
+      /** Öğretmen kaydındaki ad (taşımalı ve öğle yemeği nöbetinde 1. nöbetçi) */
+      teacherName: teacher?.fullName ?? null,
       days,
     };
   });

@@ -71,7 +71,7 @@ function MyDuties() {
       )}
       <BentoRow>
         <Tile tone="ink" icon="shield-checkmark-outline" label={showingNext ? monthName(d.showing) : `${monthName(d.month)} · kalan`} value={dutyDays.filter((x) => x.duties.length).length} caption="nöbet günü" style={{ flex: 1, minHeight: 116 }} />
-        <Tile tone="sun" icon="bus-outline" label="Taşımalı görev" value={transportDays} caption="servis · öğle yemeği" style={{ flex: 1, minHeight: 116 }} />
+        <Tile tone="sun" icon="bus-outline" label="Taşımalı · öğle" value={transportDays} caption="servis · öğle yemeği" style={{ flex: 1, minHeight: 116 }} />
       </BentoRow>
       {!d.teacher ? (
         <Card>
@@ -82,7 +82,7 @@ function MyDuties() {
           <Empty icon="checkmark-circle-outline" title={showingNext ? `${monthName(d.showing)} ayında da nöbetiniz yok` : 'Bu ay kalan nöbetiniz yok'} />
         </Card>
       ) : (
-        d.days.map((day) => <MyDutyCard key={day.date} day={day} today={d.today} />)
+        d.days.map((day) => <MyDutyCard key={day.date} day={day} today={d.today} teacherName={d.teacherName} />)
       )}
 
       <Button icon="calendar-outline" variant="secondary" onPress={() => router.push('/izin')}>
@@ -95,7 +95,7 @@ function MyDuties() {
   );
 }
 
-function MyDutyCard({ day, today }: { day: MyDuties['days'][number]; today: string }) {
+function MyDutyCard({ day, today, teacherName }: { day: MyDuties['days'][number]; today: string; teacherName: string | null }) {
   const isToday = day.date === today;
   const label = isToday ? `Bugün · ${WEEKDAY_LONG_TR[day.weekday]}` : dayTitle(day.date);
   if (day.holiday) {
@@ -136,19 +136,15 @@ function MyDutyCard({ day, today }: { day: MyDuties['days'][number]; today: stri
       {day.transport && (
         <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start', backgroundColor: tiles.sun.bg, borderRadius: 14, padding: 12 }}>
           <Icon name="bus-outline" size={18} color={tiles.sun.fg} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 14, fontWeight: '800', color: tiles.sun.fg }}>Taşımalı öğrenci görevi</Text>
-            <Text style={{ fontSize: 12.5, fontWeight: '600', color: tiles.sun.sub }}>
-              Servis karşılama, öğle yemeği ve servise bindirme{day.transport.partners.length ? ` · birlikte: ${day.transport.partners.join(', ')}` : ''}
-            </Text>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={{ fontSize: 14, fontWeight: '800', color: tiles.sun.fg, marginBottom: 2 }}>Taşımalı ve öğle yemeği nöbeti</Text>
+            {[teacherName ?? 'Siz', ...day.transport.partners].map((name, i) => (
+              <Text key={`${i}${name}`} style={{ fontSize: 13, fontWeight: i === 0 ? '700' : '600', color: i === 0 ? tiles.sun.fg : tiles.sun.sub }}>
+                {i + 1}. Nöbetçi: {name}
+              </Text>
+            ))}
           </View>
         </View>
-      )}
-      {/* Taşımalı / öğle yemeği görevi olan günlerde o günün okul içi nöbetçileri listelenmez */}
-      {!day.transport && day.others.length > 0 && (
-        <T size={12.5} color={colors.muted}>
-          Aynı gün nöbetçi: {day.others.map((o) => `${o.name} (${o.area})`).join(', ')}
-        </T>
       )}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.divider }}>
         <Icon name="person-circle-outline" size={16} color={colors.muted} />
