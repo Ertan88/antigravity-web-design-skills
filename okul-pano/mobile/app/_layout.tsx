@@ -16,6 +16,7 @@ import { Animated, Easing, Image, Platform, StyleSheet, View } from 'react-nativ
 import { Text } from '../src/text.tsx';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../src/auth.tsx';
+import { restored } from '../src/persist.ts';
 import { registerForPush } from '../src/push.ts';
 import { colors } from '../src/theme.ts';
 import { ThemeProvider, useThemeMode } from '../src/themeMode.tsx';
@@ -103,7 +104,8 @@ function Gate({ fontsReady }: { fontsReady: boolean }) {
   useEffect(() => {
     if (fontsReady) void SplashScreen.hideAsync().catch(() => undefined);
   }, [fontsReady]);
-  const splashFinishing = status !== 'loading' && fontsReady && minDone && (fetching === 0 || maxDone);
+  // Saklanan veriyle açıldıysa ağ beklenmez (güncel veri arkada gelir)
+  const splashFinishing = status !== 'loading' && fontsReady && minDone && (fetching === 0 || maxDone || restored);
   const hideSplash = useRef(() => setSplashHidden(true)).current;
 
   useEffect(() => {

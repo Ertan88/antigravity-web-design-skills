@@ -2,6 +2,7 @@ import type { Permission, Role } from '@okulpano/shared/permissions';
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, login, logout, session } from './api.ts';
+import { clearSaved, restoreQueries, startSaving } from './persist.ts';
 import { unregisterPush } from './push.ts';
 import { storage } from './storage.ts';
 
@@ -83,13 +84,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (preferred: string | null) => {
       const data = await api<Me>('/api/me');
       const picked = applyMe(data, preferred);
+      startSaving(qc, `${session.server}|${data.user.id}`);
       await Promise.all([session.setSchool(picked), session.setMe(JSON.stringify(data))]);
     },
-    [applyMe],
+    [applyMe, qc],
   );
 
   useEffect(() => {
     session.onSignedOut(() => {
+      void clearSaved();
       setMe(null);
       setStatus('signedOut');
     });
@@ -105,7 +108,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch {
         cached = null;
       }
-      if (cached?.user && Array.isArray(cached.schools)) applyMe(cached, s.schoolId);
+      if (cached?.user && Array.isArray(cached.schools)) {
+        // Son görülen ekran verileri de yüklenir: ekranlar sunucuyu (uykudan uyanıyor olabilir) beklemeden açılır
+        await restoreQueries(qc, `${s.server}|${cached.user.id}`);
+        applyMe(cached, s.schoolId);
+      }
       try {
         await loadMe(s.schoolId);
       } catch {
@@ -113,7 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!cached) setStatus('signedOut');
       }
     })();
-  }, [loadMe, applyMe]);
+  }, [loadMe, applyMe, qc]);
 
   const value = useMemo<AuthValue>(() => {
     const school = me?.schools.find((s) => s.id === schoolId) ?? null;
@@ -152,6 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       signOut: async () => {
         await unregisterPush().catch(() => undefined);
+        await clearSaved();
         await logout();
         qc.clear();
         setMe(null);

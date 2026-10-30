@@ -150,7 +150,7 @@ export function Screen({
             contentH.current = h;
             tryRestore();
           }}
-          contentContainerStyle={{ paddingBottom: 32 }}
+          contentContainerStyle={{ paddingBottom: 32, flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
           refreshControl={onRefresh ? <RefreshControl refreshing={pulled} onRefresh={pull} tintColor={colors.primary} colors={[colors.primary]} /> : undefined}
         >
@@ -472,19 +472,30 @@ export function ProgressBar({ color = colors.ink, track = colors.border, width =
  */
 export function Loading() {
   const [show, setShow] = useState(false);
+  const [slow, setSlow] = useState(false);
   const opacity = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const t = setTimeout(() => {
       setShow(true);
       Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
     }, 450);
-    return () => clearTimeout(t);
+    // Sunucu uykudan uyanıyorsa ilk yanıt yarım dakikayı bulabilir: kullanıcı neden beklediğini bilsin
+    const s = setTimeout(() => setSlow(true), 6000);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(s);
+    };
   }, [opacity]);
   return (
-    <View style={{ minHeight: 280, alignItems: 'center', justifyContent: 'center' }}>
+    <View style={{ flex: 1, minHeight: 240, alignItems: 'center', justifyContent: 'center', paddingBottom: 48 }}>
       {show && (
-        <Animated.View style={{ opacity }}>
+        <Animated.View style={{ opacity, alignItems: 'center', gap: 14 }}>
           <ProgressBar width={140} />
+          {slow && (
+            <Text style={{ fontSize: 13, color: colors.muted, textAlign: 'center', maxWidth: 260 }}>
+              Sunucu uyanıyor, ilk açılış biraz sürebilir…
+            </Text>
+          )}
         </Animated.View>
       )}
     </View>
@@ -510,7 +521,7 @@ const makeStyles = () =>
   title: { fontSize: 30, fontWeight: '800', color: colors.ink, letterSpacing: -0.9 },
   titleSmall: { fontSize: 19, fontWeight: '800', color: colors.ink, letterSpacing: -0.4 },
   subtitle: { fontSize: 13.5, color: colors.faint, marginTop: 1, fontWeight: '500' },
-  body: { paddingHorizontal: 16, paddingTop: 4, gap: 12 },
+  body: { paddingHorizontal: 16, paddingTop: 4, gap: 12, flexGrow: 1 },
   footer: { backgroundColor: colors.card, borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12, gap: 8 },
   iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
   // Düz bento kutusu: beyaz zemin, ince sıcak kenarlık, gölgesiz
