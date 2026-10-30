@@ -57,15 +57,20 @@ function MyDuties() {
   const d = q.data;
   if (!d) return q.error ? <ErrorNote error={q.error} /> : <Loading />;
   const dutyDays = d.days.filter((x) => !x.holiday);
+  const showingNext = d.showing !== d.month;
   const transportDays = dutyDays.filter((x) => x.transport).length;
   return (
     <>
-      <ScheduleNote schedule={d.schedule} />
-      {d.nextMonth.soon && !d.nextMonth.entered && (
+      {showingNext ? (
+        <Banner icon="calendar-outline" tone="primary" title={`${monthName(d.month)} ayında kalan nöbetiniz yok`} text={`${monthName(d.showing)} nöbetleriniz aşağıda.`} />
+      ) : (
+        <ScheduleNote schedule={d.schedule} />
+      )}
+      {!showingNext && d.nextMonth.soon && !d.nextMonth.entered && (
         <Banner icon="calendar-outline" tone="primary" title={`${monthName(d.nextMonth.month)} nöbet çizelgesi henüz girilmedi`} text="Girildiğinde nöbetleriniz burada görünür." />
       )}
       <BentoRow>
-        <Tile tone="ink" icon="shield-checkmark-outline" label={`${monthName(d.month)} · kalan`} value={dutyDays.filter((x) => x.duties.length).length} caption="nöbet günü" style={{ flex: 1, minHeight: 116 }} />
+        <Tile tone="ink" icon="shield-checkmark-outline" label={showingNext ? monthName(d.showing) : `${monthName(d.month)} · kalan`} value={dutyDays.filter((x) => x.duties.length).length} caption="nöbet günü" style={{ flex: 1, minHeight: 116 }} />
         <Tile tone="sun" icon="bus-outline" label="Taşımalı görev" value={transportDays} caption="servis · öğle yemeği" style={{ flex: 1, minHeight: 116 }} />
       </BentoRow>
       {!d.teacher ? (
@@ -74,7 +79,7 @@ function MyDuties() {
         </Card>
       ) : !d.days.length ? (
         <Card>
-          <Empty icon="checkmark-circle-outline" title="Bu ay kalan nöbetiniz yok" />
+          <Empty icon="checkmark-circle-outline" title={showingNext ? `${monthName(d.showing)} ayında da nöbetiniz yok` : 'Bu ay kalan nöbetiniz yok'} />
         </Card>
       ) : (
         d.days.map((day) => <MyDutyCard key={day.date} day={day} today={d.today} />)
@@ -139,7 +144,8 @@ function MyDutyCard({ day, today }: { day: MyDuties['days'][number]; today: stri
           </View>
         </View>
       )}
-      {day.others.length > 0 && (
+      {/* Taşımalı / öğle yemeği görevi olan günlerde o günün okul içi nöbetçileri listelenmez */}
+      {!day.transport && day.others.length > 0 && (
         <T size={12.5} color={colors.muted}>
           Aynı gün nöbetçi: {day.others.map((o) => `${o.name} (${o.area})`).join(', ')}
         </T>

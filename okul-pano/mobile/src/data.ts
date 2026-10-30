@@ -123,6 +123,8 @@ export interface ScheduleStatus {
 export interface MyDuties {
   today: string;
   month: string;
+  /** Listelenen ay: bu ay kalan nöbet yoksa ve girildiyse gelecek ay */
+  showing: string;
   schedule: ScheduleStatus;
   /** soon: ayın son haftası */
   nextMonth: ScheduleStatus & { soon: boolean };

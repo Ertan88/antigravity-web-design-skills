@@ -99,14 +99,20 @@ export async function meRoutes(app: FastifyInstance) {
     const month = today.slice(0, 7);
     const end = monthEnd(month);
     const nextMonth = addDays(end, 1).slice(0, 7);
-    const [current, next, days] = await Promise.all([
+    const [current, next, thisMonth] = await Promise.all([
       dutyScheduleStatus(db, schoolId, month),
       dutyScheduleStatus(db, schoolId, nextMonth),
       teacherId ? teacherDutyDays(db, schoolId, teacherId, today, end) : Promise.resolve([]),
     ]);
+    // Bu ay kalan nöbet yoksa ve gelecek ayın çizelgesi girildiyse gelecek ayın nöbetleri gösterilir
+    const remaining = thisMonth.some((d) => !d.holiday);
+    const showNext = Boolean(teacherId) && !remaining && next.entered;
+    const days = showNext ? await teacherDutyDays(db, schoolId, teacherId!, addDays(end, 1), monthEnd(nextMonth)) : thisMonth;
     return {
       today,
       month,
+      /** Listelenen ay: bu ay ya da (bu ay kalan nöbet yoksa) gelecek ay */
+      showing: showNext ? nextMonth : month,
       schedule: current,
       // Ayın son haftasında yeni ayın çizelgesi henüz girilmemişse uyarı gösterilir
       nextMonth: { ...next, soon: addDays(today, 7) > end },

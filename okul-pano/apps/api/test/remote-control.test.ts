@@ -140,8 +140,26 @@ describe.skipIf(holidayToday)('izin bildirimi ve boş nöbet', () => {
     expect(day.transport).toEqual({ partners: ['Ali Can'] });
     // Yalnızca öğretmenin kendi günleri: bugünden ay sonuna, haftanın aynı günleri
     expect(res.days.every((d: { weekday: number; date: string }) => d.weekday === weekday && d.date >= today.isoDate)).toBe(true);
+    expect(res.showing).toBe(res.month);
     // Öğretmen kaydı olmayan hesapta liste boş
     expect((await plain.get(path('me/duties'))).json()).toMatchObject({ teacher: false, days: [] });
+  });
+
+  it('nöbetlerim: bu ay kalan nöbet yoksa girilmiş gelecek ayın nöbetleri gösterilir', async () => {
+    expectStatus(await owner.post(path('members'), { email: 'ali@kumanda.local', fullName: 'Ali Can', password: 'AliCan12345!', role: 'editor', permissions: [], teacherId: teacherIds['Ali Can'] }), 201);
+    const ali = client(t.app, (await login(t.app, 'ali@kumanda.local', 'AliCan12345!')).token);
+    // Önceki testteki taşımalı görev kaldırılır: Ali Can'ın bu ay kalan görevi yok
+    expectStatus(await owner.put(path(`transport-duties/${today.isoDate}`), { teacherIds: [teacherIds['Ayşe Demir']] }), 200);
+    const before = (await ali.get(path('me/duties'))).json();
+    expect(before).toMatchObject({ days: [], nextMonth: { entered: false } });
+    expect(before.showing).toBe(before.month);
+    const next = before.nextMonth.month as string;
+    expectStatus(await owner.post(path('duties'), { month: next, weekday: 2, area: 'Kantin', teacherId: teacherIds['Ali Can'] }), 201);
+    const after = (await ali.get(path('me/duties'))).json();
+    expect(after.showing).toBe(next);
+    expect(after.days.length).toBeGreaterThan(3);
+    expect(after.days.every((d: { date: string; weekday: number }) => d.date.startsWith(next) && d.weekday === 2)).toBe(true);
+    expect(after.days.find((d: { holiday: string | null }) => !d.holiday).duties[0].area).toBe('Kantin');
   });
 });
 
