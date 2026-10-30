@@ -6,10 +6,10 @@ import { Pressable, View } from 'react-native';
 import { Text } from '../../src/text.tsx';
 import { api } from '../../src/api.ts';
 import { useAuth, useSchoolPath } from '../../src/auth.tsx';
-import { useDutyDay, useMeToday, type DutyDay } from '../../src/data.ts';
-import { addDays, dayTitle, WEEKDAY_SHORT } from '../../src/day.ts';
-import { colors } from '../../src/theme.ts';
-import { Badge, Button, Card, Empty, ErrorNote, Label, Loading, Screen, SectionTitle, Segmented, T } from '../../src/ui.tsx';
+import { useDutyDay, useMeToday, useMyDuties, type DutyDay, type MyDuties, type ScheduleStatus } from '../../src/data.ts';
+import { addDays, dayTitle } from '../../src/day.ts';
+import { colors, tiles } from '../../src/theme.ts';
+import { Badge, Banner, BentoRow, Button, Card, Empty, ErrorNote, Icon, Label, Loading, Screen, Segmented, T, Tile } from '../../src/ui.tsx';
 
 /** Nöbet (tasarım 2 ve 10): kendi nöbetlerim ve bugün kim nerede; yetkisi olan boş yere görevlendirir */
 export default function Nobet() {
@@ -32,99 +32,53 @@ export default function Nobet() {
   );
 }
 
+const monthName = (m: string) => new Intl.DateTimeFormat('tr-TR', { month: 'long', timeZone: 'UTC' }).format(new Date(`${m}-15T12:00:00Z`));
+const WEEKDAY_LONG_TR = ['', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+
+/** Ayın çizelgesi girilmemişse son girilen ayınki gösterilir: kullanıcı bilsin */
+function ScheduleNote({ schedule }: { schedule?: ScheduleStatus }) {
+  if (!schedule || schedule.entered) return null;
+  return (
+    <Banner
+      icon="alert-circle-outline"
+      tone="warning"
+      title={`${monthName(schedule.month)} nöbet çizelgesi henüz girilmedi`}
+      text={schedule.usedMonth ? `${monthName(schedule.usedMonth)} çizelgesine göre gösteriliyor; değişebilir.` : 'Nöbetler okul yönetimi çizelgeyi girince görünür.'}
+    />
+  );
+}
+
+/**
+ * Benim nöbetlerim: bu ayın bugünden sonraki nöbet günleri (okul içi nöbet yeri, taşımalı öğrenci görevi), birlikte
+ * nöbetçi olanlar ve o günün nöbetçi müdür yardımcısı. Bilgiler sistemdeki çizelgeden (Excel ya da elle) gelir.
+ */
 function MyDuties() {
-  const me = useMeToday();
-  const days = (me.data?.week ?? []).filter((d) => d.weekday <= 5).slice(0, 5);
-  const [selected, setSelected] = useState<string | null>(null);
-  if (me.isLoading || !me.data) return <Loading />;
-  const day = days.find((d) => d.date === (selected ?? me.data.today)) ?? days[0];
-  const upcoming = me.data.week.filter((d) => d.date > (day?.date ?? '') && d.duties.length && !d.holiday);
+  const q = useMyDuties();
+  const d = q.data;
+  if (!d) return q.error ? <ErrorNote error={q.error} /> : <Loading />;
+  const dutyDays = d.days.filter((x) => !x.holiday);
+  const transportDays = dutyDays.filter((x) => x.transport).length;
   return (
     <>
-      <View style={{ flexDirection: 'row', gap: 6 }}>
-        {days.map((d) => {
-          const on = d.date === day?.date;
-          const has = d.duties.some((x) => !x.coveredBy);
-          return (
-            <Pressable
-              key={d.date}
-              accessibilityRole="button"
-              accessibilityState={{ selected: on }}
-              accessibilityLabel={`${dayTitle(d.date)}${d.holiday ? ', tatil' : has ? ', nöbet var' : ''}`}
-              onPress={() => setSelected(d.date)}
-              style={{
-                flex: 1,
-                paddingVertical: 8,
-                borderRadius: 12,
-                alignItems: 'center',
-                backgroundColor: on ? colors.primary : d.holiday ? colors.primarySoft : colors.card,
-                borderWidth: 1,
-                borderStyle: d.holiday ? 'dashed' : 'solid',
-                borderColor: on ? colors.primary : d.holiday ? colors.borderStrong : colors.border,
-              }}
-            >
-              <Text style={{ fontSize: 11, color: on ? colors.onPrimary : colors.muted, fontWeight: '600' }}>{WEEKDAY_SHORT[d.weekday]}</Text>
-              <Text style={{ fontSize: 18, fontWeight: '800', color: on ? colors.onPrimary : colors.ink }}>{Number(d.date.slice(8))}</Text>
-              {d.holiday ? (
-                <Text style={{ fontSize: 9, fontWeight: '800', color: on ? colors.onPrimary : colors.faint }}>TATİL</Text>
-              ) : (
-                <View style={{ width: 6, height: 6, borderRadius: 3, marginTop: 3, backgroundColor: has ? (on ? colors.onPrimary : colors.warning) : 'transparent' }} />
-              )}
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {day && (
-        <Card style={{ gap: 12 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-            <Label color={colors.primary}>{day.date === me.data.today ? `Bugün · ${dayTitle(day.date, { weekday: 'long' })}` : dayTitle(day.date)}</Label>
-            {day.duties.length > 0 && !day.holiday && <Badge tone="success">Panoda görünüyor</Badge>}
-          </View>
-          {day.holiday ? (
-            <Empty icon="sunny-outline" title="Tatil" text={day.holiday} />
-          ) : day.duties.length ? (
-            day.duties.map((d) => (
-              <View key={d.dutyId} style={{ gap: 8 }}>
-                <T size={20} weight="800">
-                  {d.area}
-                </T>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                  {d.partners.length > 0 && <Pill>Birlikte: {d.partners.join(', ')}</Pill>}
-                  <Pill>Teneffüslerde</Pill>
-                  {d.substituteFor && <Pill tone="warning">{d.substituteFor} yerine</Pill>}
-                </View>
-                {d.coveredBy && (
-                  <T size={13} color={colors.warning} weight="600">
-                    İzniniz nedeniyle bu nöbeti {d.coveredBy} tutuyor.
-                  </T>
-                )}
-              </View>
-            ))
-          ) : (
-            <T color={colors.muted}>Bu gün nöbetiniz yok.</T>
-          )}
-          {day.supervisor && (
-            <T size={13} color={colors.muted}>
-              Nöbetçi müdür yardımcısı: <Text style={{ fontWeight: '700', color: colors.ink }}>{day.supervisor}</Text>
-            </T>
-          )}
-        </Card>
+      <ScheduleNote schedule={d.schedule} />
+      {d.nextMonth.soon && !d.nextMonth.entered && (
+        <Banner icon="calendar-outline" tone="primary" title={`${monthName(d.nextMonth.month)} nöbet çizelgesi henüz girilmedi`} text="Girildiğinde nöbetleriniz burada görünür." />
       )}
-
-      {upcoming.slice(0, 3).map((d) => (
-        <Card key={d.date} style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{ flex: 1 }}>
-            <Label>{dayTitle(d.date)}</Label>
-            <T size={16} weight="700">
-              {d.duties.map((x) => x.area).join(', ')}
-            </T>
-          </View>
-          <T size={12} color={colors.muted}>
-            Teneffüslerde
-          </T>
+      <BentoRow>
+        <Tile tone="ink" icon="shield-checkmark-outline" label={`${monthName(d.month)} · kalan`} value={dutyDays.filter((x) => x.duties.length).length} caption="nöbet günü" style={{ flex: 1, minHeight: 116 }} />
+        <Tile tone="sun" icon="bus-outline" label="Taşımalı görev" value={transportDays} caption="servis · öğle yemeği" style={{ flex: 1, minHeight: 116 }} />
+      </BentoRow>
+      {!d.teacher ? (
+        <Card>
+          <Empty icon="person-outline" title="Öğretmen kaydı bağlı değil" text="Okul yönetimi hesabınızı öğretmen kaydınızla eşleştirince nöbetleriniz görünür." />
         </Card>
-      ))}
+      ) : !d.days.length ? (
+        <Card>
+          <Empty icon="checkmark-circle-outline" title="Bu ay kalan nöbetiniz yok" />
+        </Card>
+      ) : (
+        d.days.map((day) => <MyDutyCard key={day.date} day={day} today={d.today} />)
+      )}
 
       <Button icon="calendar-outline" variant="secondary" onPress={() => router.push('/izin')}>
         İzin bildir
@@ -133,6 +87,70 @@ function MyDuties() {
         Nöbet günlerinizde ilk dersten 15 dakika önce telefonunuza hatırlatma gelir.
       </T>
     </>
+  );
+}
+
+function MyDutyCard({ day, today }: { day: MyDuties['days'][number]; today: string }) {
+  const isToday = day.date === today;
+  const label = isToday ? `Bugün · ${WEEKDAY_LONG_TR[day.weekday]}` : dayTitle(day.date);
+  if (day.holiday) {
+    return (
+      <Card style={{ gap: 4, borderStyle: 'dashed', borderWidth: 1, borderColor: colors.borderStrong }}>
+        <Label>{label}</Label>
+        <T size={15} weight="700">
+          Tatil · nöbet yok
+        </T>
+        <T size={13} color={colors.muted}>
+          {day.holiday}
+        </T>
+      </Card>
+    );
+  }
+  return (
+    <Card style={{ gap: 10 }}>
+      <Label color={isToday ? colors.primary : colors.muted}>{label}</Label>
+      {day.duties.map((x) => (
+        <View key={x.dutyId} style={{ gap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Icon name="location-outline" size={18} color={colors.primary} />
+            <T size={18} weight="800" style={{ flex: 1 }}>
+              {x.area}
+            </T>
+          </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {x.partners.length > 0 && <Pill>Birlikte: {x.partners.join(', ')}</Pill>}
+            {x.substituteFor && <Pill tone="warning">{x.substituteFor} yerine</Pill>}
+          </View>
+          {x.coveredBy && (
+            <T size={13} color={colors.warning} weight="600">
+              İzniniz nedeniyle bu nöbeti {x.coveredBy} tutuyor.
+            </T>
+          )}
+        </View>
+      ))}
+      {day.transport && (
+        <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start', backgroundColor: tiles.sun.bg, borderRadius: 14, padding: 12 }}>
+          <Icon name="bus-outline" size={18} color={tiles.sun.fg} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 14, fontWeight: '800', color: tiles.sun.fg }}>Taşımalı öğrenci görevi</Text>
+            <Text style={{ fontSize: 12.5, fontWeight: '600', color: tiles.sun.sub }}>
+              Servis karşılama, öğle yemeği ve servise bindirme{day.transport.partners.length ? ` · birlikte: ${day.transport.partners.join(', ')}` : ''}
+            </Text>
+          </View>
+        </View>
+      )}
+      {day.others.length > 0 && (
+        <T size={12.5} color={colors.muted}>
+          Aynı gün nöbetçi: {day.others.map((o) => `${o.name} (${o.area})`).join(', ')}
+        </T>
+      )}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.divider }}>
+        <Icon name="person-circle-outline" size={16} color={colors.muted} />
+        <T size={13} color={colors.muted}>
+          Nöbetçi müdür yardımcısı: <Text style={{ fontWeight: '700', color: day.supervisor ? colors.ink : colors.faint }}>{day.supervisor ?? 'girilmemiş'}</Text>
+        </T>
+      </View>
+    </Card>
   );
 }
 
@@ -162,6 +180,7 @@ function AllDuties() {
     return [...map.values()];
   }, [day]);
 
+  const weekend = day ? day.weekday >= 6 : false;
   return (
     <>
       <Segmented
@@ -175,37 +194,56 @@ function AllDuties() {
       <ErrorNote error={q.error} />
       {!day ? (
         <Loading />
-      ) : day.holiday ? (
-        <Card>
-          <Empty icon="sunny-outline" title="Tatil" text={`${day.holiday}: nöbet yok`} />
-        </Card>
-      ) : !day.entries.length ? (
-        <Card>
-          <Empty icon="shield-outline" title="Bu gün için nöbet girilmemiş" text="Nöbet çizelgesi panelden Excel ile yüklenebilir." />
-        </Card>
       ) : (
         <>
-          {day.gaps.length > 0 &&
-            day.entries
-              .filter((e) => day.gaps.includes(e.dutyId))
-              .map((gap) => <GapCard key={gap.dutyId} day={day} gap={gap} canAssign={canAssign} />)}
-          <SectionTitle>{offset ? 'Yarın kim nerede' : 'Bugün kim nerede'}</SectionTitle>
-          <Card style={{ paddingVertical: 4, gap: 0 }}>
-            {areas.map((list, i) => (
-              <View key={list[0]!.dutyId} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: colors.divider }}>
-                <T weight="600" style={{ flex: 1 }}>
-                  {list[0]!.area}
+          {day.supervisor && (
+            <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Icon name="person-circle-outline" size={22} color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <T size={12.5} color={colors.muted} weight="600">
+                  Nöbetçi müdür yardımcısı
                 </T>
-                <T size={13} color={colors.muted} style={{ flexShrink: 1, textAlign: 'right' }}>
-                  {list.map((e) => (e.substitute ? `${e.substitute.teacherName} (yerine)` : e.onLeave ? `${e.teacherName} (izinli)` : e.teacherName)).join(', ')}
+                <T size={15.5} weight="800">
+                  {day.supervisor}
                 </T>
               </View>
-            ))}
-          </Card>
-          {day.supervisor && (
-            <T size={13} color={colors.muted}>
-              Nöbetçi müdür yardımcısı: <Text style={{ fontWeight: '700', color: colors.ink }}>{day.supervisor}</Text>
-            </T>
+            </Card>
+          )}
+          {day.holiday ? (
+            <Card>
+              <Empty icon="sunny-outline" title={`${WEEKDAY_LONG_TR[day.weekday]} · tatil`} text={`${day.holiday} nedeniyle nöbet yok.`} />
+            </Card>
+          ) : !day.entries.length ? (
+            <Card>
+              {weekend ? (
+                <Empty icon="cafe-outline" title={`${WEEKDAY_LONG_TR[day.weekday]} · hafta sonu`} text="Okul kapalı, nöbet yok." />
+              ) : (
+                <Empty icon="shield-outline" title="Bu gün için nöbet girilmemiş" text="Nöbet çizelgesi panelden Excel ile ya da elle girilebilir." />
+              )}
+            </Card>
+          ) : (
+            <>
+              <ScheduleNote schedule={day.schedule} />
+              {day.gaps.length > 0 &&
+                day.entries
+                  .filter((e) => day.gaps.includes(e.dutyId))
+                  .map((gap) => <GapCard key={gap.dutyId} day={day} gap={gap} canAssign={canAssign} />)}
+              <Card style={{ paddingVertical: 4, gap: 0 }}>
+                {areas.map((list, i) => (
+                  <View key={list[0]!.dutyId} style={{ paddingVertical: 12, gap: 3, borderTopWidth: i ? 1 : 0, borderTopColor: colors.divider }}>
+                    <T size={15.5} weight="800">
+                      {list.map((e) => (e.substitute ? `${e.substitute.teacherName} (yerine)` : e.onLeave ? `${e.teacherName} (izinli)` : e.teacherName)).join(', ')}
+                    </T>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Icon name="location-outline" size={14} color={colors.muted} />
+                      <T size={13} weight="600" color={colors.muted}>
+                        {list[0]!.area}
+                      </T>
+                    </View>
+                  </View>
+                ))}
+              </Card>
+            </>
           )}
         </>
       )}

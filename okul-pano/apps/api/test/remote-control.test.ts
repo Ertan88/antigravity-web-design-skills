@@ -128,6 +128,21 @@ describe.skipIf(holidayToday)('izin bildirimi ve boş nöbet', () => {
     expect(todayEntry.duties).toEqual([{ dutyId, area: 'Bahçe', partners: ['Mehmet Kaya'], substituteFor: null, coveredBy: 'Selin Ak' }]);
     expect(me.leaves[0]).toMatchObject({ status: 'approved' });
   });
+
+  it('nöbetlerim: ayın nöbetleri, taşımalı görev ve birlikte görevliler; çizelge durumu', async () => {
+    expectStatus(await owner.put(path(`transport-duties/${today.isoDate}`), { teacherIds: [teacherIds['Ayşe Demir'], teacherIds['Ali Can']] }), 200);
+    const res = (await teacherUser.get(path('me/duties'))).json();
+    expect(res.schedule).toMatchObject({ month: today.isoDate.slice(0, 7), entered: true });
+    // Gelecek ayın çizelgesi girilmedi (son girilen ay gösterilir)
+    expect(res.nextMonth.entered).toBe(false);
+    const day = res.days.find((d: { date: string }) => d.date === today.isoDate);
+    expect(day.duties).toEqual([{ dutyId, area: 'Bahçe', partners: ['Mehmet Kaya'], substituteFor: null, coveredBy: 'Selin Ak' }]);
+    expect(day.transport).toEqual({ partners: ['Ali Can'] });
+    // Yalnızca öğretmenin kendi günleri: bugünden ay sonuna, haftanın aynı günleri
+    expect(res.days.every((d: { weekday: number; date: string }) => d.weekday === weekday && d.date >= today.isoDate)).toBe(true);
+    // Öğretmen kaydı olmayan hesapta liste boş
+    expect((await plain.get(path('me/duties'))).json()).toMatchObject({ teacher: false, days: [] });
+  });
 });
 
 describe('uzaktan kumanda', () => {

@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { accessUser, audit, schoolGuard } from '../context.ts';
 import { bellSchedules, classGroups, pushTokens, teacherLeaves, teachers, timetableEntries } from '../db/schema.ts';
-import { addDays, dutyDay, holidaysAndHalfDays } from '../lib/dayinfo.ts';
+import { addDays, dutyDay, dutyScheduleStatus, holidaysAndHalfDays, monthEnd, teacherDutyDays } from '../lib/dayinfo.ts';
 import { badRequest, parse } from '../lib/errors.ts';
 import { notifyUsers, usersWithPermission } from '../lib/push.ts';
 
@@ -85,6 +85,33 @@ export async function meRoutes(app: FastifyInstance) {
       lessons,
       leaves: leaves.map((l) => ({ id: l.id, startDate: l.startDate, endDate: l.endDate, note: l.note, status: l.approvalStatus })),
       week,
+    };
+  });
+
+  /**
+   * Öğretmenin bu ayki nöbetleri (bugünden ay sonuna): okul içi nöbet yerleri, taşımalı öğrenci görevleri
+   * (servis, öğle yemeği), birlikte nöbetçi olanlar ve o günlerin nöbetçi müdür yardımcısı. Ayın çizelgesi
+   * girilmemişse (son girilen ayınki gösterilir) ve ay sonu yaklaşırken yeni ay girilmemişse bildirilir.
+   */
+  app.get('/api/schools/:schoolId/me/duties', member, async (req) => {
+    const { schoolId, school, teacherId } = req.ctx;
+    const today = zonedParts(new Date(), school.timezone).isoDate;
+    const month = today.slice(0, 7);
+    const end = monthEnd(month);
+    const nextMonth = addDays(end, 1).slice(0, 7);
+    const [current, next, days] = await Promise.all([
+      dutyScheduleStatus(db, schoolId, month),
+      dutyScheduleStatus(db, schoolId, nextMonth),
+      teacherId ? teacherDutyDays(db, schoolId, teacherId, today, end) : Promise.resolve([]),
+    ]);
+    return {
+      today,
+      month,
+      schedule: current,
+      // Ayın son haftasında yeni ayın çizelgesi henüz girilmemişse uyarı gösterilir
+      nextMonth: { ...next, soon: addDays(today, 7) > end },
+      teacher: Boolean(teacherId),
+      days,
     };
   });
 

@@ -163,7 +163,7 @@ export default function RootLayout() {
     PlusJakartaSans_700Bold,
     PlusJakartaSans_800ExtraBold,
   });
-  const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 10_000 } } }));
+  const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 10_000, gcTime: 30 * 60_000 } } }));
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={client}>

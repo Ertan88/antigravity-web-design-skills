@@ -109,7 +109,35 @@ export interface DutyDay {
   }[];
   gaps: string[];
   candidates: { teacherId: string; fullName: string; monthCount: number }[];
+  /** Ayın çizelgesi girilmemişse son girilen ayınki gösterilir (usedMonth) */
+  schedule?: ScheduleStatus;
 }
+
+export interface ScheduleStatus {
+  month: string;
+  entered: boolean;
+  usedMonth: string | null;
+}
+
+/** Öğretmenin bu ayki nöbetleri (bugünden ay sonuna) */
+export interface MyDuties {
+  today: string;
+  month: string;
+  schedule: ScheduleStatus;
+  /** soon: ayın son haftası */
+  nextMonth: ScheduleStatus & { soon: boolean };
+  teacher: boolean;
+  days: {
+    date: string;
+    weekday: number;
+    holiday: string | null;
+    supervisor: string | null;
+    duties: { dutyId: string; area: string; partners: string[]; substituteFor: string | null; coveredBy: string | null }[];
+    transport: { partners: string[] } | null;
+    others: { name: string; area: string }[];
+  }[];
+}
+export const useMyDuties = () => useSchoolQuery<MyDuties>('me/duties', { refetchInterval: 10 * 60_000 });
 
 /** Bildirim kutusu (panelle ortak): okunanlar da saklanır, okundu bilgisi her cihazda aynıdır */
 export interface InboxItem {

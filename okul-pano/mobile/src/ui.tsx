@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, usePathname } from 'expo-router';
-import { useEffect, useRef, type ComponentProps, type ComponentRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ComponentProps, type ComponentRef, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Animated, Easing, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 import { Text, TextInput } from './text.tsx';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -65,6 +65,23 @@ export function Screen({
     }, 1000);
     return () => clearTimeout(t);
   }, [path]);
+  // Yenileme simgesi yalnızca kullanıcı aşağı çekince görünür; ekran açılırken arkada yapılan tazelemede görünmez
+  const [pulled, setPulled] = useState(false);
+  const sawRefresh = useRef(false);
+  useEffect(() => {
+    if (!pulled) return;
+    if (refreshing) sawRefresh.current = true;
+    else if (sawRefresh.current) setPulled(false);
+    // Tazeleme hiç başlamazsa (ör. veri zaten güncel) simge kısa süre sonra kalkar
+    const t = setTimeout(() => setPulled(false), 4000);
+    return () => clearTimeout(t);
+  }, [pulled, refreshing]);
+  const pull = () => {
+    sawRefresh.current = false;
+    setPulled(true);
+    onRefresh?.();
+    setTimeout(() => !sawRefresh.current && setPulled(false), 600);
+  };
   const body = <View style={styles.body}>{children}</View>;
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: bg }]} edges={['top', 'left', 'right']}>
@@ -111,7 +128,7 @@ export function Screen({
           }}
           contentContainerStyle={{ paddingBottom: 32 }}
           keyboardShouldPersistTaps="handled"
-          refreshControl={onRefresh ? <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} tintColor={colors.primary} /> : undefined}
+          refreshControl={onRefresh ? <RefreshControl refreshing={pulled} onRefresh={pull} tintColor={colors.primary} colors={[colors.primary]} /> : undefined}
         >
           {body}
         </ScrollView>
@@ -424,11 +441,27 @@ export function ProgressBar({ color = colors.ink, track = colors.border, width =
   );
 }
 
-/** Veri yüklenirken: yuvarlak simge yerine ince ilerleme çubuğu */
+/**
+ * Veri yüklenirken: kısa yüklemelerde hiçbir şey görünmez (göz kırpması olmasın); uzarsa ekranın ortasında ince
+ * ilerleme çubuğu belirir.
+ */
 export function Loading() {
+  const [show, setShow] = useState(false);
+  const opacity = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setShow(true);
+      Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+    }, 450);
+    return () => clearTimeout(t);
+  }, [opacity]);
   return (
-    <View style={{ paddingVertical: 48, alignItems: 'center' }}>
-      <ProgressBar />
+    <View style={{ minHeight: 280, alignItems: 'center', justifyContent: 'center' }}>
+      {show && (
+        <Animated.View style={{ opacity }}>
+          <ProgressBar width={140} />
+        </Animated.View>
+      )}
     </View>
   );
 }

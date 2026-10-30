@@ -1,7 +1,7 @@
 import { trCompare } from '@okulpano/shared';
 import { and, asc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import type { DB } from '../db/client.ts';
-import { duties, dutySubstitutions, dutySupervisors, teacherLeaves, teachers } from '../db/schema.ts';
+import { duties, dutySubstitutions, dutySupervisors, schools, teacherLeaves, teachers, transportDuties } from '../db/schema.ts';
 import { holidaysInRange } from '../routes/holidays.ts';
 
 /** ISO hafta günü (1 = Pazartesi) */
@@ -152,4 +152,123 @@ export async function substituteCandidates(db: DB, schoolId: string, day: DutyDa
     .map((t) => ({ teacherId: t.id, fullName: t.fullName, monthCount: count.get(t.id) ?? 0 }))
     .sort((a, b) => a.monthCount - b.monthCount || trCompare(a.fullName, b.fullName))
     .slice(0, limit);
+}
+
+/** Ayın son günü: "2026-10" → "2026-10-31" */
+export function monthEnd(month: string) {
+  const [y, m] = month.split('-').map(Number) as [number, number];
+  return addDays(m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`, -1);
+}
+
+/** Bu ay için nöbet çizelgesi girilmiş mi; girilmemişse gösterilen (son girilen) ay */
+export async function dutyScheduleStatus(db: DB, schoolId: string, month: string) {
+  const [row] = await db
+    .select({ month: sql<string | null>`${dutyMonthSql(schoolId, month)}` })
+    .from(schools)
+    .where(eq(schools.id, schoolId));
+  const used = row?.month ?? null;
+  return { month, entered: used === month, usedMonth: used };
+}
+
+export interface TeacherDutyDay {
+  date: string;
+  weekday: number;
+  /** Nöbet gününe denk gelen tatil (o gün nöbet yok) */
+  holiday: string | null;
+  supervisor: string | null;
+  duties: {
+    dutyId: string;
+    area: string;
+    /** Aynı yerde nöbetçi olanlar */
+    partners: string[];
+    substituteFor: string | null;
+    coveredBy: string | null;
+  }[];
+  /** Taşımalı öğrenci görevi (servis, öğle yemeği): birlikte görevli olanlar */
+  transport: { partners: string[] } | null;
+  /** O gün nöbetçi olan diğer öğretmenler ve yerleri */
+  others: { name: string; area: string }[];
+}
+
+/**
+ * Öğretmenin bir tarih aralığındaki nöbet günleri (aralık tek bir ay içinde): okul içi nöbet yerleri, yerine
+ * görevlendirmeler, taşımalı öğrenci görevleri, o günün nöbetçi müdür yardımcısı. Sorgular toplu yapılır.
+ */
+export async function teacherDutyDays(db: DB, schoolId: string, teacherId: string, from: string, to: string): Promise<TeacherDutyDay[]> {
+  const month = from.slice(0, 7);
+  const [rows, holidays, leaves, subs, supervisors, transport] = await Promise.all([
+    db
+      .select({ dutyId: duties.id, weekday: duties.weekday, area: duties.area, teacherId: duties.teacherId, teacherName: teachers.fullName, sortOrder: duties.sortOrder })
+      .from(duties)
+      .innerJoin(teachers, eq(teachers.id, duties.teacherId))
+      .where(and(eq(duties.schoolId, schoolId), eq(duties.month, dutyMonthSql(schoolId, month))))
+      .orderBy(asc(duties.sortOrder), asc(duties.area)),
+    effectiveHolidays(db, schoolId, from, to),
+    db
+      .select({ teacherId: teacherLeaves.teacherId, startDate: teacherLeaves.startDate, endDate: teacherLeaves.endDate })
+      .from(teacherLeaves)
+      .where(and(eq(teacherLeaves.schoolId, schoolId), eq(teacherLeaves.approvalStatus, 'approved'), lte(teacherLeaves.startDate, to), gte(teacherLeaves.endDate, from))),
+    db
+      .select({ date: dutySubstitutions.date, dutyId: dutySubstitutions.dutyId, teacherId: dutySubstitutions.teacherId, teacherName: teachers.fullName })
+      .from(dutySubstitutions)
+      .innerJoin(teachers, eq(teachers.id, dutySubstitutions.teacherId))
+      .where(and(eq(dutySubstitutions.schoolId, schoolId), gte(dutySubstitutions.date, from), lte(dutySubstitutions.date, to))),
+    db
+      .select({ date: dutySupervisors.date, name: dutySupervisors.name })
+      .from(dutySupervisors)
+      .where(and(eq(dutySupervisors.schoolId, schoolId), gte(dutySupervisors.date, from), lte(dutySupervisors.date, to))),
+    db
+      .select({ date: transportDuties.date, teacherId: transportDuties.teacherId, teacherName: teachers.fullName })
+      .from(transportDuties)
+      .innerJoin(teachers, eq(teachers.id, transportDuties.teacherId))
+      .where(and(eq(transportDuties.schoolId, schoolId), gte(transportDuties.date, from), lte(transportDuties.date, to)))
+      .orderBy(asc(transportDuties.sortOrder)),
+  ]);
+  const holidayOf = new Map(holidays.map((h) => [h.date, h.name]));
+  const supervisorOf = new Map(supervisors.map((s) => [s.date, s.name]));
+  const out: TeacherDutyDay[] = [];
+  for (let date = from; date <= to; date = addDays(date, 1)) {
+    const weekday = weekdayOf(date);
+    const holiday = holidayOf.get(date) ?? null;
+    const daySubs = new Map(subs.filter((s) => s.date === date).map((s) => [s.dutyId, s]));
+    const onLeave = (id: string) => leaves.some((l) => l.teacherId === id && l.startDate <= date && l.endDate >= date);
+    // O günün nöbetçileri: izinli olanın yerine görevlendirilen
+    const entries = rows
+      .filter((r) => r.weekday === weekday)
+      .map((r) => {
+        const sub = daySubs.get(r.dutyId);
+        return { ...r, sub, onDuty: sub ? { id: sub.teacherId, name: sub.teacherName } : onLeave(r.teacherId) ? null : { id: r.teacherId, name: r.teacherName } };
+      });
+    const mine = entries.filter((e) => e.teacherId === teacherId || e.sub?.teacherId === teacherId);
+    const dayTransport = transport.filter((t) => t.date === date);
+    const transportMine = dayTransport.some((t) => t.teacherId === teacherId);
+    if (!mine.length && !transportMine) continue;
+    out.push({
+      date,
+      weekday,
+      holiday,
+      supervisor: supervisorOf.get(date) ?? null,
+      duties: holiday
+        ? mine.map((e) => ({ dutyId: e.dutyId, area: e.area, partners: [], substituteFor: null, coveredBy: null }))
+        : mine.map((e) => {
+            const covering = e.sub?.teacherId === teacherId;
+            return {
+              dutyId: e.dutyId,
+              area: e.area,
+              partners: entries
+                .filter((o) => o.dutyId !== e.dutyId && o.area.toLocaleLowerCase('tr-TR') === e.area.toLocaleLowerCase('tr-TR') && o.onDuty)
+                .map((o) => o.onDuty!.name),
+              substituteFor: covering ? e.teacherName : null,
+              coveredBy: e.teacherId === teacherId && e.sub ? e.sub.teacherName : null,
+            };
+          }),
+      transport: transportMine && !holiday ? { partners: dayTransport.filter((t) => t.teacherId !== teacherId).map((t) => t.teacherName) } : null,
+      others: holiday
+        ? []
+        : entries
+            .filter((e) => e.onDuty && e.onDuty.id !== teacherId && !mine.some((m) => m.area.toLocaleLowerCase('tr-TR') === e.area.toLocaleLowerCase('tr-TR')))
+            .map((e) => ({ name: e.onDuty!.name, area: e.area })),
+    });
+  }
+  return out;
 }

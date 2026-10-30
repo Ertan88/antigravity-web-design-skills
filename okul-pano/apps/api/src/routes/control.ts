@@ -4,7 +4,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { audit, schoolGuard, UUID_RE } from '../context.ts';
 import { announcements, duties, dutySubstitutions, screens, teacherLeaves, teachers, users } from '../db/schema.ts';
-import { dutyDay, dutyGaps, substituteCandidates } from '../lib/dayinfo.ts';
+import { dutyDay, dutyGaps, dutyScheduleStatus, substituteCandidates } from '../lib/dayinfo.ts';
 import { badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 import { notifyUsers, usersForTeacher } from '../lib/push.ts';
 
@@ -32,12 +32,15 @@ export async function controlRoutes(app: FastifyInstance) {
 
   app.get('/api/schools/:schoolId/duty-day', member, async (req) => {
     const { date } = parse(dateQuery, req.query);
-    const day = await dutyDay(db, req.ctx.schoolId, date ?? todayOf(req).isoDate);
+    const iso = date ?? todayOf(req).isoDate;
+    const [day, schedule] = await Promise.all([dutyDay(db, req.ctx.schoolId, iso), dutyScheduleStatus(db, req.ctx.schoolId, iso.slice(0, 7))]);
     const canAssign = req.ctx.permissions.includes('duties.manage');
     // Onay bekleyen izin talepleri yalnızca izin ya da nöbet yetkisi olanlara görünür
     const seesRequests = canAssign || req.ctx.permissions.includes('leaves.manage');
     return {
       ...day,
+      // Ayın çizelgesi girilmemişse son girilen ayınki gösterilir; ekranda not düşülür
+      schedule,
       entries: seesRequests ? day.entries : day.entries.map((e) => ({ ...e, leavePending: false })),
       gaps: dutyGaps(day).map((g) => g.dutyId),
       // Öneriler yalnızca görevlendirme yapabilenlere (ve boş yer varken) hesaplanır
