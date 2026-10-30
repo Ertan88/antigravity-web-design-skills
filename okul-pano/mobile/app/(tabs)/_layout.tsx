@@ -6,6 +6,9 @@ import { useControlCenter, useInbox } from '../../src/data.ts';
 import { colors } from '../../src/theme.ts';
 import { Icon, type IconName } from '../../src/ui.tsx';
 
+// Sekme ekranlarında beklenmeyen bir hata olursa uygulama kapanmaz, "Yeniden dene" görünür
+export { ErrorBoundary } from '../../src/errorBoundary.tsx';
+
 type TabName = 'index' | 'onaylar' | 'panolar' | 'nobet' | 'acil' | 'duyurular' | 'gozlem' | 'izinlerim' | 'okullar' | 'takvim' | 'kutu' | 'profil';
 
 /**

@@ -1,4 +1,5 @@
 import { dehydrate, hydrate, type DehydratedState, type QueryClient } from '@tanstack/react-query';
+import Constants from 'expo-constants';
 import { File, Paths } from 'expo-file-system';
 import { AppState, Platform } from 'react-native';
 
@@ -13,6 +14,15 @@ const MAX_AGE_MS = 7 * 86400_000;
 const SKIP = ['conduct/', 'members', 'teachers', 'students'];
 
 type Saved = { owner: string; savedAt: number; state: DehydratedState };
+
+/**
+ * Kayıt uygulama sürümüne bağlıdır: yeni sürüm kurulunca eski biçimdeki veri kullanılmaz (ekranlar yeni alanları
+ * beklerken eski kayıtla açılıp hata vermesin).
+ */
+const VERSION = Constants.expoConfig?.version ?? '';
+/** Kayıt biçimi: ekranların beklediği veri değiştiğinde artırılır (web sürümünde uygulama sürümü okunamaz) */
+const SCHEMA = 2;
+const ownerKey = (who: string) => `${who}|${VERSION}|${SCHEMA}`;
 
 const file = () => (Platform.OS === 'web' ? null : new File(Paths.document, NAME));
 
@@ -60,7 +70,7 @@ const keep = (key: readonly unknown[]) => {
 /** Saklanan veriyi önbelleğe yükler (yalnızca aynı hesap ve sunucu için) ve değişiklikleri kaydetmeye başlar */
 export async function restoreQueries(qc: QueryClient, who: string) {
   const saved = await read();
-  if (saved && saved.owner === who && Date.now() - saved.savedAt < MAX_AGE_MS) {
+  if (saved && saved.owner === ownerKey(who) && Date.now() - saved.savedAt < MAX_AGE_MS) {
     hydrate(qc, saved.state);
     restored = true;
   }
@@ -76,7 +86,7 @@ export function startSaving(qc: QueryClient, who: string) {
     timer = null;
     if (owner !== who) return;
     const state = dehydrate(qc, { shouldDehydrateQuery: (q) => q.state.status === 'success' && keep(q.queryKey) });
-    void write({ owner: who, savedAt: Date.now(), state });
+    void write({ owner: ownerKey(who), savedAt: Date.now(), state });
   };
   const unsub = qc.getQueryCache().subscribe((e) => {
     if (e.type !== 'updated' || e.action.type !== 'success' || timer) return;

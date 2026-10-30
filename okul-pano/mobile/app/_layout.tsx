@@ -155,6 +155,8 @@ function Gate({ fontsReady }: { fontsReady: boolean }) {
   );
 }
 
+export { ErrorBoundary } from '../src/errorBoundary.tsx';
+
 export default function RootLayout() {
   // Telefonda yazı tipleri uygulamaya gömülüdür (expo-font eklentisi) ve hemen hazırdır; web'de indirilir.
   // Yazı tipi yüklenemezse (ör. bozuk dosya) uygulama sistem yazı tipiyle açılır

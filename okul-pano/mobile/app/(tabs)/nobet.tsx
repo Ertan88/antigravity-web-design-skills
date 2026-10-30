@@ -97,6 +97,8 @@ function MyDuties() {
  * tamamını (tutulan nöbetler dahil) tek bakışta gösterir.
  */
 function MonthStrip({ data }: { data: MyDuties }) {
+  // Eski sunucu / eski kayıt: şerit verisi yoksa şerit çizilmez (liste yine görünür)
+  if (!data.calendar) return null;
   const month = data.showing;
   const marks = new Map(data.calendar.marks.map((m) => [m.date, m]));
   const holidays = new Map(data.calendar.holidays.map((h) => [h.date, h.name]));
