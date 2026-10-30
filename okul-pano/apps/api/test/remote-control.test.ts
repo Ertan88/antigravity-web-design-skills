@@ -131,7 +131,17 @@ describe.skipIf(holidayToday)('izin bildirimi ve boş nöbet', () => {
 
   it('nöbetlerim: ayın nöbetleri, taşımalı görev ve birlikte görevliler; çizelge durumu', async () => {
     expectStatus(await owner.put(path(`transport-duties/${today.isoDate}`), { teacherIds: [teacherIds['Ayşe Demir'], teacherIds['Ali Can']] }), 200);
+    // Okulda taşımalı eğitim kapalıyken taşımalı görev gösterilmez (kayıt silinmez)
+    const closed = (await teacherUser.get(path('me/duties'))).json();
+    expect(closed.hasTransport).toBe(false);
+    expect(closed.days.find((d: { date: string }) => d.date === today.isoDate).transport).toBeNull();
+    expect(closed.calendar.marks.find((m: { date: string }) => m.date === today.isoDate)).toEqual({ date: today.isoDate, duty: true, transport: false });
+    expectStatus(await owner.patch(`/api/schools/${schoolId}`, { settings: { hasTransport: true } }), 200);
     const res = (await teacherUser.get(path('me/duties'))).json();
+    expect(res.hasTransport).toBe(true);
+    // Ay şeridi: ayın bütün görev günleri (geçmişler dahil), hafta günü aynı
+    expect(res.calendar.marks.find((m: { date: string }) => m.date === today.isoDate)).toEqual({ date: today.isoDate, duty: true, transport: true });
+    expect(res.calendar.marks.every((m: { date: string }) => m.date.startsWith(today.isoDate.slice(0, 7)))).toBe(true);
     expect(res.schedule).toMatchObject({ month: today.isoDate.slice(0, 7), entered: true });
     // Gelecek ayın çizelgesi girilmedi (son girilen ay gösterilir)
     expect(res.nextMonth.entered).toBe(false);
@@ -143,6 +153,15 @@ describe.skipIf(holidayToday)('izin bildirimi ve boş nöbet', () => {
     expect(res.showing).toBe(res.month);
     // Öğretmen kaydı olmayan hesapta liste boş
     expect((await plain.get(path('me/duties'))).json()).toMatchObject({ teacher: false, days: [] });
+  });
+
+  it('kim nerede: haftanın iş günleri tek istekte', async () => {
+    const week = (await teacherUser.get(path(`duty-week?date=${today.isoDate}`))).json();
+    expect(week.days).toHaveLength(5);
+    expect(week.days.map((d: { weekday: number }) => d.weekday)).toEqual([1, 2, 3, 4, 5]);
+    expect(week.start).toBe(week.days[0].date);
+    const day = week.days.find((d: { date: string }) => d.date === today.isoDate);
+    if (day) expect(day.entries.map((e: { area: string }) => e.area)).toContain('Bahçe');
   });
 
   it('nöbetlerim: bu ay kalan nöbet yoksa girilmiş gelecek ayın nöbetleri gösterilir', async () => {

@@ -4,7 +4,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { audit, schoolGuard, UUID_RE } from '../context.ts';
 import { announcements, duties, dutySubstitutions, screens, teacherLeaves, teachers, users } from '../db/schema.ts';
-import { dutyDay, dutyGaps, dutyScheduleStatus, substituteCandidates } from '../lib/dayinfo.ts';
+import { addDays, dutyDay, dutyGaps, dutyScheduleStatus, substituteCandidates, weekdayOf } from '../lib/dayinfo.ts';
 import { badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 import { notifyUsers, usersForTeacher } from '../lib/push.ts';
 
@@ -30,9 +30,8 @@ export async function controlRoutes(app: FastifyInstance) {
 
   /* ---------- Nöbet günü: kim nerede, boş yerler, yerine görevlendirme ---------- */
 
-  app.get('/api/schools/:schoolId/duty-day', member, async (req) => {
-    const { date } = parse(dateQuery, req.query);
-    const iso = date ?? todayOf(req).isoDate;
+  /** Bir günün nöbet yerleri, boş yerler ve (görevlendirme yetkisi olana) öneriler */
+  async function dayView(req: FastifyRequest, iso: string) {
     const [day, schedule] = await Promise.all([dutyDay(db, req.ctx.schoolId, iso), dutyScheduleStatus(db, req.ctx.schoolId, iso.slice(0, 7))]);
     const canAssign = req.ctx.permissions.includes('duties.manage');
     // Onay bekleyen izin talepleri yalnızca izin ya da nöbet yetkisi olanlara görünür
@@ -46,6 +45,19 @@ export async function controlRoutes(app: FastifyInstance) {
       // Öneriler yalnızca görevlendirme yapabilenlere (ve boş yer varken) hesaplanır
       candidates: canAssign && dutyGaps(day).length ? await substituteCandidates(db, req.ctx.schoolId, day) : [],
     };
+  }
+
+  app.get('/api/schools/:schoolId/duty-day', member, async (req) => {
+    const { date } = parse(dateQuery, req.query);
+    return dayView(req, date ?? todayOf(req).isoDate);
+  });
+
+  /** Haftanın iş günleri (Pazartesi–Cuma): verilen tarihin haftası; mobilde "Kim nerede" gün şeridi */
+  app.get('/api/schools/:schoolId/duty-week', member, async (req) => {
+    const { date } = parse(dateQuery, req.query);
+    const iso = date ?? todayOf(req).isoDate;
+    const monday = addDays(iso, 1 - weekdayOf(iso));
+    return { start: monday, days: await Promise.all([0, 1, 2, 3, 4].map((i) => dayView(req, addDays(monday, i)))) };
   });
 
   app.post('/api/schools/:schoolId/duty-substitutions', dutyWrite, async (req, reply) => {

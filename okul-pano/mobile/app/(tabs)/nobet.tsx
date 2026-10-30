@@ -6,17 +6,17 @@ import { Pressable, View } from 'react-native';
 import { Text } from '../../src/text.tsx';
 import { api } from '../../src/api.ts';
 import { useAuth, useSchoolPath } from '../../src/auth.tsx';
-import { useDutyDay, useMeToday, useMyDuties, type DutyDay, type MyDuties, type ScheduleStatus } from '../../src/data.ts';
+import { useDutyWeek, useMeToday, useMyDuties, type DutyDay, type MyDuties, type ScheduleStatus } from '../../src/data.ts';
 import { addDays, dayTitle } from '../../src/day.ts';
 import { colors, tiles } from '../../src/theme.ts';
-import { Badge, Banner, BentoRow, Button, Card, Empty, ErrorNote, HolidayCard, Icon, Label, Loading, Screen, Segmented, T, Tile } from '../../src/ui.tsx';
+import { Badge, Banner, Button, Card, Empty, ErrorNote, HolidayCard, Icon, Label, Loading, Screen, Segmented, T } from '../../src/ui.tsx';
 
 /** Nöbet (tasarım 2 ve 10): kendi nöbetlerim ve bugün kim nerede; yetkisi olan boş yere görevlendirir */
 export default function Nobet() {
   const { isTeacher } = useAuth();
   const [tab, setTab] = useState<'mine' | 'all'>(isTeacher ? 'mine' : 'all');
   return (
-    <Screen title={isTeacher ? 'Nöbetlerim' : 'Bugünün nöbetleri'}>
+    <Screen title={isTeacher ? 'Nöbetlerim' : 'Nöbetler'}>
       {isTeacher && (
         <Segmented
           value={tab}
@@ -34,6 +34,7 @@ export default function Nobet() {
 
 const monthName = (m: string) => new Intl.DateTimeFormat('tr-TR', { month: 'long', timeZone: 'UTC' }).format(new Date(`${m}-15T12:00:00Z`));
 const WEEKDAY_LONG_TR = ['', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+const WEEKDAY_SHORT_TR = ['', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
 
 /** Ayın çizelgesi girilmemişse son girilen ayınki gösterilir: kullanıcı bilsin */
 function ScheduleNote({ schedule }: { schedule?: ScheduleStatus }) {
@@ -56,9 +57,7 @@ function MyDuties() {
   const q = useMyDuties();
   const d = q.data;
   if (!d) return q.error ? <ErrorNote error={q.error} /> : <Loading />;
-  const dutyDays = d.days.filter((x) => !x.holiday);
   const showingNext = d.showing !== d.month;
-  const transportDays = dutyDays.filter((x) => x.transport).length;
   return (
     <>
       {showingNext ? (
@@ -69,10 +68,7 @@ function MyDuties() {
       {!showingNext && d.nextMonth.soon && !d.nextMonth.entered && (
         <Banner icon="calendar-outline" tone="primary" title={`${monthName(d.nextMonth.month)} nöbet çizelgesi henüz girilmedi`} text="Girildiğinde nöbetleriniz burada görünür." />
       )}
-      <BentoRow>
-        <Tile tone="ink" icon="shield-checkmark-outline" label={showingNext ? monthName(d.showing) : `${monthName(d.month)} · kalan`} value={dutyDays.filter((x) => x.duties.length).length} caption="nöbet günü" style={{ flex: 1, minHeight: 116 }} />
-        <Tile tone="sun" icon="bus-outline" label="Taşımalı · öğle" value={transportDays} caption="servis · öğle yemeği" style={{ flex: 1, minHeight: 116 }} />
-      </BentoRow>
+      <MonthStrip data={d} />
       {!d.teacher ? (
         <Card>
           <Empty icon="person-outline" title="Öğretmen kaydı bağlı değil" text="Okul yönetimi hesabınızı öğretmen kaydınızla eşleştirince nöbetleriniz görünür." />
@@ -92,6 +88,95 @@ function MyDuties() {
         Nöbet günlerinizde ilk dersten 15 dakika önce telefonunuza hatırlatma gelir.
       </T>
     </>
+  );
+}
+
+/**
+ * Ay şeridi: ayın iş günleri Pazartesi'den Cuma'ya; okul içi nöbet sarı, taşımalı ve öğle yemeği nöbeti yeşil
+ * (ikisi aynı günse yarı yarıya), tatil lila, geçmiş günler soluk. Liste günlerin ayrıntısını verir; şerit ayın
+ * tamamını (tutulan nöbetler dahil) tek bakışta gösterir.
+ */
+function MonthStrip({ data }: { data: MyDuties }) {
+  const month = data.showing;
+  const marks = new Map(data.calendar.marks.map((m) => [m.date, m]));
+  const holidays = new Map(data.calendar.holidays.map((h) => [h.date, h.name]));
+  const last = Number(new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5)), 0)).getUTCDate());
+  const days = Array.from({ length: last }, (_, i) => `${month}-${String(i + 1).padStart(2, '0')}`).filter((iso) => {
+    const wd = new Date(`${iso}T12:00:00Z`).getUTCDay();
+    return wd >= 1 && wd <= 5;
+  });
+  const lead = (new Date(`${days[0]}T12:00:00Z`).getUTCDay() + 6) % 7;
+  // Haftalara bölünür: ilk haftanın başı ve son haftanın sonu boş kutularla doldurulur
+  const slots: (string | null)[] = [...Array<null>(lead).fill(null), ...days];
+  while (slots.length % 5) slots.push(null);
+  const weeks = Array.from({ length: slots.length / 5 }, (_, i) => slots.slice(i * 5, i * 5 + 5));
+  const upcoming = data.calendar.marks.filter((m) => m.date >= data.today);
+  const next = upcoming[0]?.date;
+  const dutyLeft = upcoming.filter((m) => m.duty).length;
+  const transportLeft = upcoming.filter((m) => m.transport).length;
+  const ink = tiles.ink;
+  const cell = (iso: string) => {
+    const m = marks.get(iso);
+    const past = iso < data.today;
+    const holiday = holidays.has(iso);
+    const isNext = iso === next;
+    const bg = holiday ? tiles.lilac.bg : m?.duty && !m.transport ? '#fde68a' : m?.transport && !m.duty ? '#bbf7d0' : 'rgba(255,255,255,0.08)';
+    const fg = holiday ? tiles.lilac.fg : m?.duty ? '#713f12' : m?.transport ? '#14532d' : 'rgba(255,255,255,0.8)';
+    return (
+      <View
+        key={iso}
+        accessibilityLabel={`${dayTitle(iso)}${holiday ? `, tatil: ${holidays.get(iso)}` : ''}${m?.duty ? ', nöbet' : ''}${m?.transport ? ', taşımalı ve öğle yemeği nöbeti' : ''}`}
+        style={{ flex: 1, height: 32, borderRadius: 9, overflow: 'hidden', backgroundColor: bg, opacity: past ? 0.45 : 1, borderWidth: isNext ? 2 : 0, borderColor: '#fff', flexDirection: 'row' }}
+      >
+        {m?.duty && m.transport && !holiday && (
+          <>
+            <View style={{ flex: 1, backgroundColor: '#fde68a' }} />
+            <View style={{ flex: 1, backgroundColor: '#bbf7d0' }} />
+          </>
+        )}
+        <Text style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, textAlign: 'center', textAlignVertical: 'center', lineHeight: 30, fontSize: 12.5, fontWeight: '800', color: fg }}>
+          {Number(iso.slice(8))}
+        </Text>
+      </View>
+    );
+  };
+  const legend: [string, string][] = [
+    ['#fde68a', 'nöbet'],
+    ...(data.hasTransport ? ([['#bbf7d0', 'taşımalı ve öğle']] as [string, string][]) : []),
+    [tiles.lilac.bg, 'tatil'],
+  ];
+  return (
+    <View style={{ backgroundColor: ink.bg, borderRadius: 26, padding: 16, gap: 12 }}>
+      <View>
+        <Text style={{ fontSize: 13, fontWeight: '700', color: ink.sub }}>{monthName(month)}{month === data.month ? ' · kalan' : ''}</Text>
+        <Text style={{ fontSize: 38, lineHeight: 44, fontWeight: '800', letterSpacing: -1.5, color: ink.fg }}>{data.hasTransport ? upcoming.length : dutyLeft}</Text>
+        <Text style={{ fontSize: 13, fontWeight: '700', color: ink.fg }}>
+          {data.hasTransport ? `gün · ${dutyLeft} nöbet, ${transportLeft} taşımalı ve öğle` : `nöbet günü · ayda toplam ${data.calendar.marks.filter((m) => m.duty).length}`}
+        </Text>
+      </View>
+      <View style={{ gap: 6 }}>
+        <View style={{ flexDirection: 'row', gap: 6 }}>
+          {['Pzt', 'Sal', 'Çar', 'Per', 'Cum'].map((w) => (
+            <Text key={w} style={{ flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '700', color: ink.sub }}>
+              {w}
+            </Text>
+          ))}
+        </View>
+        {weeks.map((week, w) => (
+          <View key={w} style={{ flexDirection: 'row', gap: 6 }}>
+            {week.map((iso, i) => (iso ? cell(iso) : <View key={`b${w}${i}`} style={{ flex: 1, height: 32 }} />))}
+          </View>
+        ))}
+      </View>
+      <View style={{ flexDirection: 'row', gap: 14, flexWrap: 'wrap' }}>
+        {legend.map(([c, label]) => (
+          <View key={label} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: c }} />
+            <Text style={{ fontSize: 11.5, fontWeight: '600', color: ink.sub }}>{label}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -122,12 +207,12 @@ function MyDutyCard({ day, today, teacherName }: { day: MyDuties['days'][number]
         </View>
       ))}
       {day.transport && (
-        <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start', backgroundColor: tiles.sun.bg, borderRadius: 14, padding: 12 }}>
-          <Icon name="bus-outline" size={18} color={tiles.sun.fg} />
+        <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start', backgroundColor: tiles.mint.bg, borderRadius: 14, padding: 12 }}>
+          <Icon name="bus-outline" size={18} color={tiles.mint.fg} />
           <View style={{ flex: 1, gap: 2 }}>
-            <Text style={{ fontSize: 14, fontWeight: '800', color: tiles.sun.fg, marginBottom: 2 }}>Taşımalı ve öğle yemeği nöbeti</Text>
+            <Text style={{ fontSize: 14, fontWeight: '800', color: tiles.mint.fg, marginBottom: 2 }}>Taşımalı ve öğle yemeği nöbeti</Text>
             {[teacherName ?? 'Siz', ...day.transport.partners].map((name, i) => (
-              <Text key={`${i}${name}`} style={{ fontSize: 13, fontWeight: i === 0 ? '700' : '600', color: i === 0 ? tiles.sun.fg : tiles.sun.sub }}>
+              <Text key={`${i}${name}`} style={{ fontSize: 13, fontWeight: i === 0 ? '700' : '600', color: i === 0 ? tiles.mint.fg : tiles.mint.sub }}>
                 {i + 1}. Nöbetçi: {name}
               </Text>
             ))}
@@ -152,14 +237,30 @@ function Pill({ children, tone = 'muted' }: { children: React.ReactNode; tone?: 
   );
 }
 
+const shortMonth = (iso: string) => new Intl.DateTimeFormat('tr-TR', { month: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));
+/** Hafta sonuysa gelecek haftanın Pazartesi'si (gün şeridi iş günlerini gösterir) */
+const workdayOf = (iso: string) => {
+  const wd = ((new Date(`${iso}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
+  return wd >= 6 ? addDays(iso, 8 - wd) : iso;
+};
+
+/**
+ * Kim nerede: haftanın iş günleri üstte (Pazartesi–Cuma), seçilen günün nöbetçileri altta; oklarla haftalar
+ * arasında geçilir. Tatil günleri lila; kullanıcının kendi satırı vurgulu.
+ */
 function AllDuties() {
-  const { can } = useAuth();
-  const [offset, setOffset] = useState(0);
+  const { can, school } = useAuth();
   const today = useMeToday();
-  const date = today.data ? addDays(today.data.today, offset) : undefined;
-  const q = useDutyDay(date);
-  const day = q.data;
+  const start = today.data ? workdayOf(today.data.today) : undefined;
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [selected, setSelected] = useState<string | null>(null);
+  const anchor = start ? addDays(start, weekOffset * 7) : undefined;
+  const q = useDutyWeek(anchor);
+  const week = q.data;
+  const day = week?.days.find((d) => d.date === (selected ?? anchor)) ?? week?.days[0];
   const canAssign = can('duties.manage');
+  const todayIso = today.data?.today;
+  const thisWeek = Boolean(week && todayIso && week.days.some((d) => d.date === todayIso));
 
   const areas = useMemo(() => {
     const map = new Map<string, DutyDay['entries']>();
@@ -170,17 +271,57 @@ function AllDuties() {
     return [...map.values()];
   }, [day]);
 
-  const weekend = day ? day.weekday >= 6 : false;
+  const goWeek = (by: number) => {
+    setWeekOffset((w) => w + by);
+    setSelected(null);
+  };
+  const first = week?.days[0]?.date;
+  const last = week?.days[4]?.date;
+  const label =
+    first && last
+      ? `${Number(first.slice(8))}${first.slice(5, 7) === last.slice(5, 7) ? '' : ` ${shortMonth(first)}`} – ${Number(last.slice(8))} ${shortMonth(last)}${thisWeek ? ' · bu hafta' : ''}`
+      : '';
+
   return (
     <>
-      <Segmented
-        value={String(offset)}
-        onChange={(v) => setOffset(Number(v))}
-        options={[
-          { value: '0', label: 'Bugün' },
-          { value: '1', label: 'Yarın' },
-        ]}
-      />
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Önceki hafta" hitSlop={8} onPress={() => goWeek(-1)} style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
+          <Icon name="chevron-back" size={18} />
+        </Pressable>
+        <Text style={{ fontSize: 14.5, fontWeight: '800', color: colors.ink }}>{label}</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Sonraki hafta" hitSlop={8} onPress={() => goWeek(1)} style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
+          <Icon name="chevron-forward" size={18} />
+        </Pressable>
+      </View>
+      <View style={{ flexDirection: 'row', gap: 6 }}>
+        {(week?.days ?? []).map((d) => {
+          const on = d.date === day?.date;
+          const hol = Boolean(d.holiday);
+          const isToday = d.date === todayIso;
+          return (
+            <Pressable
+              key={d.date}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              accessibilityLabel={`${dayTitle(d.date)}${hol ? `, tatil: ${d.holiday}` : ''}${isToday ? ', bugün' : ''}`}
+              onPress={() => setSelected(d.date)}
+              style={{
+                flex: 1,
+                paddingVertical: 8,
+                borderRadius: 14,
+                alignItems: 'center',
+                backgroundColor: on ? colors.primary : hol ? tiles.lilac.bg : colors.card,
+                borderWidth: 1,
+                borderColor: on ? colors.primary : hol ? tiles.lilac.bg : isToday ? colors.borderStrong : colors.border,
+              }}
+            >
+              <Text style={{ fontSize: 11, fontWeight: '600', color: on ? colors.onPrimary : hol ? tiles.lilac.fg : colors.muted }}>{WEEKDAY_SHORT_TR[d.weekday]}</Text>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: on ? colors.onPrimary : hol ? tiles.lilac.fg : colors.ink }}>{Number(d.date.slice(8))}</Text>
+              <View style={{ width: 5, height: 5, borderRadius: 3, marginTop: 2, backgroundColor: isToday ? (on ? colors.onPrimary : colors.primary) : 'transparent' }} />
+            </Pressable>
+          );
+        })}
+      </View>
       <ErrorNote error={q.error} />
       {!day ? (
         <Loading />
@@ -203,11 +344,7 @@ function AllDuties() {
             <HolidayCard label={`${WEEKDAY_LONG_TR[day.weekday]} · tatil`} name={day.holiday} />
           ) : !day.entries.length ? (
             <Card>
-              {weekend ? (
-                <Empty icon="cafe-outline" title={`${WEEKDAY_LONG_TR[day.weekday]} · hafta sonu`} text="Okul kapalı, nöbet yok." />
-              ) : (
-                <Empty icon="shield-outline" title="Bu gün için nöbet girilmemiş" text="Nöbet çizelgesi panelden Excel ile ya da elle girilebilir." />
-              )}
+              <Empty icon="shield-outline" title="Bu gün için nöbet girilmemiş" text="Nöbet çizelgesi panelden Excel ile ya da elle girilebilir." />
             </Card>
           ) : (
             <>
@@ -216,20 +353,27 @@ function AllDuties() {
                 day.entries
                   .filter((e) => day.gaps.includes(e.dutyId))
                   .map((gap) => <GapCard key={gap.dutyId} day={day} gap={gap} canAssign={canAssign} />)}
-              <Card style={{ paddingVertical: 4, gap: 0 }}>
-                {areas.map((list, i) => (
-                  <View key={list[0]!.dutyId} style={{ paddingVertical: 12, gap: 3, borderTopWidth: i ? 1 : 0, borderTopColor: colors.divider }}>
-                    <T size={15.5} weight="800">
-                      {list.map((e) => (e.substitute ? `${e.substitute.teacherName} (yerine)` : e.onLeave ? `${e.teacherName} (izinli)` : e.teacherName)).join(', ')}
-                    </T>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Icon name="location-outline" size={14} color={colors.muted} />
-                      <T size={13} weight="600" color={colors.muted}>
-                        {list[0]!.area}
+              <Card style={{ paddingVertical: 4, gap: 0, overflow: 'hidden' }}>
+                {areas.map((list, i) => {
+                  const mine = list.some((e) => (e.substitute?.teacherId ?? e.teacherId) === school?.teacherId);
+                  return (
+                    <View
+                      key={list[0]!.dutyId}
+                      style={{ paddingVertical: 12, paddingHorizontal: 16, marginHorizontal: -16, gap: 3, borderTopWidth: i ? 1 : 0, borderTopColor: colors.divider, backgroundColor: mine ? tiles.sun.bg : 'transparent' }}
+                    >
+                      <T size={15.5} weight="800" color={mine ? tiles.sun.fg : colors.ink}>
+                        {list.map((e) => (e.substitute ? `${e.substitute.teacherName} (yerine)` : e.onLeave ? `${e.teacherName} (izinli)` : e.teacherName)).join(', ')}
+                        {mine ? ' · siz' : ''}
                       </T>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Icon name="location-outline" size={14} color={mine ? tiles.sun.fg : colors.muted} />
+                        <T size={13} weight="600" color={mine ? tiles.sun.sub : colors.muted}>
+                          {list[0]!.area}
+                        </T>
+                      </View>
                     </View>
-                  </View>
-                ))}
+                  );
+                })}
               </Card>
             </>
           )}
@@ -251,7 +395,11 @@ function GapCard({ day, gap, canAssign }: { day: DutyDay; gap: DutyDay['entries'
     setError(null);
     try {
       await api(path, { method: 'POST', body: { date: day.date, dutyId: gap.dutyId, teacherId } });
-      await Promise.all([qc.invalidateQueries({ queryKey: [school?.id, 'duty-day'] }), qc.invalidateQueries({ queryKey: [school?.id, 'control-center'] })]);
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: [school?.id, 'duty-day'] }),
+        qc.invalidateQueries({ queryKey: [school?.id, 'duty-week'] }),
+        qc.invalidateQueries({ queryKey: [school?.id, 'control-center'] }),
+      ]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Atanamadı');
     } finally {

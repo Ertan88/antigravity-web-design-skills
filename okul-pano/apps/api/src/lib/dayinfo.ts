@@ -192,7 +192,16 @@ export interface TeacherDutyDay {
  * Öğretmenin bir tarih aralığındaki nöbet günleri (aralık tek bir ay içinde): okul içi nöbet yerleri, yerine
  * görevlendirmeler, taşımalı öğrenci görevleri, o günün nöbetçi müdür yardımcısı. Sorgular toplu yapılır.
  */
-export async function teacherDutyDays(db: DB, schoolId: string, teacherId: string, from: string, to: string): Promise<TeacherDutyDay[]> {
+export async function teacherDutyDays(
+  db: DB,
+  schoolId: string,
+  teacherId: string,
+  from: string,
+  to: string,
+  opts: { transport?: boolean } = {},
+): Promise<TeacherDutyDay[]> {
+  // Okulda taşımalı eğitim kapalıysa taşımalı kayıtları hiç okunmaz (silinmez, gizlenir; panodaki gibi)
+  const withTransport = opts.transport !== false;
   const month = from.slice(0, 7);
   const [rows, holidays, leaves, subs, supervisors, transport] = await Promise.all([
     db
@@ -215,12 +224,14 @@ export async function teacherDutyDays(db: DB, schoolId: string, teacherId: strin
       .select({ date: dutySupervisors.date, name: dutySupervisors.name })
       .from(dutySupervisors)
       .where(and(eq(dutySupervisors.schoolId, schoolId), gte(dutySupervisors.date, from), lte(dutySupervisors.date, to))),
-    db
-      .select({ date: transportDuties.date, teacherId: transportDuties.teacherId, teacherName: teachers.fullName })
-      .from(transportDuties)
-      .innerJoin(teachers, eq(teachers.id, transportDuties.teacherId))
-      .where(and(eq(transportDuties.schoolId, schoolId), gte(transportDuties.date, from), lte(transportDuties.date, to)))
-      .orderBy(asc(transportDuties.sortOrder)),
+    withTransport
+      ? db
+          .select({ date: transportDuties.date, teacherId: transportDuties.teacherId, teacherName: teachers.fullName })
+          .from(transportDuties)
+          .innerJoin(teachers, eq(teachers.id, transportDuties.teacherId))
+          .where(and(eq(transportDuties.schoolId, schoolId), gte(transportDuties.date, from), lte(transportDuties.date, to)))
+          .orderBy(asc(transportDuties.sortOrder))
+      : Promise.resolve([]),
   ]);
   const holidayOf = new Map(holidays.map((h) => [h.date, h.name]));
   const supervisorOf = new Map(supervisors.map((s) => [s.date, s.name]));

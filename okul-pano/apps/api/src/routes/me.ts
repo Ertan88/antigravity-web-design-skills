@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { accessUser, audit, schoolGuard } from '../context.ts';
 import { bellSchedules, classGroups, pushTokens, teacherLeaves, teachers, timetableEntries } from '../db/schema.ts';
-import { addDays, dutyDay, dutyScheduleStatus, holidaysAndHalfDays, monthEnd, teacherDutyDays } from '../lib/dayinfo.ts';
+import { addDays, dutyDay, dutyScheduleStatus, effectiveHolidays, holidaysAndHalfDays, monthEnd, teacherDutyDays } from '../lib/dayinfo.ts';
 import { badRequest, parse } from '../lib/errors.ts';
 import { notifyUsers, usersWithPermission } from '../lib/push.ts';
 
@@ -99,28 +99,43 @@ export async function meRoutes(app: FastifyInstance) {
     const month = today.slice(0, 7);
     const end = monthEnd(month);
     const nextMonth = addDays(end, 1).slice(0, 7);
-    const [current, next, thisMonth] = await Promise.all([
+    const transport = schoolSettingsSchema.parse(school.settings ?? {}).hasTransport;
+    const monthStart = `${month}-01`;
+    const [current, next, wholeMonth] = await Promise.all([
       dutyScheduleStatus(db, schoolId, month),
       dutyScheduleStatus(db, schoolId, nextMonth),
-      teacherId ? teacherDutyDays(db, schoolId, teacherId, today, end) : Promise.resolve([]),
+      teacherId ? teacherDutyDays(db, schoolId, teacherId, monthStart, end, { transport }) : Promise.resolve([]),
     ]);
+    const thisMonth = wholeMonth.filter((d) => d.date >= today);
     // Bu ay kalan nöbet yoksa ve gelecek ayın çizelgesi girildiyse gelecek ayın nöbetleri gösterilir
     const remaining = thisMonth.some((d) => !d.holiday);
     const showNext = Boolean(teacherId) && !remaining && next.entered;
-    const days = showNext ? await teacherDutyDays(db, schoolId, teacherId!, addDays(end, 1), monthEnd(nextMonth)) : thisMonth;
-    const [teacher] = teacherId ? await db.select({ fullName: teachers.fullName }).from(teachers).where(eq(teachers.id, teacherId)) : [];
+    const showing = showNext ? nextMonth : month;
+    const monthDays = showNext ? await teacherDutyDays(db, schoolId, teacherId!, addDays(end, 1), monthEnd(nextMonth), { transport }) : wholeMonth;
+    const [[teacher], holidays] = await Promise.all([
+      teacherId ? db.select({ fullName: teachers.fullName }).from(teachers).where(eq(teachers.id, teacherId)) : Promise.resolve([]),
+      effectiveHolidays(db, schoolId, `${showing}-01`, monthEnd(showing)),
+    ]);
     return {
       today,
       month,
       /** Listelenen ay: bu ay ya da (bu ay kalan nöbet yoksa) gelecek ay */
-      showing: showNext ? nextMonth : month,
+      showing,
+      /** Okulda taşımalı eğitim açık mı (kapalıysa taşımalı görevler gösterilmez) */
+      hasTransport: transport,
       schedule: current,
       // Ayın son haftasında yeni ayın çizelgesi henüz girilmemişse uyarı gösterilir
       nextMonth: { ...next, soon: addDays(today, 7) > end },
+      /** Ay şeridi: gösterilen ayın bütün görev günleri (geçmişler dahil) ve tatilleri */
+      calendar: {
+        marks: monthDays.filter((d) => !d.holiday).map((d) => ({ date: d.date, duty: d.duties.length > 0, transport: Boolean(d.transport) })),
+        holidays,
+      },
       teacher: Boolean(teacherId),
       /** Öğretmen kaydındaki ad (taşımalı ve öğle yemeği nöbetinde 1. nöbetçi) */
       teacherName: teacher?.fullName ?? null,
-      days,
+      /** Liste: bugünden sonraki görev günleri */
+      days: showNext ? monthDays : thisMonth,
     };
   });
 

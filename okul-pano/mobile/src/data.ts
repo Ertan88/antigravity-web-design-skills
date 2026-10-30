@@ -125,7 +125,11 @@ export interface MyDuties {
   month: string;
   /** Listelenen ay: bu ay kalan nöbet yoksa ve girildiyse gelecek ay */
   showing: string;
+  /** Okulda taşımalı eğitim açık mı */
+  hasTransport: boolean;
   schedule: ScheduleStatus;
+  /** Ay şeridi: gösterilen ayın görev günleri (geçmişler dahil) ve tatilleri */
+  calendar: { marks: { date: string; duty: boolean; transport: boolean }[]; holidays: { date: string; name: string }[] };
   /** soon: ayın son haftası */
   nextMonth: ScheduleStatus & { soon: boolean };
   teacher: boolean;
@@ -203,6 +207,13 @@ export function useInboxActions() {
   return { read, unread, remove, readAll: () => read.mutate({ all: true, ...(school ? { schoolId: school.id } : {}) }) };
 }
 export const useTeachers = (enabled = true) => useSchoolQuery<{ id: string; fullName: string; isActive: boolean }[]>('teachers', { enabled });
+
+/** Haftanın iş günleri (verilen tarihin haftası): "Kim nerede" gün şeridi */
+export function useDutyWeek(date?: string) {
+  const { school } = useAuth();
+  const path = useSchoolPath(`duty-week${date ? `?date=${date}` : ''}`);
+  return useQuery({ queryKey: [school?.id, 'duty-week', date ?? 'today'], queryFn: () => api<{ start: string; days: DutyDay[] }>(path), enabled: Boolean(school) && Boolean(date) });
+}
 
 export function useDutyDay(date?: string) {
   const { school } = useAuth();
