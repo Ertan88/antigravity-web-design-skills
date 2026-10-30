@@ -9,7 +9,7 @@ import { useAuth, useSchoolPath } from '../../src/auth.tsx';
 import { useDutyDay, useMeToday, useMyDuties, type DutyDay, type MyDuties, type ScheduleStatus } from '../../src/data.ts';
 import { addDays, dayTitle } from '../../src/day.ts';
 import { colors, tiles } from '../../src/theme.ts';
-import { Badge, Banner, BentoRow, Button, Card, Empty, ErrorNote, Icon, Label, Loading, Screen, Segmented, T, Tile } from '../../src/ui.tsx';
+import { Badge, Banner, BentoRow, Button, Card, Empty, ErrorNote, HolidayCard, Icon, Label, Loading, Screen, Segmented, T, Tile } from '../../src/ui.tsx';
 
 /** Nöbet (tasarım 2 ve 10): kendi nöbetlerim ve bugün kim nerede; yetkisi olan boş yere görevlendirir */
 export default function Nobet() {
@@ -98,19 +98,7 @@ function MyDuties() {
 function MyDutyCard({ day, today, teacherName }: { day: MyDuties['days'][number]; today: string; teacherName: string | null }) {
   const isToday = day.date === today;
   const label = isToday ? `Bugün · ${WEEKDAY_LONG_TR[day.weekday]}` : dayTitle(day.date);
-  if (day.holiday) {
-    return (
-      <Card style={{ gap: 4, borderStyle: 'dashed', borderWidth: 1, borderColor: colors.borderStrong }}>
-        <Label>{label}</Label>
-        <T size={15} weight="700">
-          Tatil · nöbet yok
-        </T>
-        <T size={13} color={colors.muted}>
-          {day.holiday}
-        </T>
-      </Card>
-    );
-  }
+  if (day.holiday) return <HolidayCard label={label} name={day.holiday} />;
   return (
     <Card style={{ gap: 10 }}>
       <Label color={isToday ? colors.primary : colors.muted}>{label}</Label>
@@ -212,9 +200,7 @@ function AllDuties() {
             </Card>
           )}
           {day.holiday ? (
-            <Card>
-              <Empty icon="sunny-outline" title={`${WEEKDAY_LONG_TR[day.weekday]} · tatil`} text={`${day.holiday} nedeniyle nöbet yok.`} />
-            </Card>
+            <HolidayCard label={`${WEEKDAY_LONG_TR[day.weekday]} · tatil`} name={day.holiday} />
           ) : !day.entries.length ? (
             <Card>
               {weekend ? (

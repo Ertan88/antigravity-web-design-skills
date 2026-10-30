@@ -143,9 +143,7 @@ export function MySchedule({ data }: { data: MeToday }) {
     <View style={{ gap: 8 }}>
       <SectionTitle>Bugünkü programım</SectionTitle>
       <Card style={{ padding: 0, gap: 0, overflow: 'hidden' }}>
-        {day.holiday ? (
-          <Empty icon="sunny-outline" title="Bugün tatil" text={day.holiday} />
-        ) : day.lessons.length ? (
+        {day.lessons.length ? (
           day.lessons.map((l, i) => (
             <View
               key={l.period.no}

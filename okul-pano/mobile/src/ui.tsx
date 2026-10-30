@@ -757,3 +757,20 @@ export function Tile({
 export function BentoRow({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
   return <View style={[{ flexDirection: 'row', gap: 10, alignItems: 'stretch' }, style]}>{children}</View>;
 }
+
+/** Tatil günü: diğer kartlardan ayrılsın diye kendi renginde (lila), güneş simgeli */
+export function HolidayCard({ label, name }: { label: string; name: string }) {
+  const t = tiles.lilac;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: t.bg, borderRadius: radius.lg, padding: 16 }}>
+      <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: t.chip, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name="sunny" size={22} color={t.fg} />
+      </View>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={{ fontSize: 12, fontWeight: '800', color: t.sub, letterSpacing: 0.3 }}>{label.toLocaleUpperCase('tr-TR')}</Text>
+        <Text style={{ fontSize: 16, fontWeight: '800', color: t.fg }}>{name}</Text>
+        <Text style={{ fontSize: 13, fontWeight: '600', color: t.sub }}>Tatil · nöbet yok</Text>
+      </View>
+    </View>
+  );
+}

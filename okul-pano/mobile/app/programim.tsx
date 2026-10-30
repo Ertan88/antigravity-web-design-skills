@@ -5,7 +5,7 @@ import { Text } from '../src/text.tsx';
 import { useMeToday, useNow } from '../src/data.ts';
 import { teacherDay, WEEKDAY_LONG, WEEKDAY_SHORT } from '../src/day.ts';
 import { colors } from '../src/theme.ts';
-import { Card, Chip, Empty, ErrorNote, Loading, Screen, SectionTitle, T } from '../src/ui.tsx';
+import { Card, Chip, Empty, ErrorNote, HolidayCard, Loading, Screen, SectionTitle, T } from '../src/ui.tsx';
 
 /** Ders programım ve zil saatleri: haftanın her günü için dersler; seçilen günün zil çizelgesi */
 export default function Programim() {
@@ -60,9 +60,7 @@ export default function Programim() {
         {isToday ? ' · bugün' : ''}
       </SectionTitle>
       {isToday && today?.holiday ? (
-        <Card>
-          <Empty icon="sunny-outline" title="Bugün tatil" text={today.holiday} />
-        </Card>
+        <HolidayCard label="Bugün" name={today.holiday} />
       ) : !periods.length ? (
         <Card>
           <Empty icon="notifications-off-outline" title="Bu gün zil çalmıyor" />
