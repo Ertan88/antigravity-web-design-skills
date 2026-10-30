@@ -16,17 +16,50 @@ interface SignupConfig {
 
 export const useSignupConfig = () => useQuery({ queryKey: ['signup-config'], queryFn: () => api<SignupConfig>('/api/signup/config'), staleTime: 300_000 });
 
-/** Giriş yapmadan açılan sayfaların ortak çerçevesi: logo, ortada tek kart */
-function PublicShell({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
+/**
+ * Giriş yapmadan açılan sayfaların ortak çerçevesi: üstte marka kutusu (mobil giriş ekranıyla aynı koyu turkuaz,
+ * logo, slogan ve isteğe bağlı renkli etiketler), altında tek kart.
+ */
+function PublicShell({ children, wide = false, chips }: { children: ReactNode; wide?: boolean; chips?: { label: string; cls: string }[] }) {
   return (
-    <div className="flex min-h-dvh flex-col items-center bg-slate-50 px-4 py-10 sm:py-14">
-      <Link to="/" className="mb-8 flex items-center gap-2.5" aria-label="Okulyayın girişine dön">
-        <BrandMark className="size-10" />
-        <BrandName className="text-2xl font-extrabold tracking-tight text-ink" />
-      </Link>
-      <main className={`w-full ${wide ? 'max-w-xl' : 'max-w-md'} rounded-2xl bg-surface p-6 shadow-sm ring-1 ring-slate-900/[0.06] sm:p-8`}>{children}</main>
-      <p className="mt-6 text-xs text-slate-500">© {new Date().getFullYear()} Okulyayın</p>
+    <div className="flex min-h-dvh flex-col items-center bg-slate-50 px-4 py-8 sm:py-12">
+      <div className={`w-full ${wide ? 'max-w-xl' : 'max-w-md'} space-y-4`}>
+        <header className="rounded-[28px] bg-[#0E5E66] p-6 text-white sm:p-7">
+          <Link to="/" className="inline-flex items-center gap-2.5" aria-label="Okulyayın girişine dön">
+            <BrandMark className="size-10" />
+            <BrandName className="text-[22px] font-extrabold tracking-tight text-white" accent="text-[#F5B83D]" />
+          </Link>
+          <p className="mt-4 text-[26px] leading-[1.15] font-extrabold tracking-[-0.03em] sm:text-[30px]">
+            Okulunuzun her anı,
+            <span className="block text-white/60">tek ekranda.</span>
+          </p>
+          {chips && (
+            <div className="mt-4 flex flex-wrap gap-1.5">
+              {chips.map((c) => (
+                <span key={c.label} className={`rounded-full px-3 py-1 text-xs font-extrabold ${c.cls}`}>
+                  {c.label}
+                </span>
+              ))}
+            </div>
+          )}
+        </header>
+        <main className="rounded-3xl bg-surface p-6 ring-1 ring-slate-200 sm:p-8">{children}</main>
+        <p className="text-center text-xs text-slate-500">© {new Date().getFullYear()} Okulyayın</p>
+      </div>
     </div>
+  );
+}
+
+/** Kayıt formunda numaralı bölüm başlığı */
+function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
+  return (
+    <fieldset className="space-y-4">
+      <legend className="mb-4 flex items-center gap-2.5">
+        <span className="flex size-7 items-center justify-center rounded-full bg-ink text-xs font-extrabold text-white dark:text-[#1c1917]">{n}</span>
+        <span className="text-base font-extrabold tracking-tight">{title}</span>
+      </legend>
+      {children}
+    </fieldset>
   );
 }
 
@@ -98,19 +131,24 @@ export function Signup() {
   }
 
   const days = config.data?.trialDays ?? 30;
+  const screens = config.data?.trialScreens ?? 2;
   return (
-    <PublicShell wide>
-      <form onSubmit={submit} className="space-y-5">
+    <PublicShell
+      wide
+      chips={[
+        { label: `${days} gün ücretsiz`, cls: 'bg-[#fde68a] text-[#713f12]' },
+        { label: `${screens} panoya kadar`, cls: 'bg-[#bbf7d0] text-[#14532d]' },
+        { label: 'Kart bilgisi yok', cls: 'bg-[#bae6fd] text-[#0c4a6e]' },
+      ]}
+    >
+      <form onSubmit={submit} className="space-y-7">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Okulunuz için ücretsiz deneyin</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {days} gün boyunca {config.data?.trialScreens ?? 2} panoya kadar ücretsiz. Kart bilgisi istenmez; deneme bitince aboneliği siz başlatırsınız.
-          </p>
+          <h1 className="text-[26px] leading-tight font-extrabold tracking-[-0.03em]">Okulunuz için ücretsiz deneyin</h1>
+          <p className="mt-1 text-sm text-slate-500">Deneme bitince aboneliği siz başlatırsınız; o zamana kadar hiçbir ücret alınmaz.</p>
         </div>
         {error && <Alert tone="red">{error}</Alert>}
 
-        <fieldset className="space-y-4">
-          <legend className="mb-3 text-xs font-semibold tracking-wider text-slate-500 uppercase">Okul</legend>
+        <Step n={1} title="Okul">
           <Field label="Okulun tam adı" help="Panolarda bu ad görünür; sonra değiştirebilirsiniz.">
             {(id) => <Input id={id} required minLength={3} maxLength={120} value={form.schoolName} onChange={set('schoolName')} autoComplete="organization" />}
           </Field>
@@ -133,10 +171,9 @@ export function Signup() {
             <Field label="İl">{(id) => <Input id={id} required minLength={2} maxLength={40} value={form.city} onChange={set('city')} autoComplete="address-level1" />}</Field>
             <Field label="İlçe">{(id) => <Input id={id} maxLength={60} value={form.district} onChange={set('district')} autoComplete="address-level2" />}</Field>
           </div>
-        </fieldset>
+        </Step>
 
-        <fieldset className="space-y-4">
-          <legend className="mb-3 text-xs font-semibold tracking-wider text-slate-500 uppercase">Yetkili (okul sahibi hesabı)</legend>
+        <Step n={2} title="Yetkili · okul sahibi hesabı">
           <Field label="Ad soyad">{(id) => <Input id={id} required minLength={3} maxLength={80} value={form.ownerName} onChange={set('ownerName')} autoComplete="name" />}</Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="E-posta">{(id) => <Input id={id} type="email" required value={form.email} onChange={set('email')} autoComplete="email" />}</Field>
@@ -145,7 +182,7 @@ export function Signup() {
           <Field label="Şifre" help="En az 8 karakter. Mobil uygulamaya da bu şifreyle girersiniz.">
             {(id) => <PasswordInput id={id} required minLength={8} value={form.password} onChange={set('password')} autoComplete="new-password" />}
           </Field>
-        </fieldset>
+        </Step>
 
         {/* Bot tuzağı: ekran okuyucudan ve klavyeden gizli */}
         <div aria-hidden="true" className="absolute -left-[9999px] h-0 overflow-hidden">
@@ -155,7 +192,7 @@ export function Signup() {
           </label>
         </div>
 
-        <div className="space-y-3 text-sm">
+        <div className="space-y-3 rounded-2xl bg-slate-50 p-4 text-sm ring-1 ring-slate-200">
           <label className="flex items-start gap-2.5">
             <input type="checkbox" required className="mt-0.5 size-4 accent-brand-600" checked={kvkk} onChange={(e) => setKvkk(e.target.checked)} />
             <span className="text-slate-600">
@@ -169,7 +206,7 @@ export function Signup() {
           </label>
         </div>
 
-        <Button type="submit" loading={busy} disabled={!kvkk} className="w-full">
+        <Button type="submit" loading={busy} className="h-12 w-full text-base">
           Ücretsiz denemeyi başlat
         </Button>
         <p className="text-center text-sm text-slate-500">

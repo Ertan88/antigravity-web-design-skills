@@ -1,23 +1,21 @@
 import { useState } from 'react';
-import { Image, KeyboardAvoidingView, Linking, Platform, Pressable, View } from 'react-native';
+import { Image, Linking, Pressable, View } from 'react-native';
 import { Text } from '../src/text.tsx';
 import { DEFAULT_SERVER, normalizeServer } from '../src/api.ts';
 import { useAuth } from '../src/auth.tsx';
-import { colors, tiles, type TileTone } from '../src/theme.ts';
+// Marka kutusu temadan bağımsızdır (koyu turkuaz); üzerindeki etiketler her iki temada açık pastel renklerle
+import { colors, LIGHT_TILES, type TileTone } from '../src/theme.ts';
 import { Button, Card, Field, Icon, Screen, T, type IconName } from '../src/ui.tsx';
-
-/** Logodaki marka rengi (yazı logosunda "yayın") */
-const BRAND = colors.brand;
 
 const FEATURES: { label: string; icon: IconName; tone: TileTone }[] = [
   { label: 'Duyurular', icon: 'megaphone', tone: 'sun' },
-  { label: 'Panolar', icon: 'tv', tone: 'sky' },
   { label: 'Nöbetler', icon: 'shield-checkmark', tone: 'mint' },
+  { label: 'Panolar', icon: 'tv', tone: 'sky' },
 ];
 
 /**
- * Giriş: panel hesabıyla, yalnızca e-posta ve şifre. Sunucu adresi uygulamaya derlemede verilir (EXPO_PUBLIC_API_URL);
- * web sürümünde açıldığı adrestir. Kendi sunucusunu kuran okullar için "Farklı sunucu" ile değiştirilebilir.
+ * Giriş: yalnızca e-posta ve şifre. Sunucu adresi uygulamaya derlemede verilir (EXPO_PUBLIC_API_URL); web sürümünde
+ * açıldığı adrestir. Kendi sunucusunu kuran okullar için "Farklı sunucu" ile değiştirilebilir.
  */
 export default function Login() {
   const { signIn, server: saved } = useAuth();
@@ -31,6 +29,7 @@ export default function Login() {
 
   const submit = async () => {
     setError(null);
+    if (!email.trim() || !password) return setError('E-posta ve şifrenizi yazın.');
     if (!server.trim()) {
       setEditServer(true);
       return setError('Sunucu adresini yazın (Okulyayın panelini açtığınız adres).');
@@ -47,30 +46,38 @@ export default function Login() {
 
   return (
     <Screen>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ gap: 18, paddingTop: 20 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <Image source={require('../assets/icon.png')} style={{ width: 44, height: 44, borderRadius: 14 }} accessibilityIgnoresInvertColors />
-          <Text style={{ fontSize: 22, fontWeight: '800', letterSpacing: -0.6, color: colors.ink }} accessibilityRole="header">
-            okul<Text style={{ color: BRAND }}>yayın</Text>
+      <View style={{ gap: 22, paddingTop: 16 }}>
+        {/* Marka kutusu: açılış ekranıyla aynı renk; logo, slogan ve uygulamanın renkli etiketleri */}
+        <View style={{ backgroundColor: '#0E5E66', borderRadius: 28, padding: 22, gap: 14, overflow: 'hidden' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Image source={require('../assets/icon.png')} style={{ width: 40, height: 40, borderRadius: 12 }} accessibilityIgnoresInvertColors />
+            <Text style={{ fontSize: 21, fontWeight: '800', letterSpacing: -0.6, color: '#fff' }}>
+              okul<Text style={{ color: '#F5B83D' }}>yayın</Text>
+            </Text>
+          </View>
+          <Text style={{ fontSize: 26, lineHeight: 31, fontWeight: '800', letterSpacing: -0.9, color: '#fff' }}>
+            Okulunuzun her anı,{'\n'}
+            <Text style={{ color: 'rgba(255,255,255,0.6)' }}>tek ekranda.</Text>
           </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {FEATURES.map((f) => (
+              <View key={f.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: LIGHT_TILES[f.tone].bg, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 }}>
+                <Icon name={f.icon} size={13} color={LIGHT_TILES[f.tone].fg} />
+                <Text style={{ fontSize: 12, fontWeight: '800', color: LIGHT_TILES[f.tone].fg }}>{f.label}</Text>
+              </View>
+            ))}
+          </View>
         </View>
-        <Text style={{ fontSize: 34, lineHeight: 38, fontWeight: '800', letterSpacing: -1.2, color: colors.ink }}>
-          Okulunuzun her anı,<Text style={{ color: colors.subtle }}>{'\n'}tek ekranda.</Text>
-        </Text>
-        {/* Uygulamanın ne yaptığını üç renkli kutuyla anlatır */}
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          {FEATURES.map((f) => (
-            <View key={f.label} style={{ flex: 1, backgroundColor: tiles[f.tone].bg, borderRadius: 20, padding: 12, gap: 18 }}>
-              <Icon name={f.icon} size={20} color={tiles[f.tone].fg} />
-              <Text style={{ fontSize: 13, fontWeight: '800', color: tiles[f.tone].fg }}>{f.label}</Text>
-            </View>
-          ))}
-        </View>
-        <T color={colors.muted} size={14}>
-          Panel hesabınızla giriş yapın. Hesabınız yoksa okul yöneticinizden isteyin.
-        </T>
 
-        <Card>
+        <Card style={{ gap: 14 }}>
+          <View style={{ gap: 2 }}>
+            <Text style={{ fontSize: 19, fontWeight: '800', color: colors.ink }} accessibilityRole="header">
+              Giriş yapın
+            </Text>
+            <T color={colors.muted} size={13.5}>
+              Okulunuzun verdiği e-posta ve şifreyle.
+            </T>
+          </View>
           {editServer && (
             <Field
               label="Sunucu adresi"
@@ -83,7 +90,17 @@ export default function Login() {
               help="Okulyayın panelini açtığınız adres"
             />
           )}
-          <Field label="E-posta" value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" textContentType="username" />
+          <Field
+            label="E-posta"
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            autoComplete="email"
+            textContentType="username"
+            returnKeyType="next"
+          />
           <View>
             <Field
               label="Şifre"
@@ -94,12 +111,13 @@ export default function Login() {
               textContentType="password"
               onSubmitEditing={() => void submit()}
               returnKeyType="go"
+              style={{ paddingRight: 52 }}
             />
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={show ? 'Şifreyi gizle' : 'Şifreyi göster'}
               onPress={() => setShow((s) => !s)}
-              style={{ position: 'absolute', right: 6, top: 26, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+              style={{ position: 'absolute', right: 4, top: 26, width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}
             >
               <Icon name={show ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.muted} />
             </Pressable>
@@ -109,29 +127,26 @@ export default function Login() {
               {error}
             </T>
           )}
-          <Button size="lg" loading={busy} disabled={!email || !password} onPress={() => void submit()}>
+          <Button size="lg" loading={busy} onPress={() => void submit()}>
             Giriş yap
           </Button>
         </Card>
-        {Boolean(server.trim()) && (
-          <Pressable
-            accessibilityRole="link"
-            onPress={() => void Linking.openURL(`${normalizeServer(server)}/admin/kayit`)}
-            style={{ alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 }}
-          >
-            <Text style={{ color: colors.muted, fontSize: 13, textAlign: 'center' }}>
-              Okulunuz Okulyayın kullanmıyor mu? <Text style={{ color: colors.ink, fontWeight: '800', textDecorationLine: 'underline' }}>Web'den ücretsiz deneyin</Text>
-            </Text>
-          </Pressable>
-        )}
-        {!editServer && (
-          <Pressable accessibilityRole="button" onPress={() => setEditServer(true)} style={{ alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 }}>
-            <Text style={{ color: colors.muted, fontSize: 13 }}>
-              Okulunuzun kendi sunucusu mu var? <Text style={{ color: colors.ink, fontWeight: '800', textDecorationLine: 'underline' }}>Farklı sunucu</Text>
-            </Text>
-          </Pressable>
-        )}
-      </KeyboardAvoidingView>
+
+        <View style={{ alignItems: 'center', gap: 2 }}>
+          {Boolean(server.trim()) && (
+            <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(`${normalizeServer(server)}/admin/kayit`)} style={{ minHeight: 40, justifyContent: 'center', paddingHorizontal: 12 }}>
+              <Text style={{ color: colors.muted, fontSize: 13 }}>
+                Okulunuz için hesap yok mu? <Text style={{ color: colors.ink, fontWeight: '700' }}>Ücretsiz deneyin</Text>
+              </Text>
+            </Pressable>
+          )}
+          {!editServer && (
+            <Pressable accessibilityRole="button" onPress={() => setEditServer(true)} style={{ minHeight: 40, justifyContent: 'center', paddingHorizontal: 12 }}>
+              <Text style={{ color: colors.faint, fontSize: 12.5 }}>Farklı sunucu</Text>
+            </Pressable>
+          )}
+        </View>
+      </View>
     </Screen>
   );
 }

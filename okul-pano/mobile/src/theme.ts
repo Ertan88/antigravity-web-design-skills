@@ -78,7 +78,7 @@ const TILE_KEYS = ['ink', 'sun', 'peach', 'mint', 'sky', 'lilac', 'rose', 'paper
 export type TileTone = (typeof TILE_KEYS)[number];
 
 /** Bento kutularının renkleri: zemin, yazı ve (varsa) simge kutusu */
-const LIGHT_TILES: Record<TileTone, Tile> = {
+export const LIGHT_TILES: Record<TileTone, Tile> = {
   ink: { bg: '#1c1917', fg: '#ffffff', sub: 'rgba(255,255,255,0.62)', chip: 'rgba(255,255,255,0.12)' },
   sun: { bg: '#fde68a', fg: '#713f12', sub: 'rgba(113,63,18,0.78)', chip: '#fbbf24' },
   peach: { bg: '#fed7aa', fg: '#7c2d12', sub: 'rgba(124,45,18,0.78)', chip: 'rgba(255,255,255,0.55)' },

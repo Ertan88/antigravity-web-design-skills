@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, usePathname } from 'expo-router';
 import { useEffect, useRef, useState, type ComponentProps, type ComponentRef, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, Animated, Easing, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Easing, Keyboard, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, TextInput as NativeTextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 import { Text, TextInput } from './text.tsx';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { scrollMemory, scrollRestore } from './scroll.ts';
@@ -65,6 +65,28 @@ export function Screen({
     }, 1000);
     return () => clearTimeout(t);
   }, [path]);
+  // Klavye açılınca odaktaki yazı kutusu klavyenin üstünde kalacak şekilde kaydırılır
+  useEffect(() => {
+    if (!scroll) return;
+    // İçerik kısaldıktan sonra ölçülür (görünen yükseklik güncellensin)
+    const sub = Keyboard.addListener('keyboardDidShow', () => setTimeout(() => {
+      const input = NativeTextInput.State.currentlyFocusedInput();
+      const inner = scroller.current?.getInnerViewRef?.();
+      if (!input || !inner) return;
+      input.measureLayout(
+        inner as never,
+        (_x, y, _w, h) => {
+          const top = y - 24;
+          const bottom = y + h + 96;
+          const current = scrollMemory.get(path) ?? 0;
+          if (top < current) scroller.current?.scrollTo({ y: Math.max(0, top), animated: true });
+          else if (bottom > current + viewH.current) scroller.current?.scrollTo({ y: bottom - viewH.current, animated: true });
+        },
+        () => undefined,
+      );
+    }, 80));
+    return () => sub.remove();
+  }, [scroll, path]);
   // Yenileme simgesi yalnızca kullanıcı aşağı çekince görünür; ekran açılırken arkada yapılan tazelemede görünmez
   const [pulled, setPulled] = useState(false);
   const sawRefresh = useRef(false);
@@ -103,6 +125,8 @@ export function Screen({
           {right}
         </View>
       )}
+      {/* Klavye açılınca içerik kısalır (Android kenardan kenara çizimde pencere küçülmez) ve odaktaki kutu görünür kalır */}
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }} enabled={Platform.OS !== 'web'}>
       {scroll ? (
         <ScrollView
           ref={scroller}
@@ -136,6 +160,7 @@ export function Screen({
         body
       )}
       {footer && <SafeAreaView edges={['bottom']} style={styles.footer}>{footer}</SafeAreaView>}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
