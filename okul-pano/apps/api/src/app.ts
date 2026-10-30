@@ -1,0 +1,203 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+import cookie from '@fastify/cookie';
+import helmet from '@fastify/helmet';
+import jwt from '@fastify/jwt';
+import multipart from '@fastify/multipart';
+import rateLimit from '@fastify/rate-limit';
+import fastifyStatic from '@fastify/static';
+import Fastify, { type FastifyInstance } from 'fastify';
+import type { AppDeps } from './context.ts';
+import { openDatabase, type Database } from './db/client.ts';
+import { loadEnv, type Env } from './env.ts';
+import { runMebCalendarJob } from './lib/mebCalendar.ts';
+import { errorHandler, unauthorized } from './lib/errors.ts';
+import { DisplayBus } from './lib/events.ts';
+import { DbStorage, LocalStorage, type FileStorage } from './lib/storage.ts';
+import { UUID_RE } from './context.ts';
+import { academicCalendarRoutes } from './routes/academicCalendar.ts';
+import { conductRoutes, runConductRetention } from './routes/conduct.ts';
+import { authRoutes } from './routes/auth.ts';
+import { contentRoutes } from './routes/content.ts';
+import { dutyRoutes } from './routes/duties.ts';
+import { holidayRoutes } from './routes/holidays.ts';
+import { transportRoutes } from './routes/transport.ts';
+import { displayRoutes } from './routes/display.ts';
+import { emergencyRoutes } from './routes/emergency.ts';
+import { notificationRoutes } from './routes/notifications.ts';
+import { memberRoutes } from './routes/members.ts';
+import { controlRoutes } from './routes/control.ts';
+import { meRoutes } from './routes/me.ts';
+import { privacyRoutes } from './routes/privacy.ts';
+import { runTrialReminders, signupRoutes } from './routes/signup.ts';
+import { notifyUsers, usersWithPermission } from './lib/push.ts';
+import { screens } from './db/schema.ts';
+import { eq } from 'drizzle-orm';
+import { schoolRoutes } from './routes/schools.ts';
+import { screenRoutes } from './routes/screens.ts';
+import { studentRoutes } from './routes/students.ts';
+import { teacherRoutes } from './routes/teachers.ts';
+import { timetableRoutes } from './routes/timetable.ts';
+
+export interface BuildOptions {
+  env?: Partial<Record<keyof Env, unknown>>;
+  database?: Database;
+  storage?: FileStorage;
+  logger?: boolean;
+}
+
+export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance> {
+  const env = loadEnv(opts.env);
+  const database = opts.database ?? (await openDatabase({ databaseUrl: env.DATABASE_URL, pgliteDir: env.PGLITE_DIR }));
+  const localStorage = new LocalStorage(env.UPLOAD_DIR);
+  const dbStorage = env.FILE_STORAGE === 'db' ? new DbStorage(database.db) : null;
+  const deps: AppDeps = {
+    db: database.db,
+    bus: new DisplayBus(),
+    storage: opts.storage ?? dbStorage ?? localStorage,
+    env,
+  };
+
+  const useLogger = opts.logger ?? env.NODE_ENV !== 'test';
+  const app = Fastify({
+    logger: useLogger
+      ? {
+          level: env.NODE_ENV === 'production' ? 'info' : 'warn',
+          // Ekran anahtarı SSE adresinde sorgu olarak taşınır; loglara yalnızca yol yazılır
+          serializers: { req: (req) => ({ method: req.method, url: req.url.split('?')[0] }) },
+        }
+      : false,
+    trustProxy: true,
+  });
+  app.decorate('deps', deps);
+  app.decorateRequest('ctx', null as never);
+  app.setErrorHandler(errorHandler);
+
+  await app.register(helmet, {
+    // Pano YouTube videolarını gömdüğü için CSP, ön yüz uygulamalarının kendi başlıklarında yönetilir.
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    // YouTube gömülü oynatıcı, kaynağı (Referer) göremezse videoyu oynatmayı reddeder
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  });
+  await app.register(cookie);
+  await app.register(jwt, { secret: env.JWT_SECRET });
+  await app.register(rateLimit, { global: false });
+  await app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024, files: 1 } });
+
+  app.decorate('authenticate', async (req) => {
+    try {
+      await req.jwtVerify();
+    } catch {
+      throw unauthorized();
+    }
+    if (req.user.typ !== 'access') throw unauthorized();
+  });
+
+  app.get('/api/health', async () => ({ ok: true, driver: database.driver, time: new Date().toISOString() }));
+
+  await app.register(authRoutes);
+  await app.register(schoolRoutes);
+  await app.register(memberRoutes);
+  await app.register(contentRoutes);
+  await app.register(teacherRoutes);
+  await app.register(studentRoutes);
+  await app.register(dutyRoutes);
+  await app.register(transportRoutes);
+  await app.register(holidayRoutes);
+  await app.register(timetableRoutes);
+  await app.register(screenRoutes);
+  await app.register(displayRoutes);
+  await app.register(emergencyRoutes);
+  await app.register(notificationRoutes);
+  await app.register(controlRoutes);
+  await app.register(meRoutes);
+  await app.register(privacyRoutes);
+  await app.register(signupRoutes);
+  await app.register(academicCalendarRoutes);
+  await app.register(conductRoutes);
+
+  // Deneme süresi hatırlatmaları: açılıştan kısa süre sonra ve saatte bir (testlerde elle çağrılır)
+  if (env.NODE_ENV !== 'test') {
+    const run = () => {
+      void runTrialReminders(deps).catch((err) => app.log.error(err, 'deneme hatırlatması'));
+      void runConductRetention(deps).catch((err) => app.log.error(err, 'gözlem saklama süresi'));
+      // MEB çalışma takvimi: haziran ortasından itibaren yayımlanır; her yıl için günde bir deneme
+      if (deps.env.MEB_INDEX_URLS) void runMebCalendarJob(deps).catch((err) => app.log.error(err, 'MEB çalışma takvimi'));
+    };
+    const first = setTimeout(run, 60_000);
+    const hourly = setInterval(run, 3600_000);
+    first.unref();
+    hourly.unref();
+    app.addHook('onClose', async () => {
+      clearTimeout(first);
+      clearInterval(hourly);
+    });
+  }
+
+  // Pano 10 dakikadan uzun süre bağlantısız kalırsa ekranları yönetenlerin telefonuna bildirim
+  deps.bus.onLongOffline = (screenId) => {
+    void (async () => {
+      const [screen] = await deps.db.select({ name: screens.name, schoolId: screens.schoolId }).from(screens).where(eq(screens.id, screenId));
+      if (!screen) return;
+      notifyUsers(deps, await usersWithPermission(deps, screen.schoolId, 'screens.manage'), {
+        title: 'Pano bağlantısı koptu',
+        body: `${screen.name} panosu 10 dakikadır çevrimdışı. Elektrik ya da internet bağlantısını kontrol edin.`,
+        url: '/panolar',
+      });
+    })().catch(() => {});
+  };
+
+  /* ---------- Statik dosyalar: yüklenen görseller ve derlenmiş ön yüzler ---------- */
+  await app.register(fastifyStatic, {
+    root: localStorage.root,
+    prefix: '/uploads/',
+    decorateReply: true,
+    maxAge: '30d',
+    immutable: true,
+    // Görseller veritabanındaysa bu adresleri aşağıdaki rota sunar
+    serve: !dbStorage,
+  });
+  if (dbStorage) {
+    app.get('/uploads/:schoolId/:name', async (req, reply) => {
+      const { schoolId, name } = req.params as { schoolId: string; name: string };
+      if (!UUID_RE.test(schoolId) || !/^[0-9a-f-]{36}\.(png|jpg|gif|webp)$/.test(name)) return reply.status(404).send({ error: 'not_found', message: 'Dosya bulunamadı.' });
+      const file = await dbStorage.read(schoolId, name);
+      if (!file) return reply.status(404).send({ error: 'not_found', message: 'Dosya bulunamadı.' });
+      // Adlar rastgele ve dosyalar değişmez: uzun süre önbelleğe alınabilir
+      return reply.header('Cache-Control', 'public, max-age=2592000, immutable').type(file.contentType).send(file.data);
+    });
+  }
+
+  const spas = [
+    { prefix: '/admin/', dir: env.ADMIN_DIST },
+    { prefix: '/display/', dir: env.DISPLAY_DIST },
+    { prefix: '/app/', dir: env.MOBILE_DIST },
+  ].filter((s): s is { prefix: string; dir: string } => Boolean(s.dir && existsSync(resolve(s.dir, 'index.html'))));
+
+  for (const spa of spas) {
+    await app.register(fastifyStatic, { root: resolve(spa.dir), prefix: spa.prefix, decorateReply: false });
+  }
+  if (spas.length) {
+    app.get('/', (_req, reply) => reply.redirect('/admin/'));
+    app.setNotFoundHandler((req, reply) => {
+      const [path = '', query] = req.url.split('?');
+      // Sondaki "/" unutulmuş adres (ör. /app, /display) uygulamanın kendisine gider
+      const bare = spas.find((s) => path === s.prefix.slice(0, -1));
+      if (bare && req.method === 'GET') return reply.redirect(`${bare.prefix}${query ? `?${query}` : ''}`);
+      const spa = spas.find((s) => path.startsWith(s.prefix));
+      // Sayfa rotaları uygulamanın index.html'ine düşer; eksik dosyalar (.js, .css...) gerçek 404 alır
+      if (spa && req.method === 'GET' && !/\.[a-z0-9]+$/i.test(path)) {
+        return reply.sendFile('index.html', resolve(spa.dir), { maxAge: 0 });
+      }
+      return reply.status(404).send({ error: 'not_found', message: 'Sayfa bulunamadı.' });
+    });
+  }
+
+  app.addHook('onClose', async () => {
+    deps.bus.close();
+    if (!opts.database) await database.close();
+  });
+
+  return app;
+}

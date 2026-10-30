@@ -1,0 +1,54 @@
+# Sunucuya kurulum (VPS): PostgreSQL + uygulama + otomatik HTTPS (Caddy)
+#
+#   cp deploy/.env.example deploy/.env   # alan adı, şifreler
+#   docker compose --env-file deploy/.env up -d --build
+#   docker compose --env-file deploy/.env exec app node dist/seed.js   # isteğe bağlı örnek okul
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: okulpano
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD gerekli}
+      POSTGRES_DB: okulpano
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U okulpano']
+      interval: 10s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://okulpano:${POSTGRES_PASSWORD}@db:5432/okulpano
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET gerekli}
+      PUBLIC_URL: https://${DOMAIN:?DOMAIN gerekli}
+      SEED_SUPERADMIN_EMAIL: ${SEED_SUPERADMIN_EMAIL:-}
+      SEED_SUPERADMIN_PASSWORD: ${SEED_SUPERADMIN_PASSWORD:-}
+    volumes:
+      - uploads:/app/apps/api/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - app
+
+volumes:
+  pgdata:
+  uploads:
+  caddy_data:

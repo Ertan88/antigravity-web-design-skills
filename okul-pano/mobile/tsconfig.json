@@ -1,0 +1,15 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "baseUrl": ".",
+    "paths": {
+      "@okulpano/shared/*": ["../packages/shared/src/*"],
+      "zod": ["./node_modules/zod"]
+    }
+  },
+  "include": ["app", "src", "*.ts"],
+  "exclude": ["node_modules"]
+}

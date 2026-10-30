@@ -1,0 +1,204 @@
+import { changePasswordSchema, effectivePermissions, loginSchema, updateProfileSchema } from '@okulpano/shared';
+import { and, asc, eq, gt, lt } from 'drizzle-orm';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { z } from 'zod';
+import { accessUser } from '../context.ts';
+import { memberships, schools, sessions, users } from '../db/schema.ts';
+import { burnPasswordCheck, hashPassword, randomToken, sha256, verifyPassword } from '../lib/crypto.ts';
+import { badRequest, conflict, notFound, parse, unauthorized } from '../lib/errors.ts';
+
+const ACCESS_TTL = '15m';
+const REFRESH_TTL_MS = 30 * 24 * 3600 * 1000;
+const COOKIE = 'op_refresh';
+
+export async function authRoutes(app: FastifyInstance) {
+  const { db, env } = app.deps;
+  const secureCookie = env.NODE_ENV === 'production';
+
+  function setRefreshCookie(reply: FastifyReply, token: string) {
+    reply.setCookie(COOKIE, token, {
+      httpOnly: true,
+      secure: secureCookie,
+      sameSite: 'lax',
+      path: '/api/auth',
+      maxAge: REFRESH_TTL_MS / 1000,
+    });
+  }
+
+  async function issueSession(req: FastifyRequest, userId: string) {
+    const refreshToken = randomToken('rt');
+    await db.insert(sessions).values({
+      userId,
+      tokenHash: sha256(refreshToken),
+      userAgent: req.headers['user-agent']?.slice(0, 200) ?? null,
+      expiresAt: new Date(Date.now() + REFRESH_TTL_MS),
+    });
+    return refreshToken;
+  }
+
+  function accessToken(user: { id: string; isSuperAdmin: boolean }) {
+    return app.jwt.sign({ typ: 'access', sub: user.id, sa: user.isSuperAdmin }, { expiresIn: ACCESS_TTL });
+  }
+
+  app.post('/api/auth/login', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
+    const body = parse(loginSchema, req.body);
+    const [user] = await db.select().from(users).where(eq(users.email, body.email.toLowerCase()));
+    if (!user) {
+      await burnPasswordCheck(body.password);
+      throw unauthorized('E-posta ya da şifre hatalı.');
+    }
+    if (!(await verifyPassword(body.password, user.passwordHash))) throw unauthorized('E-posta ya da şifre hatalı.');
+
+    await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
+    await db.delete(sessions).where(lt(sessions.expiresAt, new Date()));
+    const refreshToken = await issueSession(req, user.id);
+    setRefreshCookie(reply, refreshToken);
+    return {
+      accessToken: accessToken(user),
+      ...(body.client === 'mobile' ? { refreshToken } : {}),
+    };
+  });
+
+  /** Yenileme anahtarı her kullanımda döndürülür (rotation); çalınan eski anahtar işe yaramaz. */
+  app.post('/api/auth/refresh', async (req, reply) => {
+    const fromBody = (req.body as { refreshToken?: unknown } | undefined)?.refreshToken;
+    const token = typeof fromBody === 'string' ? fromBody : req.cookies[COOKIE];
+    if (!token) throw unauthorized();
+    const [session] = await db
+      .delete(sessions)
+      .where(and(eq(sessions.tokenHash, sha256(token)), gt(sessions.expiresAt, new Date())))
+      .returning();
+    if (!session) {
+      reply.clearCookie(COOKIE, { path: '/api/auth' });
+      throw unauthorized('Oturumun süresi doldu, lütfen yeniden giriş yapın.');
+    }
+    const [user] = await db.select().from(users).where(eq(users.id, session.userId));
+    if (!user) throw unauthorized();
+    const refreshToken = await issueSession(req, user.id);
+    setRefreshCookie(reply, refreshToken);
+    return {
+      accessToken: accessToken(user),
+      ...(typeof fromBody === 'string' ? { refreshToken } : {}),
+    };
+  });
+
+  app.post('/api/auth/logout', async (req, reply) => {
+    const fromBody = (req.body as { refreshToken?: unknown } | undefined)?.refreshToken;
+    const token = typeof fromBody === 'string' ? fromBody : req.cookies[COOKIE];
+    if (token) await db.delete(sessions).where(eq(sessions.tokenHash, sha256(token)));
+    reply.clearCookie(COOKIE, { path: '/api/auth' });
+    return reply.status(204).send();
+  });
+
+  /**
+   * Platform yöneticisinin panelde açabildiği okullar: üyesi olduğu (kendi) okulları ve okul sahibinin süreli
+   * destek erişimi verdiği okullar (KVKK). Diğer okulların yalnızca kayıt bilgileri Platform sayfasında görünür.
+   */
+  async function superAdminSchools(userId: string) {
+    const own = await db
+      .select({ school: schools, role: memberships.role, permissions: memberships.permissions, teacherId: memberships.teacherId })
+      .from(memberships)
+      .innerJoin(schools, eq(schools.id, memberships.schoolId))
+      .where(eq(memberships.userId, userId))
+      .orderBy(asc(schools.name));
+    const ownIds = new Set(own.map((r) => r.school.id));
+    const support = (await db.select().from(schools).where(gt(schools.supportAccessUntil, new Date())).orderBy(asc(schools.name)))
+      .filter((s) => !ownIds.has(s.id))
+      .map((school) => ({ school, role: 'owner' as const, permissions: [] as string[], teacherId: null as string | null, support: true }));
+    return [...own, ...support];
+  }
+
+  app.get('/api/me', { preHandler: app.authenticate }, async (req) => {
+    const { sub } = accessUser(req);
+    const [user] = await db
+      .select({ id: users.id, email: users.email, fullName: users.fullName, isSuperAdmin: users.isSuperAdmin, lastSchoolId: users.lastSchoolId })
+      .from(users)
+      .where(eq(users.id, sub));
+    if (!user) throw unauthorized();
+    const { lastSchoolId, ...profile } = user;
+
+    const rows = user.isSuperAdmin
+      ? await superAdminSchools(sub)
+      : await db
+          .select({ school: schools, role: memberships.role, permissions: memberships.permissions, teacherId: memberships.teacherId })
+          .from(memberships)
+          .innerJoin(schools, eq(schools.id, memberships.schoolId))
+          .where(eq(memberships.userId, sub))
+          .orderBy(asc(schools.name));
+
+    return {
+      user: profile,
+      /** Açılışta seçilecek okul: en son açılan, yoksa listenin ilki */
+      lastSchoolId: rows.some((r) => r.school.id === lastSchoolId) ? lastSchoolId : null,
+      schools: rows.map((r) => ({
+        id: r.school.id,
+        name: r.school.name,
+        slug: r.school.slug,
+        logoUrl: r.school.logoUrl,
+        isActive: r.school.isActive,
+        role: r.role,
+        permissions: effectivePermissions(r.role, r.permissions),
+        teacherId: r.teacherId,
+        /** Üyelik yok, okulun verdiği süreli destek erişimi */
+        support: 'support' in r ? true : undefined,
+      })),
+    };
+  });
+
+  /** Seçilen okulu hatırlar (panelde ya da mobilde okul değiştirildiğinde) */
+  app.put('/api/me/school', { preHandler: app.authenticate }, async (req, reply) => {
+    const { sub, sa } = accessUser(req);
+    const { schoolId } = parse(z.object({ schoolId: z.string().uuid() }), req.body);
+    const [allowed] = sa
+      ? await db.select({ id: schools.id }).from(schools).where(eq(schools.id, schoolId))
+      : await db
+          .select({ id: memberships.schoolId })
+          .from(memberships)
+          .where(and(eq(memberships.userId, sub), eq(memberships.schoolId, schoolId)));
+    if (!allowed) throw notFound();
+    await db.update(users).set({ lastSchoolId: schoolId }).where(eq(users.id, sub));
+    return reply.status(204).send();
+  });
+
+  /** Profil: ad ve e-posta. E-posta değişikliği mevcut şifreyle onaylanır (hesap ele geçirmeye karşı). */
+  app.patch('/api/me', { preHandler: app.authenticate }, async (req) => {
+    const { sub } = accessUser(req);
+    const body = parse(updateProfileSchema, req.body);
+    const [user] = await db.select().from(users).where(eq(users.id, sub));
+    if (!user) throw unauthorized();
+    const email = body.email?.toLowerCase();
+    if (email && email !== user.email) {
+      if (!body.currentPassword || !(await verifyPassword(body.currentPassword, user.passwordHash))) {
+        throw badRequest('E-postayı değiştirmek için mevcut şifrenizi doğru girin.');
+      }
+      const [taken] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
+      if (taken) throw conflict('Bu e-posta başka bir hesapta kullanılıyor.');
+    }
+    const [updated] = await db
+      .update(users)
+      .set({ ...(body.fullName ? { fullName: body.fullName } : {}), ...(email ? { email } : {}) })
+      .where(eq(users.id, sub))
+      .returning({ id: users.id, email: users.email, fullName: users.fullName, isSuperAdmin: users.isSuperAdmin });
+    return updated;
+  });
+
+  app.post('/api/me/password', { preHandler: app.authenticate }, async (req, reply) => {
+    const { sub } = accessUser(req);
+    const body = parse(changePasswordSchema, req.body);
+    const [user] = await db.select().from(users).where(eq(users.id, sub));
+    if (!user || !(await verifyPassword(body.currentPassword, user.passwordHash))) {
+      throw badRequest('Mevcut şifre hatalı.');
+    }
+    await db
+      .update(users)
+      .set({ passwordHash: await hashPassword(body.newPassword) })
+      .where(eq(users.id, sub));
+    // Diğer cihazlardaki oturumları kapat
+    await db.delete(sessions).where(eq(sessions.userId, sub));
+    const refreshToken = await issueSession(req, sub);
+    setRefreshCookie(reply, refreshToken);
+    // Mobil uygulama çerez kullanmaz: oturumu sürdürmek için yeni anahtarı yanıttan alır
+    const mobile = (req.body as { client?: unknown } | undefined)?.client === 'mobile';
+    return mobile ? { ok: true, refreshToken } : { ok: true };
+  });
+}

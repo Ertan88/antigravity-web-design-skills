@@ -1,0 +1,368 @@
+/*
+ * Hazır şablonlu duyuru slaytı. Ölçüler kutuya göre: --u, kutu genişliğinin yüzde biri
+ * (kutu çok basıksa yüksekliğe göre küçülür). Panodaki büyük alan ile paneldeki küçük önizleme
+ * birebir aynı görünür. Dikey kutuda (aspect-ratio < 1) simge üstte, metin altta dizilir.
+ */
+.ds {
+  container-type: size;
+  position: relative;
+  /* İçerik ve alttaki okul adı alt alta: uzun notlarda bile üst üste binmez */
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: #fff;
+  background: linear-gradient(135deg, var(--ds-from) 0%, var(--ds-to) 100%);
+  font-family: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  text-align: left;
+}
+
+.ds-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.ds-orb {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.ds-orb-1 {
+  width: 95cqmin;
+  height: 95cqmin;
+  right: -28cqmin;
+  top: -34cqmin;
+}
+
+.ds-orb-2 {
+  width: 60cqmin;
+  height: 60cqmin;
+  left: -22cqmin;
+  bottom: -30cqmin;
+  background: color-mix(in srgb, var(--ds-accent) 14%, transparent);
+}
+
+.ds-dots {
+  position: absolute;
+  left: 5cqmin;
+  top: 5cqmin;
+  width: 22cqmin;
+  height: 12cqmin;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.28) 0.45cqmin, transparent 0.5cqmin);
+  background-size: 3cqmin 3cqmin;
+  opacity: 0.6;
+}
+
+.ds-confetti {
+  position: absolute;
+  width: 2.2cqmin;
+  height: 4.4cqmin;
+  border-radius: 0.5cqmin;
+  background: var(--ds-accent);
+  opacity: 0.85;
+}
+
+.ds-confetti-1 {
+  background: #fff;
+  width: 1.6cqmin;
+  height: 1.6cqmin;
+  border-radius: 50%;
+}
+
+.ds-confetti-2 {
+  background: color-mix(in srgb, var(--ds-accent) 50%, #fff);
+  height: 2.6cqmin;
+}
+
+.ds-content,
+.ds-school {
+  --u: calc(min(1.2cqw, 1.9cqh) * var(--fit, 1));
+}
+
+.ds-content {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  /* safe: taşan içerik yukarı kaçmaz, ölçülebilir; slayt da kendini küçültür */
+  align-items: safe center;
+  gap: calc(var(--u) * 4);
+  padding: calc(var(--u) * 5) calc(var(--u) * 6) calc(var(--u) * 2);
+}
+
+.ds-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.ds-kicker {
+  display: inline-block;
+  padding: calc(var(--u) * 0.8) calc(var(--u) * 2);
+  border-radius: 999px;
+  background: var(--ds-accent);
+  color: var(--ds-from);
+  font-size: calc(var(--u) * 2.1);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.ds-headline {
+  margin: calc(var(--u) * 2.4) 0 0;
+  font-size: calc(var(--u) * 6.4);
+  font-weight: 900;
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  overflow-wrap: break-word;
+}
+
+.ds-headline.ds-mid {
+  font-size: calc(var(--u) * 5.2);
+}
+
+.ds-headline.ds-long {
+  font-size: calc(var(--u) * 4.2);
+}
+
+.ds-subline {
+  margin-top: calc(var(--u) * 1.4);
+  font-size: calc(var(--u) * 3.8);
+  font-weight: 800;
+  color: var(--ds-accent);
+}
+
+.ds-info {
+  list-style: none;
+  margin: calc(var(--u) * 3.4) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 1.6);
+}
+
+.ds-info li {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 1.6);
+}
+
+.ds-info-icon {
+  flex: none;
+  width: calc(var(--u) * 5.4);
+  height: calc(var(--u) * 5.4);
+  border-radius: calc(var(--u) * 1.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--ds-accent);
+}
+
+.ds-info-icon svg {
+  width: calc(var(--u) * 2.9);
+  height: calc(var(--u) * 2.9);
+}
+
+.ds-info-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ds-info-label {
+  font-size: calc(var(--u) * 1.5);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.ds-info-value {
+  font-size: calc(var(--u) * 3);
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.ds-note {
+  margin: calc(var(--u) * 3) 0 0;
+  font-size: calc(var(--u) * 2.5);
+  line-height: 1.35;
+  opacity: 0.88;
+  max-width: 95%;
+  white-space: pre-line;
+}
+
+.ds-art {
+  flex: none;
+  position: relative;
+  width: calc(var(--u) * 30);
+  height: calc(var(--u) * 30);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 0 calc(var(--u) * 0.9) rgba(255, 255, 255, 0.06);
+}
+
+.ds-art-ring {
+  position: absolute;
+  inset: calc(var(--u) * -2.4);
+  border-radius: 50%;
+  border: calc(var(--u) * 0.3) dashed color-mix(in srgb, var(--ds-accent) 60%, transparent);
+}
+
+.ds-art-icon {
+  width: calc(var(--u) * 16);
+  height: calc(var(--u) * 16);
+  color: #fff;
+}
+
+.ds-school {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 1.2);
+  padding: 0 calc(var(--u) * 6) calc(var(--u) * 3);
+  font-size: calc(var(--u) * 1.6);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.ds-school-logo {
+  height: calc(var(--u) * 4.2);
+  width: auto;
+  max-width: calc(var(--u) * 8);
+  object-fit: contain;
+  border-radius: calc(var(--u) * 0.6);
+  background: rgba(255, 255, 255, 0.9);
+  padding: calc(var(--u) * 0.3);
+}
+
+.ds-school-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.ds-school-name {
+  font-size: calc(var(--u) * 2.1);
+  font-weight: 900;
+}
+
+.ds-school-type {
+  margin-top: calc(var(--u) * 0.2);
+  font-size: calc(var(--u) * 1.7);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ds-accent);
+}
+
+/* Ortalı şablonlar: tebrik, kutlama */
+.ds-center .ds-content {
+  justify-content: safe center;
+  text-align: center;
+}
+
+.ds-center .ds-text {
+  align-items: center;
+}
+
+.ds-center .ds-headline {
+  font-size: calc(var(--u) * 7.2);
+}
+
+.ds-center .ds-headline.ds-mid {
+  font-size: calc(var(--u) * 5.8);
+}
+
+.ds-center .ds-headline.ds-long {
+  font-size: calc(var(--u) * 4.6);
+}
+
+.ds-center .ds-subline {
+  font-size: calc(var(--u) * 4.8);
+}
+
+.ds-center .ds-info {
+  align-items: center;
+}
+
+.ds-center .ds-note {
+  max-width: 85%;
+}
+
+.ds-center-icon {
+  width: calc(var(--u) * 10);
+  height: calc(var(--u) * 10);
+  margin-bottom: calc(var(--u) * 2);
+  color: var(--ds-accent);
+  filter: drop-shadow(0 calc(var(--u) * 0.6) calc(var(--u) * 2) rgba(0, 0, 0, 0.25));
+}
+
+.ds-center .ds-school {
+  justify-content: center;
+}
+
+.ds-center .ds-school-text {
+  align-items: flex-start;
+}
+
+/* Dikey ya da kareye yakın kutu: simge üstte küçülür, metin altında */
+@container (aspect-ratio < 1.15) {
+  .ds-split .ds-content {
+    flex-direction: column-reverse;
+    justify-content: safe center;
+    align-items: flex-start;
+    gap: calc(var(--u) * 5);
+  }
+
+  .ds-split .ds-art {
+    width: calc(var(--u) * 22);
+    height: calc(var(--u) * 22);
+    align-self: flex-end;
+  }
+
+  .ds-split .ds-art-icon {
+    width: calc(var(--u) * 12);
+    height: calc(var(--u) * 12);
+  }
+}
+
+/* Fotoğraflı şablonlar (ayın öğrencisi, başarı) */
+.ds-art-photo {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  border: calc(var(--u) * 0.9) solid var(--ds-accent);
+}
+
+.ds-photo {
+  display: block;
+  overflow: hidden;
+  border-radius: 50%;
+  border: calc(var(--u) * 0.7) solid var(--ds-accent);
+  box-shadow: 0 calc(var(--u) * 1) calc(var(--u) * 3) rgba(0, 0, 0, 0.3);
+}
+
+.ds-photo-center {
+  width: calc(var(--u) * 18);
+  height: calc(var(--u) * 18);
+  margin-bottom: calc(var(--u) * 2);
+}
+
+.ds-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

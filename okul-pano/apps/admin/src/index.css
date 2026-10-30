@@ -1,0 +1,212 @@
+@import 'tailwindcss';
+
+/* Koyu tema: <html class="dark"> (kullanıcı sağ üstten seçer) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /*
+   * "Bento" tasarım sistemi (mobil uygulamayla aynı): sıcak kâğıt zemin, koyu mürekkep ana renk ve bilgiyi
+   * türüne göre ayıran pastel kutular. "brand" mürekkep tonlarıdır (birincil düğme, seçili menü).
+   */
+  --color-brand-50: #f3f1ec;
+  --color-brand-100: #e9e5de;
+  --color-brand-200: #dad4c9;
+  --color-brand-300: #bfb7aa;
+  --color-brand-400: #8f877c;
+  --color-brand-500: #292524;
+  --color-brand-600: #1c1917;
+  --color-brand-700: #1c1917;
+  --color-brand-800: #0c0a09;
+  --color-brand-900: #0c0a09;
+  /* Nötrler sıcak taş tonları (slate sınıfları sayfalarda değişmeden bu renklere döner) */
+  --color-slate-50: #f7f6f3;
+  --color-slate-100: #f0ede8;
+  --color-slate-200: #e7e3dc;
+  --color-slate-300: #d6d1c8;
+  --color-slate-400: #a8a29e;
+  --color-slate-500: #78716c;
+  --color-slate-600: #57534e;
+  --color-slate-700: #44403c;
+  --color-slate-800: #292524;
+  --color-slate-900: #1c1917;
+  /* Bento kutuları: zemin (tile-*) ve üstündeki yazı (tile-*-ink) */
+  --color-tile-sun: #fde68a;
+  --color-tile-sun-ink: #713f12;
+  --color-tile-peach: #fed7aa;
+  --color-tile-peach-ink: #7c2d12;
+  --color-tile-mint: #bbf7d0;
+  --color-tile-mint-ink: #14532d;
+  --color-tile-sky: #bae6fd;
+  --color-tile-sky-ink: #0c4a6e;
+  --color-tile-lilac: #ddd6fe;
+  --color-tile-lilac-ink: #3b0764;
+  --color-tile-rose: #fecdd3;
+  --color-tile-rose-ink: #881337;
+  --color-tile-dark: #1c1917;
+  /* Temaya göre değişen yüzey ve yazı renkleri */
+  --color-surface: #ffffff;
+  --color-ink: #1c1917;
+  --radius-xl: 0.875rem;
+  --radius-2xl: 1.25rem;
+  --radius-3xl: 1.625rem;
+}
+
+/*
+ * Koyu temada nötr tonlar ters çevrilir (açık arka planlar koyulaşır, koyu yazılar açılır);
+ * renkli açık tonlar (…-50/100/200) yarı saydam vurguya, koyu yazı tonları (…-700/800/900) açık tona döner.
+ * Böylece sayfalar ayrı ayrı "dark:" sınıfı gerektirmeden iki temada da okunur.
+ */
+.dark {
+  color-scheme: dark;
+  /* Kartlar zeminden belirgin biçimde açık, kenarlıklar görünür */
+  --color-surface: #1f1d1a;
+  --color-ink: #f5f3ef;
+
+  --color-slate-50: #0c0b0a;
+  --color-slate-100: #2a2723;
+  --color-slate-200: #3a3631;
+  --color-slate-300: #4d4740;
+  --color-slate-400: #8a837b;
+  --color-slate-500: #b0a9a1;
+  --color-slate-600: #cdc8c1;
+  --color-slate-700: #e3dfd9;
+  --color-slate-800: #f0ede9;
+
+  /*
+   * Mürekkep rengi koyu temada tersine döner: birincil düğme ve seçili menü açık krem zemin + koyu yazı
+   * (bkz. aşağıdaki .dark .bg-brand-* kuralı), mürekkep renkli bağlantılar açık krem.
+   */
+  --color-brand-50: rgb(255 255 255 / 0.07);
+  --color-brand-100: rgb(255 255 255 / 0.12);
+  --color-brand-200: rgb(255 255 255 / 0.2);
+  --color-brand-300: #8a837b;
+  --color-brand-400: #b0a9a1;
+  --color-brand-500: #d6d1ca;
+  --color-brand-600: #ece9e4;
+  --color-brand-700: #ece9e4;
+  --color-brand-800: #f5f3ef;
+  --color-brand-900: #fafaf9;
+
+  /* Pastel kutular koyu temada koyu zeminli, açık yazılı */
+  --color-tile-sun: #3a2e0c;
+  --color-tile-sun-ink: #fde68a;
+  --color-tile-peach: #3d2412;
+  --color-tile-peach-ink: #fed7aa;
+  --color-tile-mint: #10301e;
+  --color-tile-mint-ink: #bbf7d0;
+  --color-tile-sky: #0d2b3e;
+  --color-tile-sky-ink: #bae6fd;
+  --color-tile-lilac: #26193f;
+  --color-tile-lilac-ink: #ddd6fe;
+  --color-tile-rose: #3e1422;
+  --color-tile-rose-ink: #fecdd3;
+  --color-tile-dark: #000000;
+
+  --color-emerald-50: rgb(16 185 129 / 0.13);
+  --color-emerald-100: rgb(16 185 129 / 0.2);
+  --color-emerald-200: rgb(16 185 129 / 0.3);
+  --color-emerald-700: #6ee7b7;
+  --color-emerald-800: #a7f3d0;
+
+  --color-amber-50: rgb(245 158 11 / 0.12);
+  --color-amber-100: rgb(245 158 11 / 0.2);
+  --color-amber-200: rgb(245 158 11 / 0.3);
+  --color-amber-700: #fcd34d;
+  --color-amber-800: #fde68a;
+  --color-amber-900: #fef3c7;
+  --color-amber-950: #fffbeb;
+
+  --color-red-50: rgb(239 68 68 / 0.13);
+  --color-red-100: rgb(239 68 68 / 0.2);
+  --color-red-200: rgb(239 68 68 / 0.3);
+  --color-red-700: #fca5a5;
+  --color-red-800: #fecaca;
+  --color-red-900: #fee2e2;
+
+  --color-teal-50: rgb(20 184 166 / 0.13);
+  --color-teal-100: rgb(20 184 166 / 0.2);
+  --color-teal-200: rgb(20 184 166 / 0.3);
+  --color-teal-700: #5eead4;
+  --color-teal-800: #99f6e4;
+  --color-teal-950: #f0fdfa;
+
+  --color-sky-100: rgb(14 165 233 / 0.2);
+  --color-sky-700: #7dd3fc;
+  --color-blue-100: rgb(59 130 246 / 0.2);
+  --color-blue-700: #93c5fd;
+  --color-cyan-100: rgb(6 182 212 / 0.2);
+  --color-cyan-800: #a5f3fc;
+  --color-lime-100: rgb(132 204 22 / 0.2);
+  --color-lime-800: #d9f99d;
+  --color-orange-100: rgb(249 115 22 / 0.2);
+  --color-orange-800: #fed7aa;
+  --color-rose-50: rgb(244 63 94 / 0.12);
+  --color-rose-100: rgb(244 63 94 / 0.2);
+  --color-rose-200: rgb(244 63 94 / 0.3);
+  --color-rose-700: #fda4af;
+}
+
+/* Koyu temada açık krem mürekkep zeminin üstündeki "beyaz" yazı koyu olur (sayfalara ayrı sınıf gerekmez) */
+.dark :is(.bg-brand-500, .bg-brand-600, .bg-brand-700):is(.text-white, [class*='text-white/']),
+.dark :is(.bg-brand-500, .bg-brand-600, .bg-brand-700) :is(.text-white, [class*='text-white/']) {
+  color: #1c1917;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+    /* Kaydırma çubuğu çıkıp kaybolduğunda sayfanın sağa sola kaymaması için yeri hep ayrılır */
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    @apply bg-slate-50 text-ink transition-colors;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ink;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes nudge {
+  0%,
+  100% {
+    transform: none;
+  }
+  25% {
+    transform: translateX(-6px);
+  }
+  50% {
+    transform: translateX(6px);
+  }
+  75% {
+    transform: translateX(-3px);
+  }
+}
+
+.animate-nudge {
+  animation: nudge 0.3s ease-in-out;
+}
+
+.animate-toast {
+  animation: toast-in 0.2s ease-out both;
+}
+
+/* Öneri listeli (datalist) kutular düz giriş kutusu gibi görünsün: tarayıcının açılır ok simgesi gizlenir,
+   öneriler yazmaya başlayınca çıkar */
+input[list]::-webkit-calendar-picker-indicator {
+  display: none !important;
+}

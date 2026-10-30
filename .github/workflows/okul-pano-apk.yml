@@ -1,0 +1,98 @@
+# Okulyayın mobil uygulamasının Android deneme sürümü (APK).
+# Elle çalıştırılabilir (Actions › "Okul Pano · Android APK" › Run workflow) ya da mobil kod değişince kendiliğinden çalışır.
+# Çıkan APK, deponun Releases sayfasındaki "okul-pano-android" sürümüne yüklenir: telefondan indirilip kurulabilir.
+name: Okul Pano · Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/okul-dijital-pano-4oao0y]
+    paths:
+      - okul-pano/mobile/**
+      - okul-pano/packages/shared/**
+      - .github/workflows/okul-pano-apk.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: okul-pano-apk
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      # Uygulamanın bağlandığı sunucu: girişte yalnızca e-posta ve şifre sorulur. Kendi alan adınıza geçince
+      # GitHub › Settings › Secrets and variables › Actions › Variables altında PANOKUL_API_URL tanımlayın.
+      EXPO_PUBLIC_API_URL: ${{ vars.PANOKUL_API_URL || 'https://okul-pano.onrender.com' }}
+      # Telefon bildirimleri (isteğe bağlı): Expo projesinin kimliği (Variables › EXPO_PROJECT_ID) ve Firebase'in
+      # google-services.json içeriği (Secrets › GOOGLE_SERVICES_JSON). Tanımlı değilse uygulama yalnızca telefondaki
+      # hatırlatmaları (nöbet sabahı) kurar; sunucudan gelen bildirimler bu sürümde gelmez.
+      EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID }}
+    defaults:
+      run:
+        working-directory: okul-pano/mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: okul-pano/mobile/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Bağımlılıklar
+        run: npm ci
+
+      - name: Bildirim hizmeti (Firebase) ayarı
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > google-services.json
+            echo "Firebase ayarı eklendi"
+          else
+            echo "::warning::GOOGLE_SERVICES_JSON tanımlı değil: APK sunucudan telefon bildirimi alamaz"
+          fi
+
+      - name: Android projesini oluştur
+        run: npx expo prebuild --platform android --no-install
+
+      - name: APK derle
+        working-directory: okul-pano/mobile/android
+        run: |
+          sed -i 's/-Xmx[0-9]*m/-Xmx4096m/' gradle.properties
+          ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
+
+      - name: APK'yı adlandır
+        # GitHub, dosya adındaki boşluk ve Türkçe karakterleri değiştirdiği için dosya Okul-Yayin.apk;
+        # sürüm sayfasında "Okul Yayın" etiketiyle görünür
+        run: cp android/app/build/outputs/apk/release/app-release.apk Okul-Yayin.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: okul-yayin-apk
+          path: okul-pano/mobile/Okul-Yayin.apk
+
+      - name: Sürüm sayfasına yükle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=okul-pano-android
+          TITLE="Okulyayın · Android uygulaması"
+          NOTES="Okul Yayın uygulamasını telefona indirip kurun: Android \"bilinmeyen kaynak\" uyarısı verirse bu kaynaktan yüklemeye izin verin. Girişte okulunuzun size verdiği e-posta ve şifreyi yazmanız yeterli."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "$TITLE" --notes "$NOTES"
+          else
+            gh release create "$TAG" --prerelease --target "$GITHUB_SHA" --title "$TITLE" --notes "$NOTES"
+          fi
+          gh release upload "$TAG" "Okul-Yayin.apk#Okul Yayın" --clobber
+          # Eski adla yüklenmiş dosya kaldırılır
+          gh release delete-asset "$TAG" okul-pano.apk --yes 2>/dev/null || true
