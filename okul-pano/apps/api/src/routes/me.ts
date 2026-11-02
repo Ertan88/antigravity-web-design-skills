@@ -1,4 +1,4 @@
-import { leaveRequestSchema, normalizeName, pushTokenSchema, schoolSettingsSchema, zonedParts } from '@okulpano/shared';
+import { joinClassNames, leaveRequestSchema, normalizeName, pushTokenSchema, schoolSettingsSchema, zonedParts } from '@okulpano/shared';
 import { and, asc, desc, eq, gte } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -82,7 +82,7 @@ export async function meRoutes(app: FastifyInstance) {
       /** Arifeler: dersler halfDayEnd saatinde biter */
       halfDays: holidays.halfDays,
       halfDayEnd: settings.halfDayEnd,
-      lessons,
+      lessons: mergeLessons(lessons),
       leaves: leaves.map((l) => ({ id: l.id, startDate: l.startDate, endDate: l.endDate, note: l.note, status: l.approvalStatus })),
       week,
     };
@@ -199,4 +199,16 @@ export async function meRoutes(app: FastifyInstance) {
     await db.delete(pushTokens).where(and(eq(pushTokens.token, token), eq(pushTokens.userId, sub)));
     return reply.status(204).send();
   });
+}
+
+/** Aynı saatte birleştirilmiş sınıflar tek ders: "AMP 11-ACM · Rehberlik ve Yönlendirme" */
+function mergeLessons<T extends { weekday: number; periodNo: number; className: string; subject: string }>(rows: T[]): T[] {
+  const byKey = new Map<string, { row: T; names: string[] }>();
+  for (const r of rows) {
+    const key = `${r.weekday}-${r.periodNo}-${r.subject}`;
+    const hit = byKey.get(key);
+    if (hit) hit.names.push(r.className);
+    else byKey.set(key, { row: r, names: [r.className] });
+  }
+  return [...byKey.values()].map(({ row, names }) => ({ ...row, className: joinClassNames(names) }));
 }

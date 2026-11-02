@@ -43,3 +43,28 @@ export function compareClassNames(a: string, b: string): number {
   if (ga === null !== (gb === null)) return ga === null ? 1 : -1;
   return a.localeCompare(b, 'tr', { numeric: true, sensitivity: 'base' });
 }
+
+/**
+ * Aynı saatte birleştirilmiş sınıflar tek adla: ["AMP 11-M", "AMP 11-A", "AMP 11-C"] → "AMP 11-ACM".
+ * Aynı program ve düzeydeki şubeler yan yana, alfabetik; farklı olanlar virgülle ayrılır ("AMP 10-CT, ATP 10-A").
+ * Şube adı tek harften uzunsa "/" ile ayrılır (9-AB/9-ÇK gibi karışmasın diye).
+ */
+export function joinClassNames(names: string[]): string {
+  const groups = new Map<string, string[]>();
+  for (const name of [...new Set(names.map((n) => n.trim()))].sort(compareClassNames)) {
+    const m = /^(.*?\d{1,2})\s*-\s*(\S+)$/u.exec(name);
+    if (!m) {
+      groups.set(name, []);
+      continue;
+    }
+    const prefix = `${m[1]}-`;
+    groups.set(prefix, [...(groups.get(prefix) ?? []), m[2]!]);
+  }
+  return [...groups]
+    .map(([prefix, sections]) => {
+      if (!sections.length) return prefix;
+      const sorted = sections.sort((a, b) => a.localeCompare(b, 'tr'));
+      return prefix + (sorted.every((s) => [...s].length === 1) ? sorted.join('') : sorted.join('/'));
+    })
+    .join(', ');
+}

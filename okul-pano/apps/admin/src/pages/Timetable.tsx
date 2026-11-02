@@ -1,4 +1,4 @@
-import { compareClassNames, gradeOf, timetableEntrySchema, WEEKDAY_NAMES, WEEKDAY_SHORT, type Period } from '@okulpano/shared';
+import { compareClassNames, gradeOf, joinClassNames, timetableEntrySchema, WEEKDAY_NAMES, WEEKDAY_SHORT, type Period } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { CalendarClock, FileUp, Pencil, Plus, Trash2, Users } from 'lucide-react';
@@ -474,12 +474,16 @@ function cellLines(list: TimetableEntry[], teacherNames: Map<string, string>) {
   return [...lines.values()].map((l) => ({ ...l, teachers: l.names.join(', ') }));
 }
 
-/** Öğretmene göre görünümde hücre: sınıf ve ders (aynı saatte iki sınıf birleştirilmiş derste ikisi de) */
+/**
+ * Öğretmene göre görünümde hücre: aynı saatte birleştirilmiş sınıflar tek satırda ("AMP 11-ACM"), ders adı bir kez.
+ */
 function teacherLines(list: TimetableEntry[], classNames: Map<string, string>) {
-  const seen = new Map<string, { key: string; className: string; group: string | null; subject: string }>();
+  const lines = new Map<string, { key: string; group: string | null; subject: string; names: string[] }>();
   for (const e of list) {
-    const key = `${e.classGroupId}|${e.groupLabel ?? ''}|${e.subject}`;
-    if (!seen.has(key)) seen.set(key, { key, className: classNames.get(e.classGroupId) ?? '', group: e.groupLabel, subject: e.subject });
+    const key = `${e.groupLabel ?? ''}|${e.subject}`;
+    let line = lines.get(key);
+    if (!line) lines.set(key, (line = { key, group: e.groupLabel, subject: e.subject, names: [] }));
+    line.names.push(classNames.get(e.classGroupId) ?? '');
   }
-  return [...seen.values()];
+  return [...lines.values()].map((l) => ({ ...l, className: joinClassNames(l.names.filter(Boolean)) }));
 }
