@@ -124,7 +124,7 @@ export async function substituteCandidates(db: DB, schoolId: string, day: DutyDa
     db
       .select({ teacherId: dutySubstitutions.teacherId, n: sql<number>`count(*)::int` })
       .from(dutySubstitutions)
-      .where(and(eq(dutySubstitutions.schoolId, schoolId), gte(dutySubstitutions.date, `${month}-01`), lte(dutySubstitutions.date, `${month}-31`)))
+      .where(and(eq(dutySubstitutions.schoolId, schoolId), gte(dutySubstitutions.date, `${month}-01`), lte(dutySubstitutions.date, monthEnd(month))))
       .groupBy(dutySubstitutions.teacherId),
   ]);
   const onLeave = await db
