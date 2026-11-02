@@ -1,4 +1,4 @@
-import { joinClassNames, leaveRequestSchema, normalizeName, pushTokenSchema, schoolSettingsSchema, zonedParts } from '@okulpano/shared';
+import { joinClassNames, leaveRequestSchema, lessonCounts, normalizeName, pushTokenSchema, schoolSettingsSchema, zonedParts } from '@okulpano/shared';
 import { and, asc, desc, eq, gte } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -26,12 +26,12 @@ export async function meRoutes(app: FastifyInstance) {
       : [];
     const dates = Array.from({ length: 8 }, (_, i) => addDays(today, i));
 
-    const [bells, holidays, lessons, leaves, days] = await Promise.all([
+    const [bells, holidays, lessons, leaves, days, allLessons, classRows] = await Promise.all([
       db.select().from(bellSchedules).where(eq(bellSchedules.schoolId, schoolId)).orderBy(asc(bellSchedules.sortOrder)),
       holidaysAndHalfDays(db, schoolId, today, addDays(today, 21)),
       teacher
         ? db
-            .select({ weekday: timetableEntries.weekday, periodNo: timetableEntries.periodNo, className: classGroups.name, classId: classGroups.id, bellPlan: classGroups.bellPlan, subject: timetableEntries.subject })
+            .select({ weekday: timetableEntries.weekday, periodNo: timetableEntries.periodNo, className: classGroups.name, classId: classGroups.id, shift: classGroups.shift, subject: timetableEntries.subject })
             .from(timetableEntries)
             .innerJoin(classGroups, eq(classGroups.id, timetableEntries.classGroupId))
             .where(and(eq(timetableEntries.schoolId, schoolId), eq(timetableEntries.teacherId, teacher.id)))
@@ -45,6 +45,12 @@ export async function meRoutes(app: FastifyInstance) {
             .orderBy(asc(teacherLeaves.startDate))
         : Promise.resolve([]),
       teacher ? Promise.all(dates.map((d) => dutyDay(db, schoolId, d))) : Promise.resolve([]),
+      // Günün ders sayısı (zil düzeni seçimi) bütün okulun programından
+      db
+        .select({ weekday: timetableEntries.weekday, periodNo: timetableEntries.periodNo, classGroupId: timetableEntries.classGroupId })
+        .from(timetableEntries)
+        .where(eq(timetableEntries.schoolId, schoolId)),
+      db.select({ id: classGroups.id, bellExempt: classGroups.bellExempt, shift: classGroups.shift }).from(classGroups).where(eq(classGroups.schoolId, schoolId)),
     ]);
 
     const week = days.map((day) => {
@@ -77,7 +83,11 @@ export async function meRoutes(app: FastifyInstance) {
       today,
       timezone: school.timezone,
       lunchThresholdMin: settings.lunchThresholdMin,
-      bellSchedules: bells.map((b) => ({ id: b.id, name: b.name, weekdays: b.weekdays, periods: b.periods, sortOrder: b.sortOrder })),
+      bellSchedules: bells.map((b) => ({ id: b.id, name: b.name, weekdays: b.weekdays, periods: b.periods, sortOrder: b.sortOrder, lessonCount: b.lessonCount, shift: b.shift })),
+      /** İkili öğretim: her dersin vardiyası (`lessons[].shift`) kendi zilini belirler */
+      dualShift: settings.dualShift,
+      /** Günün ders sayısı: "<vardiya>:<gün>" → en geç biten sınıfın son dersi */
+      lessonCounts: allLessons.length ? lessonCounts(allLessons, classRows, settings.dualShift) : null,
       holidays: holidays.holidays,
       /** Arifeler: dersler halfDayEnd saatinde biter */
       halfDays: holidays.halfDays,

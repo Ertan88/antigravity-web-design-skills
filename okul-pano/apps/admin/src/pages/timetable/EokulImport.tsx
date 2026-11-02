@@ -129,7 +129,7 @@ export function EokulImport({ file, onClose }: { file: File | null; onClose: () 
               {p.bells.map((b, i) => (
                 <div key={i} className="text-sm">
                   <span className="font-semibold text-ink">
-                    {i === 0 ? 'Ana zil' : `${i + 1}. zil`} · {b.periods.length} ders · {b.periods[0]?.start}–{b.periods[b.periods.length - 1]?.end}
+                    {p.bells.length > 1 ? (i === 0 ? 'Sabahçı' : 'Öğlenci') : "e-Okul saatleri"} · {b.periods.length} ders saati · {b.periods[0]?.start}–{b.periods[b.periods.length - 1]?.end}
                   </span>
                   <span className="text-slate-500">
                     {' '}
@@ -140,13 +140,11 @@ export function EokulImport({ file, onClose }: { file: File | null; onClose: () 
               <Toggle
                 checked={useBells}
                 onChange={setUseBells}
-                label="Zil saatlerini e-Okul'daki saatlerle güncelle"
+                label="Zil düzenini e-Okul saatlerinden oluştur"
                 description={
                   p.bells.length > 1
-                    ? 'Ana zil okulun genel zilinin yerine yazılır; saatleri farklı sınıflar (ör. öğlenci) ayrı zile atanır. Cuma gibi özel çizelgelere dokunulmaz.'
-                    : p.bell.mismatches.length
-                      ? `Okulun zili (${p.bell.schedule ?? 'tanımlı değil'}) ${p.bell.mismatches.length} ders saatinde farklı; e-Okul saatleri yazılır. Cuma gibi özel çizelgelere dokunulmaz.`
-                      : "Okulun zili e-Okul'daki saatlerle aynı."
+                    ? "İki farklı saat düzeni var: ikili öğretim açılır, erken başlayan sınıflar sabahçı, diğerleri öğlenci olur. Her vardiyada en sık görülen ders sayısı için düzen yazılır; diğer ders sayıları için Zil Saatleri sayfasında düzen önerilir."
+                    : "En sık görülen günlük ders sayısı için düzen (ör. \"9 derslik gün\") e-Okul saatleriyle yazılır. Programdaki diğer ders sayıları (ör. 10, 11 dersli günler) için Zil Saatleri sayfasında düzen önerilir; teneffüs ve öğle arasını orada okulunuza göre ayarlarsınız."
                 }
               />
             </div>

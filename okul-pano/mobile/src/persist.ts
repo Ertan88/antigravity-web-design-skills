@@ -21,7 +21,7 @@ type Saved = { owner: string; savedAt: number; state: DehydratedState };
  */
 const VERSION = Constants.expoConfig?.version ?? '';
 /** Kayıt biçimi: ekranların beklediği veri değiştiğinde artırılır (web sürümünde uygulama sürümü okunamaz) */
-const SCHEMA = 2;
+const SCHEMA = 3;
 const ownerKey = (who: string) => `${who}|${VERSION}|${SCHEMA}`;
 
 const file = () => (Platform.OS === 'web' ? null : new File(Paths.document, NAME));

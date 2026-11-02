@@ -1,260 +1,336 @@
-import { BELL_OFF, bellGroups, compareClassNames, joinClassNames, WEEKDAY_NAMES, WEEKDAY_SHORT, type BellGroup, type BellGroupDay } from '@okulpano/shared';
+import { compareClassNames, joinClassNames, latestClasses, scheduleLessonCount, WEEKDAY_NAMES, WEEKDAY_SHORT, type Period, type Shift } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { AlertTriangle, Plus, Settings2, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Lock, Settings2 } from 'lucide-react';
+import { useState } from 'react';
 import { useToast } from '../../components/Toast.tsx';
-import { Button, Card, Input, Modal } from '../../components/ui.tsx';
+import { Badge, Button, Card, Modal, Toggle } from '../../components/ui.tsx';
 import { api } from '../../lib/api.ts';
 import { useAuth } from '../../lib/auth.tsx';
-import { useSchool, useSchoolPath, type BellSchedule, type ClassGroup, type School, type TimetableEntry } from '../../lib/data.ts';
+import { useSchoolPath, type BellSchedule, type ClassGroup, type School, type TimetableEntry } from '../../lib/data.ts';
+import { shortDate } from './ScheduleView.tsx';
 
-/** Çizelgelerin tablodaki renkleri (listedeki sırasına göre) */
-const TONES = [
-  'bg-sky-50 text-sky-900 ring-sky-200',
-  'bg-violet-50 text-violet-900 ring-violet-200',
-  'bg-pink-50 text-pink-900 ring-pink-200',
-  'bg-orange-50 text-orange-900 ring-orange-200',
-  'bg-teal-50 text-teal-900 ring-teal-200',
-  'bg-lime-50 text-lime-900 ring-lime-200',
-];
+export interface WeekDay {
+  weekday: number;
+  date: string;
+  /** Günün ders sayısı (null: ders programı yok) */
+  count: number | null;
+  schedule: BellSchedule | null;
+  /** O gün çalan ders saatleri (son derste biter; tatil / arife uygulanmış) */
+  periods: Period[];
+  holiday: string | null;
+  halfDay: string | null;
+  /** Düzen o güne elle sabitlenmiş */
+  fixed: boolean;
+}
 
-/**
- * Zil ataması tablosu: ders programından aynı düzendeki sınıflar gruplanır; her grup ve gün için hangi zilin çaldığı,
- * ilk–son ders ve bitiş saati görünür. Hücreye tıklayınca o grup için o günün zili değiştirilir.
- */
-export function BellPlan({
+/** Düzenlerin renkleri (ders sayısına göre sırayla) */
+const TONES = ['bg-sky-100 text-sky-900', 'bg-violet-100 text-violet-900', 'bg-pink-100 text-pink-900', 'bg-orange-100 text-orange-900', 'bg-teal-100 text-teal-900'];
+const toneOf = (schedules: BellSchedule[], id: string | undefined) => {
+  const sorted = [...schedules].sort((a, b) => scheduleLessonCount(a) - scheduleLessonCount(b));
+  return TONES[Math.max(0, sorted.findIndex((s) => s.id === id)) % TONES.length];
+};
+
+/** Bu hafta: her gün kaç ders var, hangi düzen çalıyor, saat aralığı; tıklayınca günün düzeni elle seçilir */
+export function WeekDays({
+  days,
+  todayIso,
   schedules,
   classes,
   timetable,
+  dual,
+  shift,
   editable,
+  onSet,
 }: {
+  days: WeekDay[];
+  todayIso: string;
   schedules: BellSchedule[];
   classes: ClassGroup[];
   timetable: TimetableEntry[];
+  dual: boolean;
+  shift: Shift;
   editable: boolean;
+  onSet: (weekday: number, scheduleId: string | null) => Promise<void>;
 }) {
-  const school = useSchool();
-  const offsite = school.data?.settings.offsiteSubjects ?? [];
-  const [cell, setCell] = useState<{ group: BellGroup; day: BellGroupDay } | null>(null);
-  const [exemptOpen, setExemptOpen] = useState(false);
-  const [offsiteOpen, setOffsiteOpen] = useState(false);
-  const classNames = useMemo(() => new Map(classes.map((c) => [c.id, c.name])), [classes]);
-
-  const weekdays = useMemo(() => {
-    const days = new Set([1, 2, 3, 4, 5]);
-    for (const s of schedules) for (const d of s.weekdays) days.add(d);
-    for (const e of timetable) days.add(e.weekday);
-    return [...days].sort();
-  }, [schedules, timetable]);
-  const groups = useMemo(() => bellGroups(classes, timetable, schedules, offsite, weekdays), [classes, timetable, schedules, offsite, weekdays]);
-  const exempt = classes.filter((c) => c.bellExempt).sort((a, b) => compareClassNames(a.name, b.name));
-  const tone = (id: string | undefined) => TONES[Math.max(0, schedules.findIndex((s) => s.id === id)) % TONES.length];
-  const missing = groups.flatMap((g) => g.days.filter((d) => d.missing.length).map((d) => ({ g, d })));
-
-  if (!timetable.length) return null;
+  const [picking, setPicking] = useState<WeekDay | null>(null);
+  const [busy, setBusy] = useState(false);
+  const toast = useToast();
+  const names = new Map(classes.map((c) => [c.id, c.name]));
+  const latest = (d: number) => latestClasses(timetable, classes, dual, d, shift).map((id) => names.get(id) ?? '');
 
   return (
     <Card>
-      <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:px-6">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-semibold text-ink">Zil ataması</h2>
-          <p className="text-sm text-slate-500">
-            Ders programındaki günlük düzene göre gruplandı. Her sınıf yalnızca kendi ilk–son dersi boyunca derstedir; farklı saat uygulanan bir gün için hücreye tıklayıp başka zil seçin.
-          </p>
-        </div>
-        {editable && (
-          <div className="flex shrink-0 flex-wrap gap-2">
-            <Button size="sm" variant="secondary" icon={<Settings2 className="size-3.5" />} onClick={() => setOffsiteOpen(true)}>
-              Okul dışı dersler
-            </Button>
-            <Button size="sm" variant="secondary" icon={<Settings2 className="size-3.5" />} onClick={() => setExemptOpen(true)}>
-              Zil hesabına katılmayanlar
-            </Button>
-          </div>
-        )}
+      <div className="border-b border-slate-100 px-5 py-4 sm:px-6">
+        <h2 className="text-lg font-semibold text-ink">Bu hafta zil</h2>
+        <p className="text-sm text-slate-500">
+          Günün ders sayısı, o gün en geç biten sınıfın son dersidir (zil hesabına katılmayan sınıflar sayılmaz). Sınav günü gibi durumlarda güne tıklayıp düzeni elle seçebilirsiniz.
+        </p>
       </div>
-      <div className="overflow-x-auto p-4 sm:p-5">
-        <div className="grid min-w-[760px] gap-2" style={{ gridTemplateColumns: `15rem repeat(${weekdays.length}, minmax(0, 1fr))` }}>
-          <div />
-          {weekdays.map((d) => (
-            <div key={d} className="px-1 text-xs font-bold tracking-wide text-slate-500 uppercase">
-              {WEEKDAY_NAMES[d]}
-            </div>
-          ))}
-          {groups.map((g, i) => {
-            const names = g.classIds.map((id) => classNames.get(id) ?? '');
-            return [
-              <div key={`h${i}`} className="rounded-xl bg-slate-50 px-3 py-2.5 ring-1 ring-slate-200/70">
-                <div className="text-sm font-bold text-ink">
-                  Grup {i + 1} · {g.classIds.length} sınıf
-                </div>
-                <div className="line-clamp-2 text-xs text-slate-500" title={names.sort(compareClassNames).join(', ')}>
-                  {joinClassNames(names)}
-                </div>
-              </div>,
-              ...g.days.map((d) => (
-                <button
-                  key={`${i}-${d.weekday}`}
-                  type="button"
-                  disabled={!editable}
-                  onClick={() => setCell({ group: g, day: d })}
-                  className={clsx(
-                    'min-w-0 rounded-xl px-3 py-2.5 text-left text-xs ring-1 transition',
-                    editable && 'hover:ring-2 hover:ring-brand-400',
-                    d.offsite || d.planned === BELL_OFF
-                      ? 'bg-emerald-50 text-emerald-900 ring-emerald-200'
-                      : d.first === null
-                        ? 'bg-slate-50 text-slate-400 ring-slate-200'
-                        : tone(d.schedule?.id),
-                  )}
-                >
-                  {d.offsite || d.planned === BELL_OFF ? (
-                    <>
-                      <span className="block text-[13px] font-bold">Okul dışında</span>
-                      {d.offsite ? 'Bütün dersleri okul dışında' : 'Bu gün okulda değil'}
-                    </>
-                  ) : d.first === null ? (
-                    <span className="block py-1">Ders yok</span>
+      <div className="grid gap-2.5 p-4 sm:grid-cols-3 sm:p-5 lg:grid-cols-5">
+        {days.map((d) => {
+          const first = d.periods[0];
+          const last = d.periods[d.periods.length - 1];
+          const late = d.count ? latest(d.weekday) : [];
+          return (
+            <button
+              key={d.weekday}
+              type="button"
+              disabled={!editable}
+              onClick={() => setPicking(d)}
+              className={clsx(
+                'min-w-0 rounded-2xl p-3.5 text-left ring-1 transition',
+                d.date === todayIso ? 'ring-2 ring-ink' : 'ring-slate-200',
+                editable && 'hover:ring-brand-400',
+              )}
+            >
+              <div className="flex items-baseline justify-between gap-2 text-xs font-bold tracking-wide text-slate-500 uppercase">
+                <span>{WEEKDAY_NAMES[d.weekday]}</span>
+                <span className="font-medium tracking-normal normal-case">{shortDate(d.date)}</span>
+              </div>
+              {d.holiday ? (
+                <div className="mt-2 text-sm font-semibold text-rose-700">{d.holiday}</div>
+              ) : (
+                <>
+                  <div className="mt-1 text-2xl font-extrabold text-ink tabular-nums">
+                    {d.count ?? '–'} <span className="text-sm font-semibold text-slate-500">ders</span>
+                  </div>
+                  {d.schedule ? (
+                    <span className={clsx('mt-1.5 inline-flex max-w-full items-center gap-1 truncate rounded-full px-2.5 py-0.5 text-xs font-bold', toneOf(schedules, d.schedule.id))}>
+                      {d.fixed && <Lock className="size-3" />}
+                      {d.schedule.name}
+                    </span>
                   ) : (
-                    <>
-                      <span className="block truncate text-[13px] font-bold">{d.schedule?.name ?? 'Zil yok'}</span>
-                      <span className="tabular-nums">
-                        {d.first}–{d.last}. ders{d.start && d.end ? ` · ${d.start}–${d.end}` : ''}
-                      </span>
-                      {d.missing.length > 0 && (
-                        <span className="mt-1 flex items-center gap-1 font-semibold text-amber-700">
-                          <AlertTriangle className="size-3.5" /> {d.missing.join(', ')}. ders zilde yok
-                        </span>
-                      )}
-                    </>
+                    <span className="mt-1.5 inline-block text-xs text-slate-400">{d.count === 0 ? 'Ders yok' : 'Zil düzeni yok'}</span>
                   )}
-                </button>
-              )),
-            ];
-          })}
-          {exempt.length > 0 && (
-            <>
-              <div className="rounded-xl border border-dashed border-slate-300 px-3 py-2.5">
-                <div className="text-sm font-bold text-slate-500">Zil hesabına katılmayan · {exempt.length}</div>
-                <div className="line-clamp-2 text-xs text-slate-400">{exempt.map((c) => c.name).join(', ')}</div>
-              </div>
-              <div className="flex items-center rounded-xl border border-dashed border-slate-300 px-3 text-xs text-slate-400" style={{ gridColumn: `span ${weekdays.length}` }}>
-                Bu sınıflar genel zili izler; panodaki zil seçimine, "Şu an derste" listesine ve öğretmen çakışma denetimine girmez.
-              </div>
-            </>
-          )}
-        </div>
-        {missing.length > 0 && (
-          <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
-            Bazı derslerin ders saati zilde yok ({missing.map(({ d }) => `${WEEKDAY_SHORT[d.weekday]} ${d.missing.join(', ')}. ders`).join('; ')}). O güne daha çok ders saati olan bir zil seçin ya da zile ders saati ekleyin.
-          </p>
-        )}
+                  {first && last && (
+                    <div className="mt-1.5 text-sm font-semibold text-slate-700 tabular-nums">
+                      {first.start} – {last.end}
+                      {d.halfDay && <span className="ml-1 text-xs font-medium text-amber-700">· arife</span>}
+                    </div>
+                  )}
+                  {late.length > 0 && <div className="mt-1 line-clamp-2 text-[11px] text-slate-400">En geç: {joinClassNames(late)}</div>}
+                </>
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      <CellDialog cell={cell} schedules={schedules} classNames={classNames} onClose={() => setCell(null)} />
-      <ExemptDialog open={exemptOpen} classes={classes} onClose={() => setExemptOpen(false)} />
-      <OffsiteDialog open={offsiteOpen} subjects={offsite} timetable={timetable} onClose={() => setOffsiteOpen(false)} />
+      <Modal open={Boolean(picking)} onClose={() => setPicking(null)} title={picking ? `${WEEKDAY_NAMES[picking.weekday]} zili` : ''} description={picking?.count ? `Programda bu gün ${picking.count} ders var.` : undefined}>
+        {picking && (
+          <div className="space-y-2">
+            {[{ id: null as string | null, name: 'Otomatik (ders sayısına göre)', hint: 'Önerilen' }, ...schedules.map((s) => ({ id: s.id as string | null, name: s.name, hint: `${s.periods.length} ders` }))].map((o) => {
+              const current = picking.fixed ? picking.schedule?.id === o.id : o.id === null;
+              return (
+                <button
+                  key={o.id ?? 'auto'}
+                  type="button"
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true);
+                    try {
+                      await onSet(picking.weekday, o.id);
+                      toast.success(`${WEEKDAY_NAMES[picking.weekday]}: ${o.id ? o.name : 'otomatik'}`);
+                      setPicking(null);
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : 'Kaydedilemedi');
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                  className={clsx(
+                    'flex w-full items-center justify-between gap-3 rounded-xl px-4 py-3 text-left ring-1 transition',
+                    current ? 'bg-brand-50 ring-2 ring-brand-500' : 'ring-slate-200 hover:ring-slate-300',
+                  )}
+                >
+                  <span className="font-semibold text-ink">{o.name}</span>
+                  <span className="text-xs text-slate-500">{o.hint}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </Modal>
     </Card>
   );
 }
 
-function CellDialog({
-  cell,
-  schedules,
-  classNames,
-  onClose,
-}: {
-  cell: { group: BellGroup; day: BellGroupDay } | null;
-  schedules: BellSchedule[];
-  classNames: Map<string, string>;
-  onClose: () => void;
-}) {
-  const { schoolId } = useAuth();
-  const path = useSchoolPath('classes');
-  const qc = useQueryClient();
-  const toast = useToast();
-  const save = useMutation({
-    mutationFn: (value: string | null) =>
-      api(`${path}/bell-plan`, { method: 'POST', body: { classIds: cell!.group.classIds, weekday: cell!.day.weekday, value } }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: [schoolId, 'classes'] });
-      toast.success('Zil ataması kaydedildi');
-      onClose();
-    },
-    onError: (e) => toast.error(e.message),
-  });
-  if (!cell) return null;
-  const { group, day } = cell;
-  const general = schedules
-    .filter((s) => s.weekdays.includes(day.weekday) && s.periods.length)
-    .sort((a, b) => a.weekdays.length - b.weekdays.length || a.sortOrder - b.sortOrder)[0];
-  const current = day.planned ?? '';
-  const options = [
-    { value: '', label: `Okulun ${WEEKDAY_NAMES[day.weekday]} zili`, hint: general ? `${general.name} · ${range(general)}` : 'Bu gün için zil yok' },
-    ...schedules.filter((s) => s.periods.length).map((s) => ({ value: s.id, label: s.name, hint: range(s) })),
-    { value: BELL_OFF, label: 'Okulda değil', hint: 'O gün zil çalmaz, panoda görünmez' },
+const toMin = (hm: string) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5));
+
+/** Düzen kartı: kural özeti, şerit, kullanıldığı günler */
+export function ProfileCard({ schedule, usedOn, active, onSelect }: { schedule: BellSchedule; usedOn: number[]; active: boolean; onSelect: () => void }) {
+  const ps = [...schedule.periods].sort((a, b) => a.start.localeCompare(b.start));
+  const first = ps[0];
+  const last = ps[ps.length - 1];
+  const gaps = ps.slice(1).map((p, i) => toMin(p.start) - toMin(ps[i]!.end));
+  const longest = Math.max(0, ...gaps);
+  const lunchAt = longest >= 20 ? gaps.indexOf(longest) : -1;
+  const morningBreak = gaps.find((_, i) => lunchAt < 0 || i < lunchAt);
+  const afternoonBreak = lunchAt < 0 ? undefined : gaps.find((_, i) => i > lunchAt);
+  const span = first && last ? Math.max(1, toMin(last.end) - toMin(first.start)) : 1;
+  const rows: [string, string][] = [
+    ['İlk ders', first?.start ?? '–'],
+    ['Ders', first ? `${toMin(first.end) - toMin(first.start)} dk` : '–'],
+    ['Sabah teneffüsü', morningBreak !== undefined ? `${morningBreak} dk` : '–'],
+    ['Öğle arası', lunchAt >= 0 ? `${lunchAt + 1}. dersten sonra · ${longest} dk` : 'yok'],
+    ['Öğleden sonra teneffüs', afternoonBreak !== undefined ? `${afternoonBreak} dk` : '–'],
+    ['Son zil', last?.end ?? '–'],
   ];
   return (
-    <Modal
-      open
-      onClose={onClose}
-      title={`${WEEKDAY_NAMES[day.weekday]} · ${group.classIds.length} sınıf`}
-      description={joinClassNames(group.classIds.map((id) => classNames.get(id) ?? ''))}
+    <button
+      type="button"
+      onClick={onSelect}
+      className={clsx('min-w-0 rounded-2xl p-4 text-left ring-1 transition', active ? 'bg-brand-50/60 ring-2 ring-brand-500' : 'ring-slate-200 hover:ring-slate-300')}
     >
-      <div className="space-y-2">
-        {day.first !== null && (
-          <p className="mb-3 text-sm text-slate-500">
-            Bu gün programda {day.first}–{day.last}. dersler var.
-          </p>
-        )}
-        {options.map((o) => (
-          <button
-            key={o.value || 'default'}
-            type="button"
-            disabled={save.isPending}
-            onClick={() => save.mutate(o.value || null)}
-            className={clsx(
-              'flex w-full items-center justify-between gap-3 rounded-xl px-4 py-3 text-left ring-1 transition',
-              current === o.value ? 'bg-brand-50 ring-2 ring-brand-500' : 'ring-slate-200 hover:ring-slate-300',
-            )}
-          >
-            <span className="font-semibold text-ink">{o.label}</span>
-            <span className="text-xs text-slate-500 tabular-nums">{o.hint}</span>
-          </button>
+      <div className="flex items-center justify-between gap-2">
+        <span className="truncate text-[15px] font-bold text-ink">{schedule.name}</span>
+        <span className="flex shrink-0 gap-1">
+          {schedule.source === 'eokul' && <Badge tone="green">e-Okul</Badge>}
+          {schedule.weekdays.length > 0 && <Badge tone="slate">Sabit: {schedule.weekdays.map((d) => WEEKDAY_SHORT[d]).join(', ')}</Badge>}
+        </span>
+      </div>
+      <div className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+        {rows.map(([k, v]) => (
+          <div key={k} className="flex justify-between gap-2 border-b border-dashed border-slate-200 py-0.5">
+            <span className="text-slate-500">{k}</span>
+            <span className="font-semibold text-ink tabular-nums">{v}</span>
+          </div>
         ))}
       </div>
-    </Modal>
+      {first && (
+        <div className="relative mt-3 h-5 overflow-hidden rounded-md bg-emerald-300">
+          {ps.map((p) => (
+            <span
+              key={p.no}
+              className="absolute inset-y-0 rounded-[3px] bg-slate-700"
+              style={{ left: `${((toMin(p.start) - toMin(first.start)) / span) * 100}%`, width: `${((toMin(p.end) - toMin(p.start)) / span) * 100}%` }}
+            />
+          ))}
+          {lunchAt >= 0 && (
+            <span
+              className="absolute inset-y-0 bg-amber-400"
+              style={{ left: `${((toMin(ps[lunchAt]!.end) - toMin(first.start)) / span) * 100}%`, width: `${(longest / span) * 100}%` }}
+            />
+          )}
+        </div>
+      )}
+      <div className="mt-2 text-xs text-slate-500">
+        {schedule.weekdays.length ? 'Elle sabitlendi' : `${scheduleLessonCount(schedule)} dersli günlerde`}
+        {usedOn.length > 0 ? ` · bu hafta: ${usedOn.map((d) => WEEKDAY_SHORT[d]).join(', ')}` : ' · bu hafta kullanılmıyor'}
+      </div>
+    </button>
   );
 }
 
-const range = (s: BellSchedule) => {
-  const sorted = [...s.periods].sort((a, b) => a.start.localeCompare(b.start));
-  return sorted.length ? `${sorted.length} ders · ${sorted[0]!.start}–${sorted[sorted.length - 1]!.end}` : 'ders saati yok';
-};
-
-function ExemptDialog({ open, classes, onClose }: { open: boolean; classes: ClassGroup[]; onClose: () => void }) {
+/** İkili öğretim ve zil hesabına katılmayan sınıflar */
+export function BellClassSettings({ classes, dual, editable }: { classes: ClassGroup[]; dual: boolean; editable: boolean }) {
   const { schoolId } = useAuth();
-  const path = useSchoolPath('classes');
+  const schoolPath = useSchoolPath();
   const qc = useQueryClient();
   const toast = useToast();
-  const [picked, setPicked] = useState<Set<string> | null>(null);
-  const selected = picked ?? new Set(classes.filter((c) => c.bellExempt).map((c) => c.id));
+  const [dialog, setDialog] = useState<'exempt' | 'shift' | null>(null);
   const sorted = [...classes].sort((a, b) => compareClassNames(a.name, b.name));
-  const save = useMutation({
-    mutationFn: async () => {
-      const on = classes.filter((c) => selected.has(c.id) && !c.bellExempt).map((c) => c.id);
-      const off = classes.filter((c) => !selected.has(c.id) && c.bellExempt).map((c) => c.id);
-      if (on.length) await api(`${path}/bell-exempt`, { method: 'POST', body: { classIds: on, exempt: true } });
-      if (off.length) await api(`${path}/bell-exempt`, { method: 'POST', body: { classIds: off, exempt: false } });
-    },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: [schoolId, 'classes'] });
-      toast.success('Kaydedildi');
-      close();
-    },
+  const exempt = sorted.filter((c) => c.bellExempt);
+  const afternoon = sorted.filter((c) => c.shift === 'afternoon');
+  const saveDual = useMutation({
+    mutationFn: (dualShift: boolean) => api<School>(schoolPath, { method: 'PATCH', body: { settings: { dualShift } } }),
+    onSuccess: (data) => qc.setQueryData([schoolId, 'school'], data),
     onError: (e) => toast.error(e.message),
   });
+
+  return (
+    <div className="mt-5 grid gap-5 lg:grid-cols-2">
+      <Card>
+        <div className="space-y-4 p-5 sm:p-6">
+          <Toggle
+            checked={dual}
+            onChange={(v) => editable && saveDual.mutate(v)}
+            disabled={!editable}
+            label="İkili öğretim"
+            description="Sabahçı ve öğlenci sınıfların zilleri ve ders sayıları ayrı hesaplanır; pano sabah sabahçı, sabahçı dersleri bitince öğlenci zilini gösterir."
+          />
+          {dual && (
+            <div className="flex flex-wrap items-center gap-1.5 text-sm">
+              <span className="mr-1 font-semibold text-ink">Öğlenci sınıflar ({afternoon.length}):</span>
+              {afternoon.map((c) => (
+                <span key={c.id} className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-700">
+                  {c.name}
+                </span>
+              ))}
+              {!afternoon.length && <span className="text-xs text-slate-500">Henüz yok; bütün sınıflar sabahçı.</span>}
+              {editable && (
+                <Button size="sm" variant="secondary" icon={<Settings2 className="size-3.5" />} onClick={() => setDialog('shift')}>
+                  Seç
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      </Card>
+      <Card>
+        <div className="space-y-3 p-5 sm:p-6">
+          <div>
+            <div className="font-semibold text-ink">Zil hesabına katılmayan sınıflar</div>
+            <p className="text-sm text-slate-500">Günün ders sayısını belirlemezler (ör. özel eğitim); zil onlar için de aynı çalar.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {exempt.map((c) => (
+              <span key={c.id} className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-700">
+                {c.name}
+              </span>
+            ))}
+            {!exempt.length && <span className="text-xs text-slate-500">Yok.</span>}
+            {editable && (
+              <Button size="sm" variant="secondary" icon={<Settings2 className="size-3.5" />} onClick={() => setDialog('exempt')}>
+                Düzenle
+              </Button>
+            )}
+          </div>
+        </div>
+      </Card>
+      <ClassPicker
+        open={dialog !== null}
+        title={dialog === 'shift' ? 'Öğlenci sınıflar' : 'Zil hesabına katılmayan sınıflar'}
+        classes={sorted}
+        initial={new Set((dialog === 'shift' ? afternoon : exempt).map((c) => c.id))}
+        onClose={() => setDialog(null)}
+        onSave={async (picked) => {
+          const path = `${schoolPath}/classes`;
+          if (dialog === 'shift') {
+            await api(`${path}/shift`, { method: 'POST', body: { classIds: sorted.filter((c) => picked.has(c.id)).map((c) => c.id), shift: 'afternoon' } });
+            await api(`${path}/shift`, { method: 'POST', body: { classIds: sorted.filter((c) => !picked.has(c.id) && c.shift === 'afternoon').map((c) => c.id), shift: 'morning' } });
+          } else {
+            await api(`${path}/bell-exempt`, { method: 'POST', body: { classIds: sorted.filter((c) => picked.has(c.id) && !c.bellExempt).map((c) => c.id), exempt: true } });
+            await api(`${path}/bell-exempt`, { method: 'POST', body: { classIds: sorted.filter((c) => !picked.has(c.id) && c.bellExempt).map((c) => c.id), exempt: false } });
+          }
+          await qc.invalidateQueries({ queryKey: [schoolId, 'classes'] });
+          toast.success('Kaydedildi');
+          setDialog(null);
+        }}
+      />
+    </div>
+  );
+}
+
+function ClassPicker({
+  open,
+  title,
+  classes,
+  initial,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  title: string;
+  classes: ClassGroup[];
+  initial: Set<string>;
+  onClose: () => void;
+  onSave: (picked: Set<string>) => Promise<void>;
+}) {
+  const [picked, setPicked] = useState<Set<string> | null>(null);
+  const [busy, setBusy] = useState(false);
+  const current = picked ?? initial;
   const close = () => {
     setPicked(null);
     onClose();
@@ -264,29 +340,39 @@ function ExemptDialog({ open, classes, onClose }: { open: boolean; classes: Clas
       open={open}
       onClose={close}
       size="lg"
-      title="Zil hesabına katılmayan sınıflar"
-      description="Ör. özel eğitim sınıfları. Genel zili izlerler; panodaki zil seçimine, &quot;Şu an derste&quot; listesine ve öğretmen çakışma denetimine girmezler."
+      title={title}
       footer={
         <>
           <Button variant="secondary" onClick={close}>
             Vazgeç
           </Button>
-          <Button loading={save.isPending} onClick={() => save.mutate()}>
+          <Button
+            loading={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await onSave(current);
+                setPicked(null);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
             Kaydet
           </Button>
         </>
       }
     >
       <div className="flex flex-wrap gap-1.5">
-        {sorted.map((c) => {
-          const on = selected.has(c.id);
+        {classes.map((c) => {
+          const on = current.has(c.id);
           return (
             <button
               key={c.id}
               type="button"
               aria-pressed={on}
               onClick={() => {
-                const next = new Set(selected);
+                const next = new Set(current);
                 if (on) next.delete(c.id);
                 else next.add(c.id);
                 setPicked(next);
@@ -297,71 +383,6 @@ function ExemptDialog({ open, classes, onClose }: { open: boolean; classes: Clas
             </button>
           );
         })}
-      </div>
-    </Modal>
-  );
-}
-
-function OffsiteDialog({ open, subjects, timetable, onClose }: { open: boolean; subjects: string[]; timetable: TimetableEntry[]; onClose: () => void }) {
-  const { schoolId } = useAuth();
-  const schoolPath = useSchoolPath();
-  const qc = useQueryClient();
-  const toast = useToast();
-  const [draft, setDraft] = useState('');
-  const all = useMemo(() => [...new Set(timetable.map((e) => e.subject))].sort((a, b) => a.localeCompare(b, 'tr')), [timetable]);
-  const save = useMutation({
-    mutationFn: (offsiteSubjects: string[]) => api<School>(schoolPath, { method: 'PATCH', body: { settings: { offsiteSubjects } } }),
-    onSuccess: (data) => {
-      qc.setQueryData([schoolId, 'school'], data);
-      setDraft('');
-    },
-    onError: (e) => toast.error(e.message),
-  });
-  const add = () => {
-    const v = draft.trim();
-    if (v && !subjects.some((s) => s.toLocaleLowerCase('tr-TR') === v.toLocaleLowerCase('tr-TR'))) save.mutate([...subjects, v]);
-  };
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="Okul dışı dersler"
-      description="Bir sınıfın o günkü bütün dersleri bu listedeyse sınıf o gün okulda sayılmaz: zil çalmaz, panoda görünmez (ör. işletmede mesleki eğitim)."
-      footer={
-        <Button variant="secondary" onClick={onClose}>
-          Kapat
-        </Button>
-      }
-    >
-      <div className="space-y-4">
-        <div className="flex flex-wrap gap-1.5">
-          {subjects.map((s) => (
-            <span key={s} className="inline-flex items-center gap-1 rounded-full bg-emerald-50 py-1 pr-1 pl-3 text-xs font-bold text-emerald-900 ring-1 ring-emerald-200">
-              {s}
-              <button type="button" aria-label={`${s} kaldır`} onClick={() => save.mutate(subjects.filter((x) => x !== s))} className="rounded-full p-0.5 hover:bg-emerald-100">
-                <X className="size-3.5" />
-              </button>
-            </span>
-          ))}
-          {!subjects.length && <span className="text-sm text-slate-500">Liste boş.</span>}
-        </div>
-        <form
-          className="flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            add();
-          }}
-        >
-          <Input list="offsite-subjects" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ders adı (programdaki gibi)" />
-          <datalist id="offsite-subjects">
-            {all.map((s) => (
-              <option key={s} value={s} />
-            ))}
-          </datalist>
-          <Button type="submit" variant="secondary" icon={<Plus className="size-4" />} loading={save.isPending}>
-            Ekle
-          </Button>
-        </form>
       </div>
     </Modal>
   );

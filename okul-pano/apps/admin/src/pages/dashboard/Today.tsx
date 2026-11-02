@@ -3,9 +3,12 @@ import {
   countdown,
   formatPersonName,
   isBirthdayToday,
+  boardBell,
+  lessonCounts,
+  pickSchedule,
   schoolDay,
   periodLabel,
-  pickSchedule,
+  lessonCountKey,
   zonedParts,
   type BellStatus,
   type DisplayState,
@@ -116,11 +119,23 @@ export function TodaySummary() {
   const supervisor = (st.dutySupervisors ?? []).find((x) => x.date === today.isoDate)?.name ?? null;
   const leaves = st.leaves.filter((l) => l.startDate <= today.isoDate && l.endDate >= today.isoDate);
   const birthdays = st.birthdays.filter((b) => isBirthdayToday(b.monthDay, today));
-  const schedule = pickSchedule(st.bellSchedules, today.weekday);
-  // Panodaki gibi: tam gün tatilde zil çalmaz, arifede dersler yarım gün saatinde biter
-  const day = schoolDay(today.isoDate, { schedules: st.bellSchedules, holidays: st.holidays ?? [], halfDays: st.halfDays ?? [], halfDayEnd: s.halfDayEnd });
+  // Panodaki gibi: tek zil, günün ders sayısına göre; tam gün tatilde zil çalmaz, arifede dersler yarım gün saatinde biter
+  const dual = Boolean(s.dualShift);
+  const cal = {
+    schedules: st.bellSchedules,
+    holidays: st.holidays ?? [],
+    halfDays: st.halfDays ?? [],
+    halfDayEnd: s.halfDayEnd,
+    lessonCounts: st.timetable.length ? lessonCounts(st.timetable, st.classes ?? [], dual) : null,
+  };
+  const day = schoolDay(today.isoDate, cal);
+  const active = day.holiday ? { shift: 'morning' as const, periods: [] } : boardBell(today.isoDate, cal, dual, today.secondsOfDay);
+  const schedule = pickSchedule(st.bellSchedules, today.weekday, {
+    shift: active.shift,
+    lessonCount: cal.lessonCounts ? (cal.lessonCounts[lessonCountKey(active.shift, today.weekday)] ?? 0) : null,
+  });
   const halfDay = day.halfDay;
-  const periods = day.periods.length ? day.periods : null;
+  const periods = active.periods.length ? active.periods : null;
   const bell = bellText(periods ? computeBellStatus(periods, today.secondsOfDay, s.lunchThresholdMin) : { kind: 'off' });
 
   return (

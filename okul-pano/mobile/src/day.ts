@@ -1,4 +1,4 @@
-import { computeBellStatus, periodLabel, type BellStatus, type Period } from '@okulpano/shared/bell';
+import { computeBellStatus, periodLabel, type BellStatus, type Period, type Shift } from '@okulpano/shared/bell';
 import { schoolDay } from '@okulpano/shared/schoolDay';
 import { zonedParts, type ZonedParts } from '@okulpano/shared/time';
 import type { MeToday } from './data.ts';
@@ -21,20 +21,21 @@ export interface TeacherDay {
 /** Öğretmenin bugünü: zil durumu ve dersleri (panoyla aynı hesap) */
 export function teacherDay(data: MeToday, date: Date): TeacherDay {
   const now = zonedParts(date, data.timezone);
-  // Panoyla aynı hesap: tatilde ders yok, arifede dersler yarım gün saatinde biter
-  const day = schoolDay(now.isoDate, { schedules: data.bellSchedules, holidays: data.holidays, halfDays: data.halfDays ?? [], halfDayEnd: data.halfDayEnd });
+  // Panoyla aynı hesap: tek zil, günün ders sayısına göre; tatilde ders yok, arifede dersler yarım gün saatinde biter.
+  // İkili öğretimde her ders kendi vardiyasının zilini izler; zil kartı öğretmenin o günkü vardiyasını gösterir
+  const cal = { schedules: data.bellSchedules, holidays: data.holidays, halfDays: data.halfDays ?? [], halfDayEnd: data.halfDayEnd, lessonCounts: data.lessonCounts ?? null };
+  const dual = Boolean(data.dualShift);
+  const shiftOf = (l: { shift?: Shift | null }): Shift => (dual && l.shift === 'afternoon' ? 'afternoon' : 'morning');
+  const todays = data.lessons.filter((l) => l.weekday === now.weekday);
+  const myShift = todays.length ? shiftOf(todays[0]!) : 'morning';
+  const days = { morning: schoolDay(now.isoDate, cal, 'morning'), afternoon: dual ? schoolDay(now.isoDate, cal, 'afternoon') : null };
+  const day = (myShift === 'afternoon' && days.afternoon) || days.morning;
   const { holiday, halfDay, endsAt, periods } = day;
   const bell: BellStatus = periods.length ? computeBellStatus(periods, now.secondsOfDay, data.lunchThresholdMin) : { kind: 'off' };
-  // Her ders kendi sınıfının zilini izler (ör. salı 11. sınıfların farklı ders saatleri)
-  const cal = { schedules: data.bellSchedules, holidays: data.holidays, halfDays: data.halfDays ?? [], halfDayEnd: data.halfDayEnd };
-  const byNo = new Map(periods.map((p) => [p.no, p]));
-  // Zil ataması yapılmış sınıflar kendi zilini izler (ör. ikili öğretimde öğlenci, uzun gün)
-  const scoped = data.lessons.some((l) => l.bellPlan && Object.keys(l.bellPlan).length);
   let seenNext = false;
-  const lessons = data.lessons
-    .filter((l) => l.weekday === now.weekday)
+  const lessons = todays
     .flatMap((l) => {
-      const period = scoped ? schoolDay(now.isoDate, cal, { id: l.classId, name: l.className, bellPlan: l.bellPlan }).periods.find((p) => p.no === l.periodNo) : byNo.get(l.periodNo);
+      const period = ((shiftOf(l) === 'afternoon' && days.afternoon) || days.morning).periods.find((p) => p.no === l.periodNo);
       return period ? [{ l, period }] : [];
     })
     .sort((a, b) => toSec(a.period.start) - toSec(b.period.start))

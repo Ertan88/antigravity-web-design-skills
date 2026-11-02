@@ -204,6 +204,13 @@
       "when": 1794600000000,
       "tag": "0028_bell_plan",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1794700000000,
+      "tag": "0029_bell_by_count",
+      "breakpoints": true
     }
   ]
 }

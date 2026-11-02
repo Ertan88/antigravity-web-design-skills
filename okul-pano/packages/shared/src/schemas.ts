@@ -133,8 +133,8 @@ export const schoolSettingsSchema = z.object({
   tickerSpeed: z.number().int().min(20).max(300).default(90),
   videoSound: z.boolean().default(false),
   lunchThresholdMin: z.number().int().min(10).max(180).default(30),
-  /** Okul dışında yapılan dersler: bir sınıfın o günkü bütün dersleri bunlardansa sınıf o gün okulda sayılmaz */
-  offsiteSubjects: z.array(z.string().trim().min(1).max(120)).max(30).default(['İşletmelerde Mesleki Eğitim']),
+  /** İkili öğretim: sabahçı ve öğlenci sınıfların zilleri ayrı */
+  dualShift: z.boolean().default(false),
   /** Arifede (yarım gün) derslerin bittiği saat; kamuda arife 13.00'ten itibaren tatildir */
   halfDayEnd: clock.default('13:00'),
   /** Okulun kendi adlandırdığı başlıklar (kart ve sekme adları); boş olan varsayılanı kullanır */
@@ -424,15 +424,16 @@ export type TeacherImportInput = z.infer<typeof teacherImportSchema>;
 export const classGroupSchema = z.object({
   name: required('Sınıf adı', 20),
   sortOrder: z.number().int().default(0),
-  /** Zil hesabına katılmaz (ör. özel eğitim sınıfı): panodaki zil seçimine ve çakışma denetimine girmez */
+  /** Zil hesabına katılmaz (ör. özel eğitim sınıfı): günün ders sayısını belirlemez */
   bellExempt: z.boolean().optional(),
+  /** İkili öğretimde vardiyası */
+  shift: z.enum(['morning', 'afternoon']).nullable().optional(),
 });
 
-/** Zil ataması tablosundan: seçili sınıfların bir gündeki zili (null: okulun genel zili, "off": okulda değil) */
-export const classBellPlanSchema = z.object({
-  classIds: z.array(id).min(1).max(300),
-  weekday,
-  value: z.union([id, z.literal('off')]).nullable(),
+/** İkili öğretim: seçili sınıfların vardiyası */
+export const classShiftSchema = z.object({
+  classIds: z.array(id).max(300),
+  shift: z.enum(['morning', 'afternoon']),
 });
 
 /** Seçili sınıfları zil hesabına kat / katma */
@@ -566,13 +567,17 @@ export const periodSchema = z.object({
 export const bellScheduleSchema = z
   .object({
     name: required('Çizelge adı', 60),
-    /** Okul geneli günler; boşsa çizelge yalnızca zil ataması tablosunda seçilen sınıf ve günlerde çalar */
+    /** Elle sabitlendiği günler (ör. Cuma düzeni); boşsa düzen günün ders sayısına göre otomatik seçilir */
     weekdays: z
       .array(weekday)
       .max(7)
       .refine((d) => new Set(d).size === d.length, 'Aynı gün iki kez seçilmiş'),
     periods: z.array(periodSchema).min(1, 'En az bir ders saati ekleyin').max(30),
     sortOrder: z.number().int().default(0),
+    /** "N derslik gün": günün ders sayısı N olduğunda seçilir */
+    lessonCount: z.number().int().min(1).max(30).nullable().default(null),
+    /** İkili öğretimde vardiya (boş: sabahçı) */
+    shift: z.enum(['morning', 'afternoon']).nullable().default(null),
   })
   .superRefine((v, ctx) => {
     const problem = validatePeriods(v.periods);
@@ -592,8 +597,6 @@ export const timetableEntrySchema = z.object({
 export const screenDisplaySchema = z.object({
   orientation: z.enum(['landscape', 'portrait']).default('landscape'),
   mode: z.enum(['board', 'slides', 'clock']).default('board'),
-  /** Büyük zil sayacının izlediği çizelge; null: otomatik (o saatte en çok sınıfın derste olduğu zil) */
-  bellScheduleId: id.nullable().default(null),
   /** Bu panoda gösterilen sınıflar (dersler ve zil); boş: bütün okul */
   classIds: z.array(id).max(300).default([]),
 });

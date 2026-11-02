@@ -185,7 +185,7 @@ export async function seedSchoolContent(
   ]).returning({ id: exams.id }));
 
   const periods = generatePeriods({ firstStart: '08:30', lessonMin: 40, breakMin: 10, count: 8, lunchAfter: 5, lunchMin: 45 });
-  keep('bellSchedules', await db.insert(bellSchedules).values({ schoolId, name: 'Hafta içi', weekdays: [1, 2, 3, 4, 5], periods }).returning({ id: bellSchedules.id }));
+  keep('bellSchedules', await db.insert(bellSchedules).values({ schoolId, name: `${periods.length} derslik gün`, weekdays: [], lessonCount: periods.length, periods }).returning({ id: bellSchedules.id }));
 
   // Ders programı: dönüşümlü atama sayesinde bir öğretmen aynı saatte tek sınıfta olur
   const entries: (typeof timetableEntries.$inferInsert)[] = [];

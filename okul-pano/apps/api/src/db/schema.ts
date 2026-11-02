@@ -162,10 +162,10 @@ export const classGroups = pgTable(
     name: text('name').notNull(),
     /** Okul düzeyi (gözlem kriter şablonu için); boşsa sınıf adından anlaşılır (9-A → lise) */
     level: text('level').$type<SchoolLevel>(),
-    /** Hafta gününe göre zil: { "2": "<çizelge id>" | "off" }; yazılmayan günde okulun genel zili */
-    bellPlan: jsonb('bell_plan').$type<Record<string, string>>().notNull().default({}),
-    /** Zil hesabına katılmaz (ör. özel eğitim sınıfı) */
+    /** Zil hesabına katılmaz: günün ders sayısını belirlemez (ör. özel eğitim sınıfı) */
     bellExempt: boolean('bell_exempt').notNull().default(false),
+    /** İkili öğretimde vardiyası: "morning" | "afternoon" (boş: sabahçı) */
+    shift: text('shift').$type<'morning' | 'afternoon'>(),
     sortOrder: sortOrder(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -543,8 +543,12 @@ export const bellSchedules = pgTable(
     name: text('name').notNull(),
     weekdays: jsonb('weekdays').$type<number[]>().notNull(),
     periods: jsonb('periods').$type<Period[]>().notNull(),
-    /** "eokul": ders programı PDF'inden oluşturuldu (yeniden yüklenince yenilenir) */
+    /** "eokul": e-Okul PDF'indeki saatlerden oluşturuldu */
     source: text('source'),
+    /** "N derslik gün": günün ders sayısı N olduğunda seçilir (weekdays boşsa) */
+    lessonCount: integer('lesson_count'),
+    /** İkili öğretimde vardiya (boş: sabahçı) */
+    shift: text('shift').$type<'morning' | 'afternoon'>(),
     sortOrder: sortOrder(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

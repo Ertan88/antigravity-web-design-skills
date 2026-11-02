@@ -3,7 +3,7 @@ import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { audit, schoolGuard } from '../context.ts';
-import { bellSchedules, classGroups, teachers, timetableEntries } from '../db/schema.ts';
+import { bellSchedules, classGroups, schools, teachers, timetableEntries } from '../db/schema.ts';
 import { badRequest, parse } from '../lib/errors.ts';
 import { buildClasses, isSpecialEducation, parseEokulPage, readPdfPages, teacherDisplayName, teacherKey, timesToPeriods, type EokulPage } from '../lib/sheets/eokul.ts';
 
@@ -115,14 +115,14 @@ export async function timetableImportRoutes(app: FastifyInstance) {
       same.periods.sort((x, y) => x.no - y.no);
     }
     bells.sort((a, b) => b.classNames.length - a.classNames.length);
-    // Ana zil, okulun en çok günü kapsayan çizelgesiyle karşılaştırılır
-    const main = [...schedules].filter((s) => s.source !== 'eokul-extra').sort((a, b) => b.weekdays.length - a.weekdays.length || a.sortOrder - b.sortOrder)[0];
+    // e-Okul saatleri okulun ilk otomatik (sabahçı) düzeniyle karşılaştırılır
+    const main = [...schedules].filter((s) => !s.weekdays.length && s.shift !== 'afternoon').sort((a, b) => a.sortOrder - b.sortOrder)[0] ?? schedules[0];
     const bell = (bells[0]?.periods ?? [])
       .map((p) => {
         const sp = main?.periods.find((x) => x.no === p.no);
         return { no: p.no, pdf: `${p.start}-${p.end}`, school: sp ? `${sp.start}-${sp.end}` : null };
       })
-      .filter((b) => b.pdf !== b.school);
+      .filter((b) => b.school !== null && b.pdf !== b.school);
 
     const all = classes.flatMap((c) => c.entries);
     return {
@@ -190,44 +190,58 @@ export async function timetableImportRoutes(app: FastifyInstance) {
       const exemptIds = body.exemptClasses.map((n) => classId.get(teacherKey(n))).filter((x): x is string => Boolean(x));
       if (exemptIds.length) await tx.update(classGroups).set({ bellExempt: true }).where(and(eq(classGroups.schoolId, schoolId), inArray(classGroups.id, exemptIds)));
 
-      // Zil saatleri e-Okul'dan: ilk zil okulun ana zilinin yerine; diğerleri ayrı zil olarak o sınıflara atanır
+      // Zil düzeni e-Okul saatlerinden. Saatleri farklı iki düzen varsa ikili öğretim: erken başlayan sabahçı, diğeri öğlenci.
+      // Her vardiyada günün en sık görülen ders sayısı için "N derslik gün" düzeni yazılır (varsa saatleri güncellenir);
+      // diğer ders sayıları için düzen panelde önerilir.
       let bellsUpdated = 0;
       if (body.bells.length) {
         for (const b of body.bells) {
           const problem = validatePeriods(b.periods);
           if (problem) throw badRequest(`e-Okul ders saatleri okunamadı: ${problem}`);
         }
-        const existing = await tx.select().from(bellSchedules).where(eq(bellSchedules.schoolId, schoolId));
-        await tx.delete(bellSchedules).where(and(eq(bellSchedules.schoolId, schoolId), eq(bellSchedules.source, 'eokul-extra')));
-        const kept = existing.filter((s) => s.source !== 'eokul-extra');
-        const main = [...kept].sort((a, b) => b.weekdays.length - a.weekdays.length || a.sortOrder - b.sortOrder)[0];
-        const [first, ...rest] = body.bells;
-        const weekdays = main?.weekdays.length ? main.weekdays : [1, 2, 3, 4, 5];
-        if (main) await tx.update(bellSchedules).set({ periods: first!.periods, updatedAt: new Date() }).where(eq(bellSchedules.id, main.id));
-        else await tx.insert(bellSchedules).values({ schoolId, name: 'Ders saatleri', weekdays, periods: first!.periods, source: 'eokul' });
-        bellsUpdated = 1;
-        const validIds = new Set(kept.map((s) => s.id));
-        const planFor = new Map<string, string>();
-        for (const [i, b] of rest.entries()) {
-          const startEnd = `${b.periods[0]!.start}–${b.periods[b.periods.length - 1]!.end}`;
-          const [row] = await tx
-            .insert(bellSchedules)
-            .values({ schoolId, name: `Ders saatleri ${i + 2} (${startEnd})`, weekdays: [], periods: b.periods, source: 'eokul-extra', sortOrder: 100 + i })
-            .returning({ id: bellSchedules.id });
-          validIds.add(row!.id);
-          bellsUpdated++;
-          for (const n of b.classNames) {
-            const id = classId.get(teacherKey(n));
-            if (id) planFor.set(id, row!.id);
+        const bells = [...body.bells].sort((a, b) => a.periods[0]!.start.localeCompare(b.periods[0]!.start)).slice(0, 2);
+        const dual = bells.length > 1;
+        const shiftOf = new Map<string, 'morning' | 'afternoon'>();
+        bells.forEach((b, i) => b.classNames.forEach((n) => shiftOf.set(teacherKey(n), i === 0 ? 'morning' : 'afternoon')));
+        if (dual) {
+          for (const shift of ['morning', 'afternoon'] as const) {
+            const ids = [...shiftOf].filter(([, s]) => s === shift).map(([k]) => classId.get(k)).filter((x): x is string => Boolean(x));
+            if (ids.length) await tx.update(classGroups).set({ shift }).where(and(eq(classGroups.schoolId, schoolId), inArray(classGroups.id, ids)));
           }
         }
-        // Silinen e-Okul zillerine bağlı atamalar temizlenir; ayrı zildeki sınıflar o zile atanır
-        const all = await tx.select({ id: classGroups.id, bellPlan: classGroups.bellPlan }).from(classGroups).where(eq(classGroups.schoolId, schoolId));
-        for (const c of all) {
-          const plan = Object.fromEntries(Object.entries(c.bellPlan ?? {}).filter(([, v]) => v === 'off' || validIds.has(v)));
-          const target = planFor.get(c.id);
-          if (target) for (const d of weekdays) plan[String(d)] = target;
-          if (JSON.stringify(plan) !== JSON.stringify(c.bellPlan ?? {})) await tx.update(classGroups).set({ bellPlan: plan }).where(eq(classGroups.id, c.id));
+        await tx
+          .update(schools)
+          .set({ settings: sql`coalesce(${schools.settings}, '{}'::jsonb) || ${JSON.stringify({ dualShift: dual })}::jsonb` })
+          .where(eq(schools.id, schoolId));
+
+        const exempt = new Set(body.exemptClasses.map(teacherKey));
+        const existing = await tx.select().from(bellSchedules).where(eq(bellSchedules.schoolId, schoolId));
+        for (const [i, b] of bells.entries()) {
+          const shift = i === 0 ? null : 'afternoon';
+          // Günün ders sayısı: bu vardiyadaki sınıfların o gün en geç biten dersi; en sık görülen sayı esas düzen olur
+          const perDay = new Map<number, number>();
+          for (const c of body.classes) {
+            if (exempt.has(teacherKey(c.name)) || (shiftOf.get(teacherKey(c.name)) ?? 'morning') !== (shift ?? 'morning')) continue;
+            for (const e of c.entries) perDay.set(e.weekday, Math.max(perDay.get(e.weekday) ?? 0, e.periodNo));
+          }
+          const freq = new Map<number, number>();
+          for (const n of perDay.values()) freq.set(n, (freq.get(n) ?? 0) + 1);
+          const count = [...freq].sort((x, y) => y[1] - x[1] || x[0] - y[0])[0]?.[0] ?? b.periods.length;
+          const periods = b.periods.filter((p) => p.no <= count);
+          const same = existing.find((s) => !s.weekdays.length && (s.shift ?? null) === shift && (s.lessonCount ?? s.periods.length) === count);
+          if (same) await tx.update(bellSchedules).set({ periods, lessonCount: count, updatedAt: new Date() }).where(eq(bellSchedules.id, same.id));
+          else
+            await tx.insert(bellSchedules).values({
+              schoolId,
+              name: `${count} derslik gün${dual ? (shift ? ' · Öğlenci' : ' · Sabahçı') : ''}`,
+              weekdays: [],
+              lessonCount: count,
+              shift,
+              periods,
+              source: 'eokul',
+              sortOrder: i,
+            });
+          bellsUpdated++;
         }
       }
 

@@ -106,11 +106,16 @@ describe('öğleden sonra teneffüsü', () => {
     expect(r[5]).toEqual({ no: 6, start: '12:40', end: '13:20' });
     expect(r[10]).toEqual({ no: 11, start: '16:25', end: '17:05' });
   });
-  it('zil planı: sınıfa o gün seçilen çizelge ya da kapalı gün', () => {
-    const a = { id: 'a', name: 'Hafta içi', weekdays: [1, 2, 3, 4, 5], periods: generatePeriods({ firstStart: '08:00', lessonMin: 40, breakMin: 10, count: 9 }) };
-    const b = { id: 'b', name: 'Uzun', weekdays: [], periods: generatePeriods({ firstStart: '08:00', lessonMin: 40, breakMin: 5, count: 11 }) };
-    expect(pickSchedule([a, b], 2, { bellPlan: { '2': 'b' } })?.id).toBe('b');
-    expect(pickSchedule([a, b], 3, { bellPlan: { '2': 'b' } })?.id).toBe('a');
-    expect(pickSchedule([a, b], 3, { bellPlan: { '3': 'off' } })).toBeNull();
+  it('ders sayısına göre düzen: tam eşleşen, yoksa bir büyüğü; elle sabitlenen gün önce', () => {
+    const mk = (id: string, count: number, weekdays: number[] = []) => ({ id, name: id, weekdays, lessonCount: count, periods: generatePeriods({ firstStart: '08:00', lessonMin: 40, breakMin: 10, count }) });
+    const all = [mk('9', 9), mk('11', 11), mk('cuma', 8, [5])];
+    expect(pickSchedule(all, 1, { lessonCount: 9 })?.id).toBe('9');
+    expect(pickSchedule(all, 1, { lessonCount: 10 })?.id).toBe('11');
+    expect(pickSchedule(all, 1, { lessonCount: 12 })?.id).toBe('11');
+    expect(pickSchedule(all, 5, { lessonCount: 9 })?.id).toBe('cuma');
+    expect(pickSchedule(all, 3, { lessonCount: 0 })).toBeNull();
+    // Ders programı yoksa hafta içi ilk düzen; hafta sonu zil yok
+    expect(pickSchedule(all, 2)?.id).toBe('9');
+    expect(pickSchedule(all, 6)).toBeNull();
   });
 });

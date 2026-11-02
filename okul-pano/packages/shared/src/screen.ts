@@ -4,20 +4,17 @@ import { sortPeriods, type Period } from './bell.ts';
 export interface ScreenDisplay {
   orientation: 'landscape' | 'portrait';
   mode: 'board' | 'slides' | 'clock';
-  /** Büyük zil sayacının izlediği çizelge; null: otomatik */
-  bellScheduleId: string | null;
   /** Bu panoda gösterilen sınıflar; boş: bütün okul */
   classIds: string[];
 }
 
-export const DEFAULT_SCREEN_DISPLAY: ScreenDisplay = { orientation: 'landscape', mode: 'board', bellScheduleId: null, classIds: [] };
+export const DEFAULT_SCREEN_DISPLAY: ScreenDisplay = { orientation: 'landscape', mode: 'board', classIds: [] };
 
 /** Kayıtlı değer eksik ya da artık desteklenmiyorsa varsayılana düşer */
 export function resolveScreenDisplay(d: Partial<ScreenDisplay> | null | undefined): ScreenDisplay {
   return {
     orientation: d?.orientation === 'portrait' ? 'portrait' : 'landscape',
     mode: d?.mode === 'slides' || d?.mode === 'clock' ? d.mode : 'board',
-    bellScheduleId: typeof d?.bellScheduleId === 'string' ? d.bellScheduleId : null,
     classIds: Array.isArray(d?.classIds) ? d.classIds.filter((x): x is string => typeof x === 'string') : [],
   };
 }

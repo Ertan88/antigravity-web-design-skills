@@ -1,4 +1,4 @@
-import { pickSchedule, sortPeriods, type BellClassRef, type BellScheduleLike, type Period } from './bell.ts';
+import { pickSchedule, sortPeriods, type BellScheduleLike, type Period, type Shift } from './bell.ts';
 import { formatClock, parseClock } from './time.ts';
 
 /**
@@ -60,23 +60,33 @@ export interface SchoolCalendar<T extends BellScheduleLike = BellScheduleLike> {
   halfDays: readonly DayHoliday[];
   /** Arifede derslerin bittiği saat (SS:DD) */
   halfDayEnd?: string;
+  /**
+   * Günün ders sayısı (vardiya ve hafta gününe göre, `lessonCountKey`): o gün en geç biten sınıfın son dersi.
+   * Verilmezse ders programı yok sayılır.
+   */
+  lessonCounts?: Record<string, number> | null;
 }
 
-/** Bir günün okul planı: tatil mi, yarım gün mü, hangi ders saatleri çalar (sınıf verilirse o sınıfın zili) */
-export function schoolDay(date: string, cal: SchoolCalendar, cls?: BellClassRef | null): SchoolDay {
+export const lessonCountKey = (shift: Shift | null | undefined, weekday: number) => `${shift === 'afternoon' ? 'afternoon' : 'morning'}:${weekday}`;
+
+/** Bir günün okul planı: tatil mi, yarım gün mü, hangi ders saatleri çalar (ikili öğretimde vardiyanın zili) */
+export function schoolDay(date: string, cal: SchoolCalendar, shift?: Shift | null): SchoolDay {
   const weekday = isoWeekday(date);
   const holiday = cal.holidays.find((h) => h.date === date)?.name ?? null;
   const halfDay = holiday ? null : (cal.halfDays.find((h) => h.date === date)?.name ?? null);
-  const schedule = holiday ? null : pickSchedule(cal.schedules, weekday, cls);
+  const count = cal.lessonCounts ? (cal.lessonCounts[lessonCountKey(shift, weekday)] ?? 0) : null;
+  const schedule = holiday ? null : pickSchedule(cal.schedules, weekday, { shift, lessonCount: count });
   const end = cal.halfDayEnd || HALF_DAY_END_DEFAULT;
-  const periods = schedule ? (halfDay ? halfDayPeriods(schedule.periods, end) : sortPeriods(schedule.periods)) : [];
+  // Zil, o gün en geç biten sınıfın son dersinde biter
+  const base = schedule ? sortPeriods(schedule.periods).filter((p) => !count || p.no <= count) : [];
+  const periods = halfDay ? halfDayPeriods(base, end) : base;
   return { date, weekday, holiday, halfDay, periods, endsAt: halfDay ? end : null };
 }
 
 /** Bugünden sonraki ilk ders günü (tatil ve hafta sonu atlanır); `withinDays` içinde yoksa null */
-export function nextSchoolDay(after: string, cal: SchoolCalendar, withinDays = 21): SchoolDay | null {
+export function nextSchoolDay(after: string, cal: SchoolCalendar, withinDays = 21, shift?: Shift | null): SchoolDay | null {
   for (let i = 1; i <= withinDays; i++) {
-    const day = schoolDay(addIsoDays(after, i), cal);
+    const day = schoolDay(addIsoDays(after, i), cal, shift);
     if (day.periods.length) return day;
   }
   return null;

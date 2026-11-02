@@ -8,28 +8,27 @@ export interface Period {
   label?: string | null;
 }
 
+/** İkili öğretimde vardiya; tekli öğretimde her şey sabahçı sayılır */
+export type Shift = 'morning' | 'afternoon';
+
 export interface BellScheduleLike {
   id: string;
   name: string;
-  /** ISO hafta günleri: 1 = Pazartesi ... 7 = Pazar */
+  /**
+   * Bu düzenin elle sabitlendiği günler (ör. Cuma düzeni). Boşsa düzen otomatiktir: günün ders sayısına göre seçilir.
+   * ISO hafta günleri: 1 = Pazartesi ... 7 = Pazar
+   */
   weekdays: number[];
   periods: Period[];
   sortOrder?: number;
+  /** "N derslik gün": günün ders sayısı N olduğunda seçilir; boşsa ders saati sayısı */
+  lessonCount?: number | null;
+  /** İkili öğretimde hangi vardiyanın zili (boş: sabahçı) */
+  shift?: Shift | null;
 }
 
-/**
- * Bir sınıfın hafta günlerine göre zili: { "2": "<çizelge id>" } o gün o çizelge, { "3": "off" } o gün okulda değil.
- * Yazılmayan günlerde okulun o güne ait genel çizelgesi geçerlidir.
- */
-export type BellPlan = Record<string, string>;
-export const BELL_OFF = 'off';
-
-/** Zilin hangi sınıf için seçildiği */
-export interface BellClassRef {
-  id?: string | null;
-  name?: string;
-  bellPlan?: BellPlan | null;
-}
+export const scheduleShift = (s: Pick<BellScheduleLike, 'shift'>): Shift => (s.shift === 'afternoon' ? 'afternoon' : 'morning');
+export const scheduleLessonCount = (s: Pick<BellScheduleLike, 'lessonCount' | 'periods'>) => s.lessonCount ?? s.periods.length;
 
 export type BellStatus =
   | { kind: 'off' }
@@ -47,22 +46,28 @@ export function sortPeriods(periods: readonly Period[]): Period[] {
 }
 
 /**
- * O günün zil çizelgesi. Sınıfın zil planında o gün için çizelge seçilmişse o ("off" ise null: sınıf o gün
- * okulda değil); yoksa okulun o günü kapsayan çizelgesi. Birden fazla çizelge aynı günü kapsıyorsa daha az gün
- * kapsayan (daha özel) olan geçerlidir: "Hafta içi" (Pzt–Cum) yanında "Cuma" çizelgesi varsa cuma günü "Cuma".
- * Eşitlikte listedeki sıra belirler.
+ * Bir günün zil düzeni (okulda tek zil çalar; zil günün ders sayısına göre değişir):
+ * 1. O gün için elle sabitlenmiş düzen varsa o (ör. Cuma düzeni; daha az gün kapsayan önce).
+ * 2. Yoksa otomatik düzenlerden günün ders sayısına uyan: tam eşleşen, yoksa bir büyüğü, o da yoksa en büyüğü.
+ * `lessonCount` 0 ise o gün ders yoktur (zil çalmaz); bilinmiyorsa (ders programı yok) hafta içi ilk otomatik düzen.
  */
-export function pickSchedule<T extends BellScheduleLike>(schedules: readonly T[], weekday: number, cls?: BellClassRef | null): T | null {
-  const planned = cls?.bellPlan?.[String(weekday)];
-  if (planned === BELL_OFF) return null;
-  if (planned) {
-    const s = schedules.find((x) => x.id === planned && x.periods.length > 0);
-    if (s) return s;
-  }
-  const matches = schedules
-    .filter((s) => s.weekdays.includes(weekday) && s.periods.length > 0)
-    .sort((a, b) => a.weekdays.length - b.weekdays.length || (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-  return matches[0] ?? null;
+export function pickSchedule<T extends BellScheduleLike>(
+  schedules: readonly T[],
+  weekday: number,
+  opts?: { shift?: Shift | null; lessonCount?: number | null },
+): T | null {
+  const shift = opts?.shift === 'afternoon' ? 'afternoon' : 'morning';
+  const pool = schedules.filter((s) => s.periods.length > 0 && scheduleShift(s) === shift);
+  const order = (a: T, b: T) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+  const fixed = pool.filter((s) => s.weekdays.includes(weekday)).sort((a, b) => a.weekdays.length - b.weekdays.length || order(a, b));
+  if (fixed[0]) return fixed[0];
+  const auto = pool.filter((s) => !s.weekdays.length);
+  if (!auto.length) return null;
+  const n = opts?.lessonCount;
+  if (n === 0) return null;
+  if (n == null) return weekday <= 5 ? ([...auto].sort(order)[0] ?? null) : null;
+  const bySize = [...auto].sort((a, b) => scheduleLessonCount(a) - scheduleLessonCount(b) || order(a, b));
+  return bySize.find((s) => scheduleLessonCount(s) >= n) ?? bySize[bySize.length - 1]!;
 }
 
 /**

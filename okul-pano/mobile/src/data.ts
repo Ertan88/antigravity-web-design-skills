@@ -30,7 +30,11 @@ export interface MeToday {
   /** Arifeler (yarım gün): dersler halfDayEnd saatinde biter */
   halfDays?: { date: string; name: string }[];
   halfDayEnd?: string;
-  lessons: { weekday: number; periodNo: number; className: string; classId?: string; bellPlan?: Record<string, string>; subject: string }[];
+  /** İkili öğretim: her ders kendi vardiyasının zilini izler */
+  dualShift?: boolean;
+  /** Günün ders sayısı ("<vardiya>:<gün>"); zil düzeni buna göre seçilir */
+  lessonCounts?: Record<string, number> | null;
+  lessons: { weekday: number; periodNo: number; className: string; classId?: string; shift?: 'morning' | 'afternoon' | null; subject: string }[];
   leaves: { id: string; startDate: string; endDate: string; note: string | null; status: 'approved' | 'pending' | 'rejected' }[];
   week: {
     date: string;

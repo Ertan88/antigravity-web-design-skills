@@ -197,9 +197,9 @@ describe('içerik doğrulama', () => {
     expect(res.json().message).toMatch(/çakışıyor/);
   });
 
-  it('günü seçilmemiş zil çizelgesi (yalnızca zil atamasıyla kullanılan) kaydedilir', async () => {
+  it('ders sayısına göre zil düzeni kaydedilir', async () => {
     const c = client(t.app, ownerToken);
-    const res = await c.post(`/api/schools/${schoolA}/bell-schedules`, { name: 'Uzun gün', weekdays: [], periods: [{ no: 1, start: '08:00', end: '08:40' }] });
+    const res = await c.post(`/api/schools/${schoolA}/bell-schedules`, { name: '11 derslik gün', weekdays: [], lessonCount: 11, periods: [{ no: 1, start: '08:00', end: '08:40' }] });
     expect(res.statusCode).toBeLessThan(300);
     expect((await c.del(`/api/schools/${schoolA}/bell-schedules/${res.json().id}`)).statusCode).toBeLessThan(300);
   });

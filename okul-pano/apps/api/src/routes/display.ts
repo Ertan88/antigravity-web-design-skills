@@ -240,7 +240,7 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
 
   const iso = (d: Date | null) => (d ? d.toISOString() : null);
   const classRows = await db
-    .select({ id: classGroups.id, name: classGroups.name, bellPlan: classGroups.bellPlan, bellExempt: classGroups.bellExempt })
+    .select({ id: classGroups.id, name: classGroups.name, bellExempt: classGroups.bellExempt, shift: classGroups.shift })
     .from(classGroups)
     .where(eq(classGroups.schoolId, id));
   const settings = schoolSettingsSchema.parse(school.settings ?? {});
@@ -289,7 +289,7 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
       endsAt: iso(a.endsAt),
     })),
     ticker: tickerRows.map((t) => ({ id: t.id, text: t.text, startsAt: iso(t.startsAt), endsAt: iso(t.endsAt) })),
-    bellSchedules: bellRows.map((b) => ({ id: b.id, name: b.name, weekdays: b.weekdays, periods: b.periods, sortOrder: b.sortOrder })),
+    bellSchedules: bellRows.map((b) => ({ id: b.id, name: b.name, weekdays: b.weekdays, periods: b.periods, sortOrder: b.sortOrder, lessonCount: b.lessonCount, shift: b.shift })),
     timetable: mergeCells(ttRows),
     classes: classRows,
     achievements: achievementRows.map((a) => ({

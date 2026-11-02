@@ -4,7 +4,8 @@ import {
   addIsoDays,
   nextSchoolDay,
   boardBell,
-  isOffsiteSubject,
+  classShift,
+  lessonCounts,
   lessonsNow,
   schoolDay,
   isSleepTime,
@@ -124,38 +125,34 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
   const leaves = state.leaves.filter((l) => l.startDate <= today.isoDate && l.endDate >= today.isoDate);
   const birthdays = state.birthdays.filter((b) => isBirthdayToday(b.monthDay, today));
 
-  // Okul günü: tam gün tatilde zil çalmaz; arifede (yarım gün) dersler halfDayEnd saatinde biter
-  const calendar = { schedules: state.bellSchedules, holidays: state.holidays ?? [], halfDays: state.halfDays ?? [], halfDayEnd: s.halfDayEnd };
+  // Okul günü: tam gün tatilde zil çalmaz; arifede (yarım gün) dersler halfDayEnd saatinde biter.
+  // Tek zil, günün ders sayısına göre (o gün en geç biten sınıfın son dersi); ikili öğretimde her vardiyanın kendi zili
+  const dual = Boolean(s.dualShift);
+  const classInfo = state.classes ?? [];
+  const calendar = {
+    schedules: state.bellSchedules,
+    holidays: state.holidays ?? [],
+    halfDays: state.halfDays ?? [],
+    halfDayEnd: s.halfDayEnd,
+    lessonCounts: state.timetable.length ? lessonCounts(state.timetable, classInfo, dual) : null,
+  };
   const day = schoolDay(today.isoDate, calendar);
   // Bu panoda gösterilen sınıflar (ekran ayarı; boşsa bütün okul)
-  const screenDisplay = resolveScreenDisplay(state.display);
-  const screenClasses = new Set(screenDisplay.classIds);
+  const screenClasses = new Set(resolveScreenDisplay(state.display).classIds);
   const timetable = screenClasses.size ? state.timetable.filter((e) => e.classId && screenClasses.has(e.classId)) : state.timetable;
-  const bellCtx = {
-    cal: calendar,
-    classes: (state.classes ?? []).filter((c) => !screenClasses.size || screenClasses.has(c.id)),
-    offsiteSubjects: s.offsiteSubjects ?? [],
-  };
-  // Büyük zil sayacı: ekranda seçilen zil ya da otomatik (o saatte en çok sınıfın derste olduğu zil), o zili izleyen
-  // sınıfların ilk dersinden son dersine kadar
-  const mainBell = day.holiday ? { periods: [] } : boardBell(today.isoDate, timetable, bellCtx, today.secondsOfDay, screenDisplay.bellScheduleId);
+  const mainBell = day.holiday ? { shift: 'morning' as const, periods: [] } : boardBell(today.isoDate, calendar, dual, today.secondsOfDay);
   const periods = mainBell.periods.length ? mainBell.periods : null;
   const bell = periods ? computeBellStatus(periods, today.secondsOfDay, s.lunchThresholdMin) : ({ kind: 'off' } as const);
   const lessonPeriod = bell.kind === 'lesson' ? bell.period : bell.kind === 'break' || bell.kind === 'before' ? bell.next : null;
-  // Her sınıf kendi zilini ve kendi ilk–son dersini izler; okul dışındaki ve zil hesabına katılmayan sınıflar listelenmez
-  const lessons = day.holiday ? [] : lessonsNow(timetable, today.isoDate, bellCtx, today.secondsOfDay, s.lunchThresholdMin);
+  // O ders saatinde dersi olan sınıflar (dersleri bitmiş sınıflar listelenmez)
+  const lessons = day.holiday ? [] : lessonsNow(timetable, today.isoDate, calendar, classInfo, dual, today.secondsOfDay, s.lunchThresholdMin);
   // Dersler bitince ya da tatilde: sonraki ders günü (bayram, hafta sonu ve köprü tatili atlanır)
-  const nextDay = (bell.kind === 'after' || bell.kind === 'off') && !lessons.length ? nextSchoolDay(today.isoDate, calendar) : null;
+  const nextDay = bell.kind === 'after' || bell.kind === 'off' ? nextSchoolDay(today.isoDate, calendar) : null;
   const nextFirst = nextDay?.periods[0] ?? null;
+  const shiftOf = new Map(classInfo.map((c) => [c.id, classShift(c, dual)]));
   const nextLessons =
     nextDay && nextFirst
-      ? timetable.filter(
-          (e) =>
-            e.weekday === nextDay.weekday &&
-            e.periodNo === nextFirst.no &&
-            !isOffsiteSubject(e.subject, bellCtx.offsiteSubjects) &&
-            !bellCtx.classes.some((c) => c.id === e.classId && c.bellExempt),
-        )
+      ? timetable.filter((e) => e.weekday === nextDay.weekday && e.periodNo === nextFirst.no && (shiftOf.get(e.classId ?? '') ?? 'morning') === 'morning')
       : [];
   const tomorrow = schoolDay(addIsoDays(today.isoDate, 1), calendar);
   const nextLabel = nextDay ? (nextDay.date === tomorrow.date ? 'Yarın' : dayLabel(nextDay.date)) : '';
