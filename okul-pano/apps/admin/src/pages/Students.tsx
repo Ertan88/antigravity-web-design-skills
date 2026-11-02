@@ -1,7 +1,7 @@
-import { layoutModules, normalizeClassName, resolveLayout, studentSchema } from '@okulpano/shared';
+import { compareClassNames, layoutModules, normalizeClassName, resolveLayout, studentSchema } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { Cake, ClipboardPaste, Search, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Cake, ClipboardPaste, FileUp, Search, Trash2 } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
 import { CrudPage } from '../components/CrudPage.tsx';
 import { ExcelButtons } from '../components/ExcelButtons.tsx';
 import { ExcelImportDialog, type ImportPreview } from '../components/ExcelImportDialog.tsx';
@@ -12,7 +12,7 @@ import { useAuth } from '../lib/auth.tsx';
 import { nameMap, useList, useSchool, useSchoolPath, type ClassGroup, type Student } from '../lib/data.ts';
 import { formatDate } from '../lib/format.ts';
 
-type Form = { schoolNo: string; fullName: string; classGroupId: string; birthDate: string };
+type Form = { listNo: string; schoolNo: string; fullName: string; classGroupId: string; birthDate: string };
 
 interface ParsedRow {
   schoolNo: string;
@@ -65,7 +65,7 @@ function studentImportMessage(res: { created: number; updated: number; classesCr
   return parts.join(', ');
 }
 
-type ExcelRow = { schoolNo: string; fullName: string; className: string | null; birthDate: string };
+type ExcelRow = { schoolNo: string; fullName: string; className: string | null; birthDate: string; listNo?: number | null };
 
 function ExcelImport({ file, onClose }: { file: File | null; onClose: () => void }) {
   const basePath = useSchoolPath('students');
@@ -77,6 +77,7 @@ function ExcelImport({ file, onClose }: { file: File | null; onClose: () => void
       invalidate={['students', 'classes']}
       initialOptions={{ updateExisting: true }}
       columns={[
+        { header: 'S.No', cell: (r) => <span className="text-slate-500 tabular-nums">{r.listNo ?? '—'}</span> },
         { header: 'Okul no', cell: (r) => <span className="font-semibold tabular-nums">{r.schoolNo}</span> },
         { header: 'Ad soyad', cell: (r) => <span className="font-medium whitespace-nowrap text-ink">{r.fullName}</span> },
         { header: 'Sınıf', cell: (r) => r.className ?? '—' },
@@ -95,7 +96,7 @@ function ExcelImport({ file, onClose }: { file: File | null; onClose: () => void
             checked={o.updateExisting}
             onChange={(v) => set({ updateExisting: v })}
             label="Kayıtlı öğrencilerin bilgilerini güncelle"
-            description="Yeni dönemde sınıf atlayan öğrenciler için açık bırakın. Öğrenci okul numarasıyla tanınır; adı, sınıfı ve doğum tarihi dosyadakiyle güncellenir."
+            description="Yeni dönemde sınıf atlayan öğrenciler için açık bırakın. Öğrenci okul numarasıyla tanınır; adı, sınıfı, sıra numarası ve doğum tarihi dosyadakiyle güncellenir."
           />
         )
       }
@@ -104,7 +105,7 @@ function ExcelImport({ file, onClose }: { file: File | null; onClose: () => void
       commitLabel={(n) => `${n} öğrenciyi kaydet`}
       commitBody={(p, o) => ({
         updateExisting: o.updateExisting,
-        rows: p.rows.map(({ schoolNo, fullName, className, birthDate }) => ({ schoolNo, fullName, className, birthDate })),
+        rows: p.rows.map(({ schoolNo, fullName, className, birthDate, listNo }) => ({ schoolNo, fullName, className, birthDate, listNo: listNo ?? null })),
       })}
       successMessage={studentImportMessage}
     />
@@ -258,12 +259,18 @@ export function Students() {
   const [onlyToday, setOnlyToday] = useState(false);
   const [importing, setImporting] = useState(false);
   const [excelFile, setExcelFile] = useState<File | null>(null);
+  const pdfInput = useRef<HTMLInputElement>(null);
   const { can } = useAuth();
   const studentsPath = useSchoolPath('students');
   const classes = useList<ClassGroup>('classes');
   const studentCount = useList<Student>('students').data?.length ?? 0;
   const school = useSchool();
   const classNames = nameMap(classes.data, (c) => c.name);
+  // Sınıf sırası (9-A, 9-B, 10-A…), sınıf içinde e-Okul sıra numarası
+  const byClass = (a: Student, b: Student) =>
+    compareClassNames(classNames.get(a.classGroupId ?? '') ?? '~', classNames.get(b.classGroupId ?? '') ?? '~') ||
+    (a.listNo ?? 9999) - (b.listNo ?? 9999) ||
+    a.fullName.localeCompare(b.fullName, 'tr');
   const now = new Date();
   const todayMd = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const needle = q.trim().toLocaleLowerCase('tr-TR');
@@ -285,11 +292,28 @@ export function Students() {
         permission="students.manage"
         icon={<Cake className="size-6" />}
         emptyTitle="Öğrenci eklenmemiş"
-        emptyText="Öğrencileri tek tek ekleyebilir ya da Excel / e-Okul listesinden toplu aktarabilirsiniz."
+        emptyText="e-Okul'dan indirdiğiniz sınıf listesi PDF'ini yükleyin; sınıflar, sıra numaraları, okul numaraları ve doğum tarihleri birlikte gelir. Excel'den ya da tek tek de ekleyebilirsiniz."
         addLabel="Öğrenci ekle"
         actionsInToolbar
         headerActions={
           <>
+            {can('students.manage') && (
+              <>
+                <input
+                  ref={pdfInput}
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    setExcelFile(e.target.files?.[0] ?? null);
+                    e.target.value = '';
+                  }}
+                />
+                <Button size="sm" icon={<FileUp className="size-4" />} onClick={() => pdfInput.current?.click()}>
+                  e-Okul listesi (PDF)
+                </Button>
+              </>
+            )}
             <ExcelButtons
               basePath={studentsPath}
               module="Öğrenci Listesi"
@@ -318,13 +342,14 @@ export function Students() {
           </div>
         }
         select={(rows) =>
-          rows.filter(
+          [...rows].sort(byClass).filter(
             (r) =>
               (!onlyToday || r.birthDate.slice(5) === todayMd) &&
               (!needle || `${r.schoolNo} ${r.fullName} ${classNames.get(r.classGroupId ?? '') ?? ''}`.toLocaleLowerCase('tr-TR').includes(needle)),
           )
         }
         columns={[
+          { header: 'S.No', cell: (r) => <span className="text-slate-500 tabular-nums">{r.listNo ?? '—'}</span> },
           { header: 'Okul no', cell: (r) => <span className="font-semibold text-slate-600 tabular-nums">{r.schoolNo}</span> },
           {
             header: 'Ad soyad',
@@ -342,12 +367,15 @@ export function Students() {
           { header: 'Sınıf', cell: (r) => <span className="text-slate-600">{classNames.get(r.classGroupId ?? '') ?? '—'}</span> },
           { header: 'Doğum tarihi', cell: (r) => <span className="whitespace-nowrap text-slate-600">{formatDate(r.birthDate)}</span> },
         ]}
-        emptyForm={() => ({ schoolNo: '', fullName: '', classGroupId: '', birthDate: '' })}
-        toForm={(r) => ({ schoolNo: r.schoolNo, fullName: r.fullName, classGroupId: r.classGroupId ?? '', birthDate: r.birthDate })}
-        toPayload={(f) => ({ schoolNo: f.schoolNo, fullName: f.fullName, classGroupId: f.classGroupId || null, birthDate: f.birthDate })}
+        emptyForm={() => ({ listNo: '', schoolNo: '', fullName: '', classGroupId: '', birthDate: '' })}
+        toForm={(r) => ({ listNo: r.listNo ? String(r.listNo) : '', schoolNo: r.schoolNo, fullName: r.fullName, classGroupId: r.classGroupId ?? '', birthDate: r.birthDate })}
+        toPayload={(f) => ({ schoolNo: f.schoolNo, fullName: f.fullName, classGroupId: f.classGroupId || null, birthDate: f.birthDate, listNo: f.listNo ? Number(f.listNo) : null })}
         renderForm={({ values: v, set, errors }) => (
           <>
-            <div className="grid gap-4 sm:grid-cols-[140px_1fr]">
+            <div className="grid gap-4 sm:grid-cols-[90px_140px_1fr]">
+              <Field label="S.No" error={errors.listNo}>
+                {(id) => <Input id={id} value={v.listNo} inputMode="numeric" onChange={(e) => set('listNo', e.target.value.replace(/\D/g, ''))} />}
+              </Field>
               <Field label="Okul no" error={errors.schoolNo}>
                 {(id) => <Input id={id} value={v.schoolNo} inputMode="numeric" onChange={(e) => set('schoolNo', e.target.value)} invalid={Boolean(errors.schoolNo)} />}
               </Field>

@@ -511,6 +511,8 @@ export const studentSchema = z.object({
   fullName: required('Ad soyad', 80, 2),
   classGroupId: id.nullable().optional(),
   birthDate: isoDate,
+  /** e-Okul sınıf listesindeki sıra numarası (S.No) */
+  listNo: z.number().int().min(1).max(999).nullable().optional(),
 });
 
 /** Excel / e-Okul listesinden yapıştırılan öğrencileri toplu içe aktarma; eksik sınıflar otomatik oluşturulur. */
@@ -522,6 +524,7 @@ export const studentImportSchema = z.object({
         fullName: required('Ad soyad', 80, 2),
         className: optionalText(20),
         birthDate: isoDate,
+        listNo: z.number().int().min(1).max(999).nullable().optional(),
       }),
     )
     .min(1, 'İçe aktarılacak satır yok')

@@ -100,6 +100,8 @@ export interface Student extends Base {
   fullName: string;
   classGroupId: string | null;
   birthDate: string;
+  /** e-Okul sınıf listesindeki sıra numarası (S.No) */
+  listNo: number | null;
 }
 export interface BellSchedule extends Base {
   name: string;

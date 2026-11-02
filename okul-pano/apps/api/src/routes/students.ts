@@ -1,12 +1,14 @@
 import { normalizeClassName, normalizeName, studentImportSchema, studentSchema, trCompare, schoolFullName } from '@okulpano/shared';
 import { asc, eq } from 'drizzle-orm';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { audit, schoolGuard } from '../context.ts';
 import type { DB } from '../db/client.ts';
 import { classGroups, students } from '../db/schema.ts';
 import { parse } from '../lib/errors.ts';
-import { exportFileName, readXlsxUpload, sendXlsx } from '../lib/excel.ts';
+import { exportFileName, sendXlsx } from '../lib/excel.ts';
+import { badRequest } from '../lib/errors.ts';
+import { parseClassListPdf } from '../lib/sheets/eokulStudents.ts';
 import { buildStudentsWorkbook, parseStudentsWorkbook } from '../lib/sheets/students.ts';
 import { registerResource } from './crud.ts';
 
@@ -25,9 +27,35 @@ async function loadClasses(db: DB | Tx, schoolId: string) {
   return { rows, byKey: new Map(rows.map((c) => [classKey(c.name), c])), byId: new Map(rows.map((c) => [c.id, c])) };
 }
 
-/** Kayıttaki ad, doğum tarihi ya da sınıf dosyadakinden farklı mı (ad karşılaştırması Türkçe büyük/küçük harf duyarsız) */
-function differs(a: { fullName: string; birthDate: string; classGroupId: string | null }, b: { fullName: string; birthDate: string; classGroupId: string | null }) {
-  return normalizeName(a.fullName) !== normalizeName(b.fullName) || a.birthDate !== b.birthDate || (b.classGroupId !== null && a.classGroupId !== b.classGroupId);
+type Compared = { fullName: string; birthDate: string; classGroupId: string | null; listNo?: number | null };
+
+/** Kayıttaki ad, doğum tarihi, sınıf ya da sıra no dosyadakinden farklı mı (ad karşılaştırması Türkçe büyük/küçük harf duyarsız) */
+function differs(a: Compared, b: Compared) {
+  return (
+    normalizeName(a.fullName) !== normalizeName(b.fullName) ||
+    a.birthDate !== b.birthDate ||
+    (b.classGroupId !== null && a.classGroupId !== b.classGroupId) ||
+    (b.listNo != null && a.listNo !== b.listNo)
+  );
+}
+
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+
+/** Öğrenci listesi dosyası: Excel (.xlsx) ya da e-Okul sınıf listesi PDF'i */
+async function readStudentUpload(req: FastifyRequest) {
+  const file = await req.file({ limits: { fileSize: MAX_UPLOAD_BYTES } });
+  if (!file) throw badRequest('Dosya bulunamadı.');
+  const pdf = /\.pdf$/i.test(file.filename);
+  if (!pdf && !/\.xlsx$/i.test(file.filename)) {
+    throw badRequest(
+      /\.xls$/i.test(file.filename)
+        ? 'Eski .xls biçimi desteklenmiyor. Excel\'de "Farklı Kaydet → Excel Çalışma Kitabı (.xlsx)" seçin.'
+        : "Lütfen .xlsx uzantılı Excel dosyası ya da e-Okul sınıf listesi PDF'i yükleyin.",
+    );
+  }
+  const data = await file.toBuffer();
+  if (file.file.truncated) throw badRequest('Dosya 10 MB sınırını aşıyor.');
+  return pdf ? parseClassListPdf(new Uint8Array(data)) : parseStudentsWorkbook(data);
 }
 
 export async function studentRoutes(app: FastifyInstance) {
@@ -81,7 +109,7 @@ export async function studentRoutes(app: FastifyInstance) {
       }
 
       const current = await tx
-        .select({ id: students.id, schoolNo: students.schoolNo, fullName: students.fullName, birthDate: students.birthDate, classGroupId: students.classGroupId })
+        .select({ id: students.id, schoolNo: students.schoolNo, fullName: students.fullName, birthDate: students.birthDate, classGroupId: students.classGroupId, listNo: students.listNo })
         .from(students)
         .where(eq(students.schoolId, schoolId));
       const byKey = new Map(current.map((s) => [studentKey(s.schoolNo), s]));
@@ -97,12 +125,13 @@ export async function studentRoutes(app: FastifyInstance) {
         const classGroupId = r.className ? (classes.byKey.get(classKey(r.className))?.id ?? null) : null;
         const fullName = r.fullName.trim().replace(/\s+/g, ' ');
         const existing = byKey.get(key);
+        const listNo = r.listNo ?? null;
         if (!existing) {
-          inserts.push({ schoolId, schoolNo: r.schoolNo, fullName, birthDate: r.birthDate, classGroupId });
-        } else if (updateExisting && differs(existing, { fullName, birthDate: r.birthDate, classGroupId })) {
+          inserts.push({ schoolId, schoolNo: r.schoolNo, fullName, birthDate: r.birthDate, classGroupId, listNo });
+        } else if (updateExisting && differs(existing, { fullName, birthDate: r.birthDate, classGroupId, listNo })) {
           await tx
             .update(students)
-            .set({ fullName, birthDate: r.birthDate, classGroupId: classGroupId ?? existing.classGroupId })
+            .set({ fullName, birthDate: r.birthDate, classGroupId: classGroupId ?? existing.classGroupId, listNo: listNo ?? existing.listNo })
             .where(eq(students.id, existing.id));
           updated++;
         } else {
@@ -120,12 +149,12 @@ export async function studentRoutes(app: FastifyInstance) {
 
   /** Excel önizlemesi: hiçbir şey kaydetmeden yeni / güncellenecek / atlanacak satırları gösterir. */
   app.post(`${base}/import/preview`, { ...write, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req) => {
-    const parsed = await parseStudentsWorkbook(await readXlsxUpload(req));
+    const parsed = await readStudentUpload(req);
     const schoolId = req.ctx.schoolId;
     const [classes, current] = await Promise.all([
       loadClasses(db, schoolId),
       db
-        .select({ schoolNo: students.schoolNo, fullName: students.fullName, birthDate: students.birthDate, classGroupId: students.classGroupId })
+        .select({ schoolNo: students.schoolNo, fullName: students.fullName, birthDate: students.birthDate, classGroupId: students.classGroupId, listNo: students.listNo })
         .from(students)
         .where(eq(students.schoolId, schoolId)),
     ]);
@@ -147,7 +176,7 @@ export async function studentRoutes(app: FastifyInstance) {
       const existing = byKey.get(key);
       const status: 'new' | 'update' | 'unchanged' = !existing
         ? 'new'
-        : (r.className && (!cls || cls.id !== existing.classGroupId)) || differs(existing, { fullName: r.fullName, birthDate: r.birthDate, classGroupId: existing.classGroupId })
+        : (r.className && (!cls || cls.id !== existing.classGroupId)) || differs(existing, { fullName: r.fullName, birthDate: r.birthDate, classGroupId: existing.classGroupId, listNo: 'listNo' in r ? (r.listNo as number | null) : null })
           ? 'update'
           : 'unchanged';
       return [{ ...r, status }];

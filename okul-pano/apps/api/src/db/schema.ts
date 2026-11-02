@@ -306,6 +306,8 @@ export const students = pgTable(
     fullName: text('full_name').notNull(),
     classGroupId: uuid('class_group_id').references(() => classGroups.id, { onDelete: 'set null' }),
     birthDate: date('birth_date', { mode: 'string' }).notNull(),
+    /** e-Okul sınıf listesindeki sıra numarası (S.No) */
+    listNo: integer('list_no'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
