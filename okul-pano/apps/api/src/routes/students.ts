@@ -4,7 +4,8 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { audit, schoolGuard } from '../context.ts';
 import type { DB } from '../db/client.ts';
-import { classGroups, students } from '../db/schema.ts';
+import { classGroups, students, teachers } from '../db/schema.ts';
+import { applyAdvisor } from '../lib/advisor.ts';
 import { parse } from '../lib/errors.ts';
 import { exportFileName, sendXlsx } from '../lib/excel.ts';
 import { badRequest } from '../lib/errors.ts';
@@ -89,7 +90,7 @@ export async function studentRoutes(app: FastifyInstance) {
    * aynı okul numaralı öğrenci varsa yeni kayıt açılmaz, adı, sınıfı ve doğum tarihi güncellenir.
    */
   app.post(`${base}/import`, write, async (req) => {
-    const { rows, updateExisting } = parse(studentImportSchema, req.body);
+    const { rows, updateExisting, advisors } = parse(studentImportSchema, req.body);
     const schoolId = req.ctx.schoolId;
 
     const result = await db.transaction(async (tx) => {
@@ -139,7 +140,27 @@ export async function studentRoutes(app: FastifyInstance) {
         }
       }
       for (let i = 0; i < inserts.length; i += 500) await tx.insert(students).values(inserts.slice(i, i + 500));
-      return { created: inserts.length, updated, unchanged, classesCreated: missing.size };
+
+      // Sınıf rehber öğretmenleri (e-Okul'daki "Sınıf Öğretmeni"): kadrodaki adla eşleşenler yazılır
+      let advisorsSet = 0;
+      if (advisors?.length) {
+        const staff = await tx.select({ id: teachers.id, fullName: teachers.fullName }).from(teachers).where(eq(teachers.schoolId, schoolId));
+        const teacherByKey = new Map(staff.map((t) => [normalizeName(t.fullName), t.id]));
+        const current = await tx.select({ id: classGroups.id, advisor: classGroups.advisorTeacherId }).from(classGroups).where(eq(classGroups.schoolId, schoolId));
+        const advisorOf = new Map(current.map((c) => [c.id, c.advisor]));
+        for (const a of advisors) {
+          const cls = classes.byKey.get(classKey(a.className));
+          const teacherId = teacherByKey.get(normalizeName(a.teacherName));
+          if (!cls || !teacherId) continue;
+          const previous = advisorOf.get(cls.id) ?? null;
+          if (previous !== teacherId) {
+            await tx.update(classGroups).set({ advisorTeacherId: teacherId }).where(eq(classGroups.id, cls.id));
+            advisorsSet++;
+          }
+          await applyAdvisor(tx, schoolId, cls.id, teacherId, previous);
+        }
+      }
+      return { created: inserts.length, updated, unchanged, classesCreated: missing.size, ...(advisors?.length ? { advisorsSet } : {}) };
     });
 
     await audit(req, 'create', 'Öğrenci', null, `${result.created} öğrenci eklendi, ${result.updated} güncellendi (toplu)`);
@@ -183,7 +204,24 @@ export async function studentRoutes(app: FastifyInstance) {
     });
 
     issues.sort((a, b) => a.row - b.row);
+    let advisors: { className: string; teacherName: string; match: { id: string; fullName: string } | null; current: string | null }[] = [];
+    const parsedAdvisors = 'advisors' in parsed ? (parsed.advisors as { className: string; teacherName: string }[]) : [];
+    if (parsedAdvisors.length) {
+      const [staff, classRows] = await Promise.all([
+        db.select({ id: teachers.id, fullName: teachers.fullName }).from(teachers).where(eq(teachers.schoolId, schoolId)),
+        db.select({ id: classGroups.id, name: classGroups.name, advisor: classGroups.advisorTeacherId }).from(classGroups).where(eq(classGroups.schoolId, schoolId)),
+      ]);
+      const teacherByKey = new Map(staff.map((t) => [normalizeName(t.fullName), t]));
+      const nameOf = new Map(staff.map((t) => [t.id, t.fullName]));
+      const advisorByClass = new Map(classRows.map((c) => [classKey(c.name), c.advisor]));
+      advisors = parsedAdvisors.map((a) => {
+        const t = teacherByKey.get(normalizeName(a.teacherName));
+        const cur = advisorByClass.get(classKey(a.className));
+        return { ...a, match: t ? { id: t.id, fullName: t.fullName } : null, current: cur ? (nameOf.get(cur) ?? null) : null };
+      });
+    }
     return {
+      advisors,
       sheetName: parsed.sheetName,
       rows,
       issues,

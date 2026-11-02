@@ -86,4 +86,50 @@ describe('öğrenci içe aktarma: sıra no', () => {
     list = (await owner.get(`${base}/students`)).json() as { listNo: number | null }[];
     expect(list[0]!.listNo).toBe(7);
   });
+
+  it('sınıf rehber öğretmeni: e-Okul listesinden yazılır, öğretmensiz rehberlik derslerine geçer, değişince taşınır', async () => {
+    const ayse = (await owner.post(`${base}/teachers`, { fullName: 'Ayşe KAYA' })).json() as { id: string };
+    const mehmet = (await owner.post(`${base}/teachers`, { fullName: 'Mehmet ÖZ' })).json() as { id: string };
+    // Ders programı: rehberlik öğretmensiz (e-Okul'daki gibi), matematik öğretmenli
+    expectStatus(
+      await owner.post(`${base}/timetable/import/eokul/apply`, {
+        createTeachers: false,
+        classes: [
+          {
+            name: 'AMP 9-B',
+            entries: [
+              { weekday: 3, periodNo: 5, subject: 'Rehberlik ve Yönlendirme', teachers: [], group: null },
+              { weekday: 1, periodNo: 1, subject: 'Matematik', teachers: [], group: null },
+            ],
+          },
+        ],
+      }),
+      200,
+    );
+    const row = { schoolNo: '88', fullName: 'Ece TAN', className: 'AMP 9-B', birthDate: '2012-01-02', listNo: 1 };
+    const res = (await owner.post(`${base}/students/import`, { rows: [row], advisors: [{ className: 'AMP 9-B', teacherName: 'AYŞE KAYA' }, { className: 'AMP 9-B', teacherName: 'KADRODA YOK' }] })).json();
+    expect(res).toMatchObject({ advisorsSet: 1 });
+    const cls = ((await owner.get(`${base}/classes`)).json() as { id: string; name: string; advisorTeacherId: string | null }[]).find((c) => c.name === 'AMP 9-B')!;
+    expect(cls.advisorTeacherId).toBe(ayse.id);
+    const tt = async () => (await owner.get(`${base}/timetable`)).json() as { subject: string; teacherId: string | null }[];
+    expect((await tt()).find((e) => e.subject.startsWith('Rehberlik'))!.teacherId).toBe(ayse.id);
+    expect((await tt()).find((e) => e.subject === 'Matematik')!.teacherId).toBeNull();
+
+    // Panelden değiştirilir: rehberlik dersi yeni rehbere geçer; kaldırılınca boşalır
+    expectStatus(await owner.put(`${base}/classes/${cls.id}/advisor`, { teacherId: mehmet.id }), 200);
+    expect((await tt()).find((e) => e.subject.startsWith('Rehberlik'))!.teacherId).toBe(mehmet.id);
+    expectStatus(await owner.put(`${base}/classes/${cls.id}/advisor`, { teacherId: null }), 200);
+    expect((await tt()).find((e) => e.subject.startsWith('Rehberlik'))!.teacherId).toBeNull();
+
+    // Ders programı yeniden yüklenince rehberlik dersine rehber öğretmen yazılır
+    expectStatus(await owner.put(`${base}/classes/${cls.id}/advisor`, { teacherId: ayse.id }), 200);
+    expectStatus(
+      await owner.post(`${base}/timetable/import/eokul/apply`, {
+        createTeachers: false,
+        classes: [{ name: 'AMP 9-B', entries: [{ weekday: 2, periodNo: 3, subject: 'Rehberlik ve Yönlendirme', teachers: [], group: null }] }],
+      }),
+      200,
+    );
+    expect((await tt())[0]!.teacherId).toBe(ayse.id);
+  });
 });

@@ -1,4 +1,5 @@
-import { classBellExemptSchema, classShiftSchema, timetableEntrySchema, WEEKDAY_NAMES } from '@okulpano/shared';
+import { classAdvisorSchema, classBellExemptSchema, classShiftSchema, timetableEntrySchema, WEEKDAY_NAMES } from '@okulpano/shared';
+import { applyAdvisor } from '../lib/advisor.ts';
 import { and, asc, eq, inArray, ne } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -15,6 +16,32 @@ export async function timetableRoutes(app: FastifyInstance) {
   const base = '/api/schools/:schoolId/timetable';
   const t = timetableEntries;
   const write = { preHandler: [app.authenticate, schoolGuard('schedule.manage')] };
+
+  /** Sınıfın rehber öğretmeni; öğretmeni boş (ya da önceki rehbere yazılmış) rehberlik dersleri ona geçer */
+  app.put('/api/schools/:schoolId/classes/:id/advisor', write, async (req) => {
+    const { id } = req.params as { id: string };
+    if (!UUID_RE.test(id)) throw notFound('Sınıf bulunamadı.');
+    const { teacherId } = parse(classAdvisorSchema, req.body);
+    const schoolId = req.ctx.schoolId;
+    const [cls] = await db
+      .select({ name: classGroups.name, advisor: classGroups.advisorTeacherId })
+      .from(classGroups)
+      .where(and(eq(classGroups.id, id), eq(classGroups.schoolId, schoolId)));
+    if (!cls) throw notFound('Sınıf bulunamadı.');
+    let teacherName: string | null = null;
+    if (teacherId) {
+      const [t] = await db.select({ fullName: teachers.fullName }).from(teachers).where(and(eq(teachers.id, teacherId), eq(teachers.schoolId, schoolId)));
+      if (!t) throw badRequest('Öğretmen bu okulun kadrosunda değil.');
+      teacherName = t.fullName;
+    }
+    await db.transaction(async (tx) => {
+      await tx.update(classGroups).set({ advisorTeacherId: teacherId, updatedAt: new Date() }).where(eq(classGroups.id, id));
+      await applyAdvisor(tx, schoolId, id, teacherId, cls.advisor);
+    });
+    await audit(req, 'update', 'Sınıf', id, `${cls.name} rehber öğretmeni: ${teacherName ?? 'yok'}`);
+    bus.contentChanged(schoolId);
+    return { ok: true };
+  });
 
   /** İkili öğretim: seçili sınıfların vardiyası (sabahçı / öğlenci) */
   app.post('/api/schools/:schoolId/classes/shift', write, async (req) => {

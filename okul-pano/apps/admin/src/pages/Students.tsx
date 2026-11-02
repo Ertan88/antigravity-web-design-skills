@@ -65,17 +65,47 @@ function studentImportMessage(res: { created: number; updated: number; classesCr
   return parts.join(', ');
 }
 
+type Advisor = { className: string; teacherName: string; match: { id: string; fullName: string } | null; current: string | null };
+const advisorChanges = (list: Advisor[] | undefined) => (list ?? []).filter((a) => a.match && a.current !== a.match.fullName).length;
+
+/** e-Okul listesindeki sınıf öğretmenleri: sınıfların rehber öğretmeni olarak yazılır */
+function AdvisorOption({ advisors, checked, onChange }: { advisors: Advisor[]; checked: boolean; onChange: (v: boolean) => void }) {
+  const unmatched = advisors.filter((a) => !a.match);
+  const changes = advisorChanges(advisors);
+  return (
+    <div className="space-y-2 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+      <Toggle
+        checked={checked}
+        onChange={onChange}
+        label={`Sınıf rehber öğretmenlerini yaz (${advisors.length - unmatched.length} sınıf${changes ? `, ${changes} değişiklik` : ', değişiklik yok'})`}
+        description="e-Okul'daki sınıf öğretmeni, sınıfın rehber öğretmeni olur; öğretmeni boş rehberlik dersleri bu öğretmene yazılır."
+      />
+      <div className="flex flex-wrap gap-1.5 pl-1 text-xs">
+        {advisors.map((a) => (
+          <span
+            key={a.className}
+            title={a.current && a.match && a.current !== a.match.fullName ? `Şu an: ${a.current}` : undefined}
+            className={a.match ? 'rounded-full bg-surface px-2.5 py-0.5 ring-1 ring-slate-200' : 'rounded-full bg-amber-50 px-2.5 py-0.5 text-amber-800 ring-1 ring-amber-200'}
+          >
+            <b>{a.className}</b> · {a.match?.fullName ?? `${a.teacherName} (kadroda yok)`}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 type ExcelRow = { schoolNo: string; fullName: string; className: string | null; birthDate: string; listNo?: number | null };
 
 function ExcelImport({ file, onClose }: { file: File | null; onClose: () => void }) {
   const basePath = useSchoolPath('students');
   return (
-    <ExcelImportDialog<ExcelRow, ImportPreview<ExcelRow> & { additions: { label: string; values: string[] }[] }, { updateExisting: boolean }>
+    <ExcelImportDialog<ExcelRow, ImportPreview<ExcelRow> & { additions: { label: string; values: string[] }[]; advisors?: Advisor[] }, { updateExisting: boolean; advisors: boolean }>
       file={file}
       onClose={onClose}
       basePath={basePath}
       invalidate={['students', 'classes']}
-      initialOptions={{ updateExisting: true }}
+      initialOptions={{ updateExisting: true, advisors: true }}
       columns={[
         { header: 'S.No', cell: (r) => <span className="text-slate-500 tabular-nums">{r.listNo ?? '—'}</span> },
         { header: 'Okul no', cell: (r) => <span className="font-semibold tabular-nums">{r.schoolNo}</span> },
@@ -90,21 +120,25 @@ function ExcelImport({ file, onClose }: { file: File | null; onClose: () => void
         { label: 'Atlanacak satır', value: p.totals.skipped, tone: p.totals.skipped ? 'amber' : 'slate' },
       ]}
       additions={(p) => p.additions}
-      renderOptions={(p, o, set) =>
-        p.totals.update > 0 && (
-          <Toggle
-            checked={o.updateExisting}
-            onChange={(v) => set({ updateExisting: v })}
-            label="Kayıtlı öğrencilerin bilgilerini güncelle"
-            description="Yeni dönemde sınıf atlayan öğrenciler için açık bırakın. Öğrenci okul numarasıyla tanınır; adı, sınıfı, sıra numarası ve doğum tarihi dosyadakiyle güncellenir."
-          />
-        )
-      }
+      renderOptions={(p, o, set) => (
+        <>
+          {p.totals.update > 0 && (
+            <Toggle
+              checked={o.updateExisting}
+              onChange={(v) => set({ ...o, updateExisting: v })}
+              label="Kayıtlı öğrencilerin bilgilerini güncelle"
+              description="Yeni dönemde sınıf atlayan öğrenciler için açık bırakın. Öğrenci okul numarasıyla tanınır; adı, sınıfı, sıra numarası ve doğum tarihi dosyadakiyle güncellenir."
+            />
+          )}
+          {(p.advisors?.length ?? 0) > 0 && <AdvisorOption advisors={p.advisors!} checked={o.advisors} onChange={(v) => set({ ...o, advisors: v })} />}
+        </>
+      )}
       rowStatus={(r, o) => (r.status === 'update' && !o.updateExisting ? 'unchanged' : r.status)}
-      commitCount={(p, o) => p.totals.new + (o.updateExisting ? p.totals.update : 0)}
-      commitLabel={(n) => `${n} öğrenciyi kaydet`}
+      commitCount={(p, o) => p.totals.new + (o.updateExisting ? p.totals.update : 0) + (o.advisors ? advisorChanges(p.advisors) : 0)}
+      commitLabel={(n) => `${n} değişikliği kaydet`}
       commitBody={(p, o) => ({
         updateExisting: o.updateExisting,
+        advisors: o.advisors ? (p.advisors ?? []).filter((a) => a.match).map(({ className, teacherName }) => ({ className, teacherName })) : undefined,
         rows: p.rows.map(({ schoolNo, fullName, className, birthDate, listNo }) => ({ schoolNo, fullName, className, birthDate, listNo: listNo ?? null })),
       })}
       successMessage={studentImportMessage}

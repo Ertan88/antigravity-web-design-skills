@@ -77,6 +77,8 @@ export interface ClassGroup extends Base {
   bellExempt: boolean;
   /** İkili öğretimde vardiyası (boş: sabahçı) */
   shift: 'morning' | 'afternoon' | null;
+  /** Sınıf rehber öğretmeni */
+  advisorTeacherId: string | null;
 }
 export interface Duty extends Base {
   /** YYYY-AA */

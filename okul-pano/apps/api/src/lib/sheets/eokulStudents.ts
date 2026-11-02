@@ -137,5 +137,6 @@ export async function parseClassListPdf(data: Uint8Array) {
   }
   const issues = lists.flatMap((l, i) => (l ? [] : [{ row: 0, message: `${i + 1}. sayfa okunamadı` }]));
   const rows = found.flatMap((l) => l.students).map((s, i) => ({ row: i + 1, schoolNo: s.schoolNo, fullName: s.fullName, className: s.className, birthDate: s.birthDate, listNo: s.listNo }));
-  return { sheetName: `e-Okul sınıf listesi · ${found.length} sınıf`, rows, issues };
+  const advisors = [...new Map(found.filter((l) => l.teacher).map((l) => [l.className, { className: l.className, teacherName: l.teacher! }])).values()];
+  return { sheetName: `e-Okul sınıf listesi · ${found.length} sınıf`, rows, issues, advisors };
 }

@@ -218,6 +218,13 @@
       "when": 1794800000000,
       "tag": "0030_student_list_no",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1794900000000,
+      "tag": "0031_class_advisor",
+      "breakpoints": true
     }
   ]
 }

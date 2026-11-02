@@ -4,6 +4,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { audit, schoolGuard } from '../context.ts';
 import { bellSchedules, classGroups, schools, teachers, timetableEntries } from '../db/schema.ts';
+import { fillGuidanceLessons } from '../lib/advisor.ts';
 import { badRequest, parse } from '../lib/errors.ts';
 import { buildClasses, isSpecialEducation, parseEokulPage, readPdfPages, teacherDisplayName, teacherKey, timesToPeriods, type EokulPage } from '../lib/sheets/eokul.ts';
 
@@ -262,6 +263,8 @@ export async function timetableImportRoutes(app: FastifyInstance) {
         }),
       );
       for (let i = 0; i < rows.length; i += 500) await tx.insert(timetableEntries).values(rows.slice(i, i + 500));
+      // e-Okul rehberlik derslerine çoğu zaman öğretmen yazmaz: sınıfın rehber öğretmeni yazılır
+      await fillGuidanceLessons(tx, schoolId);
       return { classesCreated, teachersCreated, entries: rows.length, bellsUpdated, exempt: exemptIds.length };
     });
     await audit(req, 'update', 'Ders programı', null, `e-Okul PDF'inden yüklendi: ${body.classes.length} sınıf, ${result.entries} kayıt`);

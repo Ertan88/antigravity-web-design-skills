@@ -243,7 +243,7 @@ export function Timetable() {
             </Card>
           ) : (
         <Card>
-          <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-3 sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-3 sm:flex-row sm:flex-wrap sm:items-center [&>*:first-child]:shrink-0">
             <Segmented
               value={mode}
               onChange={setMode}
@@ -274,7 +274,14 @@ export function Timetable() {
                 ))}
               </Select>
             )}
-            <span className="text-xs text-slate-500 tabular-nums">{hourCount} ders saati</span>
+            {mode === 'class' && activeClass && (
+              <AdvisorSelect
+                classGroup={(classes.data ?? []).find((c) => c.id === activeClass)}
+                teachers={sortedTeachers}
+                editable={editable}
+              />
+            )}
+            <span className="text-xs whitespace-nowrap text-slate-500 tabular-nums">{hourCount} ders saati</span>
             {editable && hourCount > 0 && (
               <Button
                 variant="ghost"
@@ -493,4 +500,41 @@ function teacherLines(list: TimetableEntry[], classNames: Map<string, string>) {
     line.names.push(classNames.get(e.classGroupId) ?? '');
   }
   return [...lines.values()].map((l) => ({ ...l, className: joinClassNames(l.names.filter(Boolean)) }));
+}
+
+/** Sınıfın rehber öğretmeni: değişince öğretmeni boş rehberlik dersleri ona yazılır */
+function AdvisorSelect({ classGroup, teachers, editable }: { classGroup: ClassGroup | undefined; teachers: Teacher[]; editable: boolean }) {
+  const { schoolId } = useAuth();
+  const path = useSchoolPath('classes');
+  const qc = useQueryClient();
+  const toast = useToast();
+  const save = useMutation({
+    mutationFn: (teacherId: string | null) => api(`${path}/${classGroup!.id}/advisor`, { method: 'PUT', body: { teacherId } }),
+    onSuccess: (_d, teacherId) => {
+      void qc.invalidateQueries({ queryKey: [schoolId, 'classes'] });
+      void qc.invalidateQueries({ queryKey: [schoolId, 'timetable'] });
+      toast.success(teacherId ? 'Rehber öğretmen kaydedildi' : 'Rehber öğretmen kaldırıldı');
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  if (!classGroup) return null;
+  return (
+    <label className="flex items-center gap-2 text-xs font-semibold whitespace-nowrap text-slate-500">
+      Rehber öğretmeni
+      <Select
+        value={classGroup.advisorTeacherId ?? ''}
+        disabled={!editable || save.isPending}
+        onChange={(e) => save.mutate(e.target.value || null)}
+        className="h-9 w-48 text-sm font-medium"
+        aria-label="Rehber öğretmeni"
+      >
+        <option value="">Seçilmedi</option>
+        {teachers.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.fullName}
+          </option>
+        ))}
+      </Select>
+    </label>
+  );
 }

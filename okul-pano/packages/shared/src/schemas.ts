@@ -430,6 +430,9 @@ export const classGroupSchema = z.object({
   shift: z.enum(['morning', 'afternoon']).nullable().optional(),
 });
 
+/** Sınıfın rehber öğretmeni (boş: yok) */
+export const classAdvisorSchema = z.object({ teacherId: id.nullable() });
+
 /** İkili öğretim: seçili sınıfların vardiyası */
 export const classShiftSchema = z.object({
   classIds: z.array(id).max(300),
@@ -529,6 +532,8 @@ export const studentImportSchema = z.object({
     )
     .min(1, 'İçe aktarılacak satır yok')
     .max(5000, 'Tek seferde en fazla 5000 öğrenci aktarılabilir'),
+  /** e-Okul sınıf listesindeki sınıf öğretmenleri: sınıfın rehber öğretmeni olarak yazılır (kadrodaki adla eşleşir) */
+  advisors: z.array(z.object({ className: required('Sınıf', 20), teacherName: required('Öğretmen', 120) })).max(500).optional(),
   /** Aynı okul numaralı öğrenci varsa adı, sınıfı ve doğum tarihi güncellenir; kapalıysa dokunulmaz */
   updateExisting: z.boolean().default(true),
 });

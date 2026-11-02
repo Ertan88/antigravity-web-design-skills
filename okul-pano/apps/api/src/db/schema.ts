@@ -162,6 +162,8 @@ export const classGroups = pgTable(
     name: text('name').notNull(),
     /** Okul düzeyi (gözlem kriter şablonu için); boşsa sınıf adından anlaşılır (9-A → lise) */
     level: text('level').$type<SchoolLevel>(),
+    /** Sınıf rehber öğretmeni (e-Okul'daki "Sınıf Öğretmeni"); öğretmeni boş rehberlik dersleri ona yazılır */
+    advisorTeacherId: uuid('advisor_teacher_id').references((): AnyPgColumn => teachers.id, { onDelete: 'set null' }),
     /** Zil hesabına katılmaz: günün ders sayısını belirlemez (ör. özel eğitim sınıfı) */
     bellExempt: boolean('bell_exempt').notNull().default(false),
     /** İkili öğretimde vardiyası: "morning" | "afternoon" (boş: sabahçı) */
