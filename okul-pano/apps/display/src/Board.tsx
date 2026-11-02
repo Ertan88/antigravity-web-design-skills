@@ -4,6 +4,7 @@ import {
   addIsoDays,
   nextSchoolDay,
   boardBell,
+  shortClassLabeler,
   classShift,
   lessonCounts,
   lessonsNow,
@@ -123,7 +124,12 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
   const substitutes = new Map((state.dutySubstitutions ?? []).filter((x) => x.date === today.isoDate).map((x) => [x.dutyId, x.teacherName]));
   const duties = state.duties.filter((d) => d.weekday === today.weekday).map((d) => (substitutes.has(d.id) ? { ...d, teacherName: substitutes.get(d.id)! } : d));
   const leaves = state.leaves.filter((l) => l.startDate <= today.isoDate && l.endDate >= today.isoDate);
-  const birthdays = state.birthdays.filter((b) => isBirthdayToday(b.monthDay, today));
+  // Panoda kısa sınıf adı: "9/B"; okulda başka program varsa onunkiler önekiyle ("ATP 9/A")
+  const shortClass = shortClassLabeler(
+    state.classes?.length ? state.classes.map((c) => c.name) : [...new Set(state.timetable.map((e) => e.className))],
+  );
+  const withShort = <T extends { className: string | null }>(x: T): T => (x.className ? { ...x, className: shortClass(x.className) } : x);
+  const birthdays = state.birthdays.filter((b) => isBirthdayToday(b.monthDay, today)).map(withShort);
 
   // Okul günü: tam gün tatilde zil çalmaz; arifede (yarım gün) dersler halfDayEnd saatinde biter.
   // Tek zil, günün ders sayısına göre (o gün en geç biten sınıfın son dersi); ikili öğretimde her vardiyanın kendi zili
@@ -145,14 +151,14 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
   const bell = periods ? computeBellStatus(periods, today.secondsOfDay, s.lunchThresholdMin) : ({ kind: 'off' } as const);
   const lessonPeriod = bell.kind === 'lesson' ? bell.period : bell.kind === 'break' || bell.kind === 'before' ? bell.next : null;
   // O ders saatinde dersi olan sınıflar (dersleri bitmiş sınıflar listelenmez)
-  const lessons = day.holiday ? [] : lessonsNow(timetable, today.isoDate, calendar, classInfo, dual, today.secondsOfDay, s.lunchThresholdMin);
+  const lessons = (day.holiday ? [] : lessonsNow(timetable, today.isoDate, calendar, classInfo, dual, today.secondsOfDay, s.lunchThresholdMin)).map(withShort);
   // Dersler bitince ya da tatilde: sonraki ders günü (bayram, hafta sonu ve köprü tatili atlanır)
   const nextDay = bell.kind === 'after' || bell.kind === 'off' ? nextSchoolDay(today.isoDate, calendar) : null;
   const nextFirst = nextDay?.periods[0] ?? null;
   const shiftOf = new Map(classInfo.map((c) => [c.id, classShift(c, dual)]));
   const nextLessons =
     nextDay && nextFirst
-      ? timetable.filter((e) => e.weekday === nextDay.weekday && e.periodNo === nextFirst.no && (shiftOf.get(e.classId ?? '') ?? 'morning') === 'morning')
+      ? timetable.filter((e) => e.weekday === nextDay.weekday && e.periodNo === nextFirst.no && (shiftOf.get(e.classId ?? '') ?? 'morning') === 'morning').map(withShort)
       : [];
   const tomorrow = schoolDay(addIsoDays(today.isoDate, 1), calendar);
   const nextLabel = nextDay ? (nextDay.date === tomorrow.date ? 'Yarın' : dayLabel(nextDay.date)) : '';
@@ -174,7 +180,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
 
 
   // Okul hayatı kartları
-  const achievementsLive = (state.achievements ?? []).filter((a) => isWithinWindow(nowMs, a.startsAt, a.endsAt));
+  const achievementsLive = (state.achievements ?? []).filter((a) => isWithinWindow(nowMs, a.startsAt, a.endsAt)).map(withShort);
   // Her başarı için ayrı seçim: Başarılar kartında ve / veya duyuru alanında
   const achievementsNow = achievementsLive.filter((a) => a.showCard !== false);
   const book = (state.books ?? []).find((b) => isWithinWindow(nowMs, b.startsAt, b.endsAt)) ?? null;

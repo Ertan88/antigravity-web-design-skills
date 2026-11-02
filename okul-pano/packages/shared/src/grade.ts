@@ -68,3 +68,52 @@ export function joinClassNames(names: string[]): string {
     })
     .join(', ');
 }
+
+/** "AMP 10-C" → { program: "AMP", grade: 10, section: "C" }; tanınmayan ad için null */
+export function parseClassName(name: string): { program: string | null; grade: number; section: string } | null {
+  const m = /^(?:([A-Za-zÇĞİÖŞÜçğıöşü]{2,6})\s+)?(\d{1,2})\s*[-/]\s*(\S+)$/u.exec(name.trim());
+  return m ? { program: m[1] ? m[1].toLocaleUpperCase('tr-TR') : null, grade: Number(m[2]), section: m[3]! } : null;
+}
+
+/**
+ * Uzun sınıf adı (e-Okul'daki gibi): "AMP 10-C" → "AMP 10. Sınıf / C Şubesi". Aynı saatte birleştirilmiş sınıflar:
+ * ["AMP 11-A", "AMP 11-C"] → "AMP 11. Sınıf / A, C Şubeleri". Tanınmayan adlar olduğu gibi kalır.
+ */
+export function classLongName(names: string | string[]): string {
+  const list = [...new Set((Array.isArray(names) ? names : [names]).map((n) => n.trim()))].sort(compareClassNames);
+  const groups = new Map<string, { head: string; sections: string[] }>();
+  const other: string[] = [];
+  for (const n of list) {
+    const p = parseClassName(n);
+    if (!p) {
+      other.push(n);
+      continue;
+    }
+    const head = `${p.program ? `${p.program} ` : ''}${p.grade}. Sınıf`;
+    const g = groups.get(head) ?? { head, sections: [] };
+    g.sections.push(p.section);
+    groups.set(head, g);
+  }
+  return [
+    ...[...groups.values()].map((g) => `${g.head} / ${g.sections.sort((a, b) => a.localeCompare(b, 'tr')).join(', ')} ${g.sections.length > 1 ? 'Şubeleri' : 'Şubesi'}`),
+    ...other,
+  ].join(' · ');
+}
+
+/**
+ * Pano için kısa sınıf adı: "9/B". Okulda birden fazla program varsa (AMP, ATP) en çok sınıfı olan programın öneki
+ * yazılmaz, diğerleri önekiyle ayrılır: "9/A" ve "ATP 9/A". Hangi programın yazılmayacağı okulun sınıflarından çıkar.
+ */
+export function shortClassLabeler(allNames: readonly string[]): (name: string) => string {
+  const count = new Map<string, number>();
+  for (const n of allNames) {
+    const p = parseClassName(n)?.program;
+    if (p) count.set(p, (count.get(p) ?? 0) + 1);
+  }
+  const main = [...count].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  return (name: string) => {
+    const p = parseClassName(name);
+    if (!p) return name;
+    return `${p.program && p.program !== main ? `${p.program} ` : ''}${p.grade}/${p.section}`;
+  };
+}

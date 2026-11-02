@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareClassNames, gradeHue, gradeOf, joinClassNames } from './grade.ts';
+import { classLongName, compareClassNames, gradeHue, gradeOf, joinClassNames, shortClassLabeler } from './grade.ts';
 
 describe('sınıf kademesi', () => {
   it('aynı kademedeki şubeler aynı renktedir', () => {
@@ -23,5 +23,20 @@ describe('joinClassNames', () => {
     expect(joinClassNames(['AMP 10-T', 'ATP 10-A', 'AMP 10-C'])).toBe('AMP 10-CT, ATP 10-A');
     expect(joinClassNames(['9-A'])).toBe('9-A');
     expect(joinClassNames(['Hazırlık', '9-B', '9-A'])).toBe('9-AB, Hazırlık');
+  });
+});
+
+describe('sınıf adı biçimleri', () => {
+  it('uzun ad ve birleştirilmiş sınıflar', () => {
+    expect(classLongName('AMP 10-C')).toBe('AMP 10. Sınıf / C Şubesi');
+    expect(classLongName(['AMP 11-M', 'AMP 11-A'])).toBe('AMP 11. Sınıf / A, M Şubeleri');
+    expect(classLongName('9-A')).toBe('9. Sınıf / A Şubesi');
+    expect(classLongName('Hazırlık')).toBe('Hazırlık');
+  });
+  it('panoda kısa ad: baskın programın öneki yazılmaz', () => {
+    const short = shortClassLabeler(['AMP 9-A', 'AMP 9-B', 'AMP 10-A', 'ATP 9-A']);
+    expect(short('AMP 9-B')).toBe('9/B');
+    expect(short('ATP 9-A')).toBe('ATP 9/A');
+    expect(shortClassLabeler(['9-A', '10-B'])('10-B')).toBe('10/B');
   });
 });

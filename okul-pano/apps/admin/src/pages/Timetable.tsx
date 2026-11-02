@@ -1,4 +1,4 @@
-import { compareClassNames, gradeOf, joinClassNames, timetableEntrySchema, WEEKDAY_NAMES, WEEKDAY_SHORT, type Period } from '@okulpano/shared';
+import { classLongName, compareClassNames, gradeOf, timetableEntrySchema, WEEKDAY_NAMES, WEEKDAY_SHORT, type Period } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { CalendarClock, FileUp, Pencil, Plus, Trash2, Users } from 'lucide-react';
@@ -358,10 +358,12 @@ export function Timetable() {
                               ) : (
                                 teacherLines(list, classNames).map((l) => (
                                   <div key={l.key} className="min-w-0">
-                                    <div className="line-clamp-1 font-semibold text-ink">{l.className}</div>
-                                    <div className="line-clamp-2 text-xs leading-snug break-words text-slate-500" title={l.subject}>
+                                    <div className="line-clamp-3 leading-snug font-semibold break-words text-ink" title={l.subject}>
                                       {l.group ? `${l.group}: ` : ''}
                                       {l.subject}
+                                    </div>
+                                    <div className="line-clamp-2 text-xs leading-snug break-words text-slate-500" title={l.className}>
+                                      {l.className}
                                     </div>
                                   </div>
                                 ))
@@ -499,7 +501,8 @@ function teacherLines(list: TimetableEntry[], classNames: Map<string, string>) {
     if (!line) lines.set(key, (line = { key, group: e.groupLabel, subject: e.subject, names: [] }));
     line.names.push(classNames.get(e.classGroupId) ?? '');
   }
-  return [...lines.values()].map((l) => ({ ...l, className: joinClassNames(l.names.filter(Boolean)) }));
+  // "AMP 10. Sınıf / C Şubesi"; birleştirilmiş sınıflar "AMP 11. Sınıf / A, C, M Şubeleri"
+  return [...lines.values()].map((l) => ({ ...l, className: classLongName(l.names.filter(Boolean)) }));
 }
 
 /** Sınıfın rehber öğretmeni: değişince öğretmeni boş rehberlik dersleri ona yazılır */
