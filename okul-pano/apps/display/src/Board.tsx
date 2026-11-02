@@ -3,6 +3,7 @@ import {
   announcementOnAir,
   addIsoDays,
   nextSchoolDay,
+  lessonsNow,
   schoolDay,
   isSleepTime,
   quoteOfDay,
@@ -127,11 +128,10 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
   const periods = day.periods.length ? day.periods : null;
   const bell = periods ? computeBellStatus(periods, today.secondsOfDay, s.lunchThresholdMin) : ({ kind: 'off' } as const);
   const lessonPeriod = bell.kind === 'lesson' ? bell.period : bell.kind === 'break' || bell.kind === 'before' ? bell.next : null;
-  const lessons = lessonPeriod
-    ? state.timetable.filter((e) => e.weekday === today.weekday && e.periodNo === lessonPeriod.no)
-    : [];
+  // Her sınıf kendi zilini izler: okulun dersleri bitse de ek ders saatindeki sınıflar (ör. salı 11. sınıflar) görünür
+  const lessons = day.holiday ? [] : lessonsNow(state.timetable, today.isoDate, calendar, today.secondsOfDay, s.lunchThresholdMin);
   // Dersler bitince ya da tatilde: sonraki ders günü (bayram, hafta sonu ve köprü tatili atlanır)
-  const nextDay = bell.kind === 'after' || bell.kind === 'off' ? nextSchoolDay(today.isoDate, calendar) : null;
+  const nextDay = (bell.kind === 'after' || bell.kind === 'off') && !lessons.length ? nextSchoolDay(today.isoDate, calendar) : null;
   const nextFirst = nextDay?.periods[0] ?? null;
   const nextLessons = nextDay && nextFirst ? state.timetable.filter((e) => e.weekday === nextDay.weekday && e.periodNo === nextFirst.no) : [];
   const tomorrow = schoolDay(addIsoDays(today.isoDate, 1), calendar);
@@ -232,12 +232,14 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
       case 'bell':
         return <BellCard key={m} status={bell} day={bellDay} />;
       case 'lessons':
-        return lessonPeriod ? (
+        return lessonPeriod || lessons.length ? (
           <LessonsCard
             key={m}
             entries={lessons}
-            heading={bell.kind === 'lesson' ? 'Şu An Derste' : 'Sıradaki Ders'}
-            periodTitle={bell.kind === 'lesson' ? periodLabel(lessonPeriod) : `${periodLabel(lessonPeriod)} · ${lessonPeriod.start}`}
+            heading={bell.kind === 'lesson' || !lessonPeriod ? 'Şu An Derste' : 'Sıradaki Ders'}
+            periodTitle={
+              !lessonPeriod ? 'Ek ders saati' : bell.kind === 'lesson' ? periodLabel(lessonPeriod) : `${periodLabel(lessonPeriod)} · ${lessonPeriod.start}`
+            }
           />
         ) : nextFirst && nextLessons.length ? (
           // Dersler bitti ya da tatil: sonraki ders gününün ilk dersi (tarihiyle)
@@ -288,7 +290,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
       case 'bell':
         return true;
       case 'lessons':
-        return Boolean(lessonPeriod) || nextLessons.length > 0;
+        return Boolean(lessonPeriod) || lessons.length > 0 || nextLessons.length > 0;
       case 'achievements':
         return achievementsNow.length > 0;
       case 'events':

@@ -30,7 +30,7 @@ export interface MeToday {
   /** Arifeler (yarım gün): dersler halfDayEnd saatinde biter */
   halfDays?: { date: string; name: string }[];
   halfDayEnd?: string;
-  lessons: { weekday: number; periodNo: number; className: string; subject: string }[];
+  lessons: { weekday: number; periodNo: number; className: string; classId?: string; subject: string }[];
   leaves: { id: string; startDate: string; endDate: string; note: string | null; status: 'approved' | 'pending' | 'rejected' }[];
   week: {
     date: string;

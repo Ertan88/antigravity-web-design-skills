@@ -1,4 +1,4 @@
-import { pickSchedule, sortPeriods, type BellScheduleLike, type Period } from './bell.ts';
+import { computeBellStatus, pickSchedule, sortPeriods, type BellClassRef, type BellScheduleLike, type Period } from './bell.ts';
 import { formatClock, parseClock } from './time.ts';
 
 /**
@@ -62,12 +62,12 @@ export interface SchoolCalendar<T extends BellScheduleLike = BellScheduleLike> {
   halfDayEnd?: string;
 }
 
-/** Bir günün okul planı: tatil mi, yarım gün mü, hangi ders saatleri çalar */
-export function schoolDay(date: string, cal: SchoolCalendar): SchoolDay {
+/** Bir günün okul planı: tatil mi, yarım gün mü, hangi ders saatleri çalar (sınıf verilirse o sınıfın zili) */
+export function schoolDay(date: string, cal: SchoolCalendar, cls?: BellClassRef | null): SchoolDay {
   const weekday = isoWeekday(date);
   const holiday = cal.holidays.find((h) => h.date === date)?.name ?? null;
   const halfDay = holiday ? null : (cal.halfDays.find((h) => h.date === date)?.name ?? null);
-  const schedule = holiday ? null : pickSchedule(cal.schedules, weekday);
+  const schedule = holiday ? null : pickSchedule(cal.schedules, weekday, cls);
   const end = cal.halfDayEnd || HALF_DAY_END_DEFAULT;
   const periods = schedule ? (halfDay ? halfDayPeriods(schedule.periods, end) : sortPeriods(schedule.periods)) : [];
   return { date, weekday, holiday, halfDay, periods, endsAt: halfDay ? end : null };
@@ -117,6 +117,34 @@ export function bridgeDays(from: string, to: string, holidays: readonly DayHolid
     }
     // Uzun iş günü dizisinin geri kalanını atla
     while (d <= stop && !off(d)) d = addIsoDays(d, 1);
+  }
+  return out;
+}
+
+/**
+ * Şu an (ya da teneffüste / ilk dersten önce sıradaki) derste olan kayıtlar; her sınıf kendi zilini izler
+ * (ör. salı 11. sınıfların farklı ders saatleri). Okulun dersleri bitmiş olsa da ek ders saatindeki sınıflar döner.
+ */
+export function lessonsNow<E extends { weekday: number; periodNo: number; className: string; classId?: string | null }>(
+  entries: readonly E[],
+  date: string,
+  cal: SchoolCalendar,
+  secondsOfDay: number,
+  lunchThresholdMin = 30,
+): E[] {
+  const weekday = isoWeekday(date);
+  const today = entries.filter((e) => e.weekday === weekday);
+  const periodOf = new Map<string, number | null>();
+  const out: E[] = [];
+  for (const e of today) {
+    const key = e.classId ?? e.className;
+    if (!periodOf.has(key)) {
+      const day = schoolDay(date, cal, { id: e.classId, name: e.className });
+      const bell = day.periods.length ? computeBellStatus(day.periods, secondsOfDay, lunchThresholdMin) : null;
+      const p = !bell ? null : bell.kind === 'lesson' ? bell.period : bell.kind === 'break' || bell.kind === 'before' ? bell.next : null;
+      periodOf.set(key, p?.no ?? null);
+    }
+    if (periodOf.get(key) === e.periodNo) out.push(e);
   }
   return out;
 }

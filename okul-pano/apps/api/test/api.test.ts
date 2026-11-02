@@ -197,6 +197,18 @@ describe('içerik doğrulama', () => {
     expect(res.json().message).toMatch(/çakışıyor/);
   });
 
+  it('düzeye özel zil çizelgesi kaydeder', async () => {
+    const c = client(t.app, ownerToken);
+    const body = { name: 'Salı · 11. sınıflar', weekdays: [2], grades: [11], periods: [{ no: 1, start: '08:00', end: '08:40' }] };
+    const res = await c.post(`/api/schools/${schoolA}/bell-schedules`, body);
+    expect(res.statusCode).toBeLessThan(300);
+    const created = res.json();
+    expect(created).toMatchObject({ grades: [11], classIds: [] });
+    const list = (await c.get(`/api/schools/${schoolA}/bell-schedules`)).json();
+    expect(list.find((x: { id: string }) => x.id === created.id)).toMatchObject({ grades: [11] });
+    expect((await c.del(`/api/schools/${schoolA}/bell-schedules/${created.id}`)).statusCode).toBeLessThan(300);
+  });
+
   it('aynı öğretmeni aynı saatte iki sınıfa yazmaz', async () => {
     const c = client(t.app, ownerToken);
     const teacher = (await c.post(`/api/schools/${schoolA}/teachers`, { fullName: 'Kemal Tunç', branch: 'Matematik' })).json();

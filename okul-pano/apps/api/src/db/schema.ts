@@ -539,6 +539,9 @@ export const bellSchedules = pgTable(
     name: text('name').notNull(),
     weekdays: jsonb('weekdays').$type<number[]>().notNull(),
     periods: jsonb('periods').$type<Period[]>().notNull(),
+    /** Yalnızca bu düzeylere / sınıflara uygulanır; ikisi de boşsa bütün okul */
+    grades: jsonb('grades').$type<number[]>().notNull().default([]),
+    classIds: jsonb('class_ids').$type<string[]>().notNull().default([]),
     sortOrder: sortOrder(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

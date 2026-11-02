@@ -25,18 +25,23 @@ export function teacherDay(data: MeToday, date: Date): TeacherDay {
   const day = schoolDay(now.isoDate, { schedules: data.bellSchedules, holidays: data.holidays, halfDays: data.halfDays ?? [], halfDayEnd: data.halfDayEnd });
   const { holiday, halfDay, endsAt, periods } = day;
   const bell: BellStatus = periods.length ? computeBellStatus(periods, now.secondsOfDay, data.lunchThresholdMin) : { kind: 'off' };
-  const currentNo = bell.kind === 'lesson' ? bell.period.no : null;
-  const nextNo = bell.kind === 'lesson' ? (bell.next?.no ?? null) : bell.kind === 'break' || bell.kind === 'before' ? bell.next.no : null;
+  // Her ders kendi sınıfının zilini izler (ör. salı 11. sınıfların farklı ders saatleri)
+  const cal = { schedules: data.bellSchedules, holidays: data.holidays, halfDays: data.halfDays ?? [], halfDayEnd: data.halfDayEnd };
   const byNo = new Map(periods.map((p) => [p.no, p]));
+  const scoped = data.bellSchedules.some((s) => (s.grades ?? []).length || (s.classIds ?? []).length);
   let seenNext = false;
   const lessons = data.lessons
-    .filter((l) => l.weekday === now.weekday && byNo.has(l.periodNo))
-    .sort((a, b) => a.periodNo - b.periodNo)
-    .map((l) => {
-      const period = byNo.get(l.periodNo)!;
-      const ended = toSec(period.end) <= now.secondsOfDay;
-      let state: 'past' | 'now' | 'next' | 'later' = ended ? 'past' : l.periodNo === currentNo ? 'now' : 'later';
-      if (state === 'later' && !seenNext && (nextNo === null || l.periodNo >= nextNo)) {
+    .filter((l) => l.weekday === now.weekday)
+    .flatMap((l) => {
+      const period = scoped ? schoolDay(now.isoDate, cal, { id: l.classId, name: l.className }).periods.find((p) => p.no === l.periodNo) : byNo.get(l.periodNo);
+      return period ? [{ l, period }] : [];
+    })
+    .sort((a, b) => toSec(a.period.start) - toSec(b.period.start))
+    .map(({ l, period }) => {
+      const start = toSec(period.start);
+      const end = toSec(period.end);
+      let state: 'past' | 'now' | 'next' | 'later' = end <= now.secondsOfDay ? 'past' : start <= now.secondsOfDay ? 'now' : 'later';
+      if (state === 'later' && !seenNext) {
         state = 'next';
         seenNext = true;
       }

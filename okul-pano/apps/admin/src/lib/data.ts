@@ -102,6 +102,9 @@ export interface BellSchedule extends Base {
   weekdays: number[];
   periods: Period[];
   sortOrder: number;
+  /** Yalnızca bu düzeylere / sınıflara uygulanır; ikisi de boşsa bütün okul */
+  grades: number[];
+  classIds: string[];
 }
 export interface TimetableEntry extends Base {
   weekday: number;

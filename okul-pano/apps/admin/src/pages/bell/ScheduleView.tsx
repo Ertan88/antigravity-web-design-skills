@@ -168,7 +168,10 @@ export function ScheduleView({
   onEdit,
   onCopy,
   onDelete,
+  scopeLabel,
 }: {
+  /** Sınıfa / düzeye özel çizelgede "11. sınıflar" gibi */
+  scopeLabel?: string | null;
   schedule: BellSchedule;
   editable: boolean;
   lunchThresholdMin: number;
@@ -218,6 +221,8 @@ export function ScheduleView({
             <h2 className="truncate text-lg font-semibold text-ink">{schedule.name}</h2>
             <p className="text-sm text-slate-500">
               {schedule.weekdays.map((d) => WEEKDAY_NAMES[d]).join(', ') || 'Gün seçilmemiş'}
+              {' · '}
+              {scopeLabel ? <span className="font-semibold text-violet-700">{scopeLabel}</span> : 'Bütün okul'}
             </p>
           </div>
           <div className="hidden shrink-0 items-center gap-1.5 text-xs font-medium text-slate-500 sm:flex">
@@ -458,7 +463,7 @@ export function ScheduleView({
             </>
           )}
           {status && off === 'half' && status.kind !== 'after' && <div className="mt-2 text-sm text-white/85">Yarım gün: son zil {day.endsAt}</div>}
-          {!isToday && !off && <div className="mt-2 text-sm text-white/85">Bu çizelge {schedule.weekdays.map((d) => WEEKDAY_SHORT[d]).join(', ')} günleri kullanılır.</div>}
+          {!isToday && !off && <div className="mt-2 text-sm text-white/85">Bu çizelge {schedule.weekdays.map((d) => WEEKDAY_NAMES[d]).join(', ')} günleri{scopeLabel ? ` ${scopeLabel} için` : ''} kullanılır.</div>}
           {status && (status.kind === 'lesson' || status.kind === 'break') && (
             <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/25">
               <div className="h-full rounded-full bg-surface" style={{ width: `${(1 - status.remainingSec / status.totalSec) * 100}%` }} />

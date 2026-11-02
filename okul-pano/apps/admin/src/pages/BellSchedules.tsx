@@ -1,16 +1,25 @@
-import { bellScheduleSchema, generatePeriods, pickSchedule, WEEKDAY_NAMES, addIsoDays, type Period } from '@okulpano/shared';
+import { bellScheduleSchema, compareClassNames, generatePeriods, gradeOf, isSchoolWide, pickSchedule, teacherClashes, WEEKDAY_NAMES, addIsoDays, type Period } from '@okulpano/shared';
+import clsx from 'clsx';
 import { BellRing, Plus, Trash2, Wand2 } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, Button, Card, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Spinner, WeekdayPicker } from '../components/ui.tsx';
 import { useAuth } from '../lib/auth.tsx';
-import { useList, useResource, useSchool, type BellSchedule } from '../lib/data.ts';
+import { nameMap, useList, useResource, useSchool, type BellSchedule, type ClassGroup, type Teacher, type TimetableEntry } from '../lib/data.ts';
 import { useUpcomingHolidays, useWeekHolidays } from './bell/HolidaysCard.tsx';
 import { ScheduleView, useNow, WeekCoverage } from './bell/ScheduleView.tsx';
 import { useForm } from '../lib/form.ts';
 
-type Form = { name: string; weekdays: number[]; periods: Period[] };
+type Scope = 'all' | 'grades' | 'classes';
+type Form = { name: string; weekdays: number[]; periods: Period[]; scope: Scope; grades: number[]; classIds: string[] };
 
-const defaultGen = { firstStart: '08:30', lessonMin: 40, breakMin: 10, count: 8, lunchAfter: 5, lunchMin: 45 };
+/** Çizelgenin kime uygulandığı: "11. sınıflar", "ATP 9-A, ATP 10-A"; bütün okulsa null */
+export function scopeLabel(s: { grades?: number[]; classIds?: string[] }, classNames: Map<string, string>): string | null {
+  if (s.classIds?.length) return s.classIds.map((id) => classNames.get(id) ?? '?').sort(compareClassNames).join(', ');
+  if (s.grades?.length) return `${[...s.grades].sort((a, b) => a - b).join(', ')}. sınıflar`;
+  return null;
+}
+
+const defaultGen = { firstStart: '08:30', lessonMin: 40, breakMin: 10, count: 8, lunchAfter: 5, lunchMin: 45, afternoonBreakMin: '' as number | '' };
 
 function addMinutes(clock: string, minutes: number): string {
   const [h, m] = clock.split(':').map(Number);
@@ -24,12 +33,19 @@ function minutesBetween(a: string, b: string) {
   return (bh! * 60 + bm!) - (ah! * 60 + am!);
 }
 
-function Editor({ form }: { form: ReturnType<typeof useForm<Form>> }) {
+function Editor({ form, classes }: { form: ReturnType<typeof useForm<Form>>; classes: ClassGroup[] }) {
   const { values: v, set, errors } = form;
   const [gen, setGen] = useState(defaultGen);
   const [showGen, setShowGen] = useState(v.periods.length === 0);
   // Hafta sonu günleri varsayılan olarak gizli; çizelgede seçiliyse ya da istenirse görünür
   const [showWeekend, setShowWeekend] = useState(() => v.weekdays.some((d) => d > 5));
+  const sortedClasses = [...classes].sort((a, b) => compareClassNames(a.name, b.name));
+  const grades = [...new Set(sortedClasses.map((c) => gradeOf(c.name)).filter((g): g is number => g !== null))].sort((a, b) => a - b);
+  const byGrade = [...sortedClasses.reduce((m, c) => {
+    const g = gradeOf(c.name);
+    const label = g === null ? 'Diğer' : `${g}. sınıflar`;
+    return m.set(label, [...(m.get(label) ?? []), c]);
+  }, new Map<string, ClassGroup[]>())];
 
   /** i. dersten itibaren tüm derslerin başlangıç ve bitişini kaydırır */
   const shiftFrom = (i: number, minutes: number) =>
@@ -62,6 +78,52 @@ function Editor({ form }: { form: ReturnType<typeof useForm<Form>> }) {
         )}
       </Field>
 
+      <Field
+        label="Hangi sınıflar"
+        help="Sınıfa ya da düzeye özel çizelge, o sınıflar için aynı günlerdeki okul geneli çizelgenin yerine geçer (ör. salı günü 11. sınıfların 11 ders saati)."
+      >
+        {() => (
+          <div className="space-y-2.5">
+            <Segmented
+              value={v.scope}
+              onChange={(scope) => set('scope', scope)}
+              options={[
+                { value: 'all', label: 'Bütün okul' },
+                { value: 'grades', label: 'Düzeyler' },
+                { value: 'classes', label: 'Sınıflar' },
+              ]}
+            />
+            {v.scope === 'grades' && (
+              <div className="flex flex-wrap gap-1.5">
+                {grades.map((g) => (
+                  <Chip key={g} on={v.grades.includes(g)} onClick={() => set('grades', toggle(v.grades, g))}>
+                    {g}. sınıflar
+                  </Chip>
+                ))}
+                {!grades.length && <span className="text-xs text-slate-500">Önce sınıf ekleyin.</span>}
+              </div>
+            )}
+            {v.scope === 'classes' && (
+              <div className="max-h-52 space-y-2 overflow-y-auto rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200/70">
+                {byGrade.map(([label, list]) => (
+                  <div key={label}>
+                    <div className="mb-1 text-[11px] font-bold tracking-wide text-slate-400 uppercase">{label}</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {list.map((c) => (
+                        <Chip key={c.id} on={v.classIds.includes(c.id)} onClick={() => set('classIds', toggle(v.classIds, c.id))}>
+                          {c.name}
+                        </Chip>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {errors.grades && <p className="text-xs font-medium text-red-600">{errors.grades}</p>}
+          </div>
+        )}
+      </Field>
+
       <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200/70">
         <button type="button" onClick={() => setShowGen((s) => !s)} className="flex items-center gap-2 text-sm font-semibold text-brand-700">
           <Wand2 className="size-4" /> Kurala göre otomatik oluştur
@@ -75,12 +137,25 @@ function Editor({ form }: { form: ReturnType<typeof useForm<Form>> }) {
               <Field label="Ders sayısı">{(id) => <Input id={id} type="number" min={1} max={16} value={gen.count} onChange={(e) => setGen({ ...gen, count: Number(e.target.value) })} />}</Field>
               <Field label="Öğle arası şu dersten sonra">{(id) => <Input id={id} type="number" min={0} max={15} value={gen.lunchAfter} onChange={(e) => setGen({ ...gen, lunchAfter: Number(e.target.value) })} />}</Field>
               <Field label="Öğle arası (dk)">{(id) => <Input id={id} type="number" min={0} max={120} value={gen.lunchMin} onChange={(e) => setGen({ ...gen, lunchMin: Number(e.target.value) })} />}</Field>
+              <Field label="Öğleden sonra teneffüs (dk)" help="Boşsa sabahki teneffüs süresi">
+                {(id) => (
+                  <Input
+                    id={id}
+                    type="number"
+                    min={0}
+                    max={60}
+                    value={gen.afternoonBreakMin}
+                    placeholder={String(gen.breakMin)}
+                    onChange={(e) => setGen({ ...gen, afternoonBreakMin: e.target.value === '' ? '' : Number(e.target.value) })}
+                  />
+                )}
+              </Field>
             </div>
             <Button
               variant="success"
               icon={<Wand2 className="size-4" />}
               onClick={() => {
-                set('periods', generatePeriods({ ...gen, lunchAfter: gen.lunchAfter || null }));
+                set('periods', generatePeriods({ ...gen, lunchAfter: gen.lunchAfter || null, afternoonBreakMin: gen.afternoonBreakMin === '' ? null : gen.afternoonBreakMin }));
                 setShowGen(false);
               }}
             >
@@ -159,7 +234,18 @@ export function BellSchedules() {
   const list = useList<BellSchedule>('bell-schedules');
   const school = useSchool();
   const ops = useResource<BellSchedule>('bell-schedules', 'Zil çizelgesi');
-  const form = useForm<Form>({ name: '', weekdays: [1, 2, 3, 4, 5], periods: [] });
+  const form = useForm<Form>({ name: '', weekdays: [1, 2, 3, 4, 5], periods: [], scope: 'all', grades: [], classIds: [] });
+  const classes = useList<ClassGroup>('classes');
+  const classNames = nameMap(classes.data, (c) => c.name);
+  const anyScoped = (list.data ?? []).some((x) => !isSchoolWide(x));
+  // Sınıflar farklı zil izliyorsa öğretmen derslerinin saatleri örtüşebilir
+  const timetable = useList<TimetableEntry>('timetable');
+  const teachers = useList<Teacher>('teachers');
+  const clashes = useMemo(
+    () => (anyScoped ? teacherClashes(timetable.data ?? [], list.data ?? [], classes.data ?? []) : []),
+    [anyScoped, timetable.data, list.data, classes.data],
+  );
+  const teacherNames = nameMap(teachers.data, (t) => t.fullName);
   const [editing, setEditing] = useState<BellSchedule | null>(null);
   const [open, setOpen] = useState(false);
   const tz = school.data?.timezone ?? 'Europe/Istanbul';
@@ -212,7 +298,7 @@ export function BellSchedules() {
   const covered = new Set((list.data ?? []).flatMap((s) => s.weekdays));
   // Aynı günü kapsayan çizelgeler: daha özel olan (az günlü) o gün geçerlidir
   const overrides = [1, 2, 3, 4, 5, 6, 7].flatMap((d) => {
-    const all = schedules.filter((x) => x.weekdays.includes(d) && x.periods.length);
+    const all = schedules.filter((x) => isSchoolWide(x) && x.weekdays.includes(d) && x.periods.length);
     const winner = pickSchedule(schedules, d);
     return all.length > 1 && winner ? [{ day: d, name: winner.name }] : [];
   });
@@ -220,18 +306,30 @@ export function BellSchedules() {
   /** Seçili çizelgenin kopyası: aynı ders saatleriyle başka gün(ler) için (ör. cuma namazı düzeni) */
   const openCopy = (s: BellSchedule) => {
     setEditing(null);
-    form.reset({ name: `${s.name} (kopya)`, weekdays: [], periods: s.periods });
+    form.reset({ name: `${s.name} (kopya)`, weekdays: [], periods: s.periods, ...scopeOf(s) });
     setOpen(true);
   };
 
   const openEditor = (s: BellSchedule | null) => {
     setEditing(s);
-    form.reset(s ? { name: s.name, weekdays: s.weekdays, periods: s.periods } : { name: list.data?.length ? '' : 'Hafta içi', weekdays: [1, 2, 3, 4, 5].filter((d) => !covered.has(d)), periods: [] });
+    form.reset(
+      s
+        ? { name: s.name, weekdays: s.weekdays, periods: s.periods, ...scopeOf(s) }
+        : { name: list.data?.length ? '' : 'Hafta içi', weekdays: [1, 2, 3, 4, 5].filter((d) => !covered.has(d)), periods: [], scope: 'all', grades: [], classIds: [] },
+    );
     setOpen(true);
   };
 
   const submit = async () => {
-    const payload = form.validate(bellScheduleSchema, { ...form.values, sortOrder: editing?.sortOrder ?? list.data?.length ?? 0 });
+    const { scope, grades, classIds, ...rest } = form.values;
+    if (scope === 'grades' && !grades.length) return form.setErrors({ grades: 'En az bir düzey seçin.' });
+    if (scope === 'classes' && !classIds.length) return form.setErrors({ grades: 'En az bir sınıf seçin.' });
+    const payload = form.validate(bellScheduleSchema, {
+      ...rest,
+      grades: scope === 'grades' ? grades : [],
+      classIds: scope === 'classes' ? classIds : [],
+      sortOrder: editing?.sortOrder ?? list.data?.length ?? 0,
+    });
     if (!payload) return;
     try {
       if (editing) await ops.update.mutateAsync({ id: editing.id, body: payload });
@@ -267,6 +365,22 @@ export function BellSchedules() {
           </Alert>
         </div>
       )}
+      {clashes.length > 0 && (
+        <div className="mb-4">
+          <Alert tone="red">
+            <strong>Öğretmen çakışması:</strong> sınıflar farklı zil izlediği için bazı öğretmenlerin dersleri aynı saate denk geliyor.
+            <ul className="mt-2 list-disc space-y-0.5 pl-5">
+              {clashes.slice(0, 8).map((c, i) => (
+                <li key={i}>
+                  {WEEKDAY_NAMES[c.weekday]} · {teacherNames.get(c.teacherId) ?? 'Öğretmen'}: {c.a.className} {c.a.periodNo}. ders ({c.a.start}–{c.a.end}) ile {c.b.className}{' '}
+                  {c.b.periodNo}. ders ({c.b.start}–{c.b.end})
+                </li>
+              ))}
+              {clashes.length > 8 && <li>ve {clashes.length - 8} çakışma daha</li>}
+            </ul>
+          </Alert>
+        </div>
+      )}
       {list.isLoading ? (
         <Spinner />
       ) : !list.data?.length ? (
@@ -287,7 +401,8 @@ export function BellSchedules() {
                   value={selected?.id ?? ''}
                   onChange={(id) => {
                     setForcedId(id);
-                    const first = schedules.find((x) => x.id === id)?.weekdays.find((d) => pickSchedule(schedules, d)?.id === id);
+                    const s = schedules.find((x) => x.id === id);
+                    const first = s && isSchoolWide(s) ? s.weekdays.find((d) => pickSchedule(schedules, d)?.id === id) : s?.weekdays[0];
                     if (first) setDay(first);
                   }}
                   options={schedules.map((x) => ({ value: x.id, label: x.name }))}
@@ -321,6 +436,7 @@ export function BellSchedules() {
             <ScheduleView
               key={selected.id}
               schedule={selected}
+              scopeLabel={scopeLabel(selected, classNames)}
               editable={editable}
               lunchThresholdMin={school.data?.settings.lunchThresholdMin ?? 30}
               day={dayContext}
@@ -357,8 +473,29 @@ export function BellSchedules() {
             <Alert tone="red">{form.errors._form}</Alert>
           </div>
         )}
-        <Editor form={form} />
+        <Editor form={form} classes={classes.data ?? []} />
       </Modal>
     </>
+  );
+}
+
+const scopeOf = (s: BellSchedule): Pick<Form, 'scope' | 'grades' | 'classIds'> => ({
+  scope: s.classIds?.length ? 'classes' : s.grades?.length ? 'grades' : 'all',
+  grades: s.grades ?? [],
+  classIds: s.classIds ?? [],
+});
+
+const toggle = <T,>(list: T[], x: T) => (list.includes(x) ? list.filter((y) => y !== x) : [...list, x]);
+
+function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      className={clsx('rounded-full px-3 py-1 text-xs font-bold transition', on ? 'bg-ink text-white' : 'bg-surface text-slate-700 ring-1 ring-slate-200 hover:ring-slate-300')}
+    >
+      {children}
+    </button>
   );
 }

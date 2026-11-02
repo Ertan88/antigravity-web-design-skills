@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeBellStatus, generatePeriods, pickSchedule, validatePeriods, type Period } from './bell.ts';
+import { computeBellStatus, generatePeriods, pickSchedule, teacherClashes, validatePeriods, type Period } from './bell.ts';
 import { parseClock } from './time.ts';
 
 const periods: Period[] = generatePeriods({
@@ -96,5 +96,41 @@ describe('validatePeriods', () => {
         { no: 1, start: '09:00', end: '09:40' },
       ]),
     ).toMatch(/birden fazla/);
+  });
+});
+
+describe('sınıfa / düzeye özel zil', () => {
+  const p = (no: number, start: string, end: string) => ({ no, start, end });
+  const general = { id: 'g', name: 'Hafta içi', weekdays: [1, 2, 3, 4, 5], periods: [p(1, '08:00', '08:40'), p(6, '13:15', '13:55')] };
+  const eleven = { id: 'e', name: 'Salı · 11', weekdays: [2], grades: [11], periods: [p(1, '08:00', '08:40'), p(6, '12:40', '13:20')] };
+  const one = { id: 'c', name: 'ATP', weekdays: [1, 2, 3, 4, 5], classIds: ['atp'], periods: [p(1, '08:10', '08:50')] };
+  const all = [general, eleven, one];
+
+  it('önce sınıfa, sonra düzeye özel çizelge; yoksa okul geneli', () => {
+    expect(pickSchedule(all, 2, { id: 'x', name: 'AMP 11-A' })?.id).toBe('e');
+    expect(pickSchedule(all, 3, { id: 'x', name: 'AMP 11-A' })?.id).toBe('g');
+    expect(pickSchedule(all, 2, { id: 'y', name: 'AMP 9-C' })?.id).toBe('g');
+    expect(pickSchedule(all, 2, { id: 'atp', name: 'ATP 11-A' })?.id).toBe('c');
+    expect(pickSchedule(all, 2)?.id).toBe('g');
+  });
+
+  it('öğleden sonra teneffüsü ayrı', () => {
+    const r = generatePeriods({ firstStart: '08:00', lessonMin: 40, breakMin: 10, count: 11, lunchAfter: 5, lunchMin: 40, afternoonBreakMin: 5 });
+    expect(r[5]).toEqual({ no: 6, start: '12:40', end: '13:20' });
+    expect(r[10]).toEqual({ no: 11, start: '16:25', end: '17:05' });
+  });
+
+  it('farklı zillerdeki sınıflarda öğretmen çakışması', () => {
+    const classes = [{ id: 'a', name: 'AMP 11-A' }, { id: 'b', name: 'AMP 9-C' }];
+    const c = teacherClashes(
+      [
+        { teacherId: 't', weekday: 2, periodNo: 6, classGroupId: 'a' },
+        { teacherId: 't', weekday: 2, periodNo: 6, classGroupId: 'b' },
+      ],
+      all,
+      classes,
+    );
+    expect(c).toHaveLength(1);
+    expect(c[0]!.a).toMatchObject({ className: 'AMP 11-A', start: '12:40' });
   });
 });

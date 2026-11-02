@@ -555,6 +555,10 @@ export const bellScheduleSchema = z
       .refine((d) => new Set(d).size === d.length, 'Aynı gün iki kez seçilmiş'),
     periods: z.array(periodSchema).min(1, 'En az bir ders saati ekleyin').max(30),
     sortOrder: z.number().int().default(0),
+    /** Yalnızca bu düzeylere uygulanır (boşsa bütün okul) */
+    grades: z.array(z.number().int().min(1).max(12)).max(12).default([]),
+    /** Yalnızca bu sınıflara uygulanır (boşsa bütün okul) */
+    classIds: z.array(id).max(300).default([]),
   })
   .superRefine((v, ctx) => {
     const problem = validatePeriods(v.periods);

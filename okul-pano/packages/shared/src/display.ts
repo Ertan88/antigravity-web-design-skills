@@ -47,7 +47,7 @@ export interface DisplayState {
   announcements: DisplayAnnouncement[];
   ticker: { id: string; text: string; startsAt: string | null; endsAt: string | null }[];
   bellSchedules: BellScheduleLike[];
-  timetable: { weekday: number; periodNo: number; className: string; subject: string; teacherName: string | null }[];
+  timetable: { weekday: number; periodNo: number; className: string; classId?: string; subject: string; teacherName: string | null }[];
   /** Başarılar ve ayın öğrencisi (yayın aralığındakiler) */
   achievements?: { id: string; kind: 'month' | 'achievement'; name: string; className: string | null; title: string; description: string | null; photoUrl: string | null; startsAt: string | null; endsAt: string | null; showCard?: boolean; showSlide?: boolean }[];
   /** Bugünden itibaren 30 günlük etkinlik takvimi */
