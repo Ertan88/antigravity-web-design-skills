@@ -1049,21 +1049,28 @@ p {
   min-width: 0;
 }
 
+/* Ders adı üstte (gerekirse iki satır), öğretmen(ler) altında küçük ve tam; yer değiştirme yok */
 .lesson-subject {
-  font-size: 22px;
+  font-size: 21px;
   font-weight: 700;
-  white-space: nowrap;
+  line-height: 1.15;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .lesson-teacher {
-  font-size: 22px;
-  font-weight: 650;
-  color: color-mix(in srgb, var(--hue, var(--primary)) 45%, var(--text));
-  white-space: nowrap;
+  margin-top: 3px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: color-mix(in srgb, var(--hue, var(--primary)) 40%, var(--muted, var(--text)));
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* Ders adı ve öğretmen aynı satırda sırayla */
@@ -2200,9 +2207,12 @@ p {
 }
 
 .text-large .person-name,
-.text-large .lesson-subject,
+.text-large .lesson-subject {
+  font-size: 23px;
+}
+
 .text-large .lesson-teacher {
-  font-size: 26px;
+  font-size: 18px;
 }
 
 .text-large .duty-card .duty-teacher {

@@ -1,5 +1,5 @@
 import { formatDuration, gradeHue, periodLabel, type BellStatus, type DisplayState } from '@okulpano/shared/client';
-import { useEffect, useState, type CSSProperties } from 'react';
+import type { CSSProperties } from 'react';
 import { AutoPager } from './AutoPager.tsx';
 import { useLabel } from './Labels.tsx';
 import { BellIcon, BellWatermarkIcon, BookIcon, CoffeeIcon, UtensilsIcon } from './Icons.tsx';
@@ -113,16 +113,7 @@ export function BellCard({ status, day }: { status: BellStatus; day?: BellDayCon
   );
 }
 
-/** Ders ve öğretmen aynı satırda sırayla gösterilir; tüm satırlar birlikte döner */
-function useAlternate(ms: number) {
-  const [on, setOn] = useState(false);
-  useEffect(() => {
-    const t = setInterval(() => setOn((x) => !x), ms);
-    return () => clearInterval(t);
-  }, [ms]);
-  return on;
-}
-
+/** Şu an derste / sıradaki ders: sınıf etiketi, ders adı (gerekirse iki satır) ve altında öğretmen(ler) */
 export function LessonsCard({
   entries,
   heading,
@@ -132,7 +123,6 @@ export function LessonsCard({
   heading: string;
   periodTitle: string;
 }) {
-  const showTeacher = useAlternate(3500);
   return (
     <section className="card list-card lessons-card">
       <div className="card-label">
@@ -141,23 +131,17 @@ export function LessonsCard({
       </div>
       <AutoPager
         items={entries}
-        rowHeight={62}
-        intervalMs={7000}
+        // Ders adı iki satıra inebilir, öğretmen(ler) altında: satır yüksekliği buna göre
+        rowHeight={88}
+        intervalMs={8000}
         keyOf={(e) => `${e.className}-${e.periodNo}`}
         empty="Bu ders saati için program girilmemiş"
         render={(e) => (
           <div className="lesson-row">
             <ClassBadge name={e.className} />
             <span className="lesson-info">
-              {showTeacher && e.teacherName ? (
-                <span key="t" className="lesson-teacher lesson-swap">
-                  {e.teacherName}
-                </span>
-              ) : (
-                <span key="s" className="lesson-subject lesson-swap">
-                  {e.subject}
-                </span>
-              )}
+              <span className="lesson-subject">{e.subject}</span>
+              {e.teacherName && <span className="lesson-teacher">{e.teacherName}</span>}
             </span>
           </div>
         )}
