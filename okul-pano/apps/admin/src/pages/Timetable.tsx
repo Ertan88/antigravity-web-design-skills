@@ -50,24 +50,31 @@ export function Timetable() {
     return [...groups];
   }, [sortedClasses]);
   const sortedTeachers = useMemo(() => [...(teachers.data ?? [])].sort((a, b) => a.fullName.localeCompare(b.fullName, 'tr')), [teachers.data]);
-  const activeClass = (classId && classes.data?.some((c) => c.id === classId) ? classId : '') || sortedClasses[0]?.id || '';
+  // Varsayılan: programı olan ilk sınıf
+  const withLessons = new Set((entries.data ?? []).map((e) => e.classGroupId));
+  const activeClass = (classId && classes.data?.some((c) => c.id === classId) ? classId : '') || sortedClasses.find((c) => withLessons.has(c.id))?.id || sortedClasses[0]?.id || '';
   const activeTeacher = (teacherId && teachers.data?.some((t) => t.id === teacherId) ? teacherId : '') || sortedTeachers[0]?.id || '';
   const teacherNames = nameMap(teachers.data, (t) => t.fullName);
   const classNames = nameMap(classes.data, (c) => c.name);
 
-  // Satırlar: tüm çizelgelerdeki ders numaralarının birleşimi; sütunlar: çizelgelerin kapsadığı günler
+  // Satırlar: zil düzenlerindeki ders numaralarının birleşimi (saatler en uzun otomatik düzenden);
+  // sütunlar: hafta içi her zaman, hafta sonu yalnızca programda dersi ya da sabit zili varsa
   const { periods, weekdays } = useMemo(() => {
     const byNo = new Map<number, Period>();
-    const days = new Set<number>();
-    for (const s of schedules.data ?? []) {
+    const days = new Set([1, 2, 3, 4, 5]);
+    const ordered = [...(schedules.data ?? [])].sort(
+      (a, b) => Number(a.shift === 'afternoon') - Number(b.shift === 'afternoon') || Number(a.weekdays.length > 0) - Number(b.weekdays.length > 0) || b.periods.length - a.periods.length,
+    );
+    for (const s of ordered) {
       s.weekdays.forEach((d) => days.add(d));
       for (const p of s.periods) if (!byNo.has(p.no)) byNo.set(p.no, p);
     }
+    for (const e of entries.data ?? []) days.add(e.weekday);
     // Zil çizelgesinde olmayan ama programda dersi bulunan saatler de gösterilir (silinip düzeltilebilsin)
     if (byNo.size) for (const e of entries.data ?? []) if (!byNo.has(e.periodNo)) byNo.set(e.periodNo, { no: e.periodNo, start: '', end: '' } as Period);
     return {
       periods: [...byNo.values()].sort((a, b) => a.no - b.no),
-      weekdays: days.size ? [...days].sort() : [1, 2, 3, 4, 5],
+      weekdays: [...days].sort(),
     };
   }, [schedules.data, entries.data]);
 

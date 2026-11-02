@@ -1,9 +1,8 @@
-import { sortPeriods } from '@okulpano/shared/bell';
 import { useState } from 'react';
 import { Platform } from 'react-native';
 import { syncToPhoneCalendar, type CalendarItem } from '../src/calendar.ts';
 import { useMeToday, useSchoolQuery } from '../src/data.ts';
-import { addDays, clock, fullDate, localIso } from '../src/day.ts';
+import { addDays, clock, dayBellPeriods, fullDate, localIso } from '../src/day.ts';
 import { colors } from '../src/theme.ts';
 import { Button, Card, ErrorNote, Loading, Screen, SectionTitle, T, ToggleRow } from '../src/ui.tsx';
 
@@ -35,8 +34,7 @@ export default function TakvimeEkle() {
     if (d.holiday) return [];
     const own = d.duties.filter((x) => !x.coveredBy);
     if (!own.length || !data) return [];
-    const schedule = data.bellSchedules.filter((s) => s.weekdays.includes(d.weekday)).sort((a, b) => a.weekdays.length - b.weekdays.length)[0];
-    const periods = schedule ? sortPeriods(schedule.periods) : [];
+    const periods = dayBellPeriods(data, d.weekday);
     if (!periods.length) return [];
     const half = data.halfDays?.find((h) => h.date === d.date);
     const end = half && data.halfDayEnd ? data.halfDayEnd : periods[periods.length - 1]!.end;

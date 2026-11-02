@@ -4,7 +4,7 @@ import { View, type StyleProp, type ViewStyle } from 'react-native';
 import { Text } from './text.tsx';
 import { useAuth } from './auth.tsx';
 import { useInbox, useMeToday, useNow, type MeToday } from './data.ts';
-import { bellHeadline, countdownText, dayTitle, greeting, teacherDay } from './day.ts';
+import { bellHeadline, countdownText, dayBellPeriods, dayTitle, greeting, teacherDay } from './day.ts';
 import { scheduleDutyReminders } from './push.ts';
 import { colors, radius, tiles, type TileTone } from './theme.ts';
 import { Badge, Banner, BentoRow, Card, Empty, HeaderButton, HomeHeader, Icon, ListRow, Loading, Screen, SectionTitle, T, Tile, type IconName } from './ui.tsx';
@@ -183,8 +183,7 @@ export function useDutyReminders(data: MeToday | undefined) {
     if (!data?.teacher) return;
     const items = data.week.flatMap((d) => {
       if (d.holiday || !d.duties.some((x) => !x.coveredBy)) return [];
-      const schedule = data.bellSchedules.filter((s) => s.weekdays.includes(d.weekday)).sort((a, b) => a.weekdays.length - b.weekdays.length)[0];
-      const first = schedule?.periods.map((p) => p.start).sort()[0];
+      const first = dayBellPeriods(data, d.weekday)[0]?.start;
       return first ? [{ date: d.date, time: first, area: d.duties.find((x) => !x.coveredBy)!.area }] : [];
     });
     void scheduleDutyReminders(items).catch(() => undefined);

@@ -1,4 +1,4 @@
-import { computeBellStatus, periodLabel, type BellStatus, type Period, type Shift } from '@okulpano/shared/bell';
+import { computeBellStatus, periodLabel, pickSchedule, sortPeriods, type BellStatus, type Period, type Shift } from '@okulpano/shared/bell';
 import { schoolDay } from '@okulpano/shared/schoolDay';
 import { zonedParts, type ZonedParts } from '@okulpano/shared/time';
 import type { MeToday } from './data.ts';
@@ -16,6 +16,16 @@ export interface TeacherDay {
   endsAt: string | null;
   /** Bugünkü dersleri: saat, sınıf, ders; şu anki işaretli */
   lessons: { period: Period; className: string; subject: string; state: 'past' | 'now' | 'next' | 'later' }[];
+}
+
+/**
+ * Bir hafta gününün zil saatleri (panoyla aynı seçim): günün ders sayısına uyan düzen ya da o güne sabitlenen düzen;
+ * zil o gün en geç biten sınıfın son dersinde biter. İkili öğretimde vardiyanın zili.
+ */
+export function dayBellPeriods(data: Pick<MeToday, 'bellSchedules' | 'lessonCounts'>, weekday: number, shift: Shift = 'morning'): Period[] {
+  const count = data.lessonCounts ? (data.lessonCounts[`${shift}:${weekday}`] ?? 0) : null;
+  const schedule = pickSchedule(data.bellSchedules, weekday, { shift, lessonCount: count });
+  return schedule ? sortPeriods(schedule.periods).filter((p) => !count || p.no <= count) : [];
 }
 
 /** Öğretmenin bugünü: zil durumu ve dersleri (panoyla aynı hesap) */
