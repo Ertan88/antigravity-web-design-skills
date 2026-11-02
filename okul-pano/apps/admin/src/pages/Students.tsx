@@ -297,8 +297,7 @@ export function Students() {
   const { can } = useAuth();
   const studentsPath = useSchoolPath('students');
   const classes = useList<ClassGroup>('classes');
-  const allStudents = useList<Student>('students').data;
-  const studentCount = allStudents?.length ?? 0;
+  const studentCount = useList<Student>('students').data?.length ?? 0;
   const school = useSchool();
   const classNames = nameMap(classes.data, (c) => c.name);
   // Sınıf sırası (9-A, 9-B, 10-A…), sınıf içinde e-Okul sıra numarası
@@ -306,8 +305,6 @@ export function Students() {
     compareClassNames(classNames.get(a.classGroupId ?? '') ?? '~', classNames.get(b.classGroupId ?? '') ?? '~') ||
     (a.listNo ?? 9999) - (b.listNo ?? 9999) ||
     a.fullName.localeCompare(b.fullName, 'tr');
-  // S.No okul genelinde kesintisiz ve sabit: süzgeç seçilse de öğrencinin numarası değişmez
-  const seqNo = useMemo(() => new Map([...(allStudents ?? [])].sort(byClass).map((r, i) => [r.id, i + 1])), [allStudents, classes.data]);
   const now = new Date();
   const todayMd = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const needle = q.trim().toLocaleLowerCase('tr-TR');
@@ -403,8 +400,8 @@ export function Students() {
           )
         }
         columns={[
-          // Liste boyunca sıra (sınıf sırası, sınıf içinde e-Okul sırası)
-          { header: 'S.No', cell: (r) => <span className="text-slate-500 tabular-nums">{seqNo.get(r.id) ?? ''}</span> },
+          // Görünen listedeki sıra: bütün sınıflarda kesintisiz, sınıf seçilince o sınıfta 1'den
+          { header: 'S.No', cell: (_r, i) => <span className="text-slate-500 tabular-nums">{i + 1}</span> },
           { header: 'Okul no', cell: (r) => <span className="font-semibold text-slate-600 tabular-nums">{r.schoolNo}</span> },
           {
             header: 'Ad soyad',
