@@ -1,6 +1,6 @@
 import type { Permission } from '@okulpano/shared';
 import clsx from 'clsx';
-import { ArrowDown, ArrowUp, Pencil, Plus } from 'lucide-react';
+import { ArrowDown, ArrowUp, Pencil, Plus, Search } from 'lucide-react';
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { ZodType } from 'zod';
@@ -11,7 +11,8 @@ import { Alert, Button, Card, DeleteButton, EmptyState, IconButton, Modal, PageH
 
 export interface Column<T> {
   header: string;
-  cell: (row: T) => ReactNode;
+  /** `index`: satırın listedeki sırası (0'dan) */
+  cell: (row: T, index: number) => ReactNode;
   className?: string;
 }
 
@@ -31,6 +32,8 @@ export interface CrudPageProps<T extends { id: string }, F extends Record<string
   columns: Column<T>[];
   /** Listeyi süzmek/sıralamak için */
   select?: (rows: T[]) => T[];
+  /** Kayıt var ama süzgece uyan yoksa gösterilen boş durum (ör. "Bugün doğum günü olan öğrenci yok") */
+  filteredEmpty?: { title: string; text?: string };
   toolbar?: ReactNode;
   /** Boş form; ?yeni=<değer> kısayolundaki değer verilir (ör. "ay": ayın öğrencisi) */
   emptyForm: (preset?: string | null) => F;
@@ -210,6 +213,8 @@ export function CrudPage<T extends { id: string; isActive?: boolean }, F extends
           <div className="p-5">
             <Alert tone="red">{list.error.message}</Alert>
           </div>
+        ) : rows.length === 0 && (list.data?.length ?? 0) > 0 && p.filteredEmpty ? (
+          <EmptyState icon={<Search className="size-6" />} title={p.filteredEmpty.title} description={p.filteredEmpty.text} />
         ) : rows.length === 0 ? (
           <EmptyState
             icon={p.icon}
@@ -232,7 +237,7 @@ export function CrudPage<T extends { id: string; isActive?: boolean }, F extends
                   <tr key={row.id} className={p.rowState?.(row).dim ? 'opacity-55 hover:opacity-80' : 'hover:bg-slate-50/60'}>
                     {p.columns.map((c, ci) => (
                       <Td key={ci} className={c.className}>
-                        {c.cell(row)}
+                        {c.cell(row, i)}
                       </Td>
                     ))}
                     {p.activeToggle && <Td>{toggle(row)}</Td>}
@@ -247,13 +252,13 @@ export function CrudPage<T extends { id: string; isActive?: boolean }, F extends
                 const [main, ...rest] = p.columns;
                 return (
                   <li key={row.id} className={clsx("space-y-3 px-4 py-4", p.rowState?.(row).dim && "opacity-55")}>
-                    {main && <div>{main.cell(row)}</div>}
+                    {main && <div>{main.cell(row, i)}</div>}
                     {rest.length > 0 && (
                       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
                         {rest.map((c, ci) => (
                           <Fragment key={ci}>
                             <dt className="text-xs font-medium text-slate-400 uppercase">{c.header}</dt>
-                            <dd className="min-w-0">{c.cell(row)}</dd>
+                            <dd className="min-w-0">{c.cell(row, i)}</dd>
                           </Fragment>
                         ))}
                       </dl>

@@ -107,7 +107,6 @@ function ExcelImport({ file, onClose }: { file: File | null; onClose: () => void
       invalidate={['students', 'classes']}
       initialOptions={{ updateExisting: true, advisors: true }}
       columns={[
-        { header: 'S.No', cell: (r) => <span className="text-slate-500 tabular-nums">{r.listNo ?? '—'}</span> },
         { header: 'Okul no', cell: (r) => <span className="font-semibold tabular-nums">{r.schoolNo}</span> },
         { header: 'Ad soyad', cell: (r) => <span className="font-medium whitespace-nowrap text-ink">{r.fullName}</span> },
         { header: 'Sınıf', cell: (r) => r.className ?? '—' },
@@ -291,13 +290,15 @@ function ClearStudents({ count }: { count: number }) {
 export function Students() {
   const [q, setQ] = useState('');
   const [onlyToday, setOnlyToday] = useState(false);
+  const [classFilter, setClassFilter] = useState('');
   const [importing, setImporting] = useState(false);
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const pdfInput = useRef<HTMLInputElement>(null);
   const { can } = useAuth();
   const studentsPath = useSchoolPath('students');
   const classes = useList<ClassGroup>('classes');
-  const studentCount = useList<Student>('students').data?.length ?? 0;
+  const allStudents = useList<Student>('students').data;
+  const studentCount = allStudents?.length ?? 0;
   const school = useSchool();
   const classNames = nameMap(classes.data, (c) => c.name);
   // Sınıf sırası (9-A, 9-B, 10-A…), sınıf içinde e-Okul sıra numarası
@@ -305,6 +306,8 @@ export function Students() {
     compareClassNames(classNames.get(a.classGroupId ?? '') ?? '~', classNames.get(b.classGroupId ?? '') ?? '~') ||
     (a.listNo ?? 9999) - (b.listNo ?? 9999) ||
     a.fullName.localeCompare(b.fullName, 'tr');
+  // S.No okul genelinde kesintisiz ve sabit: süzgeç seçilse de öğrencinin numarası değişmez
+  const seqNo = useMemo(() => new Map([...(allStudents ?? [])].sort(byClass).map((r, i) => [r.id, i + 1])), [allStudents, classes.data]);
   const now = new Date();
   const todayMd = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const needle = q.trim().toLocaleLowerCase('tr-TR');
@@ -325,6 +328,11 @@ export function Students() {
         }
         permission="students.manage"
         icon={<Cake className="size-6" />}
+        filteredEmpty={
+          onlyToday
+            ? { title: 'Bugün doğum günü olan öğrenci yok', text: classFilter || needle ? 'Seçili sınıfta ya da aramada bugün doğan öğrenci bulunamadı.' : undefined }
+            : { title: 'Aramaya uyan öğrenci yok', text: 'Sınıf seçimini ya da arama metnini değiştirin.' }
+        }
         emptyTitle="Öğrenci eklenmemiş"
         emptyText="e-Okul'dan indirdiğiniz sınıf listesi PDF'ini yükleyin; sınıflar, sıra numaraları, okul numaraları ve doğum tarihleri birlikte gelir. Excel'den ya da tek tek de ekleyebilirsiniz."
         addLabel="Öğrenci ekle"
@@ -372,6 +380,17 @@ export function Students() {
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
               <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ad, okul no ya da sınıf ara" className="pl-9" aria-label="Öğrenci ara" />
             </div>
+            <Select value={classFilter} onChange={(e) => setClassFilter(e.target.value)} className="w-full sm:w-52" aria-label="Sınıf">
+              <option value="">Bütün sınıflar</option>
+              {[...(classes.data ?? [])]
+                .sort((a, b) => compareClassNames(a.name, b.name))
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              <option value="none">Sınıfsız</option>
+            </Select>
             <Toggle checked={onlyToday} onChange={setOnlyToday} label="Yalnızca bugün doğanlar" />
           </div>
         }
@@ -379,11 +398,13 @@ export function Students() {
           [...rows].sort(byClass).filter(
             (r) =>
               (!onlyToday || r.birthDate.slice(5) === todayMd) &&
+              (!classFilter || (classFilter === 'none' ? !r.classGroupId : r.classGroupId === classFilter)) &&
               (!needle || `${r.schoolNo} ${r.fullName} ${classNames.get(r.classGroupId ?? '') ?? ''}`.toLocaleLowerCase('tr-TR').includes(needle)),
           )
         }
         columns={[
-          { header: 'S.No', cell: (r) => <span className="text-slate-500 tabular-nums">{r.listNo ?? '—'}</span> },
+          // Liste boyunca sıra (sınıf sırası, sınıf içinde e-Okul sırası)
+          { header: 'S.No', cell: (r) => <span className="text-slate-500 tabular-nums">{seqNo.get(r.id) ?? ''}</span> },
           { header: 'Okul no', cell: (r) => <span className="font-semibold text-slate-600 tabular-nums">{r.schoolNo}</span> },
           {
             header: 'Ad soyad',
@@ -406,10 +427,7 @@ export function Students() {
         toPayload={(f) => ({ schoolNo: f.schoolNo, fullName: f.fullName, classGroupId: f.classGroupId || null, birthDate: f.birthDate, listNo: f.listNo ? Number(f.listNo) : null })}
         renderForm={({ values: v, set, errors }) => (
           <>
-            <div className="grid gap-4 sm:grid-cols-[90px_140px_1fr]">
-              <Field label="S.No" error={errors.listNo}>
-                {(id) => <Input id={id} value={v.listNo} inputMode="numeric" onChange={(e) => set('listNo', e.target.value.replace(/\D/g, ''))} />}
-              </Field>
+            <div className="grid gap-4 sm:grid-cols-[140px_1fr]">
               <Field label="Okul no" error={errors.schoolNo}>
                 {(id) => <Input id={id} value={v.schoolNo} inputMode="numeric" onChange={(e) => set('schoolNo', e.target.value)} invalid={Boolean(errors.schoolNo)} />}
               </Field>
