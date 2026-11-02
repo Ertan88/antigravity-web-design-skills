@@ -147,9 +147,7 @@ export function LessonsCard({
         empty="Bu ders saati için program girilmemiş"
         render={(e) => (
           <div className="lesson-row">
-            <span className="lesson-class" style={{ '--row-hue': gradeHue(e.className) } as CSSProperties}>
-              {e.className}
-            </span>
+            <ClassBadge name={e.className} />
             <span className="lesson-info">
               {showTeacher && e.teacherName ? (
                 <span key="t" className="lesson-teacher lesson-swap">
@@ -165,5 +163,21 @@ export function LessonsCard({
         )}
       />
     </section>
+  );
+}
+
+/**
+ * Sınıf etiketi: hep aynı boyda; "9/A" büyük, program kısaltması (ATP) varsa üstünde küçük harfle. Böylece
+ * "9/A" ile "ATP 10/A" aynı genişlikte durur, ders adları aynı hizadan başlar.
+ */
+export function ClassBadge({ name }: { name: string }) {
+  const m = /^(\S+)\s+(\d.*)$/.exec(name);
+  const program = m ? m[1] : null;
+  const label = m ? m[2]! : name;
+  return (
+    <span className="lesson-class" style={{ '--row-hue': gradeHue(name) } as CSSProperties}>
+      {program && <small className="lesson-program">{program}</small>}
+      <span className="lesson-label">{label}</span>
+    </span>
   );
 }

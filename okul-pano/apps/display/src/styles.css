@@ -1011,15 +1011,36 @@ p {
 
 .lesson-class {
   flex: none !important;
-  min-width: 86px;
-  text-align: center;
-  padding: 8px 10px;
+  /* Hep aynı boy: program kısaltması (ATP) varsa "9/A"nın üstünde küçük harfle */
+  width: 96px;
+  height: 50px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 6px;
   border-radius: 12px;
   background: var(--chip-bg);
   color: var(--chip-text);
   font-size: 22px;
   font-weight: 800;
   letter-spacing: -0.01em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.lesson-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lesson-program {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  opacity: 0.85;
 }
 
 .lesson-info {
@@ -2194,6 +2215,8 @@ p {
 
 .text-large .lesson-class {
   font-size: 25px;
+  width: 104px;
+  height: 54px;
 }
 
 .text-large .empty-card-text {
