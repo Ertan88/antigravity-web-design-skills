@@ -9,6 +9,7 @@ describe('sınıf kademesi', () => {
     expect(gradeHue('Anasınıfı A')).toBe(gradeHue('Anasınıfı B'));
     expect(gradeOf('12-F')).toBe(12);
     expect(gradeOf('Hazırlık A')).toBeNull();
+    expect(gradeOf('AMP 11-A')).toBe(11);
   });
 
   it('doğal sıralar', () => {

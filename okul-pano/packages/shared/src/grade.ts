@@ -30,7 +30,8 @@ export function gradeHue(className: string): string {
 
 /** Sınıf düzeyi (9-A → 9); sayı yoksa null */
 export function gradeOf(className: string): number | null {
-  const m = /^(\d{1,2})/.exec(className.trim());
+  // Program öneki olabilir: "AMP 9-A" (e-Okul'da aynı şubeyi iki program kullanınca)
+  const m = /^(?:[A-Za-zÇĞİÖŞÜçğıöşü]{2,4}\s+)?(\d{1,2})/.exec(className.trim());
   return m ? Number(m[1]) : null;
 }
 

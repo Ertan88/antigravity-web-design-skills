@@ -566,7 +566,9 @@ export const timetableEntrySchema = z.object({
   periodNo: z.number().int().min(1).max(30),
   classGroupId: id,
   teacherId: id.nullable().optional(),
-  subject: required('Ders', 60),
+  /** Bölünmüş sınıf: aynı derse giren diğer öğretmen(ler) */
+  extraTeacherIds: z.array(id).max(3).optional(),
+  subject: required('Ders', 80),
 });
 
 export const screenDisplaySchema = z.object({

@@ -109,6 +109,8 @@ export interface TimetableEntry extends Base {
   classGroupId: string;
   teacherId: string | null;
   subject: string;
+  /** Dal ya da grup (aynı saatte sınıfın bölümleri farklı ders görüyorsa) */
+  groupLabel: string | null;
 }
 export interface Screen {
   id: string;

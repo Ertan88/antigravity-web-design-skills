@@ -285,7 +285,7 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
     })),
     ticker: tickerRows.map((t) => ({ id: t.id, text: t.text, startsAt: iso(t.startsAt), endsAt: iso(t.endsAt) })),
     bellSchedules: bellRows.map((b) => ({ id: b.id, name: b.name, weekdays: b.weekdays, periods: b.periods, sortOrder: b.sortOrder })),
-    timetable: ttRows.map(({ classOrder: _, ...r }) => r),
+    timetable: mergeCells(ttRows),
     achievements: achievementRows.map((a) => ({
       id: a.id,
       kind: a.kind,
@@ -396,4 +396,26 @@ export async function displayRoutes(app: FastifyInstance) {
       offline();
     });
   });
+}
+
+/**
+ * Panoda sınıf başına bir satır: hücrede birden çok kayıt varsa (bölünmüş sınıfta iki öğretmen, dalların farklı
+ * dersleri, birden çok seçmeli) dersler "/" ile, öğretmenler virgülle birleştirilir.
+ */
+function mergeCells(rows: { weekday: number; periodNo: number; className: string; classOrder: number; subject: string; teacherName: string | null }[]) {
+  const cells = new Map<string, { weekday: number; periodNo: number; className: string; subjects: string[]; teachers: string[] }>();
+  for (const r of rows) {
+    const key = `${r.weekday}|${r.periodNo}|${r.className}`;
+    let cell = cells.get(key);
+    if (!cell) cells.set(key, (cell = { weekday: r.weekday, periodNo: r.periodNo, className: r.className, subjects: [], teachers: [] }));
+    if (!cell.subjects.includes(r.subject)) cell.subjects.push(r.subject);
+    if (r.teacherName && !cell.teachers.includes(r.teacherName)) cell.teachers.push(r.teacherName);
+  }
+  return [...cells.values()].map((c) => ({
+    weekday: c.weekday,
+    periodNo: c.periodNo,
+    className: c.className,
+    subject: c.subjects.join(' / '),
+    teacherName: c.teachers.length ? c.teachers.join(', ') : null,
+  }));
 }

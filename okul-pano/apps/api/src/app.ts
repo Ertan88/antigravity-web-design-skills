@@ -38,6 +38,7 @@ import { screenRoutes } from './routes/screens.ts';
 import { studentRoutes } from './routes/students.ts';
 import { teacherRoutes } from './routes/teachers.ts';
 import { timetableRoutes } from './routes/timetable.ts';
+import { timetableImportRoutes } from './routes/timetableImport.ts';
 
 export interface BuildOptions {
   env?: Partial<Record<keyof Env, unknown>>;
@@ -106,6 +107,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   await app.register(transportRoutes);
   await app.register(holidayRoutes);
   await app.register(timetableRoutes);
+  await app.register(timetableImportRoutes);
   await app.register(screenRoutes);
   await app.register(displayRoutes);
   await app.register(emergencyRoutes);

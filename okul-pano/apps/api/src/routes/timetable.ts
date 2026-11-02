@@ -5,7 +5,10 @@ import { audit, schoolGuard, UUID_RE } from '../context.ts';
 import { classGroups, teachers, timetableEntries } from '../db/schema.ts';
 import { badRequest, conflict, notFound, parse } from '../lib/errors.ts';
 
-/** Ders programı: (gün, ders saati, sınıf) hücresi başına tek kayıt. */
+/**
+ * Ders programı: (gün, ders saati, sınıf) hücresinde bir ya da birden çok kayıt (bölünmüş sınıfta iki öğretmen,
+ * dallara ayrılan şubede her dalın dersi). e-Okul PDF'inden toplu yüklenebilir.
+ */
 export async function timetableRoutes(app: FastifyInstance) {
   const { db, bus } = app.deps;
   const base = '/api/schools/:schoolId/timetable';
@@ -20,6 +23,7 @@ export async function timetableRoutes(app: FastifyInstance) {
       .orderBy(asc(t.weekday), asc(t.periodNo)),
   );
 
+  /** Bir hücreyi elle yazar: hücredeki kayıtların yerine (bölünmüş sınıfta birden çok öğretmenle) yeni ders */
   app.put(`${base}/cell`, write, async (req) => {
     const body = parse(timetableEntrySchema, req.body);
     const schoolId = req.ctx.schoolId;
@@ -30,11 +34,12 @@ export async function timetableRoutes(app: FastifyInstance) {
       .where(and(eq(classGroups.id, body.classGroupId), eq(classGroups.schoolId, schoolId)));
     if (!cls) throw badRequest('Sınıf bu okula ait değil.');
 
-    if (body.teacherId) {
+    const teacherIds = [...new Set([body.teacherId, ...(body.extraTeacherIds ?? [])].filter((x): x is string => Boolean(x)))];
+    for (const teacherId of teacherIds) {
       const [teacher] = await db
         .select({ name: teachers.fullName })
         .from(teachers)
-        .where(and(eq(teachers.id, body.teacherId), eq(teachers.schoolId, schoolId)));
+        .where(and(eq(teachers.id, teacherId), eq(teachers.schoolId, schoolId)));
       if (!teacher) throw badRequest('Öğretmen bu okula ait değil.');
       // Aynı öğretmen aynı saatte iki sınıfta olamaz
       const [clash] = await db
@@ -46,7 +51,7 @@ export async function timetableRoutes(app: FastifyInstance) {
             eq(t.schoolId, schoolId),
             eq(t.weekday, body.weekday),
             eq(t.periodNo, body.periodNo),
-            eq(t.teacherId, body.teacherId),
+            eq(t.teacherId, teacherId),
             ne(t.classGroupId, body.classGroupId),
           ),
         );
@@ -55,18 +60,22 @@ export async function timetableRoutes(app: FastifyInstance) {
       }
     }
 
-    const values = { ...body, teacherId: body.teacherId ?? null, schoolId };
-    const [row] = await db
-      .insert(t)
-      .values(values)
-      .onConflictDoUpdate({
-        target: [t.schoolId, t.weekday, t.periodNo, t.classGroupId],
-        set: { subject: values.subject, teacherId: values.teacherId, updatedAt: new Date() },
-      })
-      .returning();
-    await audit(req, 'update', 'Ders programı', row!.id, `${cls.name} · ${WEEKDAY_NAMES[body.weekday]} ${body.periodNo}. ders · ${body.subject}`);
+    const cell = and(eq(t.schoolId, schoolId), eq(t.weekday, body.weekday), eq(t.periodNo, body.periodNo), eq(t.classGroupId, body.classGroupId));
+    const rows = await db.transaction(async (tx) => {
+      await tx.delete(t).where(cell);
+      const values = (teacherIds.length ? teacherIds : [null]).map((teacherId) => ({
+        schoolId,
+        weekday: body.weekday,
+        periodNo: body.periodNo,
+        classGroupId: body.classGroupId,
+        subject: body.subject,
+        teacherId,
+      }));
+      return tx.insert(t).values(values).returning();
+    });
+    await audit(req, 'update', 'Ders programı', rows[0]!.id, `${cls.name} · ${WEEKDAY_NAMES[body.weekday]} ${body.periodNo}. ders · ${body.subject}`);
     bus.contentChanged(schoolId);
-    return row;
+    return rows[0];
   });
 
   app.delete(`${base}/:id`, write, async (req, reply) => {

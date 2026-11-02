@@ -19,7 +19,8 @@ export const CONDUCT_GROUP_KEYS = Object.keys(CONDUCT_GROUPS) as ConductGroup[];
  */
 export function levelFromClassName(name: string): SchoolLevel | null {
   const n = name.trim().toLocaleLowerCase('tr-TR');
-  const grade = Number(/^(\d{1,2})/.exec(n)?.[1] ?? NaN);
+  // Program öneki olabilir: "AMP 9-A", "ATP 12-A" (e-Okul'da aynı şubeyi iki program kullanınca)
+  const grade = Number(/^(?:[a-zçğıöşü]{2,4}\s+)?(\d{1,2})/.exec(n)?.[1] ?? NaN);
   if (grade >= 1 && grade <= 4) return 'primary';
   if (grade >= 5 && grade <= 8) return 'middle';
   if (grade >= 9 && grade <= 12) return 'high';

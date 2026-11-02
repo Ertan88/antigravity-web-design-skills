@@ -7,6 +7,8 @@ describe('gözlem', () => {
     expect(levelFromClassName('3-B')).toBe('primary');
     expect(levelFromClassName('7-A')).toBe('middle');
     expect(levelFromClassName('11-C')).toBe('high');
+    expect(levelFromClassName('AMP 9-A')).toBe('high');
+    expect(levelFromClassName('ATP 12-A')).toBe('high');
     expect(levelFromClassName('Hazırlık A')).toBe('high');
     expect(levelFromClassName('Anasınıfı')).toBe('primary');
     expect(levelFromClassName('Kulüp')).toBeNull();

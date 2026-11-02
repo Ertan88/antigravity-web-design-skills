@@ -183,6 +183,13 @@
       "when": 1794300000000,
       "tag": "0025_conduct_other",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794400000000,
+      "tag": "0026_timetable_multi",
+      "breakpoints": true
     }
   ]
 }

@@ -558,10 +558,15 @@ export const timetableEntries = pgTable(
       .references(() => classGroups.id, { onDelete: 'cascade' }),
     teacherId: uuid('teacher_id').references(() => teachers.id, { onDelete: 'set null' }),
     subject: text('subject').notNull(),
+    /**
+     * Aynı saatte sınıfın bir bölümünün dersi: dal ("Web Programcılığı") ya da grup. Boşsa bütün sınıf.
+     * Bir hücrede birden çok kayıt olabilir: bölünmüş sınıfta iki öğretmen, farklı dallar, birden çok seçmeli.
+     */
+    groupLabel: text('group_label'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [uniqueIndex('timetable_cell_uq').on(t.schoolId, t.weekday, t.periodNo, t.classGroupId)],
+  (t) => [index('timetable_cell_idx').on(t.schoolId, t.weekday, t.periodNo, t.classGroupId), index('timetable_teacher_idx').on(t.schoolId, t.teacherId)],
 );
 
 export const screens = pgTable(
