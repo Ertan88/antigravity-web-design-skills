@@ -73,6 +73,10 @@ export interface ClassGroup extends Base {
   /** Gözlem düzeyi; boşsa sınıf adından anlaşılır */
   level: 'primary' | 'middle' | 'high' | null;
   sortOrder: number;
+  /** Hafta gününe göre zil: { "2": "<çizelge id>" | "off" } */
+  bellPlan: Record<string, string>;
+  /** Zil hesabına katılmaz (ör. özel eğitim) */
+  bellExempt: boolean;
 }
 export interface Duty extends Base {
   /** YYYY-AA */
@@ -102,9 +106,8 @@ export interface BellSchedule extends Base {
   weekdays: number[];
   periods: Period[];
   sortOrder: number;
-  /** Yalnızca bu düzeylere / sınıflara uygulanır; ikisi de boşsa bütün okul */
-  grades: number[];
-  classIds: string[];
+  /** "eokul": ders programı PDF'inden; "eokul-extra": PDF'teki ikinci (ör. öğlenci) zil */
+  source: string | null;
 }
 export interface TimetableEntry extends Base {
   weekday: number;

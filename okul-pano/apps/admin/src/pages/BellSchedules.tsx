@@ -1,23 +1,15 @@
-import { bellScheduleSchema, compareClassNames, generatePeriods, gradeOf, isSchoolWide, pickSchedule, teacherClashes, WEEKDAY_NAMES, addIsoDays, type Period } from '@okulpano/shared';
-import clsx from 'clsx';
+import { bellScheduleSchema, generatePeriods, pickSchedule, teacherClashes, WEEKDAY_NAMES, addIsoDays, type Period } from '@okulpano/shared';
 import { BellRing, Plus, Trash2, Wand2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Alert, Button, Card, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Spinner, WeekdayPicker } from '../components/ui.tsx';
 import { useAuth } from '../lib/auth.tsx';
 import { nameMap, useList, useResource, useSchool, type BellSchedule, type ClassGroup, type Teacher, type TimetableEntry } from '../lib/data.ts';
+import { BellPlan } from './bell/BellPlan.tsx';
 import { useUpcomingHolidays, useWeekHolidays } from './bell/HolidaysCard.tsx';
 import { ScheduleView, useNow, WeekCoverage } from './bell/ScheduleView.tsx';
 import { useForm } from '../lib/form.ts';
 
-type Scope = 'all' | 'grades' | 'classes';
-type Form = { name: string; weekdays: number[]; periods: Period[]; scope: Scope; grades: number[]; classIds: string[] };
-
-/** Çizelgenin kime uygulandığı: "11. sınıflar", "ATP 9-A, ATP 10-A"; bütün okulsa null */
-export function scopeLabel(s: { grades?: number[]; classIds?: string[] }, classNames: Map<string, string>): string | null {
-  if (s.classIds?.length) return s.classIds.map((id) => classNames.get(id) ?? '?').sort(compareClassNames).join(', ');
-  if (s.grades?.length) return `${[...s.grades].sort((a, b) => a - b).join(', ')}. sınıflar`;
-  return null;
-}
+type Form = { name: string; weekdays: number[]; periods: Period[] };
 
 const defaultGen = { firstStart: '08:30', lessonMin: 40, breakMin: 10, count: 8, lunchAfter: 5, lunchMin: 45, afternoonBreakMin: '' as number | '' };
 
@@ -33,19 +25,12 @@ function minutesBetween(a: string, b: string) {
   return (bh! * 60 + bm!) - (ah! * 60 + am!);
 }
 
-function Editor({ form, classes }: { form: ReturnType<typeof useForm<Form>>; classes: ClassGroup[] }) {
+function Editor({ form }: { form: ReturnType<typeof useForm<Form>> }) {
   const { values: v, set, errors } = form;
   const [gen, setGen] = useState(defaultGen);
   const [showGen, setShowGen] = useState(v.periods.length === 0);
   // Hafta sonu günleri varsayılan olarak gizli; çizelgede seçiliyse ya da istenirse görünür
   const [showWeekend, setShowWeekend] = useState(() => v.weekdays.some((d) => d > 5));
-  const sortedClasses = [...classes].sort((a, b) => compareClassNames(a.name, b.name));
-  const grades = [...new Set(sortedClasses.map((c) => gradeOf(c.name)).filter((g): g is number => g !== null))].sort((a, b) => a - b);
-  const byGrade = [...sortedClasses.reduce((m, c) => {
-    const g = gradeOf(c.name);
-    const label = g === null ? 'Diğer' : `${g}. sınıflar`;
-    return m.set(label, [...(m.get(label) ?? []), c]);
-  }, new Map<string, ClassGroup[]>())];
 
   /** i. dersten itibaren tüm derslerin başlangıç ve bitişini kaydırır */
   const shiftFrom = (i: number, minutes: number) =>
@@ -65,7 +50,11 @@ function Editor({ form, classes }: { form: ReturnType<typeof useForm<Form>>; cla
       <Field label="Çizelge adı" error={errors.name}>
         {(id) => <Input id={id} value={v.name} onChange={(e) => set('name', e.target.value)} placeholder="ör. Hafta içi, Cuma, Sınav haftası" invalid={Boolean(errors.name)} />}
       </Field>
-      <Field label="Geçerli günler" error={errors.weekdays}>
+      <Field
+        label="Geçerli günler"
+        error={errors.weekdays}
+        help="Okulun o günlerdeki genel zili. Hiç gün seçmezseniz çizelge yalnızca zil ataması tablosunda seçtiğiniz sınıf ve günlerde çalar (ör. uzun gün, öğlenci)."
+      >
         {() => (
           <div className="flex flex-wrap items-center gap-3">
             <WeekdayPicker value={v.weekdays} onChange={(d) => set('weekdays', d)} days={showWeekend ? [1, 2, 3, 4, 5, 6, 7] : [1, 2, 3, 4, 5]} />
@@ -74,52 +63,6 @@ function Editor({ form, classes }: { form: ReturnType<typeof useForm<Form>>; cla
                 + Hafta sonu
               </button>
             )}
-          </div>
-        )}
-      </Field>
-
-      <Field
-        label="Hangi sınıflar"
-        help="Sınıfa ya da düzeye özel çizelge, o sınıflar için aynı günlerdeki okul geneli çizelgenin yerine geçer (ör. salı günü 11. sınıfların 11 ders saati)."
-      >
-        {() => (
-          <div className="space-y-2.5">
-            <Segmented
-              value={v.scope}
-              onChange={(scope) => set('scope', scope)}
-              options={[
-                { value: 'all', label: 'Bütün okul' },
-                { value: 'grades', label: 'Düzeyler' },
-                { value: 'classes', label: 'Sınıflar' },
-              ]}
-            />
-            {v.scope === 'grades' && (
-              <div className="flex flex-wrap gap-1.5">
-                {grades.map((g) => (
-                  <Chip key={g} on={v.grades.includes(g)} onClick={() => set('grades', toggle(v.grades, g))}>
-                    {g}. sınıflar
-                  </Chip>
-                ))}
-                {!grades.length && <span className="text-xs text-slate-500">Önce sınıf ekleyin.</span>}
-              </div>
-            )}
-            {v.scope === 'classes' && (
-              <div className="max-h-52 space-y-2 overflow-y-auto rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200/70">
-                {byGrade.map(([label, list]) => (
-                  <div key={label}>
-                    <div className="mb-1 text-[11px] font-bold tracking-wide text-slate-400 uppercase">{label}</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {list.map((c) => (
-                        <Chip key={c.id} on={v.classIds.includes(c.id)} onClick={() => set('classIds', toggle(v.classIds, c.id))}>
-                          {c.name}
-                        </Chip>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {errors.grades && <p className="text-xs font-medium text-red-600">{errors.grades}</p>}
           </div>
         )}
       </Field>
@@ -234,16 +177,15 @@ export function BellSchedules() {
   const list = useList<BellSchedule>('bell-schedules');
   const school = useSchool();
   const ops = useResource<BellSchedule>('bell-schedules', 'Zil çizelgesi');
-  const form = useForm<Form>({ name: '', weekdays: [1, 2, 3, 4, 5], periods: [], scope: 'all', grades: [], classIds: [] });
+  const form = useForm<Form>({ name: '', weekdays: [1, 2, 3, 4, 5], periods: [] });
   const classes = useList<ClassGroup>('classes');
-  const classNames = nameMap(classes.data, (c) => c.name);
-  const anyScoped = (list.data ?? []).some((x) => !isSchoolWide(x));
-  // Sınıflar farklı zil izliyorsa öğretmen derslerinin saatleri örtüşebilir
   const timetable = useList<TimetableEntry>('timetable');
   const teachers = useList<Teacher>('teachers');
+  const offsite = school.data?.settings.offsiteSubjects;
+  // Sınıflar farklı zil izliyorsa öğretmen derslerinin saatleri örtüşebilir
   const clashes = useMemo(
-    () => (anyScoped ? teacherClashes(timetable.data ?? [], list.data ?? [], classes.data ?? []) : []),
-    [anyScoped, timetable.data, list.data, classes.data],
+    () => teacherClashes(timetable.data ?? [], list.data ?? [], classes.data ?? [], offsite ?? []),
+    [timetable.data, list.data, classes.data, offsite],
   );
   const teacherNames = nameMap(teachers.data, (t) => t.fullName);
   const [editing, setEditing] = useState<BellSchedule | null>(null);
@@ -298,7 +240,7 @@ export function BellSchedules() {
   const covered = new Set((list.data ?? []).flatMap((s) => s.weekdays));
   // Aynı günü kapsayan çizelgeler: daha özel olan (az günlü) o gün geçerlidir
   const overrides = [1, 2, 3, 4, 5, 6, 7].flatMap((d) => {
-    const all = schedules.filter((x) => isSchoolWide(x) && x.weekdays.includes(d) && x.periods.length);
+    const all = schedules.filter((x) => x.weekdays.includes(d) && x.periods.length);
     const winner = pickSchedule(schedules, d);
     return all.length > 1 && winner ? [{ day: d, name: winner.name }] : [];
   });
@@ -306,7 +248,7 @@ export function BellSchedules() {
   /** Seçili çizelgenin kopyası: aynı ders saatleriyle başka gün(ler) için (ör. cuma namazı düzeni) */
   const openCopy = (s: BellSchedule) => {
     setEditing(null);
-    form.reset({ name: `${s.name} (kopya)`, weekdays: [], periods: s.periods, ...scopeOf(s) });
+    form.reset({ name: `${s.name} (kopya)`, weekdays: [], periods: s.periods });
     setOpen(true);
   };
 
@@ -314,22 +256,14 @@ export function BellSchedules() {
     setEditing(s);
     form.reset(
       s
-        ? { name: s.name, weekdays: s.weekdays, periods: s.periods, ...scopeOf(s) }
-        : { name: list.data?.length ? '' : 'Hafta içi', weekdays: [1, 2, 3, 4, 5].filter((d) => !covered.has(d)), periods: [], scope: 'all', grades: [], classIds: [] },
+        ? { name: s.name, weekdays: s.weekdays, periods: s.periods }
+        : { name: list.data?.length ? '' : 'Hafta içi', weekdays: [1, 2, 3, 4, 5].filter((d) => !covered.has(d)), periods: [] },
     );
     setOpen(true);
   };
 
   const submit = async () => {
-    const { scope, grades, classIds, ...rest } = form.values;
-    if (scope === 'grades' && !grades.length) return form.setErrors({ grades: 'En az bir düzey seçin.' });
-    if (scope === 'classes' && !classIds.length) return form.setErrors({ grades: 'En az bir sınıf seçin.' });
-    const payload = form.validate(bellScheduleSchema, {
-      ...rest,
-      grades: scope === 'grades' ? grades : [],
-      classIds: scope === 'classes' ? classIds : [],
-      sortOrder: editing?.sortOrder ?? list.data?.length ?? 0,
-    });
+    const payload = form.validate(bellScheduleSchema, { ...form.values, sortOrder: editing?.sortOrder ?? list.data?.length ?? 0 });
     if (!payload) return;
     try {
       if (editing) await ops.update.mutateAsync({ id: editing.id, body: payload });
@@ -402,7 +336,7 @@ export function BellSchedules() {
                   onChange={(id) => {
                     setForcedId(id);
                     const s = schedules.find((x) => x.id === id);
-                    const first = s && isSchoolWide(s) ? s.weekdays.find((d) => pickSchedule(schedules, d)?.id === id) : s?.weekdays[0];
+                    const first = s?.weekdays.find((d) => pickSchedule(schedules, d)?.id === id);
                     if (first) setDay(first);
                   }}
                   options={schedules.map((x) => ({ value: x.id, label: x.name }))}
@@ -436,7 +370,7 @@ export function BellSchedules() {
             <ScheduleView
               key={selected.id}
               schedule={selected}
-              scopeLabel={scopeLabel(selected, classNames)}
+              scopeLabel={selected.weekdays.length ? null : 'yalnızca zil ataması tablosunda seçilen sınıflar'}
               editable={editable}
               lunchThresholdMin={school.data?.settings.lunchThresholdMin ?? 30}
               day={dayContext}
@@ -449,6 +383,7 @@ export function BellSchedules() {
               }}
             />
           )}
+          <BellPlan schedules={schedules} classes={classes.data ?? []} timetable={timetable.data ?? []} editable={editable} />
         </div>
       )}
 
@@ -473,29 +408,9 @@ export function BellSchedules() {
             <Alert tone="red">{form.errors._form}</Alert>
           </div>
         )}
-        <Editor form={form} classes={classes.data ?? []} />
+        <Editor form={form} />
       </Modal>
     </>
   );
 }
 
-const scopeOf = (s: BellSchedule): Pick<Form, 'scope' | 'grades' | 'classIds'> => ({
-  scope: s.classIds?.length ? 'classes' : s.grades?.length ? 'grades' : 'all',
-  grades: s.grades ?? [],
-  classIds: s.classIds ?? [],
-});
-
-const toggle = <T,>(list: T[], x: T) => (list.includes(x) ? list.filter((y) => y !== x) : [...list, x]);
-
-function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={on}
-      className={clsx('rounded-full px-3 py-1 text-xs font-bold transition', on ? 'bg-ink text-white' : 'bg-surface text-slate-700 ring-1 ring-slate-200 hover:ring-slate-300')}
-    >
-      {children}
-    </button>
-  );
-}

@@ -239,6 +239,10 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
   ]);
 
   const iso = (d: Date | null) => (d ? d.toISOString() : null);
+  const classRows = await db
+    .select({ id: classGroups.id, name: classGroups.name, bellPlan: classGroups.bellPlan, bellExempt: classGroups.bellExempt })
+    .from(classGroups)
+    .where(eq(classGroups.schoolId, id));
   const settings = schoolSettingsSchema.parse(school.settings ?? {});
   // Arife günleri yarım gündür (sabah ders var): tatil sayılmaz, ayrı listede gider
   const holidays = new Map(holidayRows.holidays.map((h) => [h.date, h.name] as const));
@@ -285,8 +289,9 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
       endsAt: iso(a.endsAt),
     })),
     ticker: tickerRows.map((t) => ({ id: t.id, text: t.text, startsAt: iso(t.startsAt), endsAt: iso(t.endsAt) })),
-    bellSchedules: bellRows.map((b) => ({ id: b.id, name: b.name, weekdays: b.weekdays, periods: b.periods, sortOrder: b.sortOrder, grades: b.grades, classIds: b.classIds })),
+    bellSchedules: bellRows.map((b) => ({ id: b.id, name: b.name, weekdays: b.weekdays, periods: b.periods, sortOrder: b.sortOrder })),
     timetable: mergeCells(ttRows),
+    classes: classRows,
     achievements: achievementRows.map((a) => ({
       id: a.id,
       kind: a.kind,

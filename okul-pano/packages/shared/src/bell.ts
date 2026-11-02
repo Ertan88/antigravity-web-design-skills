@@ -1,4 +1,3 @@
-import { gradeOf } from './grade.ts';
 import { formatClock, parseClock } from './time.ts';
 
 /** Bir ders saati. `no`, ders programı kayıtlarının bağlandığı kalıcı numaradır. */
@@ -16,32 +15,21 @@ export interface BellScheduleLike {
   weekdays: number[];
   periods: Period[];
   sortOrder?: number;
-  /** Yalnızca bu düzeylere (ör. [11]) uygulanır; boşsa düzey kısıtı yok */
-  grades?: number[] | null;
-  /** Yalnızca bu sınıflara uygulanır; boşsa sınıf kısıtı yok */
-  classIds?: string[] | null;
 }
 
-/** Zilin hangi sınıf için seçildiği (sınıfa / düzeye özel çizelgeler için) */
+/**
+ * Bir sınıfın hafta günlerine göre zili: { "2": "<çizelge id>" } o gün o çizelge, { "3": "off" } o gün okulda değil.
+ * Yazılmayan günlerde okulun o güne ait genel çizelgesi geçerlidir.
+ */
+export type BellPlan = Record<string, string>;
+export const BELL_OFF = 'off';
+
+/** Zilin hangi sınıf için seçildiği */
 export interface BellClassRef {
   id?: string | null;
-  name: string;
+  name?: string;
+  bellPlan?: BellPlan | null;
 }
-
-/** Çizelge bütün okula mı (0), bir düzeye mi (1), belirli sınıflara mı (2) özel; uymuyorsa -1 */
-export function scheduleSpecificity(s: BellScheduleLike, cls?: BellClassRef | null): number {
-  const classIds = s.classIds ?? [];
-  const grades = s.grades ?? [];
-  if (!classIds.length && !grades.length) return 0;
-  if (!cls) return -1;
-  if (classIds.length && cls.id && classIds.includes(cls.id)) return 2;
-  const g = gradeOf(cls.name);
-  if (grades.length && g !== null && grades.includes(g)) return 1;
-  return -1;
-}
-
-/** Çizelge bütün okula mı uygulanır */
-export const isSchoolWide = (s: BellScheduleLike) => !(s.classIds ?? []).length && !(s.grades ?? []).length;
 
 export type BellStatus =
   | { kind: 'off' }
@@ -59,18 +47,22 @@ export function sortPeriods(periods: readonly Period[]): Period[] {
 }
 
 /**
- * Bugünün hafta gününe uyan zil çizelgesini seçer. Sınıf verilirse önce o sınıfa özel, sonra o düzeye özel
- * (ör. "Salı · 11. sınıflar"), en son bütün okulun çizelgesi geçerlidir; sınıf verilmezse yalnızca bütün okulun
- * çizelgeleri. Aynı düzeyde birden fazla çizelge aynı günü kapsıyorsa daha az gün kapsayan (daha özel) olan
- * geçerlidir: "Hafta içi" (Pzt–Cum) yanında "Cuma" (yalnız Cum) çizelgesi varsa cuma günü "Cuma" kullanılır.
+ * O günün zil çizelgesi. Sınıfın zil planında o gün için çizelge seçilmişse o ("off" ise null: sınıf o gün
+ * okulda değil); yoksa okulun o günü kapsayan çizelgesi. Birden fazla çizelge aynı günü kapsıyorsa daha az gün
+ * kapsayan (daha özel) olan geçerlidir: "Hafta içi" (Pzt–Cum) yanında "Cuma" çizelgesi varsa cuma günü "Cuma".
  * Eşitlikte listedeki sıra belirler.
  */
 export function pickSchedule<T extends BellScheduleLike>(schedules: readonly T[], weekday: number, cls?: BellClassRef | null): T | null {
+  const planned = cls?.bellPlan?.[String(weekday)];
+  if (planned === BELL_OFF) return null;
+  if (planned) {
+    const s = schedules.find((x) => x.id === planned && x.periods.length > 0);
+    if (s) return s;
+  }
   const matches = schedules
-    .map((s) => ({ s, rank: scheduleSpecificity(s, cls) }))
-    .filter(({ s, rank }) => rank >= 0 && s.weekdays.includes(weekday) && s.periods.length > 0)
-    .sort((a, b) => b.rank - a.rank || a.s.weekdays.length - b.s.weekdays.length || (a.s.sortOrder ?? 0) - (b.s.sortOrder ?? 0));
-  return matches[0]?.s ?? null;
+    .filter((s) => s.weekdays.includes(weekday) && s.periods.length > 0)
+    .sort((a, b) => a.weekdays.length - b.weekdays.length || (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  return matches[0] ?? null;
 }
 
 /**
@@ -177,49 +169,4 @@ export function validatePeriods(periods: readonly Period[]): string | null {
     }
   }
   return null;
-}
-
-export interface TeacherClash {
-  teacherId: string;
-  weekday: number;
-  a: { className: string; periodNo: number; start: string; end: string };
-  b: { className: string; periodNo: number; start: string; end: string };
-}
-
-/**
- * Sınıflar farklı zil izlediğinde bir öğretmenin dersleri saat olarak örtüşebilir (ör. salı 11-A'da 6. ders
- * 12:40–13:20, 9-C'de 6. ders 13:15–13:55). Aynı saatteki birleştirilmiş / bölünmüş dersler (başlangıç ve bitiş
- * aynı) çakışma sayılmaz.
- */
-export function teacherClashes(
-  entries: readonly { teacherId: string | null; weekday: number; periodNo: number; classGroupId: string }[],
-  schedules: readonly BellScheduleLike[],
-  classes: readonly { id: string; name: string }[],
-): TeacherClash[] {
-  const className = new Map(classes.map((c) => [c.id, c.name]));
-  const slots = new Map<string, { className: string; periodNo: number; start: string; end: string; s: number; e: number }[]>();
-  for (const x of entries) {
-    if (!x.teacherId) continue;
-    const name = className.get(x.classGroupId) ?? '';
-    const period = pickSchedule(schedules, x.weekday, { id: x.classGroupId, name })?.periods.find((p) => p.no === x.periodNo);
-    if (!period) continue;
-    const key = `${x.teacherId}|${x.weekday}`;
-    const list = slots.get(key) ?? [];
-    list.push({ className: name, periodNo: x.periodNo, start: period.start, end: period.end, s: parseClock(period.start), e: parseClock(period.end) });
-    slots.set(key, list);
-  }
-  const out: TeacherClash[] = [];
-  for (const [key, list] of slots) {
-    const [teacherId, weekday] = key.split('|');
-    list.sort((p, q) => p.s - q.s);
-    for (let i = 0; i < list.length; i++)
-      for (let j = i + 1; j < list.length && list[j]!.s < list[i]!.e; j++) {
-        const a = list[i]!;
-        const b = list[j]!;
-        if (a.s === b.s && a.e === b.e) continue;
-        const pick = ({ className, periodNo, start, end }: typeof a) => ({ className, periodNo, start, end });
-        out.push({ teacherId: teacherId!, weekday: Number(weekday), a: pick(a), b: pick(b) });
-      }
-  }
-  return out.sort((p, q) => p.weekday - q.weekday || p.a.start.localeCompare(q.a.start));
 }

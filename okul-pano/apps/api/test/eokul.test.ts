@@ -140,7 +140,7 @@ describe('e-Okul ders programı yükleme', () => {
     });
     expectStatus(res, 200);
     // Ayşe KAYA kadroda; dört öğretmen eklenir
-    expect(res.json()).toEqual({ classesCreated: 1, teachersCreated: 4, entries: 6 });
+    expect(res.json()).toMatchObject({ classesCreated: 1, teachersCreated: 4, entries: 6, bellsUpdated: 0 });
     const staff = (await owner.get(`${base}/teachers`)).json() as { fullName: string }[];
     expect(staff.map((s) => s.fullName).sort()).toEqual(['Ali CAN', 'Ayşe KAYA', 'Veli ER', 'Yasin CEPECİ', 'Çiğdem YILMAZ'].sort());
     const tt = (await owner.get(`${base}/timetable`)).json() as { periodNo: number; weekday: number; groupLabel: string | null }[];
@@ -152,7 +152,7 @@ describe('e-Okul ders programı yükleme', () => {
       createTeachers: false,
       classes: [{ name: 'AMP 11-A', entries: [{ weekday: 3, periodNo: 1, subject: 'Fizik', teachers: ['YENİ ÖĞRETMEN'], group: null }] }],
     });
-    expect(again.json()).toEqual({ classesCreated: 0, teachersCreated: 0, entries: 1 });
+    expect(again.json()).toMatchObject({ classesCreated: 0, teachersCreated: 0, entries: 1 });
     const after = (await owner.get(`${base}/timetable`)).json() as { teacherId: string | null; subject: string }[];
     expect(after).toHaveLength(1);
     expect(after[0]).toMatchObject({ subject: 'Fizik', teacherId: null });
@@ -196,5 +196,51 @@ describe('e-Okul ders programı yükleme', () => {
     expect((await owner.post(`${base}/timetable/clear`, { scope: 'all' })).statusCode).toBe(400);
     expect((await owner.post(`${base}/timetable/clear`, { scope: 'all', confirm: 'delete-all' })).json()).toEqual({ deleted: 1 });
     expect(await count()).toBe(0);
+  });
+
+  it('zil saatleri e-Okul’dan: ana zil güncellenir, farklı saatli sınıflar ayrı zile atanır; özel eğitim zil hesabına katılmaz', async () => {
+    const p = (no: number, start: string, end: string) => ({ no, start, end });
+    const morning = [p(1, '07:30', '08:10'), p(2, '08:15', '08:55')];
+    const noon = [p(1, '12:50', '13:30'), p(2, '13:35', '14:15')];
+    const lesson = [{ weekday: 1, periodNo: 1, subject: 'Matematik', teachers: [], group: null }];
+    const body = {
+      createTeachers: false,
+      classes: [
+        { name: '7-A', entries: lesson },
+        { name: '5-A', entries: lesson },
+        { name: '5-F', entries: lesson },
+      ],
+      bells: [
+        { periods: morning, classNames: ['7-A', '5-F'] },
+        { periods: noon, classNames: ['5-A'] },
+      ],
+      exemptClasses: ['5-F'],
+    };
+    expect((await owner.post(`${base}/timetable/import/eokul/apply`, body)).json()).toMatchObject({ bellsUpdated: 2, exempt: 1 });
+    // İkinci kez yüklemek yeni zil eklemez, öncekini yeniler
+    expectStatus(await owner.post(`${base}/timetable/import/eokul/apply`, body), 200);
+    const schedules = (await owner.get(`${base}/bell-schedules`)).json() as { id: string; name: string; weekdays: number[]; periods: { start: string }[] }[];
+    expect(schedules).toHaveLength(2);
+    const main = schedules.find((s) => s.weekdays.length)!;
+    const extra = schedules.find((s) => !s.weekdays.length)!;
+    expect(main.periods[0]!.start).toBe('07:30');
+    expect(extra.name).toBe('Ders saatleri 2 (12:50–14:15)');
+    const classes = (await owner.get(`${base}/classes`)).json() as { id: string; name: string; bellPlan: Record<string, string>; bellExempt: boolean }[];
+    const c = (n: string) => classes.find((x) => x.name === n)!;
+    expect(c('5-A').bellPlan['1']).toBe(extra.id);
+    expect(c('7-A').bellPlan).toEqual({});
+    expect(c('5-F').bellExempt).toBe(true);
+
+    // Zil ataması tablosundan: salı 7-A okulda değil, sonra genel zile döner
+    expectStatus(await owner.post(`${base}/classes/bell-plan`, { classIds: [c('7-A').id], weekday: 2, value: 'off' }), 200);
+    let after = (await owner.get(`${base}/classes`)).json() as typeof classes;
+    expect(after.find((x) => x.name === '7-A')!.bellPlan).toEqual({ '2': 'off' });
+    expectStatus(await owner.post(`${base}/classes/bell-plan`, { classIds: [c('7-A').id], weekday: 2, value: null }), 200);
+    expectStatus(await owner.post(`${base}/classes/bell-exempt`, { classIds: [c('5-F').id], exempt: false }), 200);
+    after = (await owner.get(`${base}/classes`)).json() as typeof classes;
+    expect(after.find((x) => x.name === '7-A')!.bellPlan).toEqual({});
+    expect(after.find((x) => x.name === '5-F')!.bellExempt).toBe(false);
+    // Başka okulun çizelgesi atanamaz
+    expect((await owner.post(`${base}/classes/bell-plan`, { classIds: [c('7-A').id], weekday: 2, value: '00000000-0000-4000-8000-000000000000' })).statusCode).toBe(400);
   });
 });

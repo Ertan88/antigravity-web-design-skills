@@ -1,14 +1,14 @@
-import { resolveScreenDisplay, type ScreenDisplay } from '@okulpano/shared';
+import { compareClassNames, resolveScreenDisplay, type ScreenDisplay } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { Clock, Images, LayoutDashboard, RectangleHorizontal, RectangleVertical, type LucideIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { BoardPreview } from '../../components/BoardPreview.tsx';
 import { useToast } from '../../components/Toast.tsx';
-import { Button, Field, Modal, Segmented } from '../../components/ui.tsx';
+import { Button, Field, Modal, Segmented, Select } from '../../components/ui.tsx';
 import { api } from '../../lib/api.ts';
 import { useAuth } from '../../lib/auth.tsx';
-import { useSchoolPath, type Screen } from '../../lib/data.ts';
+import { useList, useSchoolPath, type BellSchedule, type ClassGroup, type Screen } from '../../lib/data.ts';
 
 const MODES: { value: ScreenDisplay['mode']; label: string; description: string; icon: LucideIcon }[] = [
   { value: 'board', label: 'Tam pano', description: 'Duyurular, nöbet, zil, dersler…', icon: LayoutDashboard },
@@ -33,6 +33,9 @@ export function ScreenFormatDialog({ screen, onClose }: { screen: Screen | null;
   const editable = can('screens.manage');
   const [d, setD] = useState<ScreenDisplay>(resolveScreenDisplay(screen?.display));
   const [saving, setSaving] = useState(false);
+  const schedules = useList<BellSchedule>('bell-schedules');
+  const classes = useList<ClassGroup>('classes');
+  const sortedClasses = [...(classes.data ?? [])].sort((a, b) => compareClassNames(a.name, b.name));
 
   useEffect(() => {
     if (screen) setD(resolveScreenDisplay(screen.display));
@@ -127,6 +130,40 @@ export function ScreenFormatDialog({ screen, onClose }: { screen: Screen | null;
                       </span>
                     </button>
                   ))}
+                </div>
+              )}
+            </Field>
+            <Field label="Zil sayacı" help="Otomatik: o saatte en çok sınıfın derste olduğu zil (ikili öğretimde sabah sabahçı, öğleden sonra öğlenci zili).">
+              {(id) => (
+                <Select id={id} disabled={!editable} value={d.bellScheduleId ?? ''} onChange={(e) => set({ bellScheduleId: e.target.value || null })}>
+                  <option value="">Otomatik</option>
+                  {(schedules.data ?? []).map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+            <Field label="Bu panoda gösterilen sınıflar" help="Dersler ve zil yalnızca seçili sınıflara göre gösterilir (ör. aynı binadaki ortaokul). Hiçbiri seçili değilse bütün okul.">
+              {() => (
+                <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">
+                  {sortedClasses.map((c) => {
+                    const on = d.classIds.includes(c.id);
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        disabled={!editable}
+                        aria-pressed={on}
+                        onClick={() => set({ classIds: on ? d.classIds.filter((x) => x !== c.id) : [...d.classIds, c.id] })}
+                        className={clsx('rounded-full px-3 py-1 text-xs font-bold transition', on ? 'bg-ink text-white' : 'bg-surface text-slate-700 ring-1 ring-slate-200 hover:ring-slate-300')}
+                      >
+                        {c.name}
+                      </button>
+                    );
+                  })}
+                  {!sortedClasses.length && <span className="text-xs text-slate-500">Sınıf yok.</span>}
                 </div>
               )}
             </Field>

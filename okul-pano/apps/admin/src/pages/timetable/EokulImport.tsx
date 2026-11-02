@@ -17,9 +17,11 @@ interface Preview {
   pages: number;
   failedPages: number[];
   stats: { classes: number; lessons: number; split: number; electives: number; noTeacher: number; grouped: number };
-  classes: { name: string; program: string; field: string; groups: string[]; lessons: number; existing: boolean; entries: Entry[] }[];
+  classes: { name: string; program: string; field: string; groups: string[]; lessons: number; existing: boolean; special: boolean; entries: Entry[] }[];
   teachers: { name: string; displayName: string; lessons: number; match: { id: string; fullName: string } | null }[];
   bell: { schedule: string | null; mismatches: { no: number; pdf: string; school: string | null }[] };
+  /** e-Okul'daki ders saatleri: saatleri aynı sınıflar bir zil */
+  bells: { periods: { no: number; start: string; end: string }[]; classNames: string[] }[];
 }
 
 /**
@@ -32,6 +34,8 @@ export function EokulImport({ file, onClose }: { file: File | null; onClose: () 
   const qc = useQueryClient();
   const toast = useToast();
   const [createTeachers, setCreateTeachers] = useState(true);
+  const [useBells, setUseBells] = useState(true);
+  const [exemptSpecial, setExemptSpecial] = useState(true);
 
   const preview = useMutation({
     mutationFn: (f: File) => {
@@ -42,12 +46,17 @@ export function EokulImport({ file, onClose }: { file: File | null; onClose: () 
   });
   const apply = useMutation({
     mutationFn: (p: Preview) =>
-      api<{ classesCreated: number; teachersCreated: number; entries: number }>(`${path}/apply`, {
+      api<{ classesCreated: number; teachersCreated: number; entries: number; bellsUpdated: number }>(`${path}/apply`, {
         method: 'POST',
-        body: { createTeachers, classes: p.classes.map((c) => ({ name: c.name, entries: c.entries })) },
+        body: {
+          createTeachers,
+          classes: p.classes.map((c) => ({ name: c.name, entries: c.entries })),
+          bells: useBells ? p.bells : [],
+          exemptClasses: exemptSpecial ? p.classes.filter((c) => c.special).map((c) => c.name) : [],
+        },
       }),
     onSuccess: (r) => {
-      for (const key of ['timetable', 'classes', 'teachers']) void qc.invalidateQueries({ queryKey: [schoolId, key] });
+      for (const key of ['timetable', 'classes', 'teachers', 'bell-schedules']) void qc.invalidateQueries({ queryKey: [schoolId, key] });
       toast.success(
         `Ders programı yüklendi: ${r.entries} ders saati${r.classesCreated ? `, ${r.classesCreated} yeni sınıf` : ''}${r.teachersCreated ? `, ${r.teachersCreated} yeni öğretmen` : ''}`,
       );
@@ -65,6 +74,7 @@ export function EokulImport({ file, onClose }: { file: File | null; onClose: () 
   const p = preview.data;
   const unmatched = p?.teachers.filter((t) => !t.match) ?? [];
   const newClasses = p?.classes.filter((c) => !c.existing) ?? [];
+  const special = p?.classes.filter((c) => c.special) ?? [];
 
   return (
     <Modal
@@ -113,12 +123,44 @@ export function EokulImport({ file, onClose }: { file: File | null; onClose: () 
             {p.stats.grouped ? `; dallara ayrılan şubelerde ${p.stats.grouped} ders saati dal adıyla` : ''}.
           </p>
           {p.failedPages.length > 0 && <Alert tone="amber">Okunamayan sayfalar: {p.failedPages.join(', ')}. Bu sayfalar yüklenmeyecek.</Alert>}
-          {p.bell.mismatches.length > 0 && (
-            <Alert tone="amber">
-              PDF'teki ders saatleri okulun zil çizelgesinden ({p.bell.schedule ?? 'tanımlı değil'}) farklı:{' '}
-              {p.bell.mismatches.map((m) => `${m.no}. ders ${m.pdf}${m.school ? ` (çizelgede ${m.school})` : ' (çizelgede yok)'}`).join(', ')}. Zil çizelgesi değiştirilmez;
-              gerekiyorsa Zil Saatleri sayfasından düzeltin.
-            </Alert>
+          <div>
+            <div className="mb-2 font-bold">Zil saatleri</div>
+            <div className="space-y-3 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+              {p.bells.map((b, i) => (
+                <div key={i} className="text-sm">
+                  <span className="font-semibold text-ink">
+                    {i === 0 ? 'Ana zil' : `${i + 1}. zil`} · {b.periods.length} ders · {b.periods[0]?.start}–{b.periods[b.periods.length - 1]?.end}
+                  </span>
+                  <span className="text-slate-500">
+                    {' '}
+                    · {p.bells.length > 1 ? b.classNames.join(', ') : 'bütün sınıflar'}
+                  </span>
+                </div>
+              ))}
+              <Toggle
+                checked={useBells}
+                onChange={setUseBells}
+                label="Zil saatlerini e-Okul'daki saatlerle güncelle"
+                description={
+                  p.bells.length > 1
+                    ? 'Ana zil okulun genel zilinin yerine yazılır; saatleri farklı sınıflar (ör. öğlenci) ayrı zile atanır. Cuma gibi özel çizelgelere dokunulmaz.'
+                    : p.bell.mismatches.length
+                      ? `Okulun zili (${p.bell.schedule ?? 'tanımlı değil'}) ${p.bell.mismatches.length} ders saatinde farklı; e-Okul saatleri yazılır. Cuma gibi özel çizelgelere dokunulmaz.`
+                      : "Okulun zili e-Okul'daki saatlerle aynı."
+                }
+              />
+            </div>
+          </div>
+
+          {special.length > 0 && (
+            <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+              <Toggle
+                checked={exemptSpecial}
+                onChange={setExemptSpecial}
+                label={`Özel eğitim sınıflarını zil hesabına katma (${special.length})`}
+                description={`${special.map((c) => c.name).join(', ')}. Genel zili izlerler; panodaki zil seçimine, "Şu an derste" listesine ve öğretmen çakışma denetimine girmezler. Sonra Zil Saatleri sayfasından değiştirilebilir.`}
+              />
+            </div>
           )}
 
           <div>

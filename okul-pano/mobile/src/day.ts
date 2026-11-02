@@ -28,12 +28,13 @@ export function teacherDay(data: MeToday, date: Date): TeacherDay {
   // Her ders kendi sınıfının zilini izler (ör. salı 11. sınıfların farklı ders saatleri)
   const cal = { schedules: data.bellSchedules, holidays: data.holidays, halfDays: data.halfDays ?? [], halfDayEnd: data.halfDayEnd };
   const byNo = new Map(periods.map((p) => [p.no, p]));
-  const scoped = data.bellSchedules.some((s) => (s.grades ?? []).length || (s.classIds ?? []).length);
+  // Zil ataması yapılmış sınıflar kendi zilini izler (ör. ikili öğretimde öğlenci, uzun gün)
+  const scoped = data.lessons.some((l) => l.bellPlan && Object.keys(l.bellPlan).length);
   let seenNext = false;
   const lessons = data.lessons
     .filter((l) => l.weekday === now.weekday)
     .flatMap((l) => {
-      const period = scoped ? schoolDay(now.isoDate, cal, { id: l.classId, name: l.className }).periods.find((p) => p.no === l.periodNo) : byNo.get(l.periodNo);
+      const period = scoped ? schoolDay(now.isoDate, cal, { id: l.classId, name: l.className, bellPlan: l.bellPlan }).periods.find((p) => p.no === l.periodNo) : byNo.get(l.periodNo);
       return period ? [{ l, period }] : [];
     })
     .sort((a, b) => toSec(a.period.start) - toSec(b.period.start))

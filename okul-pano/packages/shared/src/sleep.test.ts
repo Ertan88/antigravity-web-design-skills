@@ -36,6 +36,6 @@ describe('resolveScreenDisplay', () => {
   it('varsayılanlar ve sınırlar', () => {
     expect(resolveScreenDisplay(null).mode).toBe('board');
     expect(resolveScreenDisplay({ mode: 'wall' as never }).mode).toBe('board');
-    expect(resolveScreenDisplay({ orientation: 'portrait', mode: 'slides' })).toEqual({ orientation: 'portrait', mode: 'slides' });
+    expect(resolveScreenDisplay({ orientation: 'portrait', mode: 'slides' })).toEqual({ orientation: 'portrait', mode: 'slides', bellScheduleId: null, classIds: [] });
   });
 });

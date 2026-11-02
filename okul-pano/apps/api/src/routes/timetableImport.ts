@@ -1,11 +1,11 @@
-import { trCompare } from '@okulpano/shared';
-import { asc, eq, sql } from 'drizzle-orm';
+import { trCompare, validatePeriods } from '@okulpano/shared';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { audit, schoolGuard } from '../context.ts';
 import { bellSchedules, classGroups, teachers, timetableEntries } from '../db/schema.ts';
 import { badRequest, parse } from '../lib/errors.ts';
-import { buildClasses, parseEokulPage, readPdfPages, teacherDisplayName, teacherKey, type EokulPage } from '../lib/sheets/eokul.ts';
+import { buildClasses, isSpecialEducation, parseEokulPage, readPdfPages, teacherDisplayName, teacherKey, timesToPeriods, type EokulPage } from '../lib/sheets/eokul.ts';
 
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
 
@@ -23,6 +23,21 @@ const applySchema = z.object({
     .max(300),
   /** Kadroda olmayan öğretmenler eklensin mi (eklenmezse o dersler öğretmensiz yazılır) */
   createTeachers: z.boolean().default(true),
+  /**
+   * e-Okul'daki ders saatleri: saatleri aynı sınıflar bir zil. İlki okulun ana zilinin yerine yazılır, diğerleri
+   * (ör. ikili öğretimde öğlenci) ayrı zil olarak eklenir ve o sınıflara atanır. Boşsa zil çizelgelerine dokunulmaz.
+   */
+  bells: z
+    .array(
+      z.object({
+        periods: z.array(z.object({ no: z.number().int().min(1).max(30), start: z.string().regex(/^\d{2}:\d{2}$/), end: z.string().regex(/^\d{2}:\d{2}$/) })).min(1).max(30),
+        classNames: z.array(z.string().trim().min(1).max(60)).max(300),
+      }),
+    )
+    .max(10)
+    .default([]),
+  /** Zil hesabına katılmayacak sınıflar (ör. özel eğitim) */
+  exemptClasses: z.array(z.string().trim().min(1).max(60)).max(300).default([]),
 });
 
 async function readPdfUpload(req: FastifyRequest): Promise<Uint8Array> {
@@ -80,15 +95,32 @@ export async function timetableImportRoutes(app: FastifyInstance) {
       })
       .sort((a, b) => trCompare(a.name, b.name));
 
-    // PDF'teki ders saatleri okulun hafta içi zil çizelgesiyle karşılaştırılır (çizelge değiştirilmez)
-    const times = new Map<number, string>();
-    for (const p of pages) for (const [no, time] of Object.entries(p.times)) times.set(Number(no), time);
-    const weekday = schedules.find((s) => s.weekdays.includes(1)) ?? schedules[0];
-    const bell = [...times]
-      .sort((a, b) => a[0] - b[0])
-      .map(([no, time]) => {
-        const p = weekday?.periods.find((x) => x.no === no);
-        return { no, pdf: time, school: p ? `${p.start}-${p.end}` : null };
+    // e-Okul'daki ders saatleri: saatleri aynı olan sınıflar bir zil (ikili öğretimde sabahçı / öğlenci gibi)
+    // Ortak ders numaralarında saatleri aynı olan sayfalar (biri 10, öbürü 11 satır basılmış olsa da) aynı zildir
+    const bells: { periods: ReturnType<typeof timesToPeriods>; classNames: string[] }[] = [];
+    for (const c of classes) {
+      const periods = timesToPeriods(c.times);
+      const same = bells.find(
+        (b) =>
+          periods.some((p) => b.periods.some((q) => q.no === p.no)) &&
+          periods.every((p) => b.periods.every((q) => q.no !== p.no || (q.start === p.start && q.end === p.end))) &&
+          !validatePeriods([...b.periods, ...periods.filter((p) => !b.periods.some((q) => q.no === p.no))]),
+      );
+      if (!same) {
+        bells.push({ periods, classNames: [c.name] });
+        continue;
+      }
+      same.classNames.push(c.name);
+      for (const p of periods) if (!same.periods.some((q) => q.no === p.no)) same.periods.push(p);
+      same.periods.sort((x, y) => x.no - y.no);
+    }
+    bells.sort((a, b) => b.classNames.length - a.classNames.length);
+    // Ana zil, okulun en çok günü kapsayan çizelgesiyle karşılaştırılır
+    const main = [...schedules].filter((s) => s.source !== 'eokul-extra').sort((a, b) => b.weekdays.length - a.weekdays.length || a.sortOrder - b.sortOrder)[0];
+    const bell = (bells[0]?.periods ?? [])
+      .map((p) => {
+        const sp = main?.periods.find((x) => x.no === p.no);
+        return { no: p.no, pdf: `${p.start}-${p.end}`, school: sp ? `${sp.start}-${sp.end}` : null };
       })
       .filter((b) => b.pdf !== b.school);
 
@@ -111,10 +143,12 @@ export async function timetableImportRoutes(app: FastifyInstance) {
         groups: c.groups,
         lessons: c.entries.length,
         existing: classByKey.has(teacherKey(c.name)),
+        special: isSpecialEducation(c),
         entries: c.entries,
       })),
       teachers: teacherList,
-      bell: { schedule: weekday?.name ?? null, mismatches: bell },
+      bell: { schedule: main?.name ?? null, mismatches: bell },
+      bells,
     };
   });
 
@@ -152,6 +186,51 @@ export async function timetableImportRoutes(app: FastifyInstance) {
         }
       }
 
+      // Zil hesabına katılmayacak sınıflar (ör. özel eğitim)
+      const exemptIds = body.exemptClasses.map((n) => classId.get(teacherKey(n))).filter((x): x is string => Boolean(x));
+      if (exemptIds.length) await tx.update(classGroups).set({ bellExempt: true }).where(and(eq(classGroups.schoolId, schoolId), inArray(classGroups.id, exemptIds)));
+
+      // Zil saatleri e-Okul'dan: ilk zil okulun ana zilinin yerine; diğerleri ayrı zil olarak o sınıflara atanır
+      let bellsUpdated = 0;
+      if (body.bells.length) {
+        for (const b of body.bells) {
+          const problem = validatePeriods(b.periods);
+          if (problem) throw badRequest(`e-Okul ders saatleri okunamadı: ${problem}`);
+        }
+        const existing = await tx.select().from(bellSchedules).where(eq(bellSchedules.schoolId, schoolId));
+        await tx.delete(bellSchedules).where(and(eq(bellSchedules.schoolId, schoolId), eq(bellSchedules.source, 'eokul-extra')));
+        const kept = existing.filter((s) => s.source !== 'eokul-extra');
+        const main = [...kept].sort((a, b) => b.weekdays.length - a.weekdays.length || a.sortOrder - b.sortOrder)[0];
+        const [first, ...rest] = body.bells;
+        const weekdays = main?.weekdays.length ? main.weekdays : [1, 2, 3, 4, 5];
+        if (main) await tx.update(bellSchedules).set({ periods: first!.periods, updatedAt: new Date() }).where(eq(bellSchedules.id, main.id));
+        else await tx.insert(bellSchedules).values({ schoolId, name: 'Ders saatleri', weekdays, periods: first!.periods, source: 'eokul' });
+        bellsUpdated = 1;
+        const validIds = new Set(kept.map((s) => s.id));
+        const planFor = new Map<string, string>();
+        for (const [i, b] of rest.entries()) {
+          const startEnd = `${b.periods[0]!.start}–${b.periods[b.periods.length - 1]!.end}`;
+          const [row] = await tx
+            .insert(bellSchedules)
+            .values({ schoolId, name: `Ders saatleri ${i + 2} (${startEnd})`, weekdays: [], periods: b.periods, source: 'eokul-extra', sortOrder: 100 + i })
+            .returning({ id: bellSchedules.id });
+          validIds.add(row!.id);
+          bellsUpdated++;
+          for (const n of b.classNames) {
+            const id = classId.get(teacherKey(n));
+            if (id) planFor.set(id, row!.id);
+          }
+        }
+        // Silinen e-Okul zillerine bağlı atamalar temizlenir; ayrı zildeki sınıflar o zile atanır
+        const all = await tx.select({ id: classGroups.id, bellPlan: classGroups.bellPlan }).from(classGroups).where(eq(classGroups.schoolId, schoolId));
+        for (const c of all) {
+          const plan = Object.fromEntries(Object.entries(c.bellPlan ?? {}).filter(([, v]) => v === 'off' || validIds.has(v)));
+          const target = planFor.get(c.id);
+          if (target) for (const d of weekdays) plan[String(d)] = target;
+          if (JSON.stringify(plan) !== JSON.stringify(c.bellPlan ?? {})) await tx.update(classGroups).set({ bellPlan: plan }).where(eq(classGroups.id, c.id));
+        }
+      }
+
       // Okulun bütün programı yenisiyle değiştirilir; bölünmüş derste her öğretmen için bir kayıt
       await tx.delete(timetableEntries).where(eq(timetableEntries.schoolId, schoolId));
       const rows = body.classes.flatMap((c) =>
@@ -169,7 +248,7 @@ export async function timetableImportRoutes(app: FastifyInstance) {
         }),
       );
       for (let i = 0; i < rows.length; i += 500) await tx.insert(timetableEntries).values(rows.slice(i, i + 500));
-      return { classesCreated, teachersCreated, entries: rows.length };
+      return { classesCreated, teachersCreated, entries: rows.length, bellsUpdated, exempt: exemptIds.length };
     });
     await audit(req, 'update', 'Ders programı', null, `e-Okul PDF'inden yüklendi: ${body.classes.length} sınıf, ${result.entries} kayıt`);
     bus.contentChanged(schoolId);

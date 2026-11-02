@@ -1,9 +1,9 @@
-import { timetableEntrySchema, WEEKDAY_NAMES } from '@okulpano/shared';
-import { and, asc, eq, ne } from 'drizzle-orm';
+import { classBellExemptSchema, classBellPlanSchema, timetableEntrySchema, WEEKDAY_NAMES } from '@okulpano/shared';
+import { and, asc, eq, inArray, ne } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { audit, schoolGuard, UUID_RE } from '../context.ts';
-import { classGroups, teachers, timetableEntries } from '../db/schema.ts';
+import { bellSchedules, classGroups, teachers, timetableEntries } from '../db/schema.ts';
 import { badRequest, conflict, notFound, parse } from '../lib/errors.ts';
 
 /**
@@ -15,6 +15,50 @@ export async function timetableRoutes(app: FastifyInstance) {
   const base = '/api/schools/:schoolId/timetable';
   const t = timetableEntries;
   const write = { preHandler: [app.authenticate, schoolGuard('schedule.manage')] };
+
+  /** Zil ataması: seçili sınıfların bir gündeki zili (null: okulun genel zili, "off": o gün okulda değil) */
+  app.post('/api/schools/:schoolId/classes/bell-plan', write, async (req) => {
+    const body = parse(classBellPlanSchema, req.body);
+    const schoolId = req.ctx.schoolId;
+    if (body.value && body.value !== 'off') {
+      const [s] = await db
+        .select({ id: bellSchedules.id })
+        .from(bellSchedules)
+        .where(and(eq(bellSchedules.id, body.value), eq(bellSchedules.schoolId, schoolId)));
+      if (!s) throw badRequest('Zil çizelgesi bulunamadı.');
+    }
+    const rows = await db
+      .select({ id: classGroups.id, bellPlan: classGroups.bellPlan })
+      .from(classGroups)
+      .where(and(eq(classGroups.schoolId, schoolId), inArray(classGroups.id, body.classIds)));
+    const day = String(body.weekday);
+    await db.transaction(async (tx) => {
+      for (const r of rows) {
+        const plan = { ...(r.bellPlan ?? {}) };
+        if (body.value) plan[day] = body.value;
+        else delete plan[day];
+        await tx.update(classGroups).set({ bellPlan: plan, updatedAt: new Date() }).where(eq(classGroups.id, r.id));
+      }
+    });
+    await audit(req, 'update', 'Zil ataması', null, `${WEEKDAY_NAMES[body.weekday]}: ${rows.length} sınıf`);
+    bus.contentChanged(schoolId);
+    return { updated: rows.length };
+  });
+
+  /** Seçili sınıfları zil hesabına kat / katma (ör. özel eğitim sınıfları) */
+  app.post('/api/schools/:schoolId/classes/bell-exempt', write, async (req) => {
+    const body = parse(classBellExemptSchema, req.body);
+    const schoolId = req.ctx.schoolId;
+    if (!body.classIds.length) return { updated: 0 };
+    const rows = await db
+      .update(classGroups)
+      .set({ bellExempt: body.exempt, updatedAt: new Date() })
+      .where(and(eq(classGroups.schoolId, schoolId), inArray(classGroups.id, body.classIds)))
+      .returning({ id: classGroups.id });
+    await audit(req, 'update', 'Zil ataması', null, `${rows.length} sınıf zil hesabına ${body.exempt ? 'katılmıyor' : 'katılıyor'}`);
+    bus.contentChanged(schoolId);
+    return { updated: rows.length };
+  });
 
   app.get(base, { preHandler: [app.authenticate, schoolGuard()] }, async (req) =>
     db

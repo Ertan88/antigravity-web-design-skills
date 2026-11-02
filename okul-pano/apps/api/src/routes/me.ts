@@ -31,7 +31,7 @@ export async function meRoutes(app: FastifyInstance) {
       holidaysAndHalfDays(db, schoolId, today, addDays(today, 21)),
       teacher
         ? db
-            .select({ weekday: timetableEntries.weekday, periodNo: timetableEntries.periodNo, className: classGroups.name, classId: classGroups.id, subject: timetableEntries.subject })
+            .select({ weekday: timetableEntries.weekday, periodNo: timetableEntries.periodNo, className: classGroups.name, classId: classGroups.id, bellPlan: classGroups.bellPlan, subject: timetableEntries.subject })
             .from(timetableEntries)
             .innerJoin(classGroups, eq(classGroups.id, timetableEntries.classGroupId))
             .where(and(eq(timetableEntries.schoolId, schoolId), eq(timetableEntries.teacherId, teacher.id)))
@@ -77,7 +77,7 @@ export async function meRoutes(app: FastifyInstance) {
       today,
       timezone: school.timezone,
       lunchThresholdMin: settings.lunchThresholdMin,
-      bellSchedules: bells.map((b) => ({ id: b.id, name: b.name, weekdays: b.weekdays, periods: b.periods, sortOrder: b.sortOrder, grades: b.grades, classIds: b.classIds })),
+      bellSchedules: bells.map((b) => ({ id: b.id, name: b.name, weekdays: b.weekdays, periods: b.periods, sortOrder: b.sortOrder })),
       holidays: holidays.holidays,
       /** Arifeler: dersler halfDayEnd saatinde biter */
       halfDays: holidays.halfDays,

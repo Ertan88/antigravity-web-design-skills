@@ -48,6 +48,8 @@ export interface DisplayState {
   ticker: { id: string; text: string; startsAt: string | null; endsAt: string | null }[];
   bellSchedules: BellScheduleLike[];
   timetable: { weekday: number; periodNo: number; className: string; classId?: string; subject: string; teacherName: string | null }[];
+  /** Sınıfların zil planı ve zil hesabına katılıp katılmadığı */
+  classes?: { id: string; name: string; bellPlan: Record<string, string>; bellExempt: boolean }[];
   /** Başarılar ve ayın öğrencisi (yayın aralığındakiler) */
   achievements?: { id: string; kind: 'month' | 'achievement'; name: string; className: string | null; title: string; description: string | null; photoUrl: string | null; startsAt: string | null; endsAt: string | null; showCard?: boolean; showSlide?: boolean }[];
   /** Bugünden itibaren 30 günlük etkinlik takvimi */

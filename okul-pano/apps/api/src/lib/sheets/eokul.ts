@@ -230,6 +230,10 @@ export interface EokulClass {
   /** Birden çok sayfa (dal) birleştiyse dal adları */
   groups: string[];
   field: string;
+  /** e-Okul'daki sınıf tanımı ("9. Sınıf-Hafif Zihinsel") */
+  gradeLabel: string;
+  /** Sayfanın sol sütunundaki ders saatleri: numara → "08:00-08:40" */
+  times: Record<number, string>;
   entries: EokulEntry[];
 }
 
@@ -285,6 +289,8 @@ export function buildClasses(pages: EokulPage[]): EokulClass[] {
       section: first.section,
       groups: group.length > 1 ? group.map(label) : [],
       field: first.field,
+      gradeLabel: first.gradeLabel,
+      times: Object.assign({}, ...group.map((p) => p.times)) as Record<number, string>,
       entries: entries.sort((a, b) => a.weekday - b.weekday || a.periodNo - b.periodNo),
     });
   }
@@ -331,3 +337,19 @@ export async function readPdfPages(data: Uint8Array): Promise<PdfItem[][]> {
 
 /** Kadrodaki öğretmenle eşleştirme anahtarı (büyük/küçük harf ve boşluk farkı yok sayılır) */
 export const teacherKey = (name: string) => normalizeName(name);
+
+/** e-Okul saatlerinden zil: { 1: "08:00-08:40" } → [{ no: 1, start: "08:00", end: "08:40" }] */
+export function timesToPeriods(times: Record<number, string>): { no: number; start: string; end: string }[] {
+  return Object.entries(times)
+    .map(([no, t]) => {
+      const [start, end] = t.split('-');
+      return { no: Number(no), start: start!.padStart(5, '0'), end: end!.padStart(5, '0') };
+    })
+    .sort((a, b) => a.no - b.no);
+}
+
+/**
+ * e-Okul'un sınıf tanımında özel eğitim sınıfı mı ("Hafif Zihinsel", "Otistik", "Orta-Ağır Zihinsel" …).
+ * Yalnızca öneridir: okul, sınıfı zil hesabına katıp katmamayı kendisi değiştirebilir.
+ */
+export const isSpecialEducation = (c: { gradeLabel: string; field: string }) => /zihinsel|otistik|engelli/i.test(`${c.gradeLabel} ${c.field}`);

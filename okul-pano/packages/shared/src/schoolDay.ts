@@ -1,4 +1,4 @@
-import { computeBellStatus, pickSchedule, sortPeriods, type BellClassRef, type BellScheduleLike, type Period } from './bell.ts';
+import { pickSchedule, sortPeriods, type BellClassRef, type BellScheduleLike, type Period } from './bell.ts';
 import { formatClock, parseClock } from './time.ts';
 
 /**
@@ -121,30 +121,3 @@ export function bridgeDays(from: string, to: string, holidays: readonly DayHolid
   return out;
 }
 
-/**
- * Şu an (ya da teneffüste / ilk dersten önce sıradaki) derste olan kayıtlar; her sınıf kendi zilini izler
- * (ör. salı 11. sınıfların farklı ders saatleri). Okulun dersleri bitmiş olsa da ek ders saatindeki sınıflar döner.
- */
-export function lessonsNow<E extends { weekday: number; periodNo: number; className: string; classId?: string | null }>(
-  entries: readonly E[],
-  date: string,
-  cal: SchoolCalendar,
-  secondsOfDay: number,
-  lunchThresholdMin = 30,
-): E[] {
-  const weekday = isoWeekday(date);
-  const today = entries.filter((e) => e.weekday === weekday);
-  const periodOf = new Map<string, number | null>();
-  const out: E[] = [];
-  for (const e of today) {
-    const key = e.classId ?? e.className;
-    if (!periodOf.has(key)) {
-      const day = schoolDay(date, cal, { id: e.classId, name: e.className });
-      const bell = day.periods.length ? computeBellStatus(day.periods, secondsOfDay, lunchThresholdMin) : null;
-      const p = !bell ? null : bell.kind === 'lesson' ? bell.period : bell.kind === 'break' || bell.kind === 'before' ? bell.next : null;
-      periodOf.set(key, p?.no ?? null);
-    }
-    if (periodOf.get(key) === e.periodNo) out.push(e);
-  }
-  return out;
-}
