@@ -222,7 +222,7 @@ export function teacherDisplayName(name: string): string {
 }
 
 export interface EokulClass {
-  /** Sistemdeki adı: "9-A" ya da (aynı adı başka program da kullanıyorsa) "AMP 9-A" */
+  /** Sistemdeki adı, e-Okul'daki program önekiyle: "AMP 9-A" */
   name: string;
   program: string;
   grade: number;
@@ -243,12 +243,6 @@ export function buildClasses(pages: EokulPage[]): EokulClass[] {
     const key = `${p.program}|${p.grade}|${p.section}`;
     byKey.set(key, [...(byKey.get(key) ?? []), p]);
   }
-  // Aynı "sınıf-şube" adını farklı programlar kullanıyorsa ad program önekiyle ayrılır
-  const programsOf = new Map<string, Set<string>>();
-  for (const p of pages) {
-    const base = `${p.grade}-${p.section}`;
-    programsOf.set(base, (programsOf.get(base) ?? new Set()).add(p.program));
-  }
   const cellKey = (e: { weekday: number; periodNo: number }) => `${e.weekday}-${e.periodNo}`;
   const sig = (list: { subject: string; teachers: string[] }[]) =>
     list
@@ -259,8 +253,8 @@ export function buildClasses(pages: EokulPage[]): EokulClass[] {
   const out: EokulClass[] = [];
   for (const group of byKey.values()) {
     const first = group[0]!;
-    const base = `${first.grade}-${first.section}`;
-    const name = (programsOf.get(base)?.size ?? 0) > 1 ? `${first.program} ${base}` : base;
+    // e-Okul'daki gibi program önekiyle: "AMP 9-B", "ATP 9-A"
+    const name = `${first.program} ${first.grade}-${first.section}`;
     // Grup adı: dal ("… Dalı" kısaltılır); dallar aynıysa sınıf tanımı ("Akademik Destek (Sayısal)")
     const descriptor = (p: EokulPage) => p.gradeLabel.replace(/^\d+\.?\s*(Sınıf)?[-\s]*/i, '');
     const branchOf = (p: EokulPage) => (p.branch ? p.branch.replace(/\s+Dalı$/i, '') : null);
@@ -294,7 +288,7 @@ export function buildClasses(pages: EokulPage[]): EokulClass[] {
       entries: entries.sort((a, b) => a.weekday - b.weekday || a.periodNo - b.periodNo),
     });
   }
-  return out.sort((a, b) => a.grade - b.grade || a.section.localeCompare(b.section, 'tr') || a.name.localeCompare(b.name, 'tr'));
+  return out.sort((a, b) => a.grade - b.grade || a.section.localeCompare(b.section, 'tr') || a.program.localeCompare(b.program, 'tr'));
 }
 
 /** PDF'i sayfa sayfa okur (pdfjs; yalnızca metin) */

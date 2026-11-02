@@ -1,6 +1,7 @@
 import { timetableEntrySchema, WEEKDAY_NAMES } from '@okulpano/shared';
 import { and, asc, eq, ne } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { audit, schoolGuard, UUID_RE } from '../context.ts';
 import { classGroups, teachers, timetableEntries } from '../db/schema.ts';
 import { badRequest, conflict, notFound, parse } from '../lib/errors.ts';
@@ -76,6 +77,28 @@ export async function timetableRoutes(app: FastifyInstance) {
     await audit(req, 'update', 'Ders programı', rows[0]!.id, `${cls.name} · ${WEEKDAY_NAMES[body.weekday]} ${body.periodNo}. ders · ${body.subject}`);
     bus.contentChanged(schoolId);
     return rows[0];
+  });
+
+  /** Toplu silme: bir sınıfın programı, bir öğretmenin dersleri ya da okulun bütün programı */
+  app.post(`${base}/clear`, write, async (req) => {
+    const body = parse(
+      z.discriminatedUnion('scope', [
+        z.object({ scope: z.literal('all'), confirm: z.literal('delete-all') }),
+        z.object({ scope: z.literal('class'), id: z.string().regex(UUID_RE) }),
+        z.object({ scope: z.literal('teacher'), id: z.string().regex(UUID_RE) }),
+      ]),
+      req.body,
+    );
+    const schoolId = req.ctx.schoolId;
+    const where =
+      body.scope === 'all'
+        ? eq(t.schoolId, schoolId)
+        : and(eq(t.schoolId, schoolId), body.scope === 'class' ? eq(t.classGroupId, body.id) : eq(t.teacherId, body.id));
+    const rows = await db.delete(t).where(where).returning({ id: t.id });
+    const label = body.scope === 'all' ? 'okulun bütün programı' : body.scope === 'class' ? 'bir sınıfın programı' : 'bir öğretmenin dersleri';
+    await audit(req, 'delete', 'Ders programı', body.scope === 'all' ? null : body.id, `${label} silindi (${rows.length} kayıt)`);
+    bus.contentChanged(schoolId);
+    return { deleted: rows.length };
   });
 
   app.delete(`${base}/:id`, write, async (req, reply) => {

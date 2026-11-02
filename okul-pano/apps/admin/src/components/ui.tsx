@@ -431,10 +431,12 @@ export function DeleteButton({
   label = 'Sil',
   disabled,
   what,
+  className,
 }: {
   onConfirm: () => void;
   label?: string;
   disabled?: boolean;
+  className?: string;
   /** Onay kutusunda ne silineceği (ör. "Bu duyuru") */
   what?: string;
 }) {
@@ -475,7 +477,7 @@ export function DeleteButton({
         label={label}
         disabled={disabled}
         aria-expanded={Boolean(pos)}
-        className={clsx('hover:bg-red-50 hover:text-red-600', pos && 'bg-red-50 text-red-600')}
+        className={clsx('hover:bg-red-50 hover:text-red-600', pos && 'bg-red-50 text-red-600', className)}
         onClick={() => (pos ? setPos(null) : open())}
       >
         <Trash2 className="size-4" />

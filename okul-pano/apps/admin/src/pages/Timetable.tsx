@@ -1,13 +1,14 @@
-import { timetableEntrySchema, WEEKDAY_NAMES, WEEKDAY_SHORT, type Period } from '@okulpano/shared';
+import { compareClassNames, gradeOf, timetableEntrySchema, WEEKDAY_NAMES, WEEKDAY_SHORT, type Period } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { CalendarClock, FileUp, Plus } from 'lucide-react';
+import { CalendarClock, FileUp, Pencil, Plus, Trash2, Users } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useToast } from '../components/Toast.tsx';
 import { ClassesPanel } from './timetable/ClassesPanel.tsx';
+import { ClearDialog, type ClearScope } from './timetable/ClearDialog.tsx';
 import { EokulImport } from './timetable/EokulImport.tsx';
-import { Alert, Button, Card, EmptyState, Field, Input, Modal, PageHeader, Segmented, Select, Spinner } from '../components/ui.tsx';
+import { Alert, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Select, Spinner } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { nameMap, useList, useSchoolPath, type BellSchedule, type ClassGroup, type Teacher, type TimetableEntry } from '../lib/data.ts';
@@ -34,9 +35,23 @@ export function Timetable() {
   const form = useForm<CellForm>({ subject: '', teacherId: '', teacherId2: '' });
   const [pdf, setPdf] = useState<File | null>(null);
   const pdfInput = useRef<HTMLInputElement>(null);
+  const [classesOpen, setClassesOpen] = useState(false);
+  const [clearTarget, setClearTarget] = useState<ClearScope | null>(null);
 
-  const activeClass = classId || classes.data?.[0]?.id || '';
-  const activeTeacher = teacherId || teachers.data?.[0]?.id || '';
+  // e-Okul adları birebir ("AMP 9-A", "ATP 9-A"); açılır kutuda düzeye göre gruplanır
+  const sortedClasses = useMemo(() => [...(classes.data ?? [])].sort((a, b) => compareClassNames(a.name, b.name)), [classes.data]);
+  const classGroupsByGrade = useMemo(() => {
+    const groups = new Map<string, ClassGroup[]>();
+    for (const c of sortedClasses) {
+      const g = gradeOf(c.name);
+      const label = g === null ? 'Diğer' : `${g}. sınıflar`;
+      groups.set(label, [...(groups.get(label) ?? []), c]);
+    }
+    return [...groups];
+  }, [sortedClasses]);
+  const sortedTeachers = useMemo(() => [...(teachers.data ?? [])].sort((a, b) => a.fullName.localeCompare(b.fullName, 'tr')), [teachers.data]);
+  const activeClass = (classId && classes.data?.some((c) => c.id === classId) ? classId : '') || sortedClasses[0]?.id || '';
+  const activeTeacher = (teacherId && teachers.data?.some((t) => t.id === teacherId) ? teacherId : '') || sortedTeachers[0]?.id || '';
   const teacherNames = nameMap(teachers.data, (t) => t.fullName);
   const classNames = nameMap(classes.data, (c) => c.name);
 
@@ -48,11 +63,13 @@ export function Timetable() {
       s.weekdays.forEach((d) => days.add(d));
       for (const p of s.periods) if (!byNo.has(p.no)) byNo.set(p.no, p);
     }
+    // Zil çizelgesinde olmayan ama programda dersi bulunan saatler de gösterilir (silinip düzeltilebilsin)
+    if (byNo.size) for (const e of entries.data ?? []) if (!byNo.has(e.periodNo)) byNo.set(e.periodNo, { no: e.periodNo, start: '', end: '' } as Period);
     return {
       periods: [...byNo.values()].sort((a, b) => a.no - b.no),
       weekdays: days.size ? [...days].sort() : [1, 2, 3, 4, 5],
     };
-  }, [schedules.data]);
+  }, [schedules.data, entries.data]);
 
   const lookup = useMemo(() => {
     const m = new Map<string, TimetableEntry[]>();
@@ -86,7 +103,6 @@ export function Timetable() {
   });
 
   const openCell = (weekday: number, period: Period) => {
-    if (!editable || mode !== 'class') return;
     const entries = lookup.get(`${weekday}-${period.no}`) ?? [];
     const teacherIds = [...new Set(entries.map((e) => e.teacherId).filter((x): x is string => Boolean(x)))];
     form.reset({ subject: entries[0]?.subject ?? '', teacherId: teacherIds[0] ?? '', teacherId2: teacherIds[1] ?? '' });
@@ -117,15 +133,31 @@ export function Timetable() {
     for (const e of entries.data ?? []) m.set(e.classGroupId, (m.get(e.classGroupId) ?? 0) + 1);
     return m;
   }, [entries.data]);
+  // Ders saati sayısı: bölünmüş derste aynı hücrenin iki kaydı tek saat sayılır
+  const hourCount = useMemo(() => new Set([...lookup.keys()]).size, [lookup]);
+  const clearCount = !clearTarget
+    ? 0
+    : clearTarget.scope === 'all'
+      ? (entries.data ?? []).length
+      : (entries.data ?? []).filter((e) => (clearTarget.scope === 'class' ? e.classGroupId : e.teacherId) === clearTarget.id).length;
+  const activeClassName = classNames.get(activeClass) ?? '';
+  const activeTeacherName = teacherNames.get(activeTeacher) ?? '';
 
   return (
     <>
       <PageHeader
         title="Ders Programı ve Sınıflar"
-        description="Soldan bir sınıf seçip programını düzenleyin ya da e-Okul'dan indirdiğiniz ders programı PDF'ini yükleyin. Pano, zil saatine göre o anda hangi sınıfta hangi dersin ve öğretmenin olduğunu gösterir; teneffüste sıradaki dersi gösterir."
+        description="Sınıf seçip programını düzenleyin ya da e-Okul'dan indirdiğiniz ders programı PDF'ini yükleyin. Pano, zil saatine göre o anda hangi sınıfta hangi dersin ve öğretmenin olduğunu gösterir; teneffüste sıradaki dersi gösterir."
         actions={
-          editable && (
+          (editable || can('directory.manage')) && (
             <>
+              {can('directory.manage') && (
+                <Button variant="secondary" icon={<Users className="size-4" />} onClick={() => setClassesOpen(true)}>
+                  Sınıflar
+                </Button>
+              )}
+              {editable && (
+                <>
               <input
                 ref={pdfInput}
                 type="file"
@@ -139,28 +171,41 @@ export function Timetable() {
               <Button variant="secondary" icon={<FileUp className="size-4" />} onClick={() => pdfInput.current?.click()}>
                 e-Okul PDF'i yükle
               </Button>
+              <Button
+                variant="ghost"
+                className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                icon={<Trash2 className="size-4" />}
+                disabled={!entries.data?.length}
+                onClick={() => setClearTarget({ scope: 'all' })}
+              >
+                Bütün programı sil
+              </Button>
+                </>
+              )}
             </>
           )
         }
       />
       <EokulImport file={pdf} onClose={() => setPdf(null)} />
+      <ClearDialog target={clearTarget} count={clearCount} onClose={() => setClearTarget(null)} />
+      <Modal open={classesOpen} onClose={() => setClassesOpen(false)} title="Sınıflar" description="Şubeleri ekleyin, yeniden adlandırın ya da silin. Bir sınıfa tıklayınca programı açılır.">
+        <ClassesPanel
+          classes={classes.data ?? []}
+          activeId={activeClass}
+          onSelect={(id) => {
+            setClassId(id);
+            setMode('class');
+            setClassesOpen(false);
+          }}
+          editable={can('directory.manage')}
+          lessonCounts={lessonCounts}
+        />
+      </Modal>
 
       {loading ? (
         <Spinner />
       ) : (
-        <div className="grid items-start gap-5 xl:grid-cols-[19rem_minmax(0,1fr)]">
-          <div className="xl:sticky xl:top-24">
-            <ClassesPanel
-              classes={classes.data ?? []}
-              activeId={activeClass}
-              onSelect={(id) => {
-                setClassId(id);
-                setMode('class');
-              }}
-              editable={can('directory.manage')}
-              lessonCounts={lessonCounts}
-            />
-          </div>
+        <>
           {!periods.length ? (
             <Card>
               <EmptyState
@@ -179,7 +224,14 @@ export function Timetable() {
               <EmptyState
                 icon={<CalendarClock className="size-6" />}
                 title="Sınıf ekleyin"
-                description="Soldaki Sınıflar bölümünden şubeleri ekleyin (ör. 9-A, 9-B, 10-A). Sonra her sınıfın programını buradan girebilirsiniz."
+                description="e-Okul ders programı PDF'ini yükleyin; sınıflar e-Okul'daki adlarıyla eklenir. Ya da Sınıflar düğmesinden şubeleri elle ekleyin."
+                action={
+                  can('directory.manage') ? (
+                    <Button variant="secondary" icon={<Users className="size-4" />} onClick={() => setClassesOpen(true)}>
+                      Sınıflar
+                    </Button>
+                  ) : undefined
+                }
               />
             </Card>
           ) : (
@@ -194,20 +246,44 @@ export function Timetable() {
               ]}
             />
             {mode === 'class' ? (
-              <span className="text-base font-bold text-ink">{classNames.get(activeClass) ?? ''}</span>
+              <Select value={activeClass} onChange={(e) => setClassId(e.target.value)} className="sm:w-60" aria-label="Sınıf">
+                {classGroupsByGrade.map(([label, list]) => (
+                  <optgroup key={label} label={label}>
+                    {list.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                        {lessonCounts.get(c.id) ? '' : ' · program yok'}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </Select>
             ) : (
               <Select value={activeTeacher} onChange={(e) => setTeacherId(e.target.value)} className="sm:w-64" aria-label="Öğretmen">
-                {(teachers.data ?? []).map((t) => (
+                {sortedTeachers.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.fullName}
                   </option>
                 ))}
               </Select>
             )}
-            {mode === 'class' && editable && <span className="text-xs text-slate-500 sm:ml-auto">Düzenlemek için bir hücreye tıklayın</span>}
+            <span className="text-xs text-slate-500 tabular-nums">{hourCount} ders saati</span>
+            {editable && hourCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-red-600 hover:bg-red-50 hover:text-red-700 sm:ml-auto"
+                icon={<Trash2 className="size-4" />}
+                onClick={() =>
+                  setClearTarget(mode === 'class' ? { scope: 'class', id: activeClass, name: activeClassName } : { scope: 'teacher', id: activeTeacher, name: activeTeacherName })
+                }
+              >
+                {mode === 'class' ? 'Bu sınıfın programını sil' : 'Bu öğretmenin derslerini sil'}
+              </Button>
+            )}
           </div>
           <div className="overflow-x-auto p-3 sm:p-5">
-            <table className="w-full min-w-[640px] table-fixed border-separate border-spacing-1.5 text-sm">
+            <table className="w-full min-w-[760px] table-fixed border-separate border-spacing-1.5 text-sm">
               <thead>
                 <tr>
                   <th className="w-20" />
@@ -224,52 +300,67 @@ export function Timetable() {
                   <tr key={p.no}>
                     <td className="pr-2 align-middle">
                       <div className="font-semibold">{p.no}. ders</div>
-                      <div className="text-xs text-slate-500 tabular-nums">
-                        {p.start}–{p.end}
-                      </div>
+                      {p.start && (
+                        <div className="text-xs text-slate-500 tabular-nums">
+                          {p.start}–{p.end}
+                        </div>
+                      )}
                     </td>
                     {weekdays.map((d) => {
                       const list = lookup.get(`${d}-${p.no}`) ?? [];
                       const e = list[0];
                       const lines = cellLines(list, teacherNames);
                       return (
-                        <td key={d} className="p-0">
-                          <button
-                            type="button"
-                            disabled={!editable || mode !== 'class'}
-                            onClick={() => openCell(d, p)}
+                        <td key={d} className="p-0 align-top">
+                          <div
                             className={clsx(
-                              'flex min-h-16 w-full flex-col items-start justify-center rounded-lg px-2.5 py-1.5 text-left transition-colors',
-                              e ? 'bg-brand-50 ring-1 ring-brand-100' : 'bg-slate-50 ring-1 ring-slate-100',
-                              editable && mode === 'class' && 'hover:ring-brand-300',
+                              'group relative flex h-full min-h-16 w-full flex-col justify-center gap-1 rounded-lg px-2.5 py-1.5 text-left',
+                              e ? 'bg-brand-50 ring-1 ring-brand-100' : 'items-center bg-slate-50 ring-1 ring-slate-100',
                             )}
                           >
                             {e ? (
                               mode === 'class' ? (
-                                lines.map((l) => (
-                                  <span key={l.key} className="w-full min-w-0">
-                                    {l.group && <span className="block truncate text-[10.5px] font-bold tracking-wide text-slate-400 uppercase">{l.group}</span>}
-                                    <span className="block truncate font-semibold text-ink" title={l.subject}>
-                                      {l.subject}
-                                    </span>
-                                    <span className="block truncate text-xs text-slate-500" title={l.teachers || undefined}>
-                                      {l.teachers || 'Öğretmen yok'}
-                                    </span>
-                                  </span>
-                                ))
-                              ) : (
                                 <>
-                                  <span className="w-full truncate font-semibold text-ink">{classNames.get(e.classGroupId)}</span>
-                                  <span className="w-full truncate text-xs text-slate-500">
-                                    {e.groupLabel ? `${e.groupLabel}: ` : ''}
-                                    {e.subject}
-                                  </span>
+                                  {lines.map((l) => (
+                                    <div key={l.key} className={clsx('min-w-0', editable && 'pr-6')}>
+                                      {l.group && <div className="line-clamp-1 text-[10.5px] font-bold tracking-wide text-slate-400 uppercase">{l.group}</div>}
+                                      <div className="line-clamp-3 leading-snug font-semibold break-words text-ink" title={l.subject}>
+                                        {l.subject}
+                                      </div>
+                                      <div className="line-clamp-2 text-xs leading-snug break-words text-slate-500" title={l.teachers || undefined}>
+                                        {l.teachers || 'Öğretmen yok'}
+                                      </div>
+                                    </div>
+                                  ))}
+                                  {editable && (
+                                    <div className="absolute top-0.5 right-0.5 flex flex-col">
+                                      <IconButton label="Düzenle" className="size-7 hover:bg-white" onClick={() => openCell(d, p)}>
+                                        <Pencil className="size-3.5" />
+                                      </IconButton>
+                                      <DeleteButton className="size-7" label="Dersi sil" what="Bu ders" onConfirm={() => clear.mutate(list.map((x) => x.id))} />
+                                    </div>
+                                  )}
                                 </>
+                              ) : (
+                                teacherLines(list, classNames).map((l) => (
+                                  <div key={l.key} className="min-w-0">
+                                    <div className="line-clamp-1 font-semibold text-ink">{l.className}</div>
+                                    <div className="line-clamp-2 text-xs leading-snug break-words text-slate-500" title={l.subject}>
+                                      {l.group ? `${l.group}: ` : ''}
+                                      {l.subject}
+                                    </div>
+                                  </div>
+                                ))
                               )
                             ) : (
-                              editable && mode === 'class' && <Plus className="size-4 text-slate-300" />
+                              editable &&
+                              mode === 'class' && (
+                                <IconButton label="Ders ekle" className="size-8 text-slate-300 hover:bg-white hover:text-brand-600" onClick={() => openCell(d, p)}>
+                                  <Plus className="size-4" />
+                                </IconButton>
+                              )
                             )}
-                          </button>
+                          </div>
                         </td>
                       );
                     })}
@@ -280,14 +371,14 @@ export function Timetable() {
           </div>
         </Card>
           )}
-        </div>
+        </>
       )}
 
       <Modal
         open={Boolean(cell)}
         onClose={() => setCell(null)}
         title={cell ? `${classNames.get(activeClass)} · ${WEEKDAY_NAMES[cell.weekday]} · ${cell.period.no}. ders` : ''}
-        description={cell ? `${cell.period.start} – ${cell.period.end}` : undefined}
+        description={cell?.period.start ? `${cell.period.start} – ${cell.period.end}` : undefined}
         footer={
           <>
             {cell && cell.entries.length > 0 && (
@@ -381,4 +472,14 @@ function cellLines(list: TimetableEntry[], teacherNames: Map<string, string>) {
     if (name && !line.names.includes(name)) line.names.push(name);
   }
   return [...lines.values()].map((l) => ({ ...l, teachers: l.names.join(', ') }));
+}
+
+/** Öğretmene göre görünümde hücre: sınıf ve ders (aynı saatte iki sınıf birleştirilmiş derste ikisi de) */
+function teacherLines(list: TimetableEntry[], classNames: Map<string, string>) {
+  const seen = new Map<string, { key: string; className: string; group: string | null; subject: string }>();
+  for (const e of list) {
+    const key = `${e.classGroupId}|${e.groupLabel ?? ''}|${e.subject}`;
+    if (!seen.has(key)) seen.set(key, { key, className: classNames.get(e.classGroupId) ?? '', group: e.groupLabel, subject: e.subject });
+  }
+  return [...seen.values()];
 }

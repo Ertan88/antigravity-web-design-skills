@@ -68,7 +68,7 @@ describe('e-Okul ders programı ayrıştırma', () => {
     expect(teacherDisplayName('Seda Sencer')).toBe('Seda SENCER');
   });
 
-  it('dallar tek sınıfta birleşir; aynı adı kullanan programlar önek alır', () => {
+  it('dallar tek sınıfta birleşir; sınıf adı e-Okul gibi program önekli', () => {
     const parse = (header: string, cells: Cell[], n: number) => parseEokulPage(page(header, cells), n)!;
     const classes = buildClasses([
       parse('AMP - 11. Sınıf / A Şubesi MAKİNE ALANI (Makine Bakım Onarım Dalı)', [
@@ -82,7 +82,7 @@ describe('e-Okul ders programı ayrıştırma', () => {
       parse('ATP - 11. Sınıf / A Şubesi ELEKTRİK ALANI', [{ day: 2, period: 1, subject: 'FİZİK', teachers: 'AYŞE KAYA' }], 3),
       parse('AMP - 11. Sınıf / B Şubesi BİLİŞİM ALANI', [{ day: 2, period: 1, subject: 'FİZİK' }], 4),
     ]);
-    expect(classes.map((c) => c.name)).toEqual(['AMP 11-A', 'ATP 11-A', '11-B']);
+    expect(classes.map((c) => c.name)).toEqual(['AMP 11-A', 'ATP 11-A', 'AMP 11-B']);
     const amp = classes[0]!;
     expect(amp.groups).toEqual(['Makine Bakım Onarım', 'Bilgisayarlı Makine İmalatı']);
     // Ortak ders bir kez, dal dersleri dal adıyla
@@ -172,5 +172,29 @@ describe('e-Okul ders programı yükleme', () => {
     expectStatus(await owner.put(`${base}/timetable/cell`, { weekday: 4, periodNo: 1, classGroupId: cls.id, subject: 'Teknik Resim', teacherId: id('Ali CAN') }), 200);
     cell = ((await owner.get(`${base}/timetable`)).json() as { weekday: number; teacherId: string }[]).filter((e) => e.weekday === 4);
     expect(cell.map((e) => e.teacherId)).toEqual([id('Ali CAN')]);
+  });
+
+  it('toplu silme: öğretmenin dersleri, sınıfın programı, bütün program', async () => {
+    const classes = (await owner.get(`${base}/classes`)).json() as { id: string; name: string }[];
+    const staff = (await owner.get(`${base}/teachers`)).json() as { id: string; fullName: string }[];
+    const id = (n: string) => staff.find((s) => s.fullName === n)!.id;
+    const cls = classes.find((c) => c.name === 'AMP 11-A')!;
+    await owner.post(`${base}/timetable/import/eokul/apply`, {
+      createTeachers: false,
+      classes: [
+        { name: 'AMP 11-A', entries: [{ weekday: 1, periodNo: 1, subject: 'Temel Elektrik', teachers: ['ÇİĞDEM YILMAZ', 'YASİN CEPECİ'], group: null }, { weekday: 1, periodNo: 2, subject: 'Tarih', teachers: ['AYŞE KAYA'], group: null }] },
+        { name: 'AMP 9-B', entries: [{ weekday: 2, periodNo: 1, subject: 'Fizik', teachers: ['AYŞE KAYA'], group: null }] },
+      ],
+    });
+    const count = async () => ((await owner.get(`${base}/timetable`)).json() as unknown[]).length;
+    expect(await count()).toBe(4);
+    // Bölünmüş dersten yalnızca o öğretmen çıkar
+    expect((await owner.post(`${base}/timetable/clear`, { scope: 'teacher', id: id('Çiğdem YILMAZ') })).json()).toEqual({ deleted: 1 });
+    expect((await owner.post(`${base}/timetable/clear`, { scope: 'class', id: cls.id })).json()).toEqual({ deleted: 2 });
+    expect(await count()).toBe(1);
+    // Bütün program: onay kelimesi gerekir
+    expect((await owner.post(`${base}/timetable/clear`, { scope: 'all' })).statusCode).toBe(400);
+    expect((await owner.post(`${base}/timetable/clear`, { scope: 'all', confirm: 'delete-all' })).json()).toEqual({ deleted: 1 });
+    expect(await count()).toBe(0);
   });
 });
