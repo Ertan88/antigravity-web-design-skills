@@ -1,5 +1,6 @@
 import type { Period, Shift } from '@okulpano/shared/bell';
 import { router } from 'expo-router';
+import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { useNow, type MeToday } from './data.ts';
 import { dayBellPeriods, teacherDay } from './day.ts';
@@ -60,20 +61,85 @@ export function liveLesson(data: MeToday, now: Date) {
   return { nowMin, current, run, next, any: slots.length > 0 };
 }
 
-/** Şu anki ders kartı; derste değilken sıradaki ders. Merkez'de dokununca Ders programım açılır */
+/**
+ * Şu an kartı (bütün kullanıcıların ana ekranında ve Ders programım'da aynı): kendi dersi varsa ders, sınıf, kalan süre;
+ * yoksa okulun zili (ders saati, teneffüs, derslerden önce). Altında sıradaki kendi dersi. Tatilde ve okul bitince görünmez.
+ */
 export function LiveLesson({ data, link }: { data: MeToday; link?: boolean }) {
   const now = useNow(30_000);
-  const live = data.teacher ? liveLesson(data, now) : null;
-  if (!live) return null;
+  const day = teacherDay(data, now);
+  if (day.holiday) return null;
+  const live = liveLesson(data, now);
   const toneOf = classTones(data.lessons);
+  const nowMin = Math.floor(day.now.secondsOfDay / 60);
+  const bell = day.bell;
+  const hasLessons = data.teacher && data.lessons.length > 0;
+  let main: ReactNode = null;
+  if (live?.current) {
+    const { period, lesson } = live.current;
+    main = (
+      <BigCard
+        tone={toneOf(lesson.className)}
+        kicker={`ŞU AN · ${period.no}. DERS`}
+        badge="derste"
+        title={lesson.subject}
+        subtitle={`${lesson.className}${live.run!.total > 1 ? ` · ${live.run!.total} saatlik dersin ${live.run!.index}. saati` : ''}`}
+        left={toMin(period.end) - nowMin}
+        caption="dk kaldı"
+        from={period.start}
+        to={period.end}
+        nowMin={nowMin}
+      />
+    );
+  } else if (bell.kind === 'lesson') {
+    main = (
+      <BigCard
+        tone="paper"
+        kicker={`ŞU AN · ${bell.period.no}. DERS`}
+        title={hasLessons ? 'Boş saatiniz' : 'Ders saati'}
+        subtitle={`Okulda ${bell.period.no}. ders sürüyor`}
+        left={Math.ceil(bell.remainingSec / 60)}
+        caption={bell.next ? 'dk sonra teneffüs' : 'dk sonra dersler biter'}
+        from={bell.period.start}
+        to={bell.period.end}
+        nowMin={nowMin}
+      />
+    );
+  } else if (bell.kind === 'break') {
+    main = (
+      <BigCard
+        tone="sun"
+        kicker={bell.isLunch ? 'ŞU AN · ÖĞLE ARASI' : 'ŞU AN · TENEFFÜS'}
+        title={bell.isLunch ? 'Öğle arası' : 'Teneffüs'}
+        subtitle={`${bell.next.no}. ders ${bell.next.start}'de başlar`}
+        left={Math.ceil(bell.remainingSec / 60)}
+        caption="dk sonra ders"
+        from={bell.prev.end}
+        to={bell.next.start}
+        nowMin={nowMin}
+      />
+    );
+  } else if (bell.kind === 'before') {
+    main = (
+      <BigCard
+        tone="sky"
+        kicker="DERSLERDEN ÖNCE"
+        title="Günaydın"
+        subtitle={`İlk ders ${bell.next.start}'de başlar`}
+        left={Math.ceil(bell.remainingSec / 60)}
+        caption="dk sonra ilk ders"
+      />
+    );
+  }
+  const next = live?.next ?? null;
+  if (!main && !next) return null;
   const body = (
     <View style={{ gap: 10 }}>
-      {live.current && <NowCard slot={live.current} run={live.run!} nowMin={live.nowMin} tone={toneOf(live.current.lesson.className)} />}
-      {live.next && <NextCard slot={live.next} nowMin={live.nowMin} soon={!live.current} tone={toneOf(live.next.lesson.className)} />}
+      {main}
+      {next && <NextCard slot={next} nowMin={nowMin} soon={!live?.current} tone={toneOf(next.lesson.className)} />}
     </View>
   );
-  if (!live.current && !live.next) return null;
-  return link ? (
+  return link && hasLessons ? (
     <Pressable accessibilityRole="button" accessibilityLabel="Ders programım" onPress={() => router.push('/programim')}>
       {body}
     </Pressable>
@@ -82,38 +148,56 @@ export function LiveLesson({ data, link }: { data: MeToday; link?: boolean }) {
   );
 }
 
-function NowCard({ slot, run, nowMin, tone }: { slot: Slot; run: { index: number; total: number }; nowMin: number; tone: TileTone }) {
-  const t = tiles[tone];
-  const { period, lesson } = slot;
-  const start = toMin(period.start);
-  const end = toMin(period.end);
-  const left = Math.max(0, end - nowMin);
-  const progress = Math.min(1, Math.max(0, (nowMin - start) / (end - start)));
+/** Büyük kart: üst etiket, başlık, alt satır, kalan dakika ve (varsa) ilerleme çubuğu */
+function BigCard(p: {
+  tone: TileTone;
+  kicker: string;
+  badge?: string;
+  title: string;
+  subtitle: string;
+  left: number;
+  caption: string;
+  from?: string;
+  to?: string;
+  nowMin?: number;
+}) {
+  const t = tiles[p.tone];
+  const paper = p.tone === 'paper';
+  const progress = p.from && p.to && p.nowMin !== undefined ? Math.min(1, Math.max(0, (p.nowMin - toMin(p.from)) / Math.max(1, toMin(p.to) - toMin(p.from)))) : null;
+  const left = Math.max(0, p.left);
+  // Bir saatten uzunsa "1 sa 15" + "dk sonra …", tam saatse "2 sa" + "sonra …"
+  const h = Math.floor(left / 60);
+  const m = left % 60;
+  const big = h ? `${h} sa${m ? ` ${m}` : ''}` : String(left);
+  const caption = h && !m ? p.caption.replace(/^dk /, '') : p.caption;
   return (
-    <View style={{ backgroundColor: t.bg, borderRadius: 26, padding: 18, gap: 4 }}>
+    <View style={{ backgroundColor: t.bg, borderRadius: 26, padding: 18, gap: 4, borderWidth: paper ? 1 : 0, borderColor: colors.border }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={{ fontSize: 12.5, fontWeight: '800', color: t.sub, letterSpacing: 0.4 }}>ŞU AN · {period.no}. DERS</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.danger, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 }}>
-          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' }} />
-          <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#fff' }}>derste</Text>
-        </View>
+        <Text style={{ fontSize: 12.5, fontWeight: '800', color: t.sub, letterSpacing: 0.4 }}>{p.kicker}</Text>
+        {p.badge && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.danger, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 }}>
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' }} />
+            <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#fff' }}>{p.badge}</Text>
+          </View>
+        )}
       </View>
-      <Text style={{ fontSize: 24, fontWeight: '800', color: t.fg, letterSpacing: -0.6, marginTop: 6 }}>{lesson.subject}</Text>
-      <Text style={{ fontSize: 14.5, fontWeight: '700', color: t.sub }}>
-        {lesson.className}
-        {run.total > 1 ? ` · ${run.total} saatlik dersin ${run.index}. saati` : ''}
-      </Text>
+      <Text style={{ fontSize: 24, fontWeight: '800', color: t.fg, letterSpacing: -0.6, marginTop: 6 }}>{p.title}</Text>
+      <Text style={{ fontSize: 14.5, fontWeight: '700', color: t.sub }}>{p.subtitle}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 8 }}>
-        <Text style={{ fontSize: 40, fontWeight: '800', color: t.fg, letterSpacing: -1.5 }}>{left}</Text>
-        <Text style={{ fontSize: 15, fontWeight: '700', color: t.sub }}>dk kaldı</Text>
+        <Text style={{ fontSize: 40, fontWeight: '800', color: t.fg, letterSpacing: -1.5 }}>{big}</Text>
+        <Text style={{ fontSize: 15, fontWeight: '700', color: t.sub }}>{caption}</Text>
       </View>
-      <View style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(127,127,127,0.25)', overflow: 'hidden', marginTop: 6 }}>
-        <View style={{ width: `${progress * 100}%`, height: '100%', borderRadius: 4, backgroundColor: ACCENT[tone] }} />
-      </View>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-        <Text style={{ fontSize: 12, fontWeight: '700', color: t.sub }}>{period.start}</Text>
-        <Text style={{ fontSize: 12, fontWeight: '700', color: t.sub }}>{period.end}</Text>
-      </View>
+      {progress !== null && (
+        <>
+          <View style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(127,127,127,0.25)', overflow: 'hidden', marginTop: 6 }}>
+            <View style={{ width: `${progress * 100}%`, height: '100%', borderRadius: 4, backgroundColor: paper ? colors.ink : ACCENT[p.tone] }} />
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: t.sub }}>{p.from}</Text>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: t.sub }}>{p.to}</Text>
+          </View>
+        </>
+      )}
     </View>
   );
 }

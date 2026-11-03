@@ -98,7 +98,7 @@ export function ManagerHome() {
             </Pressable>
           )}
           {me.data ? <DayBanner data={me.data} /> : c.holiday ? <Banner icon="sunny" title="Bugün tatil" text={`${c.holiday} · zil çalmıyor`} /> : null}
-          {isTeacher && me.data && <LiveLesson data={me.data} link />}
+          {me.data && <LiveLesson data={me.data} link />}
 
           <BentoRow>
             <ScreensTile screens={c.screens} />

@@ -4,9 +4,10 @@ import { View, type StyleProp, type ViewStyle } from 'react-native';
 import { Text } from './text.tsx';
 import { useAuth } from './auth.tsx';
 import { useInbox, useMeToday, useNow, type MeToday } from './data.ts';
-import { bellHeadline, countdownText, dayBellPeriods, dayTitle, greeting, teacherDay } from './day.ts';
+import { dayBellPeriods, greeting, teacherDay } from './day.ts';
 import { scheduleDutyReminders } from './push.ts';
-import { colors, radius, tiles, type TileTone } from './theme.ts';
+import { colors, tiles, type TileTone } from './theme.ts';
+import { LiveLesson } from './lesson.tsx';
 import { Badge, Banner, BentoRow, Card, Empty, HeaderButton, HomeHeader, Icon, ListRow, Loading, Screen, SectionTitle, T, Tile, type IconName } from './ui.tsx';
 import { ChipLinks } from './quick.tsx';
 
@@ -25,53 +26,6 @@ export function SchoolBadge({ name, size = 44 }: { name: string; size?: number }
   );
 }
 
-/** Şu anki ders / teneffüs ve geri sayım (panodaki zil kartının cepteki hali): koyu bento kutusu; tatilde güneş bandı */
-export function BellHero({ data }: { data: MeToday }) {
-  const now = useNow(1000);
-  const day = teacherDay(data, now);
-  const h = bellHeadline(day.bell);
-  const next = day.lessons.find((l) => l.state === 'next');
-  const t = tiles.ink;
-  if (day.holiday) return <DayBanner data={data} />;
-  return (
-    <View style={{ backgroundColor: t.bg, borderRadius: radius.xl, padding: 18, gap: 12 }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
-          <Icon name="notifications-outline" size={16} color={t.sub} />
-          <Text style={{ color: t.sub, fontSize: 13, fontWeight: '700', flexShrink: 1 }} numberOfLines={1}>
-            {h.title}
-          </Text>
-        </View>
-        <View style={{ backgroundColor: t.chip, borderRadius: radius.pill, paddingHorizontal: 11, paddingVertical: 5 }}>
-          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{dayTitle(data.today, { weekday: 'long', day: 'numeric', month: 'short' })}</Text>
-        </View>
-      </View>
-      {h.remaining != null ? (
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-          <Text style={{ color: '#fff', fontSize: 52, lineHeight: 56, fontWeight: '800', letterSpacing: -2, fontVariant: ['tabular-nums'] }}>{countdownText(h.remaining)}</Text>
-          <Text style={{ color: t.sub, fontSize: 14, fontWeight: '600' }}>{h.caption}</Text>
-        </View>
-      ) : (
-        <Text style={{ color: '#fff', fontSize: 24, lineHeight: 30, fontWeight: '800', letterSpacing: -0.6 }}>{h.caption}</Text>
-      )}
-      {h.progress != null && (
-        <View style={{ height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.14)' }} accessibilityRole="progressbar">
-          <View style={{ width: `${Math.min(100, h.progress * 100)}%`, height: 6, borderRadius: 3, backgroundColor: '#fde68a' }} />
-        </View>
-      )}
-      {day.halfDay && (
-        <Text style={{ color: '#fde68a', fontSize: 13, fontWeight: '700' }}>
-          {day.halfDay} · yarım gün, son zil {day.endsAt}
-        </Text>
-      )}
-      {(next || h.next) && (
-        <Text style={{ color: t.sub, fontSize: 13, fontWeight: '600' }}>
-          {next ? `Sıradaki dersiniz ${next.period.start} · ${next.className} ${next.subject}` : h.next}
-        </Text>
-      )}
-    </View>
-  );
-}
 
 /** Bugünkü nöbet kutusu: nöbet varsa turuncu, yoksa beyaz */
 export function DutyTile({ data, style }: { data: MeToday; style?: StyleProp<ViewStyle> }) {
@@ -212,7 +166,7 @@ export function TeacherHome() {
         <Loading />
       ) : (
         <>
-          <BellHero data={today.data} />
+          {teacherDay(today.data, now).holiday ? <DayBanner data={today.data} /> : <LiveLesson data={today.data} link />}
           {!today.data.teacher && can('conduct.counsel') ? null : !today.data.teacher ? (
             <Card tone="warning">
               <T weight="700">Hesabınız bir öğretmen kaydına bağlı değil</T>

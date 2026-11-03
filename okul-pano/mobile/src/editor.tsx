@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import { useAuth } from './auth.tsx';
 import { useAnnouncements, useMeToday, type Announcement } from './data.ts';
 import { MenuButton, QuickAdd } from './quick.tsx';
+import { LiveLesson } from './lesson.tsx';
 import { DayBanner, NotificationsButton, TodayDutyCard } from './teacher.tsx';
 import { homeTitle, localIso } from './day.ts';
 import { colors } from './theme.ts';
@@ -37,6 +38,7 @@ export function EditorHome() {
         <MenuButton />
       </HomeHeader>
       {today.data ? <DayBanner data={today.data} /> : null}
+      {today.data ? <LiveLesson data={today.data} link /> : null}
 
       {can('announcements.manage') && !list.isLoading && (
         <BentoRow>
