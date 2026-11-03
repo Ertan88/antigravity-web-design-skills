@@ -6,7 +6,7 @@ import { Text, TextInput } from './text.tsx';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { scrollMemory, scrollRestore } from './scroll.ts';
 import { colors, dark, radius, space, tiles, type TileTone } from './theme.ts';
-import { dayTitle, greeting, localIso } from './day.ts';
+import { dayTitle, greeting, localIso, shortSchoolName } from './day.ts';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -606,7 +606,7 @@ export function HomeHeader({ name, school, role, children }: { name?: string | n
         <View style={{ flex: 1, minWidth: 0 }}>
           {school ? (
             <Text style={{ fontSize: 13, color: colors.faint, fontWeight: '600' }} numberOfLines={1}>
-              {school}
+              {shortSchoolName(school)}
             </Text>
           ) : null}
           <Text style={{ fontSize: 16, color: colors.ink, fontWeight: '800', letterSpacing: -0.2 }} numberOfLines={1}>

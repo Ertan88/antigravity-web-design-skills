@@ -4,7 +4,7 @@ import { View, type StyleProp, type ViewStyle } from 'react-native';
 import { Text } from './text.tsx';
 import { useAuth } from './auth.tsx';
 import { useInbox, useMeToday, useNow, type MeToday } from './data.ts';
-import { dayBellPeriods, teacherDay } from './day.ts';
+import { classLabel, dayBellPeriods, teacherDay } from './day.ts';
 import { scheduleDutyReminders } from './push.ts';
 import { colors, type TileTone } from './theme.ts';
 import { LiveLesson } from './lesson.tsx';
@@ -41,7 +41,7 @@ export function DutyTile({ data, style }: { data: MeToday; style?: StyleProp<Vie
         ? `${duty.substituteFor} yerine`
         : duty.partners.length
           ? `Birlikte: ${duty.partners.join(', ')}`
-          : 'Teneffüslerde';
+          : 'Nöbet listesi için dokunun';
   return (
     <Tile tone={tone} icon="shield-checkmark-outline" label={label} caption={caption} headline={duty ? duty.area : 'Bugün yok'} onPress={() => router.push('/nobet')} style={style} />
   );
@@ -90,10 +90,9 @@ export function TeacherHome() {
   const now = useNow(60_000);
   useDutyReminders(today.data);
   const actions: { label: string; icon: IconName; to: string }[] = [
-    // Duyuru yetkisi olmayan yalnızca yayımlanmış duyuruları görür
-    can('announcements.manage') ? { label: 'Duyuru', icon: 'megaphone-outline', to: '/duyuru-yeni' } : { label: 'Duyurular', icon: 'megaphone-outline', to: '/duyurular' },
+    // Öğretmen görünümünde duyurular yalnızca okunur (yayındakiler); ders programı alt menüde
+    { label: 'Duyurular', icon: 'megaphone-outline', to: '/duyurular' },
     { label: 'İzin bildir', icon: 'calendar-outline', to: '/izin' },
-    { label: 'Program', icon: 'time-outline', to: '/programim' },
   ];
   return (
     <Screen refreshing={today.isRefetching} onRefresh={() => void today.refetch()}>
@@ -142,9 +141,9 @@ export function MyDayCard({ data }: { data: MeToday }) {
   const lesson = day.holiday
     ? { title: 'Bugün ders yok', subtitle: day.holiday }
     : current
-      ? { title: `Şu an: ${current.className} · ${current.subject}`, subtitle: `${current.period.start} – ${current.period.end}` }
+      ? { title: `Şu an: ${classLabel(current.className)} · ${current.subject}`, subtitle: `${current.period.start} – ${current.period.end}` }
       : next
-        ? { title: `Sıradaki: ${next.className} · ${next.subject}`, subtitle: `${next.period.start} – ${next.period.end}` }
+        ? { title: `Sıradaki: ${classLabel(next.className)} · ${next.subject}`, subtitle: `${next.period.start} – ${next.period.end}` }
         : { title: day.lessons.length ? 'Bugünkü dersleriniz bitti' : 'Bugün dersiniz yok', subtitle: 'Haftalık program için dokunun' };
   return (
     <Card style={{ paddingVertical: 4, gap: 0 }}>
@@ -153,7 +152,7 @@ export function MyDayCard({ data }: { data: MeToday }) {
         icon="shield-checkmark-outline"
         iconTone={duty && !day.holiday ? 'warning' : 'muted'}
         title={day.holiday ? 'Bugün nöbet yok' : duty ? `Bugün nöbet: ${duty.area}` : 'Bugün nöbetiniz yok'}
-        subtitle={duty && !day.holiday ? (duty.partners.length ? `Birlikte: ${duty.partners.join(', ')}` : 'Teneffüslerde') : 'Haftanın nöbetleri için dokunun'}
+        subtitle={duty && !day.holiday ? (duty.partners.length ? `Birlikte: ${duty.partners.join(', ')}` : 'Nöbet listesi için dokunun') : 'Haftanın nöbetleri için dokunun'}
         onPress={() => router.push('/nobet')}
         last
       />

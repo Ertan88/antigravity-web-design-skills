@@ -94,7 +94,7 @@ export async function scheduleDutyReminders(items: { date: string; time: string;
     at.setMinutes(at.getMinutes() - 15);
     if (at.getTime() <= Date.now()) continue;
     await Notifications.scheduleNotificationAsync({
-      content: { title: 'Bugün nöbetçisiniz', body: `${item.area} · teneffüslerde`, data: { kind: 'duty', url: '/nobet' } },
+      content: { title: 'Bugün nöbetçisiniz', body: `Nöbet yeriniz: ${item.area}`, data: { kind: 'duty', url: '/nobet' } },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: at },
     });
   }

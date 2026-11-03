@@ -9,14 +9,14 @@ import { Icon, type IconName } from '../../src/ui.tsx';
 // Sekme ekranlarında beklenmeyen bir hata olursa uygulama kapanmaz, "Yeniden dene" görünür
 export { ErrorBoundary } from '../../src/errorBoundary.tsx';
 
-type TabName = 'index' | 'onaylar' | 'panolar' | 'nobet' | 'acil' | 'duyurular' | 'gozlem' | 'izinlerim' | 'okullar' | 'takvim' | 'kutu' | 'profil';
+type TabName = 'index' | 'onaylar' | 'panolar' | 'nobet' | 'acil' | 'duyurular' | 'gozlem' | 'izinlerim' | 'program' | 'okullar' | 'takvim' | 'kutu' | 'profil';
 
 /**
  * Alt menü role göre kurulur (en çok 5 sekme; geri kalanı profil menüsünde):
  * - Platform yöneticisi: Platform · Okullar · Takvim · Bildirimler
  * - Okul sahibi ve yönetici: Merkez · Onaylar · Panolar · Nöbet · Acil
  * - Editör: İçerik + yetkilerinden gelen sekmeler (Duyurular, Onaylar, Panolar, Nöbet, Acil) + Bildirimler
- * - Öğretmen: Bugün · Nöbetim · Gözlem · İzin · Profil (Duyurular Menü'de)
+ * - Öğretmen: Bugün · Nöbetim · Gözlem · Program · Profil (Duyurular ve İzin bildir ana sayfada, İzinlerim Menü'de)
  */
 function visibleTabs(role: AppRole, can: (p: Parameters<ReturnType<typeof useAuth>['can']>[0]) => boolean): TabName[] {
   switch (role) {
@@ -35,7 +35,7 @@ function visibleTabs(role: AppRole, can: (p: Parameters<ReturnType<typeof useAut
       return ['index', ...extra.slice(0, 3), 'kutu'];
     }
     default:
-      return ['index', 'nobet', 'gozlem', 'izinlerim', 'profil'];
+      return ['index', 'nobet', 'gozlem', 'program', 'profil'];
   }
 }
 
@@ -89,6 +89,7 @@ export default function TabsLayout() {
         name="nobet"
         options={{ title: role === 'teacher' ? 'Nöbetim' : 'Nöbet', ...hide('nobet'), tabBarIcon: icon('shield-checkmark-outline', 'shield-checkmark') }}
       />
+      <Tabs.Screen name="program" options={{ title: 'Program', ...hide('program'), tabBarIcon: icon('time-outline', 'time') }} />
       <Tabs.Screen name="izinlerim" options={{ title: 'İzin', ...hide('izinlerim'), tabBarIcon: icon('calendar-clear-outline', 'calendar-clear') }} />
       <Tabs.Screen
         name="acil"

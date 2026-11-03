@@ -102,11 +102,40 @@ export function countdownText(sec: number): string {
   return `${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
 }
 
+/** Vakte göre karşılama: 05–11 Günaydın, 11–17 İyi günler, 17–22 İyi akşamlar, 22–05 İyi geceler */
 export function greeting(hour: number): string {
-  if (hour < 11) return 'Günaydın';
-  if (hour < 17) return 'İyi günler';
-  return 'İyi akşamlar';
+  if (hour >= 5 && hour < 11) return 'Günaydın';
+  if (hour >= 11 && hour < 17) return 'İyi günler';
+  if (hour >= 17 && hour < 22) return 'İyi akşamlar';
+  return 'İyi geceler';
 }
+
+/**
+ * Okul adındaki MEB okul türünü kısaltır: "Örnek Mesleki ve Teknik Anadolu Lisesi" → "Örnek MTAL".
+ * Uzundan kısaya denenir; eşleşme yoksa ad olduğu gibi kalır.
+ */
+const SCHOOL_TYPES: [RegExp, string][] = [
+  [/Mesleki ve Teknik Anadolu Lisesi$/i, 'MTAL'],
+  [/Çok Programlı Anadolu Lisesi$/i, 'ÇPAL'],
+  [/Anadolu İmam Hatip Lisesi$/i, 'AİHL'],
+  [/İmam Hatip Ortaokulu$/i, 'İHO'],
+  [/Sosyal Bilimler Lisesi$/i, 'SBL'],
+  [/Güzel Sanatlar Lisesi$/i, 'GSL'],
+  [/Mesleki Eğitim Merkezi$/i, 'MEM'],
+  [/Spor Lisesi$/i, 'SL'],
+  [/Fen Lisesi$/i, 'FL'],
+  [/Anadolu Lisesi$/i, 'AL'],
+  [/Ortaokulu$/i, 'OO'],
+  [/İlkokulu$/i, 'İO'],
+];
+export function shortSchoolName(name: string): string {
+  const n = name.trim();
+  for (const [re, abbr] of SCHOOL_TYPES) if (re.test(n)) return n.replace(re, abbr);
+  return n;
+}
+
+/** Sınıf adı: e-Okul'daki "AMP" (Anadolu Meslek Programı) ön eki yazılmaz ("AMP 11-B" → "11-B"); ATP gibi diğerleri kalır */
+export const classLabel = (name: string) => name.replace(/^AMP\s+/i, '');
 
 /** "2026-10-29" → "29 Ekim Perşembe" */
 export function dayTitle(iso: string, opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', weekday: 'long' }): string {

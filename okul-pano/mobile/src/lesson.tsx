@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { useNow, type MeToday } from './data.ts';
-import { dayBellPeriods, teacherDay } from './day.ts';
+import { classLabel, dayBellPeriods, greeting, teacherDay } from './day.ts';
 import { Text } from './text.tsx';
 import { colors, tiles, type TileTone } from './theme.ts';
 import { Card, Icon } from './ui.tsx';
@@ -83,7 +83,7 @@ export function LiveLesson({ data, link }: { data: MeToday; link?: boolean }) {
         kicker={`ŞU AN · ${period.no}. DERS`}
         badge="derste"
         title={lesson.subject}
-        subtitle={`${lesson.className}${live.run!.total > 1 ? ` · ${live.run!.total} saatlik dersin ${live.run!.index}. saati` : ''}`}
+        subtitle={`${classLabel(lesson.className)}${live.run!.total > 1 ? ` · ${live.run!.total} saatlik dersin ${live.run!.index}. saati` : ''}`}
         left={toMin(period.end) - nowMin}
         caption="dk kaldı"
         from={period.start}
@@ -119,12 +119,13 @@ export function LiveLesson({ data, link }: { data: MeToday; link?: boolean }) {
         nowMin={nowMin}
       />
     );
-  } else if (bell.kind === 'before') {
+  } else if (bell.kind === 'before' && bell.remainingSec <= 3 * 3600) {
+    // İlk dersten en çok 3 saat önce (gece görünmez); başlık vakte göre karşılama
     main = (
       <BigCard
         tone="sky"
         kicker="DERSLERDEN ÖNCE"
-        title="Günaydın"
+        title={greeting(new Date().getHours())}
         subtitle={`İlk ders ${bell.next.start}'de başlar`}
       />
     );
@@ -212,10 +213,10 @@ function NextCard({ slot, nowMin, soon, tone }: { slot: Slot; nowMin: number; so
       </View>
       <View style={{ flex: 1 }}>
         <Text style={{ fontSize: 12, fontWeight: '800', color: colors.faint, letterSpacing: 0.3 }}>
-          SIRADAKİ DERSİNİZ · {period.no}. ders · {duration(inMin)} sonra
+          SIRADAKİ DERS · {period.no}. ders · {duration(inMin)} sonra
         </Text>
         <Text style={{ fontSize: soon ? 17 : 15.5, fontWeight: '800', color: colors.ink }} numberOfLines={2}>
-          {lesson.className} · {lesson.subject}
+          {classLabel(lesson.className)} · {lesson.subject}
         </Text>
       </View>
     </Card>

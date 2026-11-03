@@ -52,7 +52,9 @@ function OnAir({ list }: { list: Announcement[] }) {
 
 /** Öğretmenin duyuruları: gönderdikleri ve durumları (onay bekliyor, yayında, düzeltme istendi) */
 export default function Duyurular() {
-  const { me, can } = useAuth();
+  const { me, can: canRaw, role } = useAuth();
+  // Öğretmen görünümünde duyurular her zaman yalnızca okunur (yetkisi olsa da): yayındaki duyurular ve içerikleri
+  const can = (p: Parameters<typeof canRaw>[0]) => role !== 'teacher' && canRaw(p);
   const list = useAnnouncements();
   const mine = (list.data ?? []).filter((a) => a.createdBy === me?.user.id);
   return (

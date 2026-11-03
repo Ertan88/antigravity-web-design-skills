@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Text } from '../src/text.tsx';
 import { useMeToday, useNow } from '../src/data.ts';
-import { teacherDay, WEEKDAY_LONG, WEEKDAY_SHORT } from '../src/day.ts';
+import { classLabel, teacherDay, WEEKDAY_LONG, WEEKDAY_SHORT } from '../src/day.ts';
 import { ACCENT, classTones, daySlots, LiveLesson, toMin, type Lesson } from '../src/lesson.tsx';
 import { colors } from '../src/theme.ts';
 import { Card, Empty, ErrorNote, HolidayCard, Icon, Loading, Screen, T } from '../src/ui.tsx';
@@ -17,6 +17,11 @@ import { Card, Empty, ErrorNote, HolidayCard, Icon, Loading, Screen, T } from '.
 type Item = { kind: 'slot'; period: Period; lesson?: Lesson } | { kind: 'lunch'; from: string; to: string } | { kind: 'shift'; label: string };
 
 export default function Programim() {
+  return <ProgramimScreen back />;
+}
+
+/** Ders programım: Menü'den geri düğmeli, öğretmenin alt menüsünde (Program sekmesi) geri düğmesiz */
+export function ProgramimScreen({ back }: { back?: boolean }) {
   const q = useMeToday();
   const now = useNow(30_000);
   const data = q.data;
@@ -27,7 +32,7 @@ export default function Programim() {
 
   if (!data) {
     return (
-      <Screen back title="Ders programım">
+      <Screen back={back} title="Ders programım">
         <ErrorNote error={q.error} />
         <Loading />
       </Screen>
@@ -67,7 +72,7 @@ export default function Programim() {
 
   return (
     <Screen
-      back
+      back={back}
       title="Ders programım"
       subtitle={lessons.length ? `Haftalık ${lessons.length} ders saati` : undefined}
       refreshing={q.isRefetching}
@@ -197,7 +202,7 @@ function ItemRow({ it, first, past, tone }: { it: Item; first: boolean; past?: b
       </View>
       {lesson ? (
         <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: colors.ink, lineHeight: 20 }}>
-          {lesson.className} · {lesson.subject}
+          {classLabel(lesson.className)} · {lesson.subject}
         </Text>
       ) : (
         <Text style={{ flex: 1, fontSize: 14, fontWeight: '500', color: colors.subtle }}>Boş</Text>

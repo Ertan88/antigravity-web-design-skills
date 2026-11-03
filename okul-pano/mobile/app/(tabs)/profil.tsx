@@ -243,14 +243,8 @@ export default function Menu() {
       title: 'Öğretmen araçlarım',
       items: [
         { title: 'Ders programım', subtitle: 'Haftalık ders programı', icon: 'time-outline', to: '/programim' },
-        // Öğretmen görünümünde Gözlem alt menüde; Duyurular buraya taşındı
-        ...(role === 'teacher'
-          ? [
-              can('announcements.manage')
-                ? { title: 'Duyurularım', subtitle: 'Gönderdiklerim, onay durumu', icon: 'megaphone-outline' as IconName, to: '/duyurular' }
-                : { title: 'Duyurular', subtitle: 'Panolarda yayındaki duyurular', icon: 'megaphone-outline' as IconName, to: '/duyurular' },
-            ]
-          : [{ title: 'Gözlem', subtitle: 'Öğrencilere artı / eksi, öğrenci kartları', icon: 'clipboard-outline' as IconName, to: '/gozlem' }]),
+        // Öğretmen görünümünde Gözlem alt menüde; duyurular ana sayfadaki kısayoldan okunur
+        ...(role === 'teacher' ? [] : [{ title: 'Gözlem', subtitle: 'Öğrencilere artı / eksi, öğrenci kartları', icon: 'clipboard-outline' as IconName, to: '/gozlem' }]),
         ...(role === 'editor'
           ? [{ title: 'Nöbetlerim', subtitle: 'Bu hafta ve yerine görevlendirmeler', icon: 'shield-checkmark-outline' as IconName, to: '/nobet' }]
           : []),
