@@ -6,7 +6,6 @@ import { useAnnouncements, useMeToday, type Announcement } from './data.ts';
 import { MenuButton, QuickAdd } from './quick.tsx';
 import { LiveLesson } from './lesson.tsx';
 import { DayBanner, NotificationsButton, TodayDutyCard } from './teacher.tsx';
-import { homeTitle, localIso } from './day.ts';
 import { colors } from './theme.ts';
 import { Badge, BentoRow, Card, Empty, HomeHeader, ListRow, Loading, Screen, SectionTitle, T, Tile } from './ui.tsx';
 
@@ -30,10 +29,9 @@ export function EditorHome() {
     pending: all.filter((a) => a.approvalStatus === 'pending').length,
     rejected: all.filter((a) => a.approvalStatus === 'rejected').length,
   };
-  const [day, date] = homeTitle(localIso());
   return (
     <Screen refreshing={list.isRefetching} onRefresh={() => void list.refetch()}>
-      <HomeHeader name={me?.user.fullName} school={school?.name} role="Editör" title={day} titleMuted={date}>
+      <HomeHeader name={me?.user.fullName} school={school?.name} role="Editör">
         <NotificationsButton />
         <MenuButton />
       </HomeHeader>

@@ -51,14 +51,26 @@ export async function contentRoutes(app: FastifyInstance) {
     permission: 'announcements.manage',
     schema: announcementSchema,
     orderBy: [asc(announcements.sortOrder), desc(announcements.createdAt)],
-    // Listede duyuruyu kimin girdiği de görünür (onay akışı)
-    list: (req) =>
-      app.deps.db
+    // Listede duyuruyu kimin girdiği de görünür (onay akışı). Duyuru yetkisi olmayan (yalnızca okuyan) kullanıcı
+    // yalnızca yayımlanmış duyuruları görür: onaylı, açık ve yayın tarihleri içinde
+    list: async (req) => {
+      const rows = await app.deps.db
         .select({ ...getTableColumns(announcements), createdByName: users.fullName })
         .from(announcements)
         .leftJoin(users, eq(users.id, announcements.createdBy))
         .where(eq(announcements.schoolId, req.ctx.schoolId))
-        .orderBy(asc(announcements.sortOrder), desc(announcements.createdAt)),
+        .orderBy(asc(announcements.sortOrder), desc(announcements.createdAt));
+      const p = req.ctx.permissions;
+      if (p.includes('announcements.manage') || p.includes('announcements.approve')) return rows;
+      const now = Date.now();
+      return rows.filter(
+        (a) =>
+          a.approvalStatus === 'approved' &&
+          a.isActive &&
+          (!a.startsAt || a.startsAt.getTime() <= now) &&
+          (!a.endsAt || a.endsAt.getTime() > now),
+      );
+    },
     toRow: (i, req) => ({
       ...i,
       body: i.body || null,

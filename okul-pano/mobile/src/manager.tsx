@@ -4,7 +4,7 @@ import { Pressable, View } from 'react-native';
 import { Text } from './text.tsx';
 import { useAuth } from './auth.tsx';
 import { useControlCenter, useMeToday, type ControlCenter } from './data.ts';
-import { clock, dayTitle, localIso, timeAgo } from './day.ts';
+import { clock, timeAgo } from './day.ts';
 import { LiveLesson } from './lesson.tsx';
 import { MenuButton, QuickAdd } from './quick.tsx';
 import { DayBanner, MyDayCard, NotificationsButton } from './teacher.tsx';
@@ -50,9 +50,6 @@ export function ManagerHome() {
   const center = useControlCenter();
   const me = useMeToday();
   const c = center.data;
-  const iso = c?.today ?? localIso();
-  const day = `${dayTitle(iso, { weekday: 'long' })},`;
-  const date = dayTitle(iso, { day: 'numeric', month: 'long', year: 'numeric' });
   const pending = c ? c.pending.announcements + c.pending.leaves : 0;
 
   // Pano ve onay durumu kutularda; listede yalnızca kutulara sığmayan işler kalır
@@ -83,7 +80,7 @@ export function ManagerHome() {
 
   return (
     <Screen refreshing={center.isRefetching} onRefresh={() => void center.refetch()}>
-      <HomeHeader name={account?.user.fullName} school={school?.name} role={school?.support ? 'Destek erişimi' : role === 'owner' ? 'Okul sahibi' : 'Yönetici'} title={day} titleMuted={date} inline>
+      <HomeHeader name={account?.user.fullName} school={school?.name} role={school?.support ? 'Destek erişimi' : role === 'owner' ? 'Okul sahibi' : 'Yönetici'}>
         <NotificationsButton />
         <MenuButton />
       </HomeHeader>

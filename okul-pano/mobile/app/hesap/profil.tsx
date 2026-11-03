@@ -1,10 +1,11 @@
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { api } from '../../src/api.ts';
 import { useAuth } from '../../src/auth.tsx';
 import { colors } from '../../src/theme.ts';
-import { Button, Field, Screen, T } from '../../src/ui.tsx';
+import { Button, Card, Field, ListRow, Screen, T } from '../../src/ui.tsx';
 
-/** Profil bilgilerim: ad soyad ve e-posta. E-posta değişikliği mevcut şifreyle onaylanır. */
+/** Hesabım: ad soyad ve e-posta (e-posta değişikliği mevcut şifreyle onaylanır); şifre değiştirme buradan açılır. */
 export default function Profil() {
   const { me, reloadMe } = useAuth();
   const [fullName, setFullName] = useState(me?.user.fullName ?? '');
@@ -37,7 +38,7 @@ export default function Profil() {
   return (
     <Screen
       back
-      title="Profil bilgilerim"
+      title="Hesabım"
       footer={
         <>
           {message && (
@@ -72,6 +73,9 @@ export default function Profil() {
           help="Hesabınızın güvenliği için e-posta değişikliğini şifrenizle onaylayın."
         />
       )}
+      <Card style={{ paddingVertical: 4, gap: 0, marginTop: 8 }}>
+        <ListRow icon="lock-closed-outline" title="Şifre değiştir" subtitle="Diğer cihazlardaki oturumlar kapanır" onPress={() => router.push('/hesap/sifre')} last />
+      </Card>
     </Screen>
   );
 }

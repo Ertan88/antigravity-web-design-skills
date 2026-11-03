@@ -6,7 +6,7 @@ import { Text } from './text.tsx';
 import { api } from './api.ts';
 import { membershipLabel, useAuth } from './auth.tsx';
 import { useAcademicCalendars, usePlatformSchools, useSignups } from './data.ts';
-import { fullDate, homeTitle, localIso, timeAgo } from './day.ts';
+import { fullDate, timeAgo } from './day.ts';
 import { colors } from './theme.ts';
 import { Badge, BentoRow, Button, Card, Empty, ErrorNote, HomeHeader, ListRow, Loading, Screen, SectionTitle, T, Tile } from './ui.tsx';
 import { MenuButton } from './quick.tsx';
@@ -51,7 +51,7 @@ export function PlatformHome() {
 
   return (
     <Screen refreshing={schools.isRefetching} onRefresh={() => void Promise.all([schools.refetch(), signups.refetch(), calendars.refetch()])}>
-      <HomeHeader name={me?.user.fullName} school="Platform" role="Platform yöneticisi" title={homeTitle(localIso())[0]} titleMuted={homeTitle(localIso())[1]}>
+      <HomeHeader name={me?.user.fullName} school="Platform" role="Platform yöneticisi">
         <MenuButton />
       </HomeHeader>
       <ErrorNote error={schools.error} />

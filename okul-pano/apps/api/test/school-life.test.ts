@@ -112,6 +112,22 @@ describe('onay akışı', () => {
     expectStatus(await owner.post(path('announcements'), { kind: 'text', title: 'Müdür duyurusu' }), 201);
     expect(await titles(hol.token)).toContain('Müdür duyurusu');
   });
+
+  it('duyuru yetkisi olmayan kullanıcı yalnızca yayımlanmış duyuruları görür', async () => {
+    expectStatus(
+      await owner.post(path('members'), { email: 'okur@akis.local', fullName: 'Okuyan Öğretmen', password: 'Okuyan123!', role: 'editor', permissions: [] }),
+      201,
+    );
+    const reader = client(t.app, (await login(t.app, 'okur@akis.local', 'Okuyan123!')).token);
+    expectStatus(await owner.post(path('announcements'), { kind: 'text', title: 'Kapalı duyuru', isActive: false }), 201);
+    const all = ((await owner.get(path('announcements'))).json() as { title: string }[]).map((a) => a.title);
+    const seen = ((await reader.get(path('announcements'))).json() as { title: string; approvalStatus: string }[]);
+    expect(all).toEqual(expect.arrayContaining(['Doğru duyuru', 'Kapalı duyuru', 'Müdür duyurusu']));
+    expect(seen.map((a) => a.title)).toContain('Müdür duyurusu');
+    expect(seen.map((a) => a.title)).not.toContain('Doğru duyuru'); // onay bekliyor
+    expect(seen.map((a) => a.title)).not.toContain('Kapalı duyuru');
+    expect(seen.every((a) => a.approvalStatus === 'approved')).toBe(true);
+  });
 });
 
 describe('okul hayatı kartları', () => {

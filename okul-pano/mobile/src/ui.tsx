@@ -6,6 +6,7 @@ import { Text, TextInput } from './text.tsx';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { scrollMemory, scrollRestore } from './scroll.ts';
 import { colors, dark, radius, space, tiles, type TileTone } from './theme.ts';
+import { dayTitle, greeting, localIso } from './day.ts';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -589,26 +590,17 @@ export function Avatar({ name, size = 44 }: { name?: string | null; size?: numbe
  * Ana sayfaların başlığı (bütün rollerde aynı): solda baş harf rozeti, okul adı ve rol; sağda yuvarlak
  * düğmeler; altında iki satırlık büyük başlık (ikinci satır soluk).
  */
-export function HomeHeader({
-  name,
-  school,
-  role,
-  title,
-  titleMuted,
-  inline,
-  children,
-}: {
-  name?: string | null;
-  school?: string | null;
-  role: string;
-  title: string;
-  titleMuted?: string | null;
-  /** Başlık ve soluk kısım yan yana tek satır (sığmazsa yazı küçülür) */
-  inline?: boolean;
-  children?: ReactNode;
-}) {
+/**
+ * Ana ekran başlığı (bütün roller): avatar, okul ve rol; altında tarih (yıl dahil) ve vakte göre karşılama ile ad.
+ * Yazılar ekranda az yer kaplasın diye orta boydadır.
+ */
+export function HomeHeader({ name, school, role, children }: { name?: string | null; school?: string | null; role: string; children?: ReactNode }) {
+  const now = new Date();
+  const iso = localIso(now);
+  const date = `${dayTitle(iso, { weekday: 'long' })}, ${dayTitle(iso, { day: 'numeric', month: 'long', year: 'numeric' })}`;
+  const first = name?.trim().split(/\s+/)[0];
   return (
-    <View style={{ gap: 18, paddingTop: 8 }}>
+    <View style={{ gap: 14, paddingTop: 8 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <Avatar name={name} />
         <View style={{ flex: 1, minWidth: 0 }}>
@@ -623,17 +615,15 @@ export function HomeHeader({
         </View>
         {children ? <View style={{ flexDirection: 'row', gap: 8 }}>{children}</View> : null}
       </View>
-      {inline ? (
-        <Text style={{ fontSize: 28, lineHeight: 34, fontWeight: '800', letterSpacing: -0.9, color: colors.ink }} accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-          {title}
-          {titleMuted ? <Text style={{ color: colors.subtle }}>{` ${titleMuted}`}</Text> : null}
+      <View style={{ gap: 2 }}>
+        <Text style={{ fontSize: 22, lineHeight: 28, fontWeight: '800', letterSpacing: -0.6, color: colors.ink }} accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+          {date}
         </Text>
-      ) : (
-        <Text style={{ fontSize: 34, lineHeight: 38, fontWeight: '800', letterSpacing: -1.2, color: colors.ink }} accessibilityRole="header">
-          {title}
-          {titleMuted ? <Text style={{ color: colors.subtle }}>{`\n${titleMuted}`}</Text> : null}
+        <Text style={{ fontSize: 15, fontWeight: '600', color: colors.faint }} numberOfLines={1}>
+          {greeting(now.getHours())}
+          {first ? `, ${first}` : ''}
         </Text>
-      )}
+      </View>
     </View>
   );
 }

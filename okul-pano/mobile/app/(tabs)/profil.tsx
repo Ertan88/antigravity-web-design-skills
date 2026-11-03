@@ -245,7 +245,11 @@ export default function Menu() {
         { title: 'Ders programım', subtitle: 'Haftalık ders programı', icon: 'time-outline', to: '/programim' },
         // Öğretmen görünümünde Gözlem alt menüde; Duyurular buraya taşındı
         ...(role === 'teacher'
-          ? [{ title: 'Duyurularım', subtitle: 'Gönderdiklerim, onay durumu', icon: 'megaphone-outline' as IconName, to: '/duyurular' }]
+          ? [
+              can('announcements.manage')
+                ? { title: 'Duyurularım', subtitle: 'Gönderdiklerim, onay durumu', icon: 'megaphone-outline' as IconName, to: '/duyurular' }
+                : { title: 'Duyurular', subtitle: 'Panolarda yayındaki duyurular', icon: 'megaphone-outline' as IconName, to: '/duyurular' },
+            ]
           : [{ title: 'Gözlem', subtitle: 'Öğrencilere artı / eksi, öğrenci kartları', icon: 'clipboard-outline' as IconName, to: '/gozlem' }]),
         ...(role === 'editor'
           ? [{ title: 'Nöbetlerim', subtitle: 'Bu hafta ve yerine görevlendirmeler', icon: 'shield-checkmark-outline' as IconName, to: '/nobet' }]
@@ -279,8 +283,7 @@ export default function Menu() {
   sections.push({
     title: 'Hesabım',
     items: [
-      { title: 'Profil bilgilerim', subtitle: 'Ad soyad, e-posta', icon: 'person-outline', tone: 'muted', to: '/hesap/profil' },
-      { title: 'Şifre değiştir', subtitle: 'Diğer cihazlardaki oturumlar kapanır', icon: 'lock-closed-outline', tone: 'muted', to: '/hesap/sifre' },
+      { title: 'Hesabım', subtitle: 'Ad soyad, e-posta, şifre', icon: 'person-outline', tone: 'muted', to: '/hesap/profil' },
       {
         title: 'Bildirimler',
         subtitle: 'Okunanlar dahil geçmiş',

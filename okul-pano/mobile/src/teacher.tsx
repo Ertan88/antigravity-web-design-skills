@@ -4,11 +4,11 @@ import { View, type StyleProp, type ViewStyle } from 'react-native';
 import { Text } from './text.tsx';
 import { useAuth } from './auth.tsx';
 import { useInbox, useMeToday, useNow, type MeToday } from './data.ts';
-import { dayBellPeriods, greeting, teacherDay } from './day.ts';
+import { dayBellPeriods, teacherDay } from './day.ts';
 import { scheduleDutyReminders } from './push.ts';
 import { colors, tiles, type TileTone } from './theme.ts';
 import { LiveLesson } from './lesson.tsx';
-import { Badge, Banner, BentoRow, Card, Empty, HeaderButton, HomeHeader, Icon, ListRow, Loading, Screen, SectionTitle, T, Tile, type IconName } from './ui.tsx';
+import { Badge, Banner, Card, Empty, HeaderButton, HomeHeader, Icon, ListRow, Loading, Screen, SectionTitle, T, Tile, type IconName } from './ui.tsx';
 import { ChipLinks } from './quick.tsx';
 
 /** Sağ üstteki bildirim zili (okunmamış sayısıyla) */
@@ -47,25 +47,6 @@ export function DutyTile({ data, style }: { data: MeToday; style?: StyleProp<Vie
   );
 }
 
-/** Sıradaki (ya da şu anki) ders kutusu */
-export function LessonTile({ data, style }: { data: MeToday; style?: StyleProp<ViewStyle> }) {
-  const now = useNow(30_000);
-  const day = teacherDay(data, now);
-  const current = day.lessons.find((l) => l.state === 'now');
-  const next = day.lessons.find((l) => l.state === 'next');
-  const l = current ?? next;
-  return (
-    <Tile
-      tone={l ? 'sky' : 'paper'}
-      icon="time-outline"
-      label={current ? 'Şu anki ders' : next ? 'Sıradaki ders' : 'Ders'}
-      caption={l ? `${l.subject} · ${l.period.start}` : 'Haftalık program'}
-      onPress={() => router.push('/programim')}
-      headline={l ? l.className : day.lessons.length ? 'Bitti' : 'Ders yok'}
-      style={style}
-    />
-  );
-}
 
 /** Bugünkü nöbet (öğretmen kaydı olan editörün ana sayfasında): tam genişlikte nöbet kutusu */
 export function TodayDutyCard({ data }: { data: MeToday }) {
@@ -150,16 +131,15 @@ export function TeacherHome() {
   const today = useMeToday();
   const now = useNow(60_000);
   useDutyReminders(today.data);
-  const firstName = me?.user.fullName.split(' ')[0] ?? '';
   const actions: { label: string; icon: IconName; to: string }[] = [
-    { label: 'Duyuru', icon: 'megaphone-outline', to: '/duyuru-yeni' },
-    { label: 'İzin iste', icon: 'calendar-outline', to: '/izin' },
-    { label: 'Panolar', icon: 'tv-outline', to: '/panolar' },
+    // Duyuru yetkisi olmayan yalnızca yayımlanmış duyuruları görür
+    can('announcements.manage') ? { label: 'Duyuru', icon: 'megaphone-outline', to: '/duyuru-yeni' } : { label: 'Duyurular', icon: 'megaphone-outline', to: '/duyurular' },
+    { label: 'İzin bildir', icon: 'calendar-outline', to: '/izin' },
     { label: 'Program', icon: 'time-outline', to: '/programim' },
   ];
   return (
     <Screen refreshing={today.isRefetching} onRefresh={() => void today.refetch()}>
-      <HomeHeader name={me?.user.fullName} school={school?.name} role="Öğretmen" title={`${greeting(now.getHours())},`} titleMuted={firstName}>
+      <HomeHeader name={me?.user.fullName} school={school?.name} role="Öğretmen">
         <NotificationsButton />
       </HomeHeader>
       {today.isLoading || !today.data ? (
@@ -175,10 +155,7 @@ export function TeacherHome() {
               </T>
             </Card>
           ) : !teacherDay(today.data, now).holiday ? (
-            <BentoRow>
-              <LessonTile data={today.data} style={{ flex: 1 }} />
-              <DutyTile data={today.data} style={{ flex: 1 }} />
-            </BentoRow>
+            <DutyTile data={today.data} />
           ) : null}
           <ChipLinks items={actions} />
           <MySchedule data={today.data} />
