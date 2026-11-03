@@ -1,11 +1,9 @@
 import { router } from 'expo-router';
-import { useEffect } from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 import { Text } from './text.tsx';
 import { useAuth } from './auth.tsx';
 import { useInbox, useMeToday, useNow, type MeToday } from './data.ts';
-import { classLabel, dayBellPeriods, teacherDay } from './day.ts';
-import { scheduleDutyReminders } from './push.ts';
+import { classLabel, teacherDay } from './day.ts';
 import { colors, type TileTone } from './theme.ts';
 import { LiveLesson } from './lesson.tsx';
 import { Banner, Card, HeaderButton, HomeHeader, Icon, ListRow, Loading, Screen, T, Tile, type IconName } from './ui.tsx';
@@ -70,25 +68,12 @@ export function IconTile({ name, tone = 'primary', size = 48 }: { name: IconName
 }
 
 
-/** Nöbet günlerinde ilk dersten 15 dakika önce telefona yerel hatırlatma kurulur */
-export function useDutyReminders(data: MeToday | undefined) {
-  useEffect(() => {
-    if (!data?.teacher) return;
-    const items = data.week.flatMap((d) => {
-      if (d.holiday || !d.duties.some((x) => !x.coveredBy)) return [];
-      const first = dayBellPeriods(data, d.weekday)[0]?.start;
-      return first ? [{ date: d.date, time: first, area: d.duties.find((x) => !x.coveredBy)!.area }] : [];
-    });
-    void scheduleDutyReminders(items).catch(() => undefined);
-  }, [data]);
-}
 
 /** Öğretmenin ana ekranı: zil kutusu, ders ve nöbet kutuları, hızlı işlemler, günün programı */
 export function TeacherHome() {
   const { me, school, can } = useAuth();
   const today = useMeToday();
   const now = useNow(60_000);
-  useDutyReminders(today.data);
   const actions: { label: string; icon: IconName; to: string }[] = [
     // Öğretmen görünümünde duyurular yalnızca okunur (yayındakiler); ders programı alt menüde
     { label: 'Duyurular', icon: 'megaphone-outline', to: '/duyurular' },

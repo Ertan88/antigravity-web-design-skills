@@ -1,4 +1,5 @@
 import type { Permission } from '@okulpano/shared/permissions';
+import { reminderSummary, useReminderSettings } from '../../src/reminders.ts';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
@@ -15,6 +16,7 @@ interface Item {
   title: string;
   subtitle?: string;
   icon: IconName;
+  emoji?: { char: string; tone: TileTone };
   tone?: 'primary' | 'warning' | 'danger' | 'gold' | 'muted';
   to?: string;
   onPress?: () => void;
@@ -126,6 +128,7 @@ export default function Menu() {
   const leaves = useMyLeaves();
   const internship = useInternshipAccess();
   const [push, setPush] = useState<PushState | 'error' | null>(null);
+  const [reminders] = useReminderSettings();
   // Menüye her girişte telefonun gerçek izin durumu okunur (açıldıysa açık görünür)
   useEffect(() => {
     void pushStatus().then(setPush).catch(() => undefined);
@@ -243,6 +246,7 @@ export default function Menu() {
       title: 'Öğretmen araçlarım',
       items: [
         { title: 'Ders programım', subtitle: 'Haftalık ders programı', icon: 'time-outline', to: '/programim' },
+        { title: 'Nöbet hatırlatmaları', subtitle: reminderSummary(reminders), icon: 'notifications-outline', emoji: { char: '🛡️', tone: 'peach' }, to: '/hatirlatmalar' },
         // Öğretmen görünümünde Gözlem alt menüde; duyurular ana sayfadaki kısayoldan okunur
         ...(role === 'teacher' ? [] : [{ title: 'Gözlem', subtitle: 'Öğrencilere artı / eksi, öğrenci kartları', icon: 'clipboard-outline' as IconName, to: '/gozlem' }]),
         ...(role === 'editor'
@@ -351,6 +355,7 @@ export default function Menu() {
               <ListRow
                 key={it.title}
                 icon={it.icon}
+                emoji={it.emoji}
                 iconTone={it.tone ?? 'primary'}
                 title={it.title}
                 subtitle={it.subtitle}

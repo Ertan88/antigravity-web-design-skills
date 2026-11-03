@@ -77,11 +77,8 @@ export async function unregisterPush() {
   await storage.set(TOKEN_KEY, null);
 }
 
-/**
- * Nöbet hatırlatmaları telefonda yerel olarak kurulur (sunucu gerekmez): nöbet günü ilk dersten
- * 15 dakika önce "Bugün nöbetçisiniz" bildirimi. Her açılışta yeniden kurulur.
- */
-export async function scheduleDutyReminders(items: { date: string; time: string; area: string }[]) {
+/** Nöbet hatırlatmaları telefonda yerel olarak kurulur (sunucu gerekmez); her kurulumda öncekiler silinir */
+export async function scheduleReminders(items: { at: Date; title: string; body: string; url: string }[]) {
   if (Platform.OS === 'web') return;
   const perm = await Notifications.getPermissionsAsync();
   if (!perm.granted) return;
@@ -90,12 +87,23 @@ export async function scheduleDutyReminders(items: { date: string; time: string;
     scheduled.filter((n) => (n.content.data as { kind?: string } | undefined)?.kind === 'duty').map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
   );
   for (const item of items) {
-    const at = new Date(`${item.date}T${item.time}:00`);
-    at.setMinutes(at.getMinutes() - 15);
-    if (at.getTime() <= Date.now()) continue;
+    if (item.at.getTime() <= Date.now()) continue;
     await Notifications.scheduleNotificationAsync({
-      content: { title: 'Bugün nöbetçisiniz', body: `Nöbet yeriniz: ${item.area}`, data: { kind: 'duty', url: '/nobet' } },
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: at },
+      content: { title: item.title, body: item.body, data: { kind: 'duty', url: item.url } },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: item.at },
     });
   }
+}
+
+/** Deneme bildirimi: birkaç saniye sonra gelir (izin yoksa önce izin istenir) */
+export async function sendTestNotification(): Promise<'ok' | 'denied' | 'unavailable'> {
+  if (Platform.OS === 'web' || !Device.isDevice) return 'unavailable';
+  const current = await Notifications.getPermissionsAsync();
+  const granted = current.granted || (await Notifications.requestPermissionsAsync()).granted;
+  if (!granted) return 'denied';
+  await Notifications.scheduleNotificationAsync({
+    content: { title: 'Nöbet hatırlatmaları açık', body: 'Hatırlatmalar bu şekilde telefonunuza gelecek.', data: { kind: 'test', url: '/hatirlatmalar' } },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 3 },
+  });
+  return 'ok';
 }

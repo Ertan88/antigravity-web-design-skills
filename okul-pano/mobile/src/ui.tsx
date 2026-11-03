@@ -355,6 +355,7 @@ export function ListRow({
   title,
   subtitle,
   icon,
+  emoji,
   iconTone = 'primary',
   right,
   onPress,
@@ -363,6 +364,8 @@ export function ListRow({
   title: string;
   subtitle?: string | null;
   icon?: IconName;
+  /** Simge yerine renkli emoji (zemini bento kutusu tonunda) */
+  emoji?: { char: string; tone: TileTone };
   iconTone?: 'primary' | 'warning' | 'danger' | 'gold' | 'muted';
   right?: ReactNode;
   onPress?: () => void;
@@ -371,11 +374,15 @@ export function ListRow({
   const tone = ICON_TONES[iconTone];
   const content = (
     <View style={[styles.listRow, !last && styles.listRowBorder]}>
-      {icon && (
+      {emoji ? (
+        <View style={[styles.iconBox, { backgroundColor: tiles[emoji.tone].bg }]}>
+          <Text style={{ fontSize: 21 }}>{emoji.char}</Text>
+        </View>
+      ) : icon ? (
         <View style={[styles.iconBox, { backgroundColor: tone.bg }]}>
           <Icon name={icon} size={20} color={tone.fg} />
         </View>
-      )}
+      ) : null}
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={{ fontSize: 15, fontWeight: '700', color: colors.ink, letterSpacing: -0.1 }} numberOfLines={2}>
           {title}
