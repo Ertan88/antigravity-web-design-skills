@@ -120,6 +120,8 @@ export const teacherBranches = pgTable(
     id: pk(),
     schoolId: schoolId(),
     name: text('name').notNull(),
+    /** Meslek alanı mı (işletmelerde mesleki eğitim): boşsa MEB alan adlarından tanınır, okul açıp kapatabilir */
+    vocational: boolean('vocational'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -335,6 +337,10 @@ export const businesses = pgTable(
     /** Faaliyet alanı / dal (ör. "Mobilya", "Elektrik tesisatı") */
     field: text('field'),
     notes: text('notes'),
+    /** Okulun meslek alanı (öğretmen branşı kaydı) */
+    areaId: uuid('area_id').references((): AnyPgColumn => teacherBranches.id, { onDelete: 'set null' }),
+    /** İşletmeyi ekleyen kullanıcı: öğretmen kendi eklediği işletmeleri görür */
+    createdBy: uuid('created_by').references((): AnyPgColumn => users.id, { onDelete: 'set null' }),
     coordinatorTeacherId: uuid('coordinator_teacher_id').references((): AnyPgColumn => teachers.id, { onDelete: 'set null' }),
     isActive: isActive(),
     createdAt: createdAt(),
@@ -357,10 +363,12 @@ export const internshipMarks = pgTable(
       .references(() => students.id, { onDelete: 'cascade' }),
     date: date('date', { mode: 'string' }).notNull(),
     half: text('half').$type<'am' | 'pm'>().notNull(),
-    code: text('code').$type<'D' | 'R' | 'T' | 'K'>().notNull(),
+    code: text('code').$type<'D' | 'İ' | 'R' | 'H' | 'T' | 'K'>().notNull(),
     userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
     userName: text('user_name').notNull(),
     createdAt: createdAt(),
+    /** Devamsızlık bildirimi gönderildi (ya da gerek kalmadı); birkaç dakika beklenir, düzeltilen işaret bildirilmez */
+    notifiedAt: timestamp('notified_at', { withTimezone: true }),
   },
   (t) => [uniqueIndex('internship_marks_uq').on(t.studentId, t.date, t.half), index('internship_marks_school_idx').on(t.schoolId, t.date)],
 );

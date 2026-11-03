@@ -17,7 +17,7 @@ import { DbStorage, LocalStorage, type FileStorage } from './lib/storage.ts';
 import { UUID_RE } from './context.ts';
 import { academicCalendarRoutes } from './routes/academicCalendar.ts';
 import { conductRoutes, runConductRetention } from './routes/conduct.ts';
-import { internshipRoutes } from './routes/internship.ts';
+import { internshipRoutes, runInternshipNotices } from './routes/internship.ts';
 import { authRoutes } from './routes/auth.ts';
 import { contentRoutes } from './routes/content.ts';
 import { dutyRoutes } from './routes/duties.ts';
@@ -131,11 +131,15 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     };
     const first = setTimeout(run, 60_000);
     const hourly = setInterval(run, 3600_000);
+    // İşletmede devamsızlık bildirimleri: dakikada bir (birkaç dakika bekletilen işaretler)
+    const notices = setInterval(() => void runInternshipNotices(deps).catch((err) => app.log.error(err, 'işletmede devam bildirimi')), 60_000);
     first.unref();
     hourly.unref();
+    notices.unref();
     app.addHook('onClose', async () => {
       clearTimeout(first);
       clearInterval(hourly);
+      clearInterval(notices);
     });
   }
 

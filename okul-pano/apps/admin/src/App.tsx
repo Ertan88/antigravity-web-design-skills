@@ -116,7 +116,7 @@ export function App() {
         <Route path="donem-gostergesi" element={needsSchool(<Guard permission="conduct.counsel"><ConductReport /></Guard>)} />
         <Route path="rehberlik" element={needsSchool(<Guard permission="conduct.counsel"><ConductAlerts /></Guard>)} />
         <Route path="isletme-devam" element={needsSchool(<InternshipSheet />)} />
-        <Route path="isletmeler" element={needsSchool(<Guard permission="internship.manage"><Businesses /></Guard>)} />
+        <Route path="isletmeler" element={needsSchool(<Businesses />)} />
         <Route path="gozlem-kriterleri" element={needsSchool(<Guard permission="conduct.manage"><ConductCriteria /></Guard>)} />
         <Route path="zil-saatleri" element={needsSchool(<Guard permission="schedule.manage"><BellSchedules /></Guard>)} />
         <Route path="ders-programi" element={needsSchool(<Guard permission="schedule.manage"><Timetable /></Guard>)} />

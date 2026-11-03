@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { formatDays, internCells, internKey, internMonthDays, internTotals, isInternshipSubject, schoolHalvesFromTimetable, type InternMark } from './internship.ts';
+import { gradeOf } from './grade.ts';
+import { formatDays, internCells, internKey, internMonthDays, internshipClassIds, internTotals, isInternshipSubject, schoolHalvesFromTimetable, vocationalLessonShare, type InternMark } from './internship.ts';
 
 describe('işletmede devam çizelgesi', () => {
   // Ekim 2026: 1 Ekim Perşembe; 28 Ekim arife (öğleden sonra tatil), 29 Ekim Cumhuriyet Bayramı
@@ -63,5 +64,48 @@ describe('işletmede devam çizelgesi', () => {
     expect(halves.get(3)).toEqual([false, false]);
     expect(halves.get(4)).toEqual([true, false]);
     expect(halves.get(5)).toBeUndefined();
+  });
+
+  it('İ ve H özürlü sayılır', () => {
+    const t = internTotals([['İ', 'H'], ['R', 'D'], ['X', 'X']]);
+    expect(t).toMatchObject({ excused: 1.5, unexcused: 0.5, permitted: 0.5, referred: 0.5, report: 0.5 });
+  });
+
+  it('öğrenci seçimi: işletme dersi olan sınıflar ve 12. sınıflar; özel eğitim yalnızca işletme dersiyle', () => {
+    const classes = [
+      { id: 'a', name: 'AMP 12-C' },
+      { id: 'b', name: 'ATP 12-A' },
+      { id: 'c', name: 'AMP 11-A' },
+      { id: 'd', name: 'AMP 12-F', bellExempt: true },
+      { id: 'e', name: 'AMP 10-A' },
+      { id: 'f', name: 'AMP 9-A' },
+    ];
+    const entries = [
+      { classId: 'a', subject: 'İşletmelerde Mesleki Eğitim' },
+      { classId: 'c', subject: 'İşletmelerde Mesleki Eğitim' },
+      { classId: 'e', subject: 'Matematik' },
+    ];
+    const r = internshipClassIds(classes, entries, ['f'], gradeOf);
+    expect([...r.ids].sort()).toEqual(['a', 'b', 'c', 'f']);
+    expect([...r.withLesson].sort()).toEqual(['a', 'c']);
+    expect(r.fallback).toBe(false);
+    // Program yok, adlardan düzey çıkmıyor: bütün sınıflar
+    const none = internshipClassIds([{ id: 'x', name: 'Mobilya A' }], [], [], gradeOf);
+    expect(none).toMatchObject({ fallback: true });
+    expect([...none.ids]).toEqual(['x']);
+  });
+
+  it('branşsız öğretmen ipucu: alana özgü ders payı', () => {
+    const classes = ['11-A', '11-B', '11-C', '11-D'].map((n) => ({ id: n, name: n }));
+    const entries = [
+      ...classes.map((c) => ({ teacherId: 'mat', classId: c.id, subject: 'Matematik' })),
+      { teacherId: 'mat', classId: '11-A', subject: 'Temel Matematik (Seçmeli)' },
+      { teacherId: 'mob', classId: '11-A', subject: 'Panel Mobilya Üretimi' },
+      { teacherId: 'mob', classId: '11-A', subject: 'Tasarım ve Malzeme Bilgisi' },
+      { teacherId: 'mob', classId: '11-B', subject: 'Matematik' },
+    ];
+    const share = vocationalLessonShare(entries, classes, gradeOf);
+    expect(share.get('mat')).toBeCloseTo(0.2);
+    expect(share.get('mob')).toBeCloseTo(2 / 3);
   });
 });

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { sentPushes } from '../src/lib/push.ts';
+import { runInternshipNotices } from '../src/routes/internship.ts';
 import { client, createTestApp, expectStatus, login, SUPER, type TestCtx } from './helpers.ts';
 
 /* İşletmelerde mesleki eğitim: işletmeler, aylık devam çizelgesi, koordinatör müdür yardımcısına bildirim */
@@ -16,6 +17,8 @@ let classId: string;
 const ids: Record<string, string> = {};
 const biz: Record<string, string> = {};
 const VP_TOKEN = 'ExponentPushToken[mudur-yardimcisi]';
+/** Bekleyen devamsızlık bildirimlerini gönder (bekleme süresi geçmiş gibi) */
+const flushNotices = () => runInternshipNotices(t.app.deps, new Date(Date.now() + 3 * 60_000));
 
 beforeAll(async () => {
   t = await createTestApp({ PUSH_URL: 'memory' });
@@ -79,7 +82,6 @@ describe('işletmelerde mesleki eğitim', () => {
     biz.kent = (await owner.post(`${base}/internship/businesses`, { name: 'Kent Dekorasyon' })).json().id;
     expectStatus(await owner.put(`${base}/internship/businesses/${biz.usta}/students`, { studentIds: [ids['Arda Kaya'], ids['Elif Demir']] }), 200);
     expectStatus(await owner.put(`${base}/internship/businesses/${biz.kent}/students`, { studentIds: [ids['Burak Şahin']] }), 200);
-    expect((await coord.post(`${base}/internship/businesses`, { name: 'X' })).statusCode).toBe(403);
 
     expect((await coord.get(`${base}/internship/access`)).json()).toMatchObject({ coordinator: true, all: false });
     const mine = (await coord.get(`${base}/internship/businesses`)).json();
@@ -106,24 +108,31 @@ describe('işletmelerde mesleki eğitim', () => {
     expect(mine.students.map((s: { fullName: string }) => s.fullName)).toEqual(['Arda Kaya', 'Elif Demir']);
   });
 
-  it('D ve R kaydedilir, toplamlara özürsüz / özürlü geçer ve müdür yardımcısına bildirilir', async () => {
+  it('D ve R kaydedilir, toplamlara özürsüz / özürlü geçer; birkaç dakika sonra müdür yardımcısına bildirilir', async () => {
     const r = await coord.post(`${base}/internship/marks`, {
       date: '2026-10-08',
       items: [
         { studentId: ids['Arda Kaya'], half: 'am', code: 'D' },
         { studentId: ids['Arda Kaya'], half: 'pm', code: 'D' },
         { studentId: ids['Elif Demir'], half: 'pm', code: 'R' },
+        // Yanlışlıkla girilip hemen düzeltilen işaret bildirilmez
+        { studentId: ids['Elif Demir'], half: 'am', code: 'H' },
       ],
     });
     expectStatus(r, 200);
-    expect(r.json()).toMatchObject({ changed: 3, notified: 2 });
+    expect(r.json()).toMatchObject({ changed: 4, pending: 4 });
+    expectStatus(await coord.post(`${base}/internship/marks`, { date: '2026-10-08', items: [{ studentId: ids['Elif Demir'], half: 'am', code: 'X' }] }), 200);
+    // Bekleme süresi dolmadan gönderilmez
+    expect(await runInternshipNotices(t.app.deps)).toBe(0);
+    expect(await flushNotices()).toBe(1);
+    expect(await flushNotices()).toBe(0);
     await vi.waitFor(() => expect(sentPushes.filter((p) => p.to.includes(VP_TOKEN))).toHaveLength(1));
     const push = sentPushes.find((p) => p.to.includes(VP_TOKEN))!.message;
-    expect(push.title).toBe('İşletmede devamsızlık ve rapor');
+    expect(push.title).toBe('İşletmede devamsızlık ve rapor/izin');
     // Kilit ekranında ad ve rapor bilgisi yazmaz; ayrıntı uygulamanın bildirim kutusunda
-    expect(push.body).toBe('2 öğrenci için devamsızlık ve rapor bildirildi. Ayrıntı uygulamada.');
+    expect(push.body).toBe('2 öğrenci için devamsızlık ve rapor/izin bildirildi. Ayrıntı uygulamada.');
     const inbox = JSON.stringify((await vp.get(`${base}/inbox`)).json());
-    expect(inbox).toContain('İşletmede devamsızlık ve rapor');
+    expect(inbox).not.toContain('hasta sevkli');
     expect(inbox).toContain('Arda Kaya (12-A): 8 Ekim tam gün devamsız (özürsüz)');
     expect(inbox).toContain('Elif Demir (12-A): 8 Ekim öğleden sonra raporlu (özürlü)');
 
@@ -182,6 +191,7 @@ describe('işletmelerde mesleki eğitim', () => {
     const elif = sheet.students.find((x: { fullName: string }) => x.fullName === 'Elif Demir');
     expect(elif.cells.slice(4, 11)).toEqual([['R', 'R'], ['R', 'R'], ['R', 'R'], ['W', 'W'], ['W', 'W'], ['O', 'O'], ['O', 'O']]);
     expect(elif.totals.excused).toBe(3);
+    await flushNotices();
     const inbox = JSON.stringify((await vp.get(`${base}/inbox`)).json());
     expect(inbox).toContain('Elif Demir (12-A): 5 Mayıs – 7 Mayıs, 3 gün raporlu (özürlü)');
     expect((await coord.post(`${base}/internship/marks`, { date: '2027-05-12', items: [{ studentId: ids['Elif Demir'], half: 'am', code: 'D' }] })).statusCode).toBe(400);
@@ -194,5 +204,80 @@ describe('işletmelerde mesleki eğitim', () => {
     expect((await coord.patch(`${base}/internship/businesses/${biz.usta}/info`, { email: 'yanlis' })).statusCode).toBe(400);
     const day = (await coord.get(`${base}/internship/day?date=2026-10-08`)).json();
     expect(day.businesses[0]).toMatchObject({ name: 'Usta Mobilya', editable: true, info });
+  });
+
+  it('İ ve H özürlü sayılır', async () => {
+    expectStatus(
+      await coord.post(`${base}/internship/marks`, {
+        date: '2026-10-15',
+        items: [
+          { studentId: ids['Arda Kaya'], half: 'am', code: 'İ' },
+          { studentId: ids['Arda Kaya'], half: 'pm', code: 'H' },
+        ],
+      }),
+      200,
+    );
+    const arda = (await owner.get(`${base}/internship/sheet?month=2026-10`)).json().students[0];
+    expect(arda.cells[14]).toEqual(['İ', 'H']);
+    expect(arda.totals).toMatchObject({ permitted: 0.5, referred: 0.5 });
+    await flushNotices();
+  });
+
+  it('alanlar branştan: MEB alan adları tanınır, okul açıp kapatabilir; koordinatör adayları branşa göre', async () => {
+    const tchs = (await owner.get(`${base}/teachers`)).json() as { id: string; fullName: string }[];
+    const mob = tchs.find((x) => x.fullName === 'Başka Öğretmen')!.id;
+    // Henüz meslek branşlı öğretmen yok: bütün öğretmenler
+    expect((await owner.get(`${base}/internship/coordinator-candidates`)).json().fallback).toBe(true);
+    expectStatus(await owner.put(`${base}/internship/teachers/${mob}/branch`, { newBranch: 'Mobilya ve İç Mekân Tasarımı' }), 200);
+    const math = (await owner.post(`${base}/teachers`, { fullName: 'Matematik Hoca' })).json().id;
+    expectStatus(await owner.put(`${base}/internship/teachers/${math}/branch`, { newBranch: 'Matematik' }), 200);
+    const areas = (await owner.get(`${base}/internship/areas`)).json();
+    const areaNames = areas.areas.map((a: { name: string }) => a.name);
+    expect(areaNames).toContain('Mobilya ve İç Mekân Tasarımı');
+    expect(areaNames).not.toContain('Matematik');
+    expect(areas.unbranched.map((u: { fullName: string }) => u.fullName)).toContain('Koordinatör Öğretmen');
+    const cands = (await owner.get(`${base}/internship/coordinator-candidates`)).json();
+    expect(cands.fallback).toBe(false);
+    // Meslek branşlı öğretmen ve şu anki koordinatör; matematik öğretmeni yok
+    expect(cands.teachers.map((x: { fullName: string }) => x.fullName).sort()).toEqual(['Başka Öğretmen', 'Koordinatör Öğretmen']);
+    // Okul matematik branşını meslek alanı yapabilir (ör. yanlış tanınan ad)
+    const mathBranch = areas.branches.find((b: { name: string }) => b.name === 'Matematik').id;
+    expectStatus(await owner.patch(`${base}/internship/areas/${mathBranch}`, { vocational: true }), 200);
+    expect((await owner.get(`${base}/internship/areas`)).json().areas).toHaveLength(areaNames.length + 1);
+    expectStatus(await owner.patch(`${base}/internship/areas/${mathBranch}`, { vocational: null }), 200);
+    expect((await coord.patch(`${base}/internship/areas/${mathBranch}`, { vocational: true })).statusCode).toBe(403);
+  });
+
+  it('öğretmen işletme ekler (alanı branşından, koordinatörü kendisi); yalnızca kendi işletmelerini görür', async () => {
+    const created = await other.post(`${base}/internship/businesses`, { name: 'Ahşap Atölyesi', coordinatorTeacherId: coordTeacherId });
+    expectStatus(created, 200);
+    const b = created.json();
+    const areas = (await owner.get(`${base}/internship/areas`)).json();
+    expect(b.areaId).toBe(areas.areas.find((a: { name: string }) => a.name === 'Mobilya ve İç Mekân Tasarımı').id);
+    expect(b.coordinatorTeacherId).not.toBe(coordTeacherId);
+    // Başka öğretmen yalnızca kendi eklediğini görür; koordinatör öğretmen bunu görmez
+    expect((await other.get(`${base}/internship/businesses`)).json().map((x: { name: string }) => x.name)).toEqual(['Ahşap Atölyesi']);
+    expect((await coord.get(`${base}/internship/businesses`)).json().map((x: { name: string }) => x.name)).toEqual(['Usta Mobilya']);
+    // Öğrenci listesi yalnızca işletme sınıflarından; başka işletmedeki öğrencinin işletme adı gizli
+    const st = (await other.get(`${base}/internship/students`)).json();
+    expect(st.classes.map((c: { name: string }) => c.name)).toEqual(['12-A']);
+    expect(st.students.find((x: { fullName: string }) => x.fullName === 'Arda Kaya').businessId).toBe('other');
+    // Başka işletmedeki öğrenciyi alamaz, boştakini alır
+    expect((await other.put(`${base}/internship/businesses/${b.id}/students`, { studentIds: [ids['Arda Kaya']] })).statusCode).toBe(403);
+    const free = (await owner.post(`${base}/students/import`, { rows: [{ schoolNo: '130', fullName: 'Can Ak', className: '12-A', birthDate: '2008-01-01' }] }));
+    expectStatus(free, 200);
+    const can = ((await owner.get(`${base}/students`)).json() as { id: string; fullName: string }[]).find((x) => x.fullName === 'Can Ak')!.id;
+    expectStatus(await other.put(`${base}/internship/businesses/${b.id}/students`, { studentIds: [can] }), 200);
+    // Silme ve koordinatör değiştirme idarede
+    expect((await other.del(`${base}/internship/businesses/${b.id}`)).statusCode).toBe(403);
+    expect((await other.patch(`${base}/internship/businesses/${b.id}`, { coordinatorTeacherId: coordTeacherId })).statusCode).toBe(403);
+  });
+
+  it('öğrenci listesi: işletme dersi olmayan alt sınıflar listelenmez', async () => {
+    expectStatus(await owner.post(`${base}/students/import`, { rows: [{ schoolNo: '901', fullName: 'Dokuzuncu Sınıf', className: '9-A', birthDate: '2011-01-01' }] }), 200);
+    const st = (await owner.get(`${base}/internship/students`)).json();
+    expect(st.students.some((x: { fullName: string }) => x.fullName === 'Dokuzuncu Sınıf')).toBe(false);
+    const nine = ((await owner.get(`${base}/students`)).json() as { id: string; fullName: string }[]).find((x) => x.fullName === 'Dokuzuncu Sınıf')!.id;
+    expect((await owner.put(`${base}/internship/businesses/${biz.kent}/students`, { studentIds: [ids['Burak Şahin'], nine] })).statusCode).toBe(400);
   });
 });

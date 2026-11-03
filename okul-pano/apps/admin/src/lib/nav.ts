@@ -86,7 +86,13 @@ export const NAV: NavGroup[] = [
         // İdare, koordinatör müdür yardımcısı ve öğretmenler (koordinatör öğretmen kendi işletmelerini görür)
         when: (s, who) => Boolean(s?.internshipEnabled) && (who.can('internship.manage') || Boolean(who.teacherId) || s?.internshipManagerUserId === who.userId),
       },
-      { to: '/isletmeler', label: 'İşletmeler', icon: Building2, permission: 'internship.manage', when: (s) => Boolean(s?.internshipEnabled) },
+      // İdare bütün işletmeleri, öğretmen kendi eklediği ya da koordinatörü olduğu işletmeleri görür
+      {
+        to: '/isletmeler',
+        label: 'İşletmeler',
+        icon: Building2,
+        when: (s, who) => Boolean(s?.internshipEnabled) && (who.can('internship.manage') || Boolean(who.teacherId)),
+      },
     ],
   },
   {

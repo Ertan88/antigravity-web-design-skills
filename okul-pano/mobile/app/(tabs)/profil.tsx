@@ -209,9 +209,15 @@ export default function Menu() {
       items: [
         {
           title: 'İşletme ziyareti',
-          subtitle: 'Devamsızlık (D), rapor (R), işletme kapalı (K)',
+          subtitle: 'Bugünün devamı: D, İ, R, H, K · işletme bilgileri',
           icon: 'business-outline',
           to: '/isletme',
+        },
+        {
+          title: 'İşletmede devam',
+          subtitle: 'Aylık çizelge, özürlü / özürsüz toplamlar',
+          icon: 'grid-outline',
+          to: '/isletme-devam',
         },
       ],
     });
