@@ -114,7 +114,7 @@ export default function Programim() {
 
       <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 4 }}>
         <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink, letterSpacing: -0.2 }}>
-          {isToday && pastItems.length ? 'Günün kalanı' : `${WEEKDAY_LONG[day]}${isToday ? ' · bugün' : ''}`}
+          {isToday ? 'Bugün' : WEEKDAY_LONG[day]}
         </Text>
         {first && lastSlot && (
           <T size={12.5} color={colors.faint} weight="600">
@@ -168,7 +168,7 @@ export default function Programim() {
   );
 }
 
-/** Kısa liste satırı: ders no, başlangıç saati, sınıf · ders (renkli nokta); boş saat soluk; öğle arası ince satır */
+/** Kısa liste satırı: "1. Ders" ve altında başlangıç – bitiş saati, sınıf · ders (renkli nokta); boş saat soluk; öğle arası ince satır */
 function ItemRow({ it, first, past, tone }: { it: Item; first: boolean; past?: boolean; tone: string | null }) {
   const border = { borderTopWidth: first ? 0 : 1, borderTopColor: colors.divider };
   if (it.kind === 'shift')
@@ -189,10 +189,12 @@ function ItemRow({ it, first, past, tone }: { it: Item; first: boolean; past?: b
   const { period, lesson } = it;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: lesson ? 12 : 9, paddingHorizontal: 16, opacity: past ? 0.55 : 1, ...border }}>
-      <View style={{ width: 30, height: 30, borderRadius: 10, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ fontSize: 13, fontWeight: '800', color: colors.muted }}>{period.no}</Text>
+      <View style={{ width: 96 }}>
+        <Text style={{ fontSize: 12.5, fontWeight: '800', color: colors.muted }}>{period.no}. Ders</Text>
+        <Text style={{ fontSize: 13, fontWeight: '600', color: colors.faint, fontVariant: ['tabular-nums'] }}>
+          {period.start} – {period.end}
+        </Text>
       </View>
-      <Text style={{ width: 46, fontSize: 13.5, fontWeight: '700', color: colors.faint, fontVariant: ['tabular-nums'] }}>{period.start}</Text>
       {lesson ? (
         <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: colors.ink, lineHeight: 20 }}>
           {lesson.className} · {lesson.subject}

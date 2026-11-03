@@ -126,8 +126,6 @@ export function LiveLesson({ data, link }: { data: MeToday; link?: boolean }) {
         kicker="DERSLERDEN ÖNCE"
         title="Günaydın"
         subtitle={`İlk ders ${bell.next.start}'de başlar`}
-        left={Math.ceil(bell.remainingSec / 60)}
-        caption="dk sonra ilk ders"
       />
     );
   }
@@ -155,8 +153,8 @@ function BigCard(p: {
   badge?: string;
   title: string;
   subtitle: string;
-  left: number;
-  caption: string;
+  left?: number;
+  caption?: string;
   from?: string;
   to?: string;
   nowMin?: number;
@@ -164,12 +162,12 @@ function BigCard(p: {
   const t = tiles[p.tone];
   const paper = p.tone === 'paper';
   const progress = p.from && p.to && p.nowMin !== undefined ? Math.min(1, Math.max(0, (p.nowMin - toMin(p.from)) / Math.max(1, toMin(p.to) - toMin(p.from)))) : null;
-  const left = Math.max(0, p.left);
+  const left = Math.max(0, p.left ?? 0);
   // Bir saatten uzunsa "1 sa 15" + "dk sonra …", tam saatse "2 sa" + "sonra …"
   const h = Math.floor(left / 60);
   const m = left % 60;
   const big = h ? `${h} sa${m ? ` ${m}` : ''}` : String(left);
-  const caption = h && !m ? p.caption.replace(/^dk /, '') : p.caption;
+  const caption = p.caption && h && !m ? p.caption.replace(/^dk /, '') : p.caption;
   return (
     <View style={{ backgroundColor: t.bg, borderRadius: 26, padding: 18, gap: 4, borderWidth: paper ? 1 : 0, borderColor: colors.border }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -183,10 +181,12 @@ function BigCard(p: {
       </View>
       <Text style={{ fontSize: 24, fontWeight: '800', color: t.fg, letterSpacing: -0.6, marginTop: 6 }}>{p.title}</Text>
       <Text style={{ fontSize: 14.5, fontWeight: '700', color: t.sub }}>{p.subtitle}</Text>
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 8 }}>
-        <Text style={{ fontSize: 40, fontWeight: '800', color: t.fg, letterSpacing: -1.5 }}>{big}</Text>
-        <Text style={{ fontSize: 15, fontWeight: '700', color: t.sub }}>{caption}</Text>
-      </View>
+      {p.left !== undefined && (
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 8 }}>
+          <Text style={{ fontSize: 40, fontWeight: '800', color: t.fg, letterSpacing: -1.5 }}>{big}</Text>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: t.sub }}>{caption}</Text>
+        </View>
+      )}
       {progress !== null && (
         <>
           <View style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(127,127,127,0.25)', overflow: 'hidden', marginTop: 6 }}>
@@ -212,7 +212,7 @@ function NextCard({ slot, nowMin, soon, tone }: { slot: Slot; nowMin: number; so
       </View>
       <View style={{ flex: 1 }}>
         <Text style={{ fontSize: 12, fontWeight: '800', color: colors.faint, letterSpacing: 0.3 }}>
-          SIRADAKİ · {period.start} · {period.no}. ders{soon ? ` · ${duration(inMin)} sonra` : ''}
+          SIRADAKİ DERSİNİZ · {period.no}. ders · {duration(inMin)} sonra
         </Text>
         <Text style={{ fontSize: soon ? 17 : 15.5, fontWeight: '800', color: colors.ink }} numberOfLines={2}>
           {lesson.className} · {lesson.subject}

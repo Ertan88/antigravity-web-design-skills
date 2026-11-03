@@ -6,9 +6,9 @@ import { useAuth } from './auth.tsx';
 import { useInbox, useMeToday, useNow, type MeToday } from './data.ts';
 import { dayBellPeriods, teacherDay } from './day.ts';
 import { scheduleDutyReminders } from './push.ts';
-import { colors, tiles, type TileTone } from './theme.ts';
+import { colors, type TileTone } from './theme.ts';
 import { LiveLesson } from './lesson.tsx';
-import { Badge, Banner, Card, Empty, HeaderButton, HomeHeader, Icon, ListRow, Loading, Screen, SectionTitle, T, Tile, type IconName } from './ui.tsx';
+import { Banner, Card, HeaderButton, HomeHeader, Icon, ListRow, Loading, Screen, T, Tile, type IconName } from './ui.tsx';
 import { ChipLinks } from './quick.tsx';
 
 /** Sağ üstteki bildirim zili (okunmamış sayısıyla) */
@@ -69,48 +69,6 @@ export function IconTile({ name, tone = 'primary', size = 48 }: { name: IconName
   );
 }
 
-/** Bugünkü ders programı: geçenler soluk, şu anki vurgulu */
-export function MySchedule({ data }: { data: MeToday }) {
-  const now = useNow(30_000);
-  const day = teacherDay(data, now);
-  if (!data.teacher || day.holiday) return null;
-  return (
-    <View style={{ gap: 8 }}>
-      <SectionTitle>Bugünkü programım</SectionTitle>
-      <Card style={{ padding: 0, gap: 0, overflow: 'hidden' }}>
-        {day.lessons.length ? (
-          day.lessons.map((l, i) => (
-            <View
-              key={l.period.no}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 12,
-                paddingVertical: 14,
-                paddingHorizontal: 16,
-                borderTopWidth: i ? 1 : 0,
-                borderTopColor: colors.divider,
-                backgroundColor: l.state === 'now' ? tiles.sky.bg : colors.card,
-                opacity: l.state === 'past' ? 0.55 : 1,
-              }}
-            >
-              <Text style={{ width: 52, fontSize: 13, color: l.state === 'now' ? tiles.sky.fg : colors.faint, fontWeight: l.state === 'now' ? '800' : '600', fontVariant: ['tabular-nums'] }}>
-                {l.period.start}
-              </Text>
-              <Text style={{ flex: 1, fontSize: 14, fontWeight: l.state === 'now' ? '700' : '600', color: colors.ink }}>
-                {l.className} · {l.subject}
-              </Text>
-              {l.state === 'now' && <Badge tone="primary">Şimdi</Badge>}
-              {l.state === 'next' && <Badge>Sıradaki</Badge>}
-            </View>
-          ))
-        ) : (
-          <Empty icon="cafe-outline" title="Bugün dersiniz yok" />
-        )}
-      </Card>
-    </View>
-  );
-}
 
 /** Nöbet günlerinde ilk dersten 15 dakika önce telefona yerel hatırlatma kurulur */
 export function useDutyReminders(data: MeToday | undefined) {
@@ -158,7 +116,6 @@ export function TeacherHome() {
             <DutyTile data={today.data} />
           ) : null}
           <ChipLinks items={actions} />
-          <MySchedule data={today.data} />
         </>
       )}
     </Screen>
