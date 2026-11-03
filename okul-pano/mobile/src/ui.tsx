@@ -591,7 +591,7 @@ export function Avatar({ name, size = 44 }: { name?: string | null; size?: numbe
  * düğmeler; altında iki satırlık büyük başlık (ikinci satır soluk).
  */
 /**
- * Ana ekran başlığı (bütün roller): avatar, okul ve rol; altında tarih (yıl dahil) ve vakte göre karşılama ile ad.
+ * Ana ekran başlığı (bütün roller): avatar, okul ve rol; altında vakte göre karşılama ile ad (kalın), onun altında tarih.
  * Yazılar ekranda az yer kaplasın diye orta boydadır.
  */
 export function HomeHeader({ name, school, role, children }: { name?: string | null; school?: string | null; role: string; children?: ReactNode }) {
@@ -616,12 +616,12 @@ export function HomeHeader({ name, school, role, children }: { name?: string | n
         {children ? <View style={{ flexDirection: 'row', gap: 8 }}>{children}</View> : null}
       </View>
       <View style={{ gap: 2 }}>
-        <Text style={{ fontSize: 22, lineHeight: 28, fontWeight: '800', letterSpacing: -0.6, color: colors.ink }} accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-          {date}
-        </Text>
-        <Text style={{ fontSize: 15, fontWeight: '600', color: colors.faint }} numberOfLines={1}>
+        <Text style={{ fontSize: 24, lineHeight: 30, fontWeight: '800', letterSpacing: -0.6, color: colors.ink }} accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
           {greeting(now.getHours())}
           {first ? `, ${first}` : ''}
+        </Text>
+        <Text style={{ fontSize: 15.5, fontWeight: '600', color: colors.muted }} numberOfLines={1}>
+          {date}
         </Text>
       </View>
     </View>
