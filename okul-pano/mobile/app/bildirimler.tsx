@@ -18,7 +18,7 @@ const ROUTES: Record<string, string> = {
   'support-revoked': '/okullar',
   'support-expired': '/okullar',
   'meb-calendar': '/takvim',
-  internship: '/isletme',
+  internship: '/isletme-devam',
 };
 const ICONS: Record<string, { icon: IconName; tone: 'primary' | 'warning' | 'danger' | 'gold' | 'muted' }> = {
   approval: { icon: 'checkmark-done-outline', tone: 'primary' },
@@ -55,8 +55,8 @@ export function InboxScreen({ back }: { back?: boolean }) {
   const open = (n: InboxItem) => {
     if (!n.readAt) read.mutate({ ids: [n.id] });
     // İşletmede devamsızlık: bildirilen günün ziyaret kaydı açılır
-    const day = n.kind === 'internship' ? /[?&]gun=(\d{4}-\d{2}-\d{2})/.exec(n.to)?.[1] : null;
-    const to = day ? `/isletme?tarih=${day}` : ROUTES[n.kind];
+    const day = n.kind === 'internship' ? /[?&]gun=(\d{4}-\d{2})-\d{2}/.exec(n.to)?.[1] : null;
+    const to = day ? `/isletme-devam?ay=${day}` : ROUTES[n.kind];
     if (to) router.push(to as never);
   };
 

@@ -203,21 +203,21 @@ export default function Menu() {
     });
   }
 
-  if (role !== 'platform' && internship.data?.enabled && (internship.data.all || internship.data.coordinator)) {
+  if (role !== 'platform' && internship.data?.enabled && (internship.data.all || internship.data.coordinator || internship.data.teacher)) {
     sections.push({
       title: 'Mesleki eğitim',
       items: [
         {
-          title: 'İşletme ziyareti',
-          subtitle: 'Bugünün devamı: D, İ, R, H, K · işletme bilgileri',
-          icon: 'business-outline',
-          to: '/isletme',
-        },
-        {
           title: 'İşletmede devam',
-          subtitle: 'Aylık çizelge, özürlü / özürsüz toplamlar',
+          subtitle: 'Aylık çizelge: X, D, İ, R, H, K, T · özürlü / özürsüz',
           icon: 'grid-outline',
           to: '/isletme-devam',
+        },
+        {
+          title: 'İşletmelerim',
+          subtitle: 'İşletme bilgileri, ekle, düzenle',
+          icon: 'business-outline',
+          to: '/isletme',
         },
       ],
     });

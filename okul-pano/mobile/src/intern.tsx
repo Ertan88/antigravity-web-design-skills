@@ -43,6 +43,7 @@ export const TONE: Record<string, { bg: string; fg: string; border?: string }> =
 
 /** "Devamsızlığın gösterileceği semboller" bandı (e-Okul sırası) */
 export const LEGEND_BAND: [string, string][] = [
+  ['X', 'İşletmede'],
   ['D', 'Özürsüz Devamsız'],
   ['İ', 'İzinli'],
   ['R', 'Raporlu'],
@@ -50,7 +51,6 @@ export const LEGEND_BAND: [string, string][] = [
   ['S', 'Sabah'],
   ['Ö', 'Öğle'],
   ['T', 'Resmi Tatil'],
-  ['X', 'İşletmede'],
   ['O', 'Okulda'],
   ['K', 'İşletme Kapalı'],
 ];

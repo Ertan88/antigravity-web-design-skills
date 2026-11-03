@@ -5,11 +5,12 @@ import { useSchoolQuery } from '../src/data.ts';
 import { HALF_SHORT, HALVES, LegendBand, letter, pickable, prevCode, ReportSheet, shortDate, TONE, UndoBar, useMarks, type Cell, type Code, type Half } from '../src/intern.tsx';
 import { Text } from '../src/text.tsx';
 import { colors, radius } from '../src/theme.ts';
-import { Button, Chip, Empty, ErrorNote, Loading, Screen, T } from '../src/ui.tsx';
+import { Button, Chip, Empty, ErrorNote, Icon, Loading, Screen, T } from '../src/ui.tsx';
 
 /*
  * İşletmede devam (aylık çizelge, webdeki sayfanın mobil hâli): ad sütunu sabit, günler yana kayar; her gün S (sabah) ve
- * Ö (öğle) iki hücre. Hücreye dokununca seçilir, alttaki rozetlerden biri seçilince o alan hemen işaretlenip kaydedilir.
+ * Ö (öğle) iki hücre. Hücreye dokununca seçilir, alttaki rozetlerden biri seçilince o alan hemen işaretlenip kaydedilir;
+ * yanlış işaret "Sil" ile kaldırılır (X "İşletmede" demektir).
  */
 
 interface SheetStudent {
@@ -54,7 +55,7 @@ const PALETTE: { code: Code; label: string }[] = [
   { code: 'K', label: 'K' },
   { code: 'T', label: 'T' },
 ];
-const CODE_TEXT: Record<Code, string> = { X: 'işaret silindi', D: 'özürsüz devamsız', İ: 'izinli', R: 'raporlu', H: 'hasta sevkli', T: 'tatil', K: 'işletme kapalı' };
+const CODE_TEXT: Record<Code, string> = { X: 'işletmede', D: 'özürsüz devamsız', İ: 'izinli', R: 'raporlu', H: 'hasta sevkli', T: 'tatil', K: 'işletme kapalı' };
 
 interface Sel {
   studentId: string;
@@ -83,8 +84,12 @@ export default function IsletmeDevam() {
   const student = sel ? d?.students.find((s) => s.id === sel.studentId) : undefined;
   const selDay = sel && d ? d.days[sel.di] : undefined;
   const future = Boolean(selDay && d && selDay.date > d.today);
+  // Seçili alanda silinecek bir işaret var mı (D, İ, R, H, K, T)
+  const marked = Boolean(
+    sel && student && (scope === 'day' ? student.cells[sel.di]! : [student.cells[sel.di]![sel.half === 'am' ? 0 : 1]!]).some((c) => prevCode(c) !== 'X'),
+  );
 
-  const apply = (code: Code) => {
+  const apply = (code: Code, clear = false) => {
     if (!sel || !student || !selDay) return;
     const cells = student.cells[sel.di]!;
     const halves: Half[] = scope === 'day' ? HALVES.filter((h, i) => pickable(cells[i]!)) : [sel.half];
@@ -93,7 +98,7 @@ export default function IsletmeDevam() {
     void marks.save(
       { date: selDay.date, items: halves.map((half) => ({ studentId: student.id, half, code })) },
       {
-        label: `${student.fullName}: ${when} · ${CODE_TEXT[code]}`,
+        label: `${student.fullName}: ${when} · ${clear ? 'işaret silindi' : CODE_TEXT[code]}`,
         body: { date: selDay.date, items: halves.map((half) => ({ studentId: student.id, half, code: prevCode(cells[half === 'am' ? 0 : 1]!) })) },
       },
     );
@@ -136,7 +141,7 @@ export default function IsletmeDevam() {
           })}
         </View>
         <View style={{ flexDirection: 'row', gap: 5 }}>
-          {PALETTE.filter((p) => !(future && p.code === 'D')).map((p) => {
+          {PALETTE.filter((p) => !(future && (p.code === 'D' || p.code === 'X'))).map((p) => {
             const t = TONE[p.code]!;
             return (
               <Pressable
@@ -152,9 +157,22 @@ export default function IsletmeDevam() {
             );
           })}
         </View>
-        <Pressable accessibilityRole="button" onPress={() => setReport(student)} style={{ alignSelf: 'flex-start' }}>
-          <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.info }}>+ Birkaç günlük rapor / izin</Text>
-        </Pressable>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Pressable accessibilityRole="button" onPress={() => setReport(student)} style={{ flex: 1 }}>
+            <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.info }}>+ Birkaç günlük rapor / izin</Text>
+          </Pressable>
+          {/* Yanlış işareti kaldırmak: "İşletmede" (X) rozetinden ayrı, açıkça "Sil" */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="İşareti sil"
+            disabled={marks.busy || !marked}
+            onPress={() => apply('X', true)}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: colors.dangerBorder, backgroundColor: colors.dangerTint, opacity: marked ? 1 : 0.4 }}
+          >
+            <Icon name="trash-outline" size={15} color={colors.danger} />
+            <Text style={{ fontSize: 13, fontWeight: '800', color: colors.danger }}>Sil</Text>
+          </Pressable>
+        </View>
       </View>
     </View>
   ) : marks.undo ? (
@@ -192,16 +210,16 @@ export default function IsletmeDevam() {
             {/* Sabit ad sütunu */}
             <View style={{ width: NAME_W, borderRightWidth: 1, borderRightColor: colors.border }}>
               <View style={{ height: HEAD_H, justifyContent: 'center', paddingHorizontal: 8 }}>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: colors.faint }}>No · Sınıf · Ad</Text>
+                <Text style={{ fontSize: 11.5, fontWeight: '800', color: colors.faint }}>Öğrenci</Text>
               </View>
               {rows.map((s) => (
                 <View key={s.id} style={{ height: ROW_H, flexDirection: 'row', alignItems: 'center', paddingLeft: 8, borderTopWidth: 1, borderTopColor: colors.divider }}>
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={{ fontSize: 10.5, fontWeight: '700', color: colors.faint }} numberOfLines={1}>
-                      {s.schoolNo} · {s.className ?? ''}
-                    </Text>
                     <Text style={{ fontSize: 12.5, fontWeight: '800', color: colors.ink }} numberOfLines={1}>
                       {s.fullName}
+                    </Text>
+                    <Text style={{ fontSize: 10.5, fontWeight: '700', color: colors.faint }} numberOfLines={1}>
+                      {s.schoolNo} · {s.className ?? ''}
                     </Text>
                     <Text style={{ fontSize: 10, color: colors.subtle }} numberOfLines={1}>
                       {s.businessName}

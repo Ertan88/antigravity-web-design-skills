@@ -19,10 +19,10 @@ import {
   ChevronLeft,
   ChevronRight,
   GraduationCap,
-  Pencil,
   Plus,
   Printer,
   Search,
+  Trash2,
   Undo2,
   Users,
 } from "lucide-react";
@@ -195,8 +195,8 @@ export function InternLegend() {
         Her gün iki bölümdür: S (sabah) ve Ö (öğle); her bölüm yarım gün
         sayılır. İzinli (İ), raporlu (R) ve hasta sevkli (H) özürlü, devamsız
         (D) özürsüz devamsızlığa eklenir. Arifede öğleden sonra kendiliğinden
-        tatildir. Hücreye tıklayıp harfe basmak da yeter (D, İ, R, H, K, T;
-        silmek için X).
+        tatildir. Hücreye tıklayıp harfe basmak da yeter (X, D, İ, R, H, K, T;
+        işareti silmek için Backspace).
       </p>
     </div>
   );
@@ -609,7 +609,7 @@ const CHOICES: {
   cell: InternCell;
   title: string;
 }[] = [
-  { code: "X", label: "X", cell: "X", title: "İşletmede (işareti sil)" },
+  { code: "X", label: "X", cell: "X", title: "İşletmede" },
   { code: "D", label: "D", cell: "D", title: "Özürsüz devamsız" },
   { code: "İ", label: "İ", cell: "İ", title: "İzinli" },
   { code: "R", label: "R", cell: "R", title: "Raporlu" },
@@ -662,10 +662,14 @@ function CellMenu({
   const [until, setUntil] = useState(picked.day.date);
   const [rangeOpen, setRangeOpen] = useState(false);
   const future = picked.day.date > today;
-  const choices = CHOICES.filter((c) => !(future && c.code === "D"));
+  // İleri tarihte "işletmede" ve "devamsız" anlamsız; işaret "Sil" ile kaldırılır
+  const choices = CHOICES.filter(
+    (c) => !(future && (c.code === "D" || c.code === "X")),
+  );
+  const marked = picked.cell !== "X" && picked.cell !== "";
 
   const commit = useCallback(
-    (code: MarkCode) => {
+    (code: MarkCode, clear = false) => {
       if (future && code === "D") return;
       const range = rangeOpen && until > picked.day.date;
       const halves: InternHalf[] =
@@ -686,7 +690,7 @@ function CellMenu({
             code,
           })),
         },
-        `${picked.student.fullName}: ${when} · ${code === "X" ? "işaret silindi" : what}`,
+        `${picked.student.fullName}: ${when} · ${clear ? "işaret silindi" : what}`,
       );
     },
     [future, rangeOpen, until, scope, otherCell, picked, onSave],
@@ -703,7 +707,7 @@ function CellMenu({
         KEY_CODE[e.key.toLowerCase()];
       if (code) {
         e.preventDefault();
-        commit(code);
+        commit(code, e.key === "Backspace" || e.key === "Delete");
       }
     };
     setTimeout(() => document.addEventListener("mousedown", close));
@@ -778,7 +782,12 @@ function CellMenu({
           <span className="text-slate-400">tam gün</span>
         </label>
       )}
-      <div className="grid grid-cols-7 gap-1">
+      <div
+        className={clsx(
+          "grid gap-1",
+          choices.length === 7 ? "grid-cols-7" : "grid-cols-6",
+        )}
+      >
         {choices.map((c) => (
           <button
             key={c.code}
@@ -797,9 +806,17 @@ function CellMenu({
           </button>
         ))}
       </div>
+      <button
+        type="button"
+        disabled={busy || !marked}
+        onClick={() => commit("X", true)}
+        className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 py-1.5 text-xs font-bold text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-40 disabled:hover:bg-transparent"
+      >
+        <Trash2 className="size-3.5" /> İşareti sil
+      </button>
       <div className="mt-2 text-[11px] leading-snug text-slate-500">
-        Tıklayınca kaydedilir. X işareti siler. K bu işletmedeki, T bütün
-        öğrencilere işlenir.
+        Tıklayınca kaydedilir; yanlış işareti "İşareti sil" ile kaldırın
+        (klavyede Backspace). K bu işletmedeki, T bütün öğrencilere işlenir.
         {future
           ? " İleri tarihe D girilemez."
           : " Devamsızlık birkaç dakika sonra müdür yardımcısına bildirilir."}
@@ -845,6 +862,7 @@ export function Businesses() {
   const areas = useAreas();
   const [editing, setEditing] = useState<Business | "new" | null>(null);
   const [assigning, setAssigning] = useState<Business | null>(null);
+  const [viewing, setViewing] = useState<Business | null>(null);
   const [areasOpen, setAreasOpen] = useState(false);
   const [area, setArea] = useState<string>("");
   const [coordinator, setCoordinator] = useState("");
@@ -1010,36 +1028,18 @@ export function Businesses() {
             }
           />
         ) : (
-          <Table
-            head={[
-              "İşletme",
-              "Yetkili / usta öğretici",
-              "Koordinatör öğretmen",
-              "Öğrenci",
-              "Telefon",
-              "",
-            ]}
-          >
+          <Table head={["İşletme", "Koordinatör öğretmen", "Öğrenci", ""]}>
             {shown.map((b) => (
               <tr key={b.id}>
                 <Td>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold">{b.name}</span>
-                    {b.areaName && <Badge tone="blue">{b.areaName}</Badge>}
-                  </div>
-                  {(b.field || b.address) && (
-                    <div className="max-w-xs truncate text-xs text-slate-500">
-                      {[b.field, b.address].filter(Boolean).join(" · ")}
-                    </div>
-                  )}
-                </Td>
-                <Td>
-                  <div className="text-sm">{b.contactName ?? "–"}</div>
-                  {b.trainerName && (
-                    <div className="text-xs text-slate-500">
-                      Usta öğretici: {b.trainerName}
-                    </div>
-                  )}
+                  {/* İşletme bilgileri adına tıklayınca açılır (görüntüleme; altta Düzenle) */}
+                  <button
+                    type="button"
+                    onClick={() => setViewing(b)}
+                    className="text-left font-bold hover:underline"
+                  >
+                    {b.name}
+                  </button>
                 </Td>
                 <Td>
                   {b.coordinatorName ?? <Badge tone="amber">Seçilmedi</Badge>}
@@ -1055,15 +1055,7 @@ export function Businesses() {
                     {b.students} öğrenci
                   </Button>
                 </Td>
-                <Td className="whitespace-nowrap text-slate-600">
-                  {b.phone ?? "–"}
-                </Td>
                 <Td className="text-right whitespace-nowrap">
-                  {b.canEdit && (
-                    <IconButton label="Düzenle" onClick={() => setEditing(b)}>
-                      <Pencil className="size-4" />
-                    </IconButton>
-                  )}
                   {b.canManage && (
                     <DeleteButton
                       onConfirm={() => remove.mutate(b.id)}
@@ -1076,6 +1068,14 @@ export function Businesses() {
           </Table>
         )}
       </Card>
+      <BusinessView
+        business={viewing}
+        onClose={() => setViewing(null)}
+        onEdit={(b) => {
+          setViewing(null);
+          setEditing(b);
+        }}
+      />
       <BusinessForm
         editing={editing}
         manager={manager}
@@ -1092,6 +1092,78 @@ export function Businesses() {
         <AreasDialog open={areasOpen} onClose={() => setAreasOpen(false)} />
       )}
     </div>
+  );
+}
+
+/** İşletme bilgileri (görüntüleme); düzenleme yetkisi olan altta "Düzenle" ile forma geçer */
+function BusinessView({
+  business: b,
+  onClose,
+  onEdit,
+}: {
+  business: Business | null;
+  onClose: () => void;
+  onEdit: (b: Business) => void;
+}) {
+  const rows: [string, string | null | undefined][] = b
+    ? [
+        ["Alan", b.areaName],
+        ["Koordinatör öğretmen", b.coordinatorName],
+        ["Öğrenci", `${b.students} öğrenci`],
+        ["İşletme yetkilisi", b.contactName],
+        ["Usta öğretici / eğitici personel", b.trainerName],
+        ["Telefon", b.phone],
+        ["E-posta", b.email],
+        ["Adres", b.address],
+        ["Notlar", b.notes],
+      ]
+    : [];
+  return (
+    <Modal
+      open={Boolean(b)}
+      onClose={onClose}
+      title={b?.name ?? ""}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Kapat
+          </Button>
+          {b?.canEdit && <Button onClick={() => onEdit(b)}>Düzenle</Button>}
+        </>
+      }
+    >
+      <dl className="divide-y divide-slate-100 text-sm">
+        {rows.map(([k, v]) => (
+          <div key={k} className="grid grid-cols-[180px_1fr] gap-3 py-2.5">
+            <dt className="font-semibold text-slate-500">{k}</dt>
+            <dd
+              className={clsx(
+                "whitespace-pre-line",
+                v ? "text-ink" : "text-slate-400",
+              )}
+            >
+              {k === "Telefon" && v ? (
+                <a
+                  href={`tel:${v.replace(/[^\d+]/g, "")}`}
+                  className="font-semibold text-brand-700 hover:underline"
+                >
+                  {v}
+                </a>
+              ) : k === "E-posta" && v ? (
+                <a
+                  href={`mailto:${v}`}
+                  className="font-semibold text-brand-700 hover:underline"
+                >
+                  {v}
+                </a>
+              ) : (
+                (v ?? "Girilmemiş")
+              )}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </Modal>
   );
 }
 
@@ -1128,7 +1200,6 @@ function BusinessForm({
     queryFn: () => api<Candidates>(candPath),
     enabled: manager && Boolean(editing),
   });
-  const [showAll, setShowAll] = useState(false);
   const allTeachers = useList<Teacher>("teachers");
   const qc = useQueryClient();
   const toast = useToast();
@@ -1169,7 +1240,6 @@ function BusinessForm({
         : EMPTY_FORM,
     );
     setError(null);
-    setShowAll(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
   const save = useMutation({
@@ -1225,7 +1295,7 @@ function BusinessForm({
 
   // Koordinatör adayları: meslek branşlı öğretmenler (alana göre gruplu); seçili alanın öğretmenleri önce
   const cand = candidates.data;
-  const listAll = showAll || cand?.fallback;
+  const listAll = cand?.fallback;
   const groups = useMemo(() => {
     if (!cand) return [];
     const teachers = listAll
@@ -1334,18 +1404,7 @@ function BusinessForm({
                         Branşları girin
                       </button>
                     </div>
-                  ) : (
-                    <label className="mt-1.5 flex items-center gap-2 text-xs text-slate-500">
-                      <input
-                        type="checkbox"
-                        checked={showAll}
-                        onChange={(e) => setShowAll(e.target.checked)}
-                        className="accent-ink"
-                      />
-                      Bütün öğretmenleri göster (yalnızca meslek öğretmenleri
-                      listeleniyor)
-                    </label>
-                  )}
+                  ) : null}
                 </>
               )}
             </Field>
@@ -1358,16 +1417,6 @@ function BusinessForm({
             </Alert>
           )
         )}
-        <Field label="Dal / faaliyet">
-          {(id) => (
-            <Input
-              id={id}
-              value={form.field}
-              onChange={set("field")}
-              placeholder="Ör. Panel mobilya üretimi, elektrik tesisatı"
-            />
-          )}
-        </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="İşletme yetkilisi">
             {(id) => (

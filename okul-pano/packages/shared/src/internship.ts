@@ -47,11 +47,11 @@ export const INTERN_MARK_TEXT: Record<InternMark, string> = {
 export type InternCell = 'O' | 'X' | InternMark | 'TA' | 'W' | '';
 
 export const INTERN_LEGEND: { code: InternCell; letter: string; text: string }[] = [
+  { code: 'X', letter: 'X', text: 'İşletmede' },
   { code: 'D', letter: 'D', text: 'Özürsüz devamsız' },
   { code: 'İ', letter: 'İ', text: 'İzinli' },
   { code: 'R', letter: 'R', text: 'Raporlu' },
   { code: 'H', letter: 'H', text: 'Hasta sevkli' },
-  { code: 'X', letter: 'X', text: 'İşletmede, devam etti' },
   { code: 'O', letter: 'O', text: 'Okulda (ders programından)' },
   { code: 'TA', letter: 'T', text: 'Resmî / dinî tatil (takvimden)' },
   { code: 'T', letter: 'T', text: 'Tatil (öğretmen işaretledi, bütün öğrenciler)' },
