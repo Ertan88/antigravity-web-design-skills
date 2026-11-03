@@ -69,3 +69,31 @@ export function schoolFullName(fullName: string, schoolType?: string | null): st
   const t = splitSchoolName(fullName, schoolType);
   return t.type ? `${t.name} ${t.type}` : t.name;
 }
+
+/** Okul türünün kısaltması (mobil başlık gibi dar yerler için); bilinmeyen tür olduğu gibi kalır */
+const TYPE_ABBR: Record<string, string> = {
+  'mesleki ve teknik anadolu lisesi': 'MTAL',
+  'çok programlı anadolu lisesi': 'ÇPAL',
+  'anadolu imam hatip lisesi': 'AİHL',
+  'sosyal bilimler lisesi': 'SBL',
+  'güzel sanatlar lisesi': 'GSL',
+  'mesleki eğitim merkezi': 'MEM',
+  'imam hatip ortaokulu': 'İHO',
+  'bilim ve sanat merkezi': 'BİLSEM',
+  'anadolu lisesi': 'AL',
+  'fen lisesi': 'FL',
+  'spor lisesi': 'SL',
+  ortaokulu: 'OO',
+  ilkokulu: 'İO',
+};
+export const schoolTypeAbbr = (type: string) => TYPE_ABBR[lower(type)] ?? type.trim();
+
+/**
+ * Kısa okul adı: ad + kısaltılmış tür ("Develi" + "Mesleki ve Teknik Anadolu Lisesi" → "Develi MTAL").
+ * Tür Genel Ayarlar'dan (okul türü) gelir; girilmemişse addan ayrılır. "Müdürlüğü" eki yazılmaz.
+ */
+export function shortSchoolName(fullName: string, schoolType?: string | null): string {
+  const cleaned = fullName.trim().replace(/\s+(müdürlüğü|MÜDÜRLÜĞÜ|Müdürlüğü)$/u, '');
+  const t = splitSchoolName(cleaned, schoolType);
+  return t.type ? `${t.name} ${schoolTypeAbbr(t.type)}`.trim() : t.name;
+}

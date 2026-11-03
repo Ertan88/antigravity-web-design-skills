@@ -81,7 +81,7 @@ export function TeacherHome() {
   ];
   return (
     <Screen refreshing={today.isRefetching} onRefresh={() => void today.refetch()}>
-      <HomeHeader name={me?.user.fullName} school={school?.name} role={school ? membershipLabel(school) : 'Öğretmen'}>
+      <HomeHeader name={me?.user.fullName} school={school?.name} schoolType={school?.schoolType} role={school ? membershipLabel(school) : 'Öğretmen'}>
         <NotificationsButton />
       </HomeHeader>
       {today.isLoading || !today.data ? (

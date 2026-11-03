@@ -6,7 +6,8 @@ import { Text, TextInput } from './text.tsx';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { scrollMemory, scrollRestore } from './scroll.ts';
 import { colors, dark, radius, space, tiles, type TileTone } from './theme.ts';
-import { dayTitle, greeting, localIso, shortSchoolName } from './day.ts';
+import { shortSchoolName } from '@okulpano/shared/schoolName';
+import { dayTitle, greeting, localIso } from './day.ts';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -601,7 +602,7 @@ export function Avatar({ name, size = 44 }: { name?: string | null; size?: numbe
  * Ana ekran başlığı (bütün roller): avatar, okul ve rol; altında vakte göre karşılama ile ad (kalın), onun altında tarih.
  * Yazılar ekranda az yer kaplasın diye orta boydadır.
  */
-export function HomeHeader({ name, school, role, children }: { name?: string | null; school?: string | null; role: string; children?: ReactNode }) {
+export function HomeHeader({ name, school, schoolType, role, children }: { name?: string | null; school?: string | null; schoolType?: string | null; role: string; children?: ReactNode }) {
   const now = new Date();
   const iso = localIso(now);
   const date = `${dayTitle(iso, { weekday: 'long' })}, ${dayTitle(iso, { day: 'numeric', month: 'long', year: 'numeric' })}`;
@@ -613,7 +614,7 @@ export function HomeHeader({ name, school, role, children }: { name?: string | n
         <View style={{ flex: 1, minWidth: 0 }}>
           {school ? (
             <Text style={{ fontSize: 13, color: colors.faint, fontWeight: '600' }} numberOfLines={1}>
-              {shortSchoolName(school)}
+              {shortSchoolName(school, schoolType)}
             </Text>
           ) : null}
           <Text style={{ fontSize: 16, color: colors.ink, fontWeight: '800', letterSpacing: -0.2 }} numberOfLines={1}>

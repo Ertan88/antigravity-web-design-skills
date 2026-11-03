@@ -158,6 +158,8 @@ export async function authRoutes(app: FastifyInstance) {
       schools: rows.map((r) => ({
         id: r.school.id,
         name: r.school.name,
+        /** Genel Ayarlar › Okul türü (boşsa addan ayrılır) */
+        schoolType: ((r.school.settings ?? {}) as { schoolType?: string }).schoolType?.trim() || null,
         slug: r.school.slug,
         logoUrl: r.school.logoUrl,
         isActive: r.school.isActive,

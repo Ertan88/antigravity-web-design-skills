@@ -31,7 +31,7 @@ export function EditorHome() {
   };
   return (
     <Screen refreshing={list.isRefetching} onRefresh={() => void list.refetch()}>
-      <HomeHeader name={me?.user.fullName} school={school?.name} role={school ? membershipLabel(school) : 'Editör'}>
+      <HomeHeader name={me?.user.fullName} school={school?.name} schoolType={school?.schoolType} role={school ? membershipLabel(school) : 'Editör'}>
         <NotificationsButton />
         <MenuButton />
       </HomeHeader>

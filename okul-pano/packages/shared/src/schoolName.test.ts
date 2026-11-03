@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { splitSchoolName } from './schoolName.ts';
+import { shortSchoolName, splitSchoolName } from './schoolName.ts';
 
 describe('splitSchoolName', () => {
   it('bilinen okul türünü ayırır (büyük harf ve Türkçe karakterlerle)', () => {
@@ -24,5 +24,16 @@ describe('splitSchoolName', () => {
     expect(splitSchoolName('Muammer Kocatürk MTAL')).toEqual({ name: 'Muammer Kocatürk', type: 'Mesleki ve Teknik Anadolu Lisesi' });
     expect(splitSchoolName('Atatürk A.İ.H.L.')).toEqual({ name: 'Atatürk', type: 'Anadolu İmam Hatip Lisesi' });
     expect(splitSchoolName('Muammer Kocatürk')).toEqual({ name: 'Muammer Kocatürk', type: null });
+  });
+});
+
+describe('shortSchoolName', () => {
+  it('ayarlardaki türü kısaltır; tür girilmemişse addan ayırır', () => {
+    expect(shortSchoolName('Develi', 'Mesleki ve Teknik Anadolu Lisesi')).toBe('Develi MTAL');
+    expect(shortSchoolName('DEVELİ', 'MESLEKİ VE TEKNİK ANADOLU LİSESİ')).toBe('DEVELİ MTAL');
+    expect(shortSchoolName('Develi Mesleki ve Teknik Anadolu Lisesi Müdürlüğü')).toBe('Develi MTAL');
+    expect(shortSchoolName('Gazi İlkokulu')).toBe('Gazi İO');
+    expect(shortSchoolName('Kardelen Okulları')).toBe('Kardelen Okulları');
+    expect(shortSchoolName('Kardelen', 'Koleji')).toBe('Kardelen Koleji');
   });
 });

@@ -80,7 +80,7 @@ export function ManagerHome() {
 
   return (
     <Screen refreshing={center.isRefetching} onRefresh={() => void center.refetch()}>
-      <HomeHeader name={account?.user.fullName} school={school?.name} role={school?.support ? 'Destek erişimi' : school ? membershipLabel(school) : 'Yönetici'}>
+      <HomeHeader name={account?.user.fullName} school={school?.name} schoolType={school?.schoolType} role={school?.support ? 'Destek erişimi' : school ? membershipLabel(school) : 'Yönetici'}>
         <NotificationsButton />
         <MenuButton />
       </HomeHeader>

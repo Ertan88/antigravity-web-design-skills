@@ -110,39 +110,6 @@ export function greeting(hour: number): string {
   return 'İyi geceler';
 }
 
-/**
- * Okul adındaki MEB okul türünü kısaltır: "Örnek Mesleki ve Teknik Anadolu Lisesi" → "Örnek MTAL".
- * Büyük harfle yazılmış ad (MEB kayıtlarındaki gibi "DEVELİ ... LİSESİ"), sondaki "Müdürlüğü" ve fazla boşluklar da tanınır.
- * Türkçe büyük/küçük harf ayrımı tr-TR ile yapılır (JavaScript'in /i bayrağı İ ile i'yi eşleştirmez). Eşleşme yoksa ad aynen kalır.
- */
-const SCHOOL_TYPES: [string, string][] = [
-  ['mesleki ve teknik anadolu lisesi', 'MTAL'],
-  ['çok programlı anadolu lisesi', 'ÇPAL'],
-  ['anadolu imam hatip lisesi', 'AİHL'],
-  ['imam hatip ortaokulu', 'İHO'],
-  ['sosyal bilimler lisesi', 'SBL'],
-  ['güzel sanatlar lisesi', 'GSL'],
-  ['mesleki eğitim merkezi', 'MEM'],
-  ['spor lisesi', 'SL'],
-  ['fen lisesi', 'FL'],
-  ['anadolu lisesi', 'AL'],
-  ['ortaokulu', 'OO'],
-  ['ilkokulu', 'İO'],
-];
-const trLower = (s: string) => s.toLocaleLowerCase('tr-TR');
-export function shortSchoolName(name: string): string {
-  let words = name.trim().split(/\s+/);
-  if (words.length > 1 && trLower(words[words.length - 1]!) === 'müdürlüğü') words = words.slice(0, -1);
-  const lower = trLower(words.join(' '));
-  for (const [type, abbr] of SCHOOL_TYPES) {
-    if (lower === type || lower.endsWith(` ${type}`)) {
-      const rest = words.slice(0, words.length - type.split(' ').length);
-      return rest.length ? `${rest.join(' ')} ${abbr}` : abbr;
-    }
-  }
-  return name.trim();
-}
-
 /** Sınıf adı: e-Okul'daki "AMP" (Anadolu Meslek Programı) ön eki yazılmaz ("AMP 11-B" → "11-B"); ATP gibi diğerleri kalır */
 export const classLabel = (name: string) => name.replace(/^AMP\s+/i, '');
 

@@ -16,6 +16,8 @@ export interface SchoolAccess {
   permissions: Permission[];
   /** Bağlı öğretmen kaydı: kendi nöbetleri ve ders programı */
   teacherId: string | null;
+  /** Genel Ayarlar › Okul türü */
+  schoolType?: string | null;
   /** Öğretmen kadrosundaki ünvan (Müdür Yardımcısı, Uzman Öğretmen…) */
   teacherTitle?: string | null;
   /** Meslek öğretmeni (branşı meslek alanı ya da işletme dersi var) */
