@@ -46,6 +46,29 @@ export async function registerForPush(): Promise<'ok' | 'local' | 'denied' | 'un
   return 'ok';
 }
 
+export type PushState = 'ok' | 'local' | 'off' | 'denied' | 'unavailable';
+
+/**
+ * Şu anki durum (menüye her girişte okunur; dokunmadan önce de doğru görünsün):
+ * ok bu telefon sunucudan bildirim alıyor · local izin var ama sunucu bildirimi kurulmamış · off henüz izin istenmedi ·
+ * denied izin verilmedi (telefon ayarlarından açılır) · unavailable web ya da emülatör
+ */
+export async function pushStatus(): Promise<PushState> {
+  if (Platform.OS === 'web' || !Device.isDevice) return 'unavailable';
+  const perm = await Notifications.getPermissionsAsync();
+  if (!perm.granted) return perm.canAskAgain === false ? 'denied' : 'off';
+  return (await storage.get(TOKEN_KEY)) ? 'ok' : 'local';
+}
+
+/** Durumun menüde görünen açıklaması */
+export const PUSH_TEXT: Record<PushState, string> = {
+  ok: 'Açık: bu telefon onay, acil durum ve görev bildirimlerini alır.',
+  local: 'İzin verildi: nöbet hatırlatmaları çalışır. Sunucudan gelen bildirimler (onay, acil durum) bu sürümde kurulu değil.',
+  off: 'Kapalı: açmak için dokunun.',
+  denied: 'İzin verilmedi: telefon ayarlarından Okul Yayın için bildirimleri açın.',
+  unavailable: 'Bu cihazda kullanılamıyor.',
+};
+
 /** Çıkışta bu telefon artık bildirim almaz */
 export async function unregisterPush() {
   const token = await storage.get(TOKEN_KEY);

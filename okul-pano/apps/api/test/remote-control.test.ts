@@ -243,3 +243,24 @@ describe('kullanıcı ve öğretmen eşleşmesi', () => {
     expect(profile.schools[0].teacherId).toBe(teacherIds['Ali Can']);
   });
 });
+
+describe('izin bildirimini geri alma', () => {
+  const later = (n: number) => new Date(Date.parse(`${today.isoDate}T12:00:00Z`) + n * 86400_000).toISOString().slice(0, 10);
+
+  it('öğretmen kendi iznini siler; başkasınınkini ve geçmiş onaylı izni silemez', async () => {
+    const res = await teacherUser.post(path('me/leaves'), { startDate: later(30), endDate: later(31), note: 'Mazeret izni' });
+    expectStatus(res, 201);
+    const id = res.json().id as string;
+    // Öğretmene bağlı olmayan hesap bu izni silemez
+    expectStatus(await plain.del(path(`me/leaves/${id}`)), 404);
+    expectStatus(await teacherUser.del(path(`me/leaves/${id}`)), 204);
+    expect(((await teacherUser.get(path('me/leaves'))).json() as { id: string }[]).map((l) => l.id)).not.toContain(id);
+    expectStatus(await teacherUser.del(path(`me/leaves/${id}`)), 404);
+  });
+
+  it('geçmiş onaylı izin kayıt olarak kalır', async () => {
+    const res = await owner.post(path('leaves'), { teacherId: teacherIds['Ayşe Demir'], startDate: later(-10), endDate: later(-9), note: null });
+    expectStatus(res, 201);
+    expectStatus(await teacherUser.del(path(`me/leaves/${res.json().id}`)), 400);
+  });
+});

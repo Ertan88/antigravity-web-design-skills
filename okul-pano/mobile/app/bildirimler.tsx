@@ -1,10 +1,12 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useInbox, useInboxActions, type InboxItem } from '../src/data.ts';
 import { timeAgo } from '../src/day.ts';
+import { Sheet } from '../src/sheet.tsx';
+import { Text } from '../src/text.tsx';
 import { colors } from '../src/theme.ts';
-import { Badge, Button, Card, Empty, Icon, ListRow, Loading, Screen, Segmented, type IconName } from '../src/ui.tsx';
+import { Badge, Button, Card, Empty, Icon, ListRow, Loading, Screen, Segmented, T, type IconName } from '../src/ui.tsx';
 
 /** Paneldeki adresleri uygulamadaki ekranlara çevirir */
 const ROUTES: Record<string, string> = {
@@ -37,8 +39,8 @@ const ICONS: Record<string, { icon: IconName; tone: 'primary' | 'warning' | 'dan
 const FALLBACK = { icon: 'notifications-outline' as IconName, tone: 'muted' as const };
 
 /**
- * Bildirimler: yeni olanlar ve okunanlar dahil geçmiş (panelle aynı kutu). Dokununca okundu sayılır ve ilgili
- * ekran açılır; zarf simgesi okundu / okunmadı yapar.
+ * Bildirimler: yeni olanlar ve okunanlar dahil geçmiş (panelle aynı kutu). Dokununca okundu sayılır ve bildirimin
+ * tamamı açılır (listede iki satır görünür); ilgili ekrana oradan gidilir. Zarf simgesi okundu / okunmadı yapar.
  */
 export default function Bildirimler() {
   return <InboxScreen back />;
@@ -52,12 +54,15 @@ export function InboxScreen({ back }: { back?: boolean }) {
   const list = inbox.data?.items ?? [];
   const unreadCount = inbox.data?.unread ?? 0;
 
+  const [detail, setDetail] = useState<InboxItem | null>(null);
   const open = (n: InboxItem) => {
     if (!n.readAt) read.mutate({ ids: [n.id] });
-    // İşletmede devamsızlık: bildirilen günün ziyaret kaydı açılır
-    const day = n.kind === 'internship' ? /[?&]gun=(\d{4}-\d{2})-\d{2}/.exec(n.to)?.[1] : null;
-    const to = day ? `/isletme-devam?ay=${day}` : ROUTES[n.kind];
-    if (to) router.push(to as never);
+    setDetail(n);
+  };
+  // İşletmede devamsızlık: bildirilen ayın çizelgesi açılır
+  const routeOf = (n: InboxItem) => {
+    const month = n.kind === 'internship' ? /[?&]gun=(\d{4}-\d{2})-\d{2}/.exec(n.to)?.[1] : null;
+    return month ? `/isletme-devam?ay=${month}` : ROUTES[n.kind];
   };
 
   return (
@@ -116,6 +121,52 @@ export function InboxScreen({ back }: { back?: boolean }) {
           })}
         </Card>
       )}
+      {detail && <Detail n={detail} to={routeOf(detail)} onClose={() => setDetail(null)} onUnread={() => { unread.mutate(detail.id); setDetail(null); }} />}
     </Screen>
+  );
+}
+
+const fullTime = (iso: string) =>
+  new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', weekday: 'long', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+
+/** Bildirimin tamamı: başlık, zaman, metnin hepsi; varsa ilgili ekrana geçiş */
+function Detail({ n, to, onClose, onUnread }: { n: InboxItem; to?: string; onClose: () => void; onUnread: () => void }) {
+  const style = ICONS[n.kind] ?? FALLBACK;
+  return (
+    <Sheet open onClose={onClose}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name={style.icon} size={22} color={colors.ink} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 17, fontWeight: '800', color: colors.ink }}>{n.title}</Text>
+          <T size={12.5} color={colors.faint}>
+            {fullTime(n.at)} · {timeAgo(n.at)}
+          </T>
+        </View>
+        {n.resolvedAt && <Badge tone="success">Tamam</Badge>}
+      </View>
+      <ScrollView style={{ maxHeight: 360, marginTop: 14 }}>
+        <Text selectable style={{ fontSize: 15, lineHeight: 22, color: colors.ink }}>
+          {n.body}
+        </Text>
+      </ScrollView>
+      <View style={{ gap: 8, marginTop: 16 }}>
+        {to && (
+          <Button
+            icon="arrow-forward"
+            onPress={() => {
+              onClose();
+              router.push(to as never);
+            }}
+          >
+            İlgili ekranı aç
+          </Button>
+        )}
+        <Button variant="secondary" icon="mail-outline" onPress={onUnread}>
+          Okunmadı yap
+        </Button>
+      </View>
+    </Sheet>
   );
 }

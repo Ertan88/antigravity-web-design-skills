@@ -5,13 +5,17 @@ import { z } from 'zod';
 import { accessUser, audit, schoolGuard } from '../context.ts';
 import { bellSchedules, classGroups, pushTokens, teacherLeaves, teachers, timetableEntries } from '../db/schema.ts';
 import { addDays, dutyDay, dutyScheduleStatus, effectiveHolidays, holidaysAndHalfDays, monthEnd, teacherDutyDays } from '../lib/dayinfo.ts';
-import { badRequest, parse } from '../lib/errors.ts';
+import { badRequest, notFound, parse } from '../lib/errors.ts';
 import { notifyUsers, usersWithPermission } from '../lib/push.ts';
 
 /**
  * Mobil uygulamanın "benim" uç noktaları: öğretmenin günü (ders programı, nöbetleri), izin bildirimi
  * ve telefon bildirimleri için cihaz kaydı.
  */
+/** Bildirim metni için "20 Kasım" ya da "20 – 21 Kasım" */
+const trDay = (iso: string) => new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));
+const trRange = (a: string, b: string) => (a === b ? trDay(a) : `${trDay(a)} – ${trDay(b)}`);
+
 export async function meRoutes(app: FastifyInstance) {
   const { db, bus } = app.deps;
   const member = { preHandler: [app.authenticate, schoolGuard()] };
@@ -173,7 +177,7 @@ export async function meRoutes(app: FastifyInstance) {
     else {
       notifyUsers(app.deps, await usersWithPermission(app.deps, schoolId, 'leaves.manage'), {
         title: 'İzin bildirimi',
-        body: `${t?.fullName ?? 'Bir öğretmen'} ${body.startDate === body.endDate ? body.startDate : `${body.startDate} – ${body.endDate}`} için izin bildirdi.`,
+        body: `${t?.fullName ?? 'Bir öğretmen'} ${trRange(body.startDate, body.endDate)} için izin bildirdi.`,
         url: '/onaylar',
       });
     }
@@ -188,6 +192,36 @@ export async function meRoutes(app: FastifyInstance) {
       .where(and(eq(teacherLeaves.schoolId, req.ctx.schoolId), eq(teacherLeaves.teacherId, req.ctx.teacherId)))
       .orderBy(desc(teacherLeaves.startDate))
       .limit(30);
+  });
+
+  /**
+   * Öğretmen kendi izin bildirimini geri alır: onay bekleyen her zaman, onaylanmış ya da reddedilmiş ise bitmemişse.
+   * Geçmiş izinler kayıt olarak kalır. Onaylı izin geri alınınca pano güncellenir ve izin yöneticileri bilgilendirilir.
+   */
+  app.delete('/api/schools/:schoolId/me/leaves/:id', member, async (req, reply) => {
+    const { teacherId, schoolId, school } = req.ctx;
+    const { id } = req.params as { id: string };
+    if (!teacherId) throw notFound();
+    const [row] = await db
+      .select()
+      .from(teacherLeaves)
+      .where(and(eq(teacherLeaves.id, id), eq(teacherLeaves.schoolId, schoolId), eq(teacherLeaves.teacherId, teacherId)));
+    if (!row) throw notFound('İzin bulunamadı.');
+    const today = zonedParts(new Date(), school.timezone).isoDate;
+    if (row.approvalStatus !== 'pending' && row.endDate < today) throw badRequest('Geçmiş izinler silinemez; kayıt olarak saklanır.');
+    await db.delete(teacherLeaves).where(eq(teacherLeaves.id, id));
+    const [t] = await db.select({ fullName: teachers.fullName }).from(teachers).where(eq(teachers.id, teacherId));
+    const when = trRange(row.startDate, row.endDate);
+    await audit(req, 'delete', 'İzin bildirimi', id, `${t?.fullName ?? ''} · ${row.startDate} – ${row.endDate}`);
+    if (row.approvalStatus === 'approved') {
+      bus.contentChanged(schoolId);
+      notifyUsers(app.deps, await usersWithPermission(app.deps, schoolId, 'leaves.manage'), {
+        title: 'İzin geri alındı',
+        body: `${t?.fullName ?? 'Bir öğretmen'} ${when} iznini geri aldı.`,
+        url: '/izinler',
+      });
+    }
+    return reply.status(204).send();
   });
 
   /* ---------- Telefon bildirimleri ---------- */

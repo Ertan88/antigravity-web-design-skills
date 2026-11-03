@@ -1,12 +1,12 @@
 import type { Permission } from '@okulpano/shared/permissions';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
 import { Text } from '../../src/text.tsx';
 import { membershipLabel, useAuth, type AppRole } from '../../src/auth.tsx';
 import { useInbox, useInternshipAccess, useMyLeaves } from '../../src/data.ts';
 import { useOpenSchool } from '../../src/platform.tsx';
-import { registerForPush } from '../../src/push.ts';
+import { PUSH_TEXT, pushStatus, registerForPush, type PushState } from '../../src/push.ts';
 import { colors, radius, tiles, type TileTone } from '../../src/theme.ts';
 import { Avatar, Badge, BentoRow, Card, Chip, Icon, ListRow, Screen, SectionTitle, Segmented, T, type IconName } from '../../src/ui.tsx';
 import { useThemeMode } from '../../src/themeMode.tsx';
@@ -125,7 +125,11 @@ export default function Menu() {
   const inbox = useInbox('unread');
   const leaves = useMyLeaves();
   const internship = useInternshipAccess();
-  const [push, setPush] = useState<string | null>(null);
+  const [push, setPush] = useState<PushState | 'error' | null>(null);
+  // Menüye her girişte telefonun gerçek izin durumu okunur (açıldıysa açık görünür)
+  useEffect(() => {
+    void pushStatus().then(setPush).catch(() => undefined);
+  }, []);
   const pendingLeaves = (leaves.data ?? []).filter((l) => l.approvalStatus === 'pending').length;
   const unread = inbox.data?.unread ?? 0;
   const managerial = role === 'owner' || role === 'admin';
@@ -238,7 +242,7 @@ export default function Menu() {
     sections.push({
       title: 'Öğretmen araçlarım',
       items: [
-        { title: 'Ders programım ve zil saatleri', subtitle: 'Haftalık program, bugünün zilleri', icon: 'time-outline', to: '/programim' },
+        { title: 'Ders programım', subtitle: 'Haftalık ders programı', icon: 'time-outline', to: '/programim' },
         // Öğretmen görünümünde Gözlem alt menüde; Duyurular buraya taşındı
         ...(role === 'teacher'
           ? [{ title: 'Duyurularım', subtitle: 'Gönderdiklerim, onay durumu', icon: 'megaphone-outline' as IconName, to: '/duyurular' }]
@@ -288,22 +292,12 @@ export default function Menu() {
       ...(Platform.OS !== 'web'
         ? [
             {
-              title: 'Telefon bildirimlerini aç',
-              subtitle: push ?? 'Onaylar, nöbet hatırlatmaları',
+              title: push === 'ok' || push === 'local' ? 'Telefon bildirimleri' : 'Telefon bildirimlerini aç',
+              subtitle: push === 'error' ? 'Kaydedilemedi: internet bağlantınızı kontrol edip yeniden deneyin.' : push ? PUSH_TEXT[push] : 'Onaylar, nöbet hatırlatmaları',
               icon: 'phone-portrait-outline' as IconName,
               tone: 'muted' as const,
-              onPress: () =>
-                void registerForPush().then((r) =>
-                  setPush(
-                    r === 'ok'
-                      ? 'Açık: bu telefon bildirim alacak.'
-                      : r === 'local'
-                        ? 'İzin verildi: nöbet hatırlatmaları çalışır. Onay ve acil durum bildirimleri için bildirim hizmeti henüz kurulmadı.'
-                        : r === 'denied'
-                          ? 'İzin verilmedi: telefon ayarlarından Okul Yayın için bildirimleri açın.'
-                          : 'Bu cihazda kullanılamıyor.',
-                  ),
-                ).catch(() => setPush('Kaydedilemedi: internet bağlantınızı kontrol edip yeniden deneyin.')),
+              right: push === 'ok' || push === 'local' ? <Badge tone="success">Açık</Badge> : push === 'off' || push === 'denied' ? <Badge tone="warning">Kapalı</Badge> : undefined,
+              onPress: () => void registerForPush().then((r) => setPush(r === 'denied' ? 'denied' : r)).catch(() => setPush('error')),
             },
           ]
         : []),
