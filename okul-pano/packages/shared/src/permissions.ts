@@ -30,7 +30,7 @@ export type Permission = keyof typeof PERMISSIONS;
 export const PERMISSION_KEYS = Object.keys(PERMISSIONS) as Permission[];
 
 export const ROLES = {
-  owner: 'Okul sahibi',
+  owner: 'Okul müdürü',
   admin: 'Yönetici',
   editor: 'Editör',
 } as const;

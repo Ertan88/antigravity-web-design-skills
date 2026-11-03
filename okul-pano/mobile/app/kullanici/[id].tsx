@@ -32,7 +32,7 @@ function MemberDetail({ m }: { m: Member }) {
   const teachers = useTeachers();
   const teacherList = (teachers.data ?? []).filter((t) => t.isActive !== false);
   const refresh = () => qc.invalidateQueries({ predicate: (q) => q.queryKey[1] === 'members' });
-  // Okul sahibi, kişinin kendisi ve (okul sahibi değilse) yöneticiler kilitli; öğretmen eşleştirmesi herkes için yapılır
+  // Okul müdürü, kişinin kendisi ve (okul müdürü değilse) yöneticiler kilitli; öğretmen eşleştirmesi herkes için yapılır
   const locked = m.role === 'owner' || m.userId === me?.user.id || (m.role === 'admin' && myRole !== 'owner');
 
   const [role, setRole] = useState<FormRole>(formRole(m));
@@ -98,7 +98,7 @@ function MemberDetail({ m }: { m: Member }) {
         <Card>
           <T size={14}>{permissionSummary(m)}</T>
           <T size={12.5} color={colors.muted}>
-            {m.role === 'owner' ? 'Okul sahibinin yetkileri değiştirilemez.' : m.userId === me?.user.id ? 'Kendi yetkilerinizi değiştiremezsiniz.' : 'Yöneticileri yalnızca okul sahibi (müdür) değiştirir.'}
+            {m.role === 'owner' ? 'Okul müdürünün yetkileri değiştirilemez.' : m.userId === me?.user.id ? 'Kendi yetkilerinizi değiştiremezsiniz.' : 'Yöneticileri yalnızca okul müdürü değiştirir.'}
           </T>
         </Card>
       ) : (

@@ -1,6 +1,6 @@
 /**
  * Okulun kendi adlandırabildiği başlıklar (ör. "Taşıma ve Öğle Yemeği Nöbetçileri" yerine "Servis Nöbetçileri").
- * Boş bırakılan başlık varsayılanı kullanır. Değiştirme yetkisi: okul sahibi / yönetici ve "Başlıkları düzenleme"
+ * Boş bırakılan başlık varsayılanı kullanır. Değiştirme yetkisi: okul müdürü / yönetici ve "Başlıkları düzenleme"
  * yetkisi verilen kullanıcılar; platform yöneticisi her okulda.
  */
 export const LABELS = {

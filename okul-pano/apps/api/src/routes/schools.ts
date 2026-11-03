@@ -62,7 +62,7 @@ export async function schoolRoutes(app: FastifyInstance) {
    * süre dolunca erişim kendiliğinden kapanır. Destek erişimiyle girilen işlemler etkinlik geçmişine düşer.
    */
   app.post('/api/schools/:schoolId/support-access', { preHandler: [app.authenticate, schoolGuard('settings.manage')] }, async (req) => {
-    if (req.ctx.isSupport || req.ctx.role !== 'owner') throw forbidden('Destek erişimini yalnızca okul sahibi (müdür) verebilir.');
+    if (req.ctx.isSupport || req.ctx.role !== 'owner') throw forbidden('Destek erişimini yalnızca okul müdürü verebilir.');
     const { hours } = parse(z.object({ hours: z.union([z.literal(0), z.literal(24), z.literal(168)]) }), req.body);
     const until = hours ? new Date(Date.now() + hours * 3600_000) : null;
     const wasOpen = (req.ctx.school.supportAccessUntil?.getTime() ?? 0) > Date.now();
@@ -277,7 +277,7 @@ export async function schoolRoutes(app: FastifyInstance) {
     const result = await db.transaction(async (tx) => {
       let [owner] = await tx.select().from(users).where(eq(users.email, email));
       if (!owner) {
-        if (!body.ownerPassword) throw badRequest('Yeni okul sahibi için bir şifre belirleyin.');
+        if (!body.ownerPassword) throw badRequest('Yeni okul müdürü için bir şifre belirleyin.');
         [owner] = await tx
           .insert(users)
           .values({ email, fullName: body.ownerName, passwordHash: await hashPassword(body.ownerPassword) })

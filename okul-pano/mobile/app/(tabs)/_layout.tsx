@@ -15,7 +15,7 @@ type TabName = 'index' | 'onaylar' | 'panolar' | 'nobet' | 'acil' | 'duyurular' 
 /**
  * Alt menü role göre kurulur (en çok 5 sekme; geri kalanı profil menüsünde):
  * - Platform yöneticisi: Platform · Okullar · Takvim · Bildirimler
- * - Okul sahibi ve yönetici: Merkez · Onaylar · Panolar · Nöbet · Acil
+ * - Okul müdürü ve yönetici: Merkez · Onaylar · Panolar · Nöbet · Acil
  * - Editör: İçerik + yetkilerinden gelen sekmeler (Duyurular, Onaylar, Panolar, Nöbet, Acil) + Bildirimler
  * - Öğretmen: Bugün · Nöbetim · Gözlem · Program · Profil (Duyurular ve İzin bildir ana sayfada, İzinlerim Menü'de)
  */

@@ -11,7 +11,7 @@ import { Button, Card, Choice, Icon, T, ToggleRow } from './ui.tsx';
 
 /*
  * Kullanıcılar ve yetkiler (panelle aynı kurallar): rehber öğretmen ayrı bir rol olarak seçilir (editör + bütün
- * gözlem kayıtlarını görme yetkisi); yönetici atamayı yalnızca okul sahibi yapar.
+ * gözlem kayıtlarını görme yetkisi); yönetici atamayı yalnızca okul müdürü yapar.
  */
 
 export const GRANTABLE = PERMISSION_KEYS.filter((p) => !ADMIN_ONLY_PERMISSIONS.includes(p) && p !== 'conduct.counsel');
@@ -25,7 +25,7 @@ export const ROLE_INFO: Record<FormRole, { title: string; text: string }> = {
 /** Üyenin görünen rolü: rehber öğretmen yetkisi olan editör "Rehber öğretmen" */
 export const formRole = (m: { role: string; permissions: string[] }): FormRole =>
   m.role === 'admin' ? 'admin' : m.permissions.includes('conduct.counsel') ? 'counselor' : 'editor';
-export const roleTitle = (m: Member) => (m.role === 'owner' ? 'Okul sahibi' : ROLE_INFO[formRole(m)].title);
+export const roleTitle = (m: Member) => (m.role === 'owner' ? 'Okul müdürü' : ROLE_INFO[formRole(m)].title);
 
 /** Formdaki rol API'deki role ve yetkilere çevrilir */
 export const apiRole = (role: FormRole, permissions: Permission[]) =>

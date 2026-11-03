@@ -84,11 +84,11 @@ export const schools = pgTable('schools', {
   trialNotice: integer('trial_notice'),
   /** Kayıtta verilen yetkili telefonu (yalnızca platform yöneticisi görür) */
   contactPhone: text('contact_phone'),
-  /** İlk giriş: 'pending' iken okul sahibine örnek veri sorulur; 'sample' ya da 'empty' cevaplanmıştır */
+  /** İlk giriş: 'pending' iken okul müdürüne örnek veri sorulur; 'sample' ya da 'empty' cevaplanmıştır */
   onboarding: text('onboarding').$type<'pending' | 'sample' | 'empty'>(),
   /** Eklenen örnek kayıtların kimlikleri (tablo adı -> id listesi): "örnek verileri temizle" yalnızca bunları siler */
   sampleData: jsonb('sample_data').$type<Record<string, string[]>>(),
-  /** KVKK: platform yöneticisinin (üye değilse) okul içeriğine erişebileceği son an; okul sahibi verir */
+  /** KVKK: platform yöneticisinin (üye değilse) okul içeriğine erişebileceği son an; okul müdürü verir */
   supportAccessUntil: timestamp('support_access_until', { withTimezone: true }),
   /** Destek erişiminin verildiği an (platform yöneticisine düşen bildirimin anahtarı) */
   supportAccessGrantedAt: timestamp('support_access_granted_at', { withTimezone: true }),
@@ -755,7 +755,7 @@ export const auditLogs = pgTable(
 
 /**
  * Web'den kayıt başvurusu. E-posta doğrulanınca (ya da e-posta gönderilemiyorsa platform yöneticisi onaylayınca)
- * okul deneme paketiyle açılır ve başvuran okul sahibi olur.
+ * okul deneme paketiyle açılır ve başvuran okul müdürü olur.
  */
 export const signups = pgTable(
   'signups',

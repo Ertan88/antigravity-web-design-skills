@@ -2,7 +2,7 @@ import { EMERGENCY_INFO } from '@okulpano/shared/emergency';
 import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import { Text } from './text.tsx';
-import { useAuth } from './auth.tsx';
+import { membershipLabel, useAuth } from './auth.tsx';
 import { useControlCenter, useMeToday, type ControlCenter } from './data.ts';
 import { clock, timeAgo } from './day.ts';
 import { LiveLesson } from './lesson.tsx';
@@ -80,7 +80,7 @@ export function ManagerHome() {
 
   return (
     <Screen refreshing={center.isRefetching} onRefresh={() => void center.refetch()}>
-      <HomeHeader name={account?.user.fullName} school={school?.name} role={school?.support ? 'Destek erişimi' : role === 'owner' ? 'Okul sahibi' : 'Yönetici'}>
+      <HomeHeader name={account?.user.fullName} school={school?.name} role={school?.support ? 'Destek erişimi' : school ? membershipLabel(school) : 'Yönetici'}>
         <NotificationsButton />
         <MenuButton />
       </HomeHeader>

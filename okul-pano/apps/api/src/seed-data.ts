@@ -305,7 +305,7 @@ export async function seedDemo(
         .returning();
     }
     await db.insert(memberships).values({ userId: u!.id, schoolId, role: p.role, permissions: p.permissions }).onConflictDoNothing();
-    accounts.push({ role: p.role === 'owner' ? 'Okul sahibi' : 'Editör (duyuru + kayan yazı)', email: p.email, password: p.password });
+    accounts.push({ role: p.role === 'owner' ? 'Okul müdürü' : 'Editör (duyuru + kayan yazı)', email: p.email, password: p.password });
   }
 
   await addDefaultTeacherOptions(db, schoolId);

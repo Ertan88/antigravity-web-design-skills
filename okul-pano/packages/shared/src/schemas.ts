@@ -183,7 +183,7 @@ export const createSchoolSchema = z.object({
   plan: z.enum(['trial', 'basic', 'pro']).default('trial'),
   maxScreens: z.number().int().min(1).max(500).default(3),
   ownerEmail: z.email('Geçerli bir e-posta girin'),
-  ownerName: required('Sahip adı', 80, 2),
+  ownerName: required('Müdür adı', 80, 2),
   ownerPassword: z.string().min(8, 'Şifre en az 8 karakter olmalı').max(200).optional(),
 });
 export type CreateSchoolInput = z.infer<typeof createSchoolSchema>;

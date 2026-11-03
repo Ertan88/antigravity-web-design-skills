@@ -280,4 +280,23 @@ describe('işletmelerde mesleki eğitim', () => {
     const nine = ((await owner.get(`${base}/students`)).json() as { id: string; fullName: string }[]).find((x) => x.fullName === 'Dokuzuncu Sınıf')!.id;
     expect((await owner.put(`${base}/internship/businesses/${biz.kent}/students`, { studentIds: [ids['Burak Şahin'], nine] })).statusCode).toBe(400);
   });
+
+  it('mesleki eğitim öğretmen tarafı yalnızca meslek öğretmenine açılır; /api/me ünvanı kadrodan verir', async () => {
+    const titles = (await owner.get(`${base}/teacher-titles`)).json() as { id: string; name: string }[];
+    const title = titles.find((x) => /Uzman/.test(x.name)) ?? titles[0];
+    const tid = (await owner.post(`${base}/teachers`, { fullName: 'Kültür Öğretmeni', ...(title ? { titleId: title.id } : {}) })).json().id as string;
+    const user = await (async () => {
+      expectStatus(await owner.post(`${base}/members`, { email: 'kultur@meslek.test', fullName: 'Kültür Öğretmeni', password: 'GizliSifre42', role: 'editor', permissions: [], teacherId: tid }), 201);
+      return client(t.app, (await login(t.app, 'kultur@meslek.test', 'GizliSifre42')).token);
+    })();
+    expectStatus(await owner.put(`${base}/internship/teachers/${tid}/branch`, { newBranch: 'Tarih' }), 200);
+    expect((await user.get(`${base}/internship/access`)).json().teacher).toBe(false);
+    let school = (await user.get('/api/me')).json().schools[0];
+    expect(school.vocational).toBe(false);
+    if (title) expect(school.teacherTitle).toBe(title.name);
+    expectStatus(await owner.put(`${base}/internship/teachers/${tid}/branch`, { newBranch: 'Elektrik-Elektronik Teknolojisi' }), 200);
+    expect((await user.get(`${base}/internship/access`)).json().teacher).toBe(true);
+    school = (await user.get('/api/me')).json().schools[0];
+    expect(school.vocational).toBe(true);
+  });
 });

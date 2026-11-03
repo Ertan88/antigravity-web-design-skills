@@ -35,7 +35,7 @@ if (userCount === 0) {
   }
 }
 
-// Platform yöneticisinin kendi okulu (okul sahibi olarak üye): PLATFORM_OWNER_SCHOOLS=okulun-kisa-adi[,baska-okul]
+// Platform yöneticisinin kendi okulu (okul müdürü olarak üye): PLATFORM_OWNER_SCHOOLS=okulun-kisa-adi[,baska-okul]
 // Destek erişimi kuralı (KVKK) üyesi olmadığı okullara uygulanır; kendi okuluna böylece her zaman girer.
 const ownSlugs = (process.env.PLATFORM_OWNER_SCHOOLS ?? '').split(',').map((x) => x.trim()).filter(Boolean);
 if (ownSlugs.length) {

@@ -35,7 +35,7 @@ describe('roller', () => {
     expect((await admin.patch(path(`members/${ed.json().id}`), { role: 'editor' })).statusCode).toBe(403);
   });
 
-  it('destek erişimini yalnızca okul sahibi (müdür) verir', async () => {
+  it('destek erişimini yalnızca okul müdürü verir', async () => {
     expect((await admin.post(path('support-access'), { hours: 24 })).statusCode).toBe(403);
     expectStatus(await owner.post(path('support-access'), { hours: 24 }), 200);
     expectStatus(await owner.post(path('support-access'), { hours: 0 }), 200);

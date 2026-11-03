@@ -37,7 +37,7 @@ export async function createInvite(
   return { inviteUrl, emailed };
 }
 
-/** Kayıt başvurusundan okulu açar: okul deneme paketiyle, başvuran okul sahibi olarak */
+/** Kayıt başvurusundan okulu açar: okul deneme paketiyle, başvuran okul müdürü olarak */
 async function openSchool(deps: AppDeps, signup: typeof signups.$inferSelect, active: boolean) {
   const { db, env } = deps;
   return db.transaction(async (tx) => {

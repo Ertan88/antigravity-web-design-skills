@@ -96,7 +96,7 @@ describe('web kaydı', () => {
 });
 
 describe('ilk giriş: örnek veri', () => {
-  it('okul sahibi örnek verilerle başlar, sonra yalnızca örnekleri temizler', async () => {
+  it('okul müdürü örnek verilerle başlar, sonra yalnızca örnekleri temizler', async () => {
     const owner = await as('aylin@yildiz.test');
     const schoolId = (await owner.get('/api/me')).json().schools[0].id as string;
     expect((await owner.get(`/api/schools/${schoolId}`)).json()).toMatchObject({ onboarding: 'pending', hasSampleData: false });

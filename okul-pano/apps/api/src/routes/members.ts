@@ -36,10 +36,10 @@ export async function memberRoutes(app: FastifyInstance) {
       .innerJoin(users, eq(users.id, memberships.userId))
       .where(and(eq(memberships.id, memberId), eq(memberships.schoolId, req.ctx.schoolId)));
     if (!m) throw notFound('Kullanıcı bulunamadı.');
-    if (m.membership.role === 'owner') throw forbidden('Okul sahibinin yetkileri buradan değiştirilemez.');
+    if (m.membership.role === 'owner') throw forbidden('Okul müdürünün yetkileri buradan değiştirilemez.');
     if (m.membership.userId === req.ctx.userId) throw forbidden('Kendi yetkilerinizi değiştiremezsiniz.');
-    // Yönetici atama ve yöneticileri değiştirme okul sahibinde (müdür); yönetici editör ekler ve yetki verir
-    if (m.membership.role === 'admin' && req.ctx.role !== 'owner') throw forbidden('Yöneticileri yalnızca okul sahibi (müdür) değiştirebilir.');
+    // Yönetici atama ve yöneticileri değiştirme okul müdüründe (müdür); yönetici editör ekler ve yetki verir
+    if (m.membership.role === 'admin' && req.ctx.role !== 'owner') throw forbidden('Yöneticileri yalnızca okul müdürü değiştirebilir.');
     return m;
   }
 
@@ -72,7 +72,7 @@ export async function memberRoutes(app: FastifyInstance) {
 
   app.post(base, manage, async (req, reply) => {
     const body = parse(createMemberSchema, req.body);
-    if (body.role !== 'editor' && req.ctx.role !== 'owner') throw forbidden('Yönetici atamayı yalnızca okul sahibi (müdür) yapabilir.');
+    if (body.role !== 'editor' && req.ctx.role !== 'owner') throw forbidden('Yönetici atamayı yalnızca okul müdürü yapabilir.');
     await checkTeacher(req, body.teacherId);
     const email = body.email.toLowerCase();
     let [user] = await db.select().from(users).where(eq(users.email, email));
@@ -143,7 +143,7 @@ export async function memberRoutes(app: FastifyInstance) {
   app.patch(`${base}/:memberId`, manage, async (req) => {
     const m = await loadMember(req);
     const body = parse(updateMemberSchema, req.body);
-    if (body.role && body.role !== 'editor' && req.ctx.role !== 'owner') throw forbidden('Yönetici atamayı yalnızca okul sahibi (müdür) yapabilir.');
+    if (body.role && body.role !== 'editor' && req.ctx.role !== 'owner') throw forbidden('Yönetici atamayı yalnızca okul müdürü yapabilir.');
     const role = body.role ?? m.membership.role;
     const permissions = role === 'editor' ? effectivePermissions('editor', body.permissions ?? m.membership.permissions) : [];
     await checkTeacher(req, body.teacherId);
@@ -157,7 +157,7 @@ export async function memberRoutes(app: FastifyInstance) {
 
   /**
    * Kullanıcıyı öğretmen kaydıyla eşleştirir (mobilde kendi nöbetleri ve ders programı). Yetki değişikliği
-   * olmadığı için okul sahibine ve kişinin kendisine de uygulanabilir (ör. ders veren müdür yardımcısı).
+   * olmadığı için okul müdürüne ve kişinin kendisine de uygulanabilir (ör. ders veren müdür yardımcısı).
    */
   app.put(`${base}/:memberId/teacher`, manage, async (req) => {
     const { memberId } = req.params as { memberId: string };

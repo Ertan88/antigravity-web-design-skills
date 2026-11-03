@@ -288,7 +288,7 @@ export function Platform() {
         open={open}
         onClose={() => setOpen(false)}
         title="Yeni okul"
-        description="Okul ve okul sahibi hesabı birlikte oluşturulur."
+        description="Okul ve okul müdürü hesabı birlikte oluşturulur."
         size="lg"
         footer={
           <>
@@ -336,7 +336,7 @@ export function Platform() {
             </Field>
           </div>
           <div className="border-t border-slate-100 pt-4">
-            <div className="mb-3 text-sm font-semibold">Okul sahibi (müdür)</div>
+            <div className="mb-3 text-sm font-semibold">Okul müdürü</div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Ad soyad" error={form.errors.ownerName}>
                 {(id) => <Input id={id} value={v.ownerName} onChange={(e) => form.set('ownerName', e.target.value)} />}

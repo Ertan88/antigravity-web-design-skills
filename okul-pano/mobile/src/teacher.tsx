@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 import { Text } from './text.tsx';
-import { useAuth } from './auth.tsx';
+import { membershipLabel, useAuth } from './auth.tsx';
 import { useInbox, useMeToday, useNow, type MeToday } from './data.ts';
 import { classLabel, teacherDay } from './day.ts';
 import { colors, type TileTone } from './theme.ts';
@@ -81,7 +81,7 @@ export function TeacherHome() {
   ];
   return (
     <Screen refreshing={today.isRefetching} onRefresh={() => void today.refetch()}>
-      <HomeHeader name={me?.user.fullName} school={school?.name} role="Öğretmen">
+      <HomeHeader name={me?.user.fullName} school={school?.name} role={school ? membershipLabel(school) : 'Öğretmen'}>
         <NotificationsButton />
       </HomeHeader>
       {today.isLoading || !today.data ? (

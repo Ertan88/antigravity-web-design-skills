@@ -36,7 +36,7 @@ export interface NavItem {
   /** Menüde görünmesi için gereken yetki (yoksa tüm üyeler görür) */
   permission?: Permission;
   /** Okul ayarına bağlı modüller (ör. taşımalı eğitim yalnızca açıksa görünür) */
-  when?: (settings: SchoolSettings | undefined, who: { userId: string | null; teacherId: string | null; can: (p: Permission) => boolean }) => boolean;
+  when?: (settings: SchoolSettings | undefined, who: { userId: string | null; teacherId: string | null; vocational: boolean; can: (p: Permission) => boolean }) => boolean;
 }
 
 export interface NavGroup {
@@ -79,19 +79,19 @@ export const NAV: NavGroup[] = [
   {
     title: 'Mesleki Eğitim',
     items: [
-      // İdare bütün işletmeleri, öğretmen kendi eklediği ya da koordinatörü olduğu işletmeleri görür
+      // İdare bütün işletmeleri, meslek öğretmeni kendi eklediği ya da koordinatörü olduğu işletmeleri görür
       {
         to: '/isletmeler',
         label: 'İşletmeler',
         icon: Building2,
-        when: (s, who) => Boolean(s?.internshipEnabled) && (who.can('internship.manage') || Boolean(who.teacherId)),
+        when: (s, who) => Boolean(s?.internshipEnabled) && (who.can('internship.manage') || who.vocational),
       },
       {
         to: '/isletme-devam',
         label: 'İşletmede Devam',
         icon: CalendarCheck2,
-        // İdare, koordinatör müdür yardımcısı ve öğretmenler (koordinatör öğretmen kendi işletmelerini görür)
-        when: (s, who) => Boolean(s?.internshipEnabled) && (who.can('internship.manage') || Boolean(who.teacherId) || s?.internshipManagerUserId === who.userId),
+        // İdare, koordinatör müdür yardımcısı ve meslek öğretmenleri (koordinatör öğretmen kendi işletmelerini görür)
+        when: (s, who) => Boolean(s?.internshipEnabled) && (who.can('internship.manage') || who.vocational || s?.internshipManagerUserId === who.userId),
       },
     ],
   },

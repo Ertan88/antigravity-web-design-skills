@@ -124,7 +124,7 @@ function CitySearch({ onPick }: { onPick: (r: GeoResult) => void }) {
 }
 
 /**
- * KVKK: okulun aydınlatma metni (herkese açık /aydinlatma/<okul> adresinde yayınlanır) ve okul sahibi için
+ * KVKK: okulun aydınlatma metni (herkese açık /aydinlatma/<okul> adresinde yayınlanır) ve okul müdürü için
  * bütün verileri dışa aktarma.
  */
 function PrivacySection({ value, onChange, slug }: { value: string; onChange: (v: string) => void; slug: string }) {
@@ -357,7 +357,7 @@ export function Settings() {
             checked={s.requireApproval}
             onChange={(x) => setting('requireApproval', x)}
             label="Duyurular onaydan sonra yayınlansın"
-            description="Açıkken 'Duyuruları onaylama' yetkisi olmayan kullanıcıların (ör. öğretmenler) eklediği ya da değiştirdiği duyurular, okul sahibi, yöneticiler veya bu yetkiyi verdiğiniz kişiler (ör. müdür yardımcısı) onaylayınca panoya çıkar. Yetkiyi Kullanıcılar ve Yetkiler sayfasından verin."
+            description="Açıkken 'Duyuruları onaylama' yetkisi olmayan kullanıcıların (ör. öğretmenler) eklediği ya da değiştirdiği duyurular, okul müdürü, yöneticiler veya bu yetkiyi verdiğiniz kişiler (ör. müdür yardımcısı) onaylayınca panoya çıkar. Yetkiyi Kullanıcılar ve Yetkiler sayfasından verin."
           />
           <Toggle
             checked={Boolean(s.internshipEnabled)}

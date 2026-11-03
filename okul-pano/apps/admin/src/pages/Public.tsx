@@ -74,7 +74,7 @@ function Done({ icon, title, children }: { icon: ReactNode; title: string; child
 }
 
 /**
- * Okul için deneme kaydı. E-posta doğrulanınca okul deneme paketiyle açılır; kayıt yapan okul sahibi olur ve
+ * Okul için deneme kaydı. E-posta doğrulanınca okul deneme paketiyle açılır; kayıt yapan okul müdürü olur ve
  * öğretmenleri panelden davet eder. Mobil uygulamada kayıt yoktur.
  */
 export function Signup() {
@@ -173,7 +173,7 @@ export function Signup() {
           </div>
         </Step>
 
-        <Step n={2} title="Yetkili · okul sahibi hesabı">
+        <Step n={2} title="Yetkili · okul müdürü hesabı">
           <Field label="Ad soyad">{(id) => <Input id={id} required minLength={3} maxLength={80} value={form.ownerName} onChange={set('ownerName')} autoComplete="name" />}</Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="E-posta">{(id) => <Input id={id} type="email" required value={form.email} onChange={set('email')} autoComplete="email" />}</Field>

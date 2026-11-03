@@ -100,7 +100,7 @@ KVKK'nın 11. maddesi uyarınca kişisel verilerinizin işlenip işlenmediğini 
 }
 
 /**
- * KVKK: herkese açık aydınlatma metni sayfası, okulun bütün verisini dışa aktarma (okul sahibi) ve okulu
+ * KVKK: herkese açık aydınlatma metni sayfası, okulun bütün verisini dışa aktarma (okul müdürü) ve okulu
  * bütün verileriyle silme (platform yöneticisi; abonelik bitince).
  */
 export async function privacyRoutes(app: FastifyInstance) {
@@ -138,7 +138,7 @@ ul{padding-left:22px}footer{margin-top:16px;color:#475569;font-size:13px;text-al
   /** Okulun bütün verisi tek dosyada (veri taşınabilirliği). Şifre özetleri ve cihaz anahtarları yer almaz. */
   app.get('/api/schools/:schoolId/export', { preHandler: [app.authenticate, schoolGuard()] }, async (req, reply) => {
     const { schoolId, school, role, isSuperAdmin } = req.ctx;
-    if (role !== 'owner' && !isSuperAdmin) throw forbidden('Verileri yalnızca okul sahibi dışa aktarabilir.');
+    if (role !== 'owner' && !isSuperAdmin) throw forbidden('Verileri yalnızca okul müdürü dışa aktarabilir.');
     const data: Record<string, unknown> = {};
     for (const [name, table] of Object.entries(SCHOOL_TABLES)) {
       data[name] = await db.select().from(table as PgTable).where(eq(table.schoolId, schoolId));

@@ -25,7 +25,7 @@ export function SupportAccessCard() {
     },
     onError: (e) => toast.error(e.message),
   });
-  // Yalnızca okul sahibi (müdür) verir; platform yöneticisi kendi kendine erişim vermez
+  // Yalnızca okul müdürü verir; platform yöneticisi kendi kendine erişim vermez
   if (!school.data || me?.user.isSuperAdmin || access?.role !== 'owner') return null;
   const until = school.data.supportAccessUntil;
   const open = Boolean(until && Date.parse(until) > Date.now());

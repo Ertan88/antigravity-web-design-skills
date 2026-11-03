@@ -101,6 +101,21 @@ async function schoolAreas(deps: AppDeps, schoolId: string) {
   return rows.map((r) => ({ ...r, isVocational: branchIsVocational(r) })).sort((a, b) => trCompare(a.name, b.name));
 }
 
+/** Meslek öğretmeni mi: branşı meslek alanı (okulun düzeltmesi dahil) ya da programında işletmelerde mesleki eğitim dersi var */
+async function isVocationalTeacher(deps: AppDeps, schoolId: string, teacherId: string) {
+  const [t] = await deps.db
+    .select({ name: teacherBranches.name, vocational: teacherBranches.vocational })
+    .from(teachers)
+    .innerJoin(teacherBranches, eq(teacherBranches.id, teachers.branchId))
+    .where(and(eq(teachers.id, teacherId), eq(teachers.schoolId, schoolId)));
+  if (t && branchIsVocational(t)) return true;
+  const lessons = await deps.db
+    .selectDistinct({ subject: timetableEntries.subject })
+    .from(timetableEntries)
+    .where(and(eq(timetableEntries.schoolId, schoolId), eq(timetableEntries.teacherId, teacherId)));
+  return lessons.some((l) => isInternshipSubject(l.subject));
+}
+
 /** İşletme öğrencilerinin seçileceği sınıflar (işletme dersi olanlar ve 12. sınıflar) */
 async function eligibleClasses(deps: AppDeps, schoolId: string) {
   const [classes, entries, assigned] = await Promise.all([
@@ -218,7 +233,9 @@ export async function internshipRoutes(app: FastifyInstance) {
     const enabled = settingsOf(req).internshipEnabled && !req.ctx.isSupport;
     if (!enabled) return { enabled: false, all: false, coordinator: false, manage: false, teacher: false };
     const own = await ownBusinessIds(deps, req);
-    return { enabled: true, all: isManager(req) || isVp(req), coordinator: own.size > 0, manage: isManager(req), teacher: Boolean(req.ctx.teacherId) };
+    // Öğretmen tarafı yalnızca meslek öğretmenine (branşı meslek alanı ya da işletme dersi var) ya da işletmesi olana açılır
+    const vocational = req.ctx.teacherId ? await isVocationalTeacher(deps, req.ctx.schoolId, req.ctx.teacherId) : false;
+    return { enabled: true, all: isManager(req) || isVp(req), coordinator: own.size > 0, manage: isManager(req), teacher: vocational || own.size > 0 };
   });
 
   /** Koordinatör müdür yardımcısı seçimi (Genel Ayarlar): okulun kullanıcıları */

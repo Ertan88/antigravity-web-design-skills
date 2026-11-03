@@ -11,7 +11,7 @@ import { useSchool, useSchoolPath, type School } from '../lib/data.ts';
 
 /**
  * Başlıklar: okul, kart ve sekme adlarını kendi kullandığı adlarla değiştirir (ör. "Servis Nöbetçileri").
- * Boş bırakılan başlık varsayılanı kullanır. Yetki: okul sahibi / yönetici ve "Başlıkları düzenleme" verilenler.
+ * Boş bırakılan başlık varsayılanı kullanır. Yetki: okul müdürü / yönetici ve "Başlıkları düzenleme" verilenler.
  */
 export function Labels() {
   const { schoolId } = useAuth();

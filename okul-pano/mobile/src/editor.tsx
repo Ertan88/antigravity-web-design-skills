@@ -1,7 +1,7 @@
 import { PERMISSIONS } from '@okulpano/shared/permissions';
 import { router } from 'expo-router';
 import { View } from 'react-native';
-import { useAuth } from './auth.tsx';
+import { membershipLabel, useAuth } from './auth.tsx';
 import { useAnnouncements, useMeToday, type Announcement } from './data.ts';
 import { MenuButton, QuickAdd } from './quick.tsx';
 import { LiveLesson } from './lesson.tsx';
@@ -31,7 +31,7 @@ export function EditorHome() {
   };
   return (
     <Screen refreshing={list.isRefetching} onRefresh={() => void list.refetch()}>
-      <HomeHeader name={me?.user.fullName} school={school?.name} role="Editör">
+      <HomeHeader name={me?.user.fullName} school={school?.name} role={school ? membershipLabel(school) : 'Editör'}>
         <NotificationsButton />
         <MenuButton />
       </HomeHeader>

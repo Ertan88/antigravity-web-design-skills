@@ -67,7 +67,7 @@ describe('kullanıcı şifreleri', () => {
     expect((await tryLogin(SUPER.email, SUPER.password)).statusCode).toBe(200);
   });
 
-  it('okul sahibinin ve kendi şifresi buradan sıfırlanamaz', async () => {
+  it('okul müdürünün ve kendi şifresi buradan sıfırlanamaz', async () => {
     const members = (await owner.get(path('members'))).json() as { id: string; role: string }[];
     const own = members.find((m) => m.role === 'owner')!;
     expect((await owner.post(path(`members/${own.id}/password`), {})).statusCode).toBe(403);

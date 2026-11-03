@@ -7,7 +7,7 @@ import { colors } from '../src/theme.ts';
 import { Badge, Button, Card, Empty, ErrorNote, Loading, Screen, T } from '../src/ui.tsx';
 
 /**
- * Destek erişimi (KVKK): platform desteği okulun verilerini varsayılan olarak göremez. Yardım gerektiğinde okul sahibi
+ * Destek erişimi (KVKK): platform desteği okulun verilerini varsayılan olarak göremez. Yardım gerektiğinde okul müdürü
  * (müdür) 24 saat ya da 7 gün erişim verir; süre dolunca kendiliğinden kapanır, işlemler etkinlik geçmişine düşer.
  */
 export default function Destek() {
@@ -24,7 +24,7 @@ export default function Destek() {
     return (
       <Screen back title="Destek erişimi">
         <Card>
-          <Empty icon="lock-closed-outline" title="Destek erişimini yalnızca okul sahibi (müdür) verir" />
+          <Empty icon="lock-closed-outline" title="Destek erişimini yalnızca okul müdürü verir" />
         </Card>
       </Screen>
     );

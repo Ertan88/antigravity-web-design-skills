@@ -3,14 +3,14 @@ import { client, createTestApp, expectStatus, login, SUPER, type TestCtx } from 
 
 let t: TestCtx;
 let root: ReturnType<typeof client>;
-/** Okul sahibi: okul içeriğini o yönetir (platform yöneticisi üye değilse erişemez) */
+/** Okul müdürü: okul içeriğini o yönetir (platform yöneticisi üye değilse erişemez) */
 let owner: ReturnType<typeof client>;
 let base: string;
 
 beforeAll(async () => {
   t = await createTestApp();
   root = client(t.app, (await login(t.app, SUPER.email, SUPER.password)).token);
-  const res = await root.post('/api/platform/schools', { name: 'Deneme Okulu', slug: 'deneme-okulu', ownerEmail: 'sahip@deneme.test', ownerName: 'Okul Sahibi', ownerPassword: 'SahipSifre42' });
+  const res = await root.post('/api/platform/schools', { name: 'Deneme Okulu', slug: 'deneme-okulu', ownerEmail: 'sahip@deneme.test', ownerName: 'Okul Müdürü', ownerPassword: 'SahipSifre42' });
   expectStatus(res, 201);
   base = `/api/schools/${res.json().id}`;
   owner = client(t.app, (await login(t.app, 'sahip@deneme.test', 'SahipSifre42')).token);

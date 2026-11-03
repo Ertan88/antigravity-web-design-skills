@@ -234,7 +234,7 @@ describe('telefon bildirimleri', () => {
 });
 
 describe('kullanıcı ve öğretmen eşleşmesi', () => {
-  it('okul sahibi kendini de öğretmen kaydına bağlayabilir; /api/me eşleşmeyi döner', async () => {
+  it('okul müdürü kendini de öğretmen kaydına bağlayabilir; /api/me eşleşmeyi döner', async () => {
     const members = (await owner.get(path('members'))).json() as { id: string; email: string; teacherName: string | null }[];
     expect(members.find((m) => m.email === 'ayse@kumanda.local')!.teacherName).toBe('Ayşe Demir');
     const me = members.find((m) => m.email === 'mudur@kumanda.local')!;

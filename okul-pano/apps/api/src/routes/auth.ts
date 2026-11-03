@@ -1,9 +1,9 @@
-import { changePasswordSchema, effectivePermissions, loginSchema, updateProfileSchema } from '@okulpano/shared';
-import { and, asc, eq, gt, lt } from 'drizzle-orm';
+import { branchIsVocational, changePasswordSchema, effectivePermissions, isInternshipSubject, loginSchema, updateProfileSchema } from '@okulpano/shared';
+import { and, asc, eq, gt, inArray, lt } from 'drizzle-orm';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { accessUser } from '../context.ts';
-import { memberships, schools, sessions, users } from '../db/schema.ts';
+import { memberships, schools, sessions, teacherBranches, teachers, teacherTitles, timetableEntries, users } from '../db/schema.ts';
 import { burnPasswordCheck, hashPassword, randomToken, sha256, verifyPassword } from '../lib/crypto.ts';
 import { badRequest, conflict, notFound, parse, unauthorized } from '../lib/errors.ts';
 
@@ -91,7 +91,7 @@ export async function authRoutes(app: FastifyInstance) {
   });
 
   /**
-   * Platform yöneticisinin panelde açabildiği okullar: üyesi olduğu (kendi) okulları ve okul sahibinin süreli
+   * Platform yöneticisinin panelde açabildiği okullar: üyesi olduğu (kendi) okulları ve okul müdürünün süreli
    * destek erişimi verdiği okullar (KVKK). Diğer okulların yalnızca kayıt bilgileri Platform sayfasında görünür.
    */
   async function superAdminSchools(userId: string) {
@@ -126,6 +126,31 @@ export async function authRoutes(app: FastifyInstance) {
           .where(eq(memberships.userId, sub))
           .orderBy(asc(schools.name));
 
+    // Öğretmen kaydına bağlı üyelikler: kadrodaki ünvan (ör. Müdür Yardımcısı) ve meslek öğretmeni mi
+    // (branşı meslek alanı ya da programında işletmelerde mesleki eğitim dersi var)
+    const teacherIds = rows.map((r) => r.teacherId).filter((x): x is string => Boolean(x));
+    const info = new Map<string, { title: string | null; vocational: boolean }>();
+    if (teacherIds.length) {
+      const [rowsT, internship] = await Promise.all([
+        db
+          .select({ id: teachers.id, title: teacherTitles.name, branchName: teacherBranches.name, branchVocational: teacherBranches.vocational })
+          .from(teachers)
+          .leftJoin(teacherTitles, eq(teacherTitles.id, teachers.titleId))
+          .leftJoin(teacherBranches, eq(teacherBranches.id, teachers.branchId))
+          .where(inArray(teachers.id, teacherIds)),
+        db
+          .selectDistinct({ teacherId: timetableEntries.teacherId, subject: timetableEntries.subject })
+          .from(timetableEntries)
+          .where(inArray(timetableEntries.teacherId, teacherIds)),
+      ]);
+      const teachesInternship = new Set(internship.filter((x) => isInternshipSubject(x.subject)).map((x) => x.teacherId));
+      for (const t of rowsT)
+        info.set(t.id, {
+          title: t.title?.trim() || null,
+          vocational: (t.branchName ? branchIsVocational({ name: t.branchName, vocational: t.branchVocational }) : false) || teachesInternship.has(t.id),
+        });
+    }
+
     return {
       user: profile,
       /** Açılışta seçilecek okul: en son açılan, yoksa listenin ilki */
@@ -139,6 +164,10 @@ export async function authRoutes(app: FastifyInstance) {
         role: r.role,
         permissions: effectivePermissions(r.role, r.permissions),
         teacherId: r.teacherId,
+        /** Öğretmen kadrosundaki ünvan (Müdür Yardımcısı, Uzman Öğretmen…); kayıt yoksa ya da ünvan girilmemişse null */
+        teacherTitle: r.teacherId ? (info.get(r.teacherId)?.title ?? null) : null,
+        /** Meslek öğretmeni: branşı meslek alanı ya da işletmelerde mesleki eğitim dersi var */
+        vocational: r.teacherId ? (info.get(r.teacherId)?.vocational ?? false) : false,
         /** Üyelik yok, okulun verdiği süreli destek erişimi */
         support: 'support' in r ? true : undefined,
       })),

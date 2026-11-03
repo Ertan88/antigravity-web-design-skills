@@ -9,7 +9,7 @@ import { Badge, Button, Card, Empty, ErrorNote, ListRow, Loading, Screen, T } fr
 
 /**
  * Kullanıcılar ve yetkiler (paneldekiyle aynı): kişiye dokununca rol ve yetkiler, öğretmen kaydı, şifre sıfırlama,
- * daveti yeniden gönderme ve okuldan çıkarma açılır. Yönetici atamayı yalnızca okul sahibi (müdür) yapar.
+ * daveti yeniden gönderme ve okuldan çıkarma açılır. Yönetici atamayı yalnızca okul müdürü yapar.
  */
 export default function Kullanicilar() {
   const { role, can } = useAuth();
@@ -72,7 +72,7 @@ export default function Kullanicilar() {
         </Card>
       )}
       <T size={12} color={colors.muted} style={{ textAlign: 'center' }}>
-        {role === 'owner' ? 'Yönetici atamayı yalnızca okul sahibi yapar.' : 'Yöneticileri yalnızca okul sahibi (müdür) atar ve değiştirir.'} Editörler yalnızca seçtiğiniz bölümleri düzenleyebilir.
+        {role === 'owner' ? 'Yönetici atamayı yalnızca okul müdürü yapar.' : 'Yöneticileri yalnızca okul müdürü atar ve değiştirir.'} Editörler yalnızca seçtiğiniz bölümleri düzenleyebilir.
       </T>
     </Screen>
   );

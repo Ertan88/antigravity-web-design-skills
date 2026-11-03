@@ -70,7 +70,7 @@ function TeacherSelect({ value, onChange, teachers, id }: { value: string; onCha
 
 function RoleAndPermissions({ form }: { form: ReturnType<typeof useForm<Form>> }) {
   const { values: v, set } = form;
-  // Yönetici atama okul sahibinde (müdür); yönetici yalnızca editör ekler
+  // Yönetici atama okul müdüründe (müdür); yönetici yalnızca editör ekler
   const { school } = useAuth();
   const roles = school?.role === 'owner' ? (['editor', 'counselor', 'admin'] as const) : (['editor', 'counselor'] as const);
   return (
@@ -230,7 +230,7 @@ export function Users() {
                   </Td>
                   <Td>
                     <Badge tone={m.role === 'editor' ? (formRole(m) === 'counselor' ? 'green' : 'slate') : 'blue'}>
-                      {m.role === 'owner' ? 'Okul sahibi' : ROLE_INFO[formRole(m)].title}
+                      {m.role === 'owner' ? 'Okul müdürü' : ROLE_INFO[formRole(m)].title}
                     </Badge>
                   </Td>
                   <Td className="max-w-md">

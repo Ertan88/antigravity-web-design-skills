@@ -57,7 +57,9 @@ function SchoolBadge({ name, logo }: { name: string; logo: string | null }) {
   );
 }
 
-const roleLabel = (s: { role: string; teacherId?: string | null }) => ({ owner: 'Okul sahibi', admin: 'Yönetici', editor: s.teacherId ? 'Öğretmen' : 'Editör' })[s.role] ?? s.role;
+/** Öğretmen kaydı bağlıysa kadrodaki ünvan (Müdür Yardımcısı, Uzman Öğretmen…), değilse rol */
+const roleLabel = (s: { role: string; teacherId?: string | null; teacherTitle?: string | null }) =>
+  s.teacherTitle || (({ owner: 'Okul müdürü', admin: 'Yönetici', editor: s.teacherId ? 'Öğretmen' : 'Editör' }) as Record<string, string>)[s.role] || s.role;
 
 const initials = (name: string | undefined) =>
   (name ?? '')
@@ -75,7 +77,7 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { me, can, logout, school: access } = useAuth();
-  const who = { userId: me?.user.id ?? null, teacherId: access?.teacherId ?? null, can };
+  const who = { userId: me?.user.id ?? null, teacherId: access?.teacherId ?? null, vocational: Boolean(access?.vocational), can };
   const school = useSchool();
   const settings = school.data?.settings;
   return (

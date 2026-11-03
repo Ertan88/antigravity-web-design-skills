@@ -13,6 +13,10 @@ export interface SchoolAccess {
   permissions: Permission[];
   /** Bağlı öğretmen kaydı */
   teacherId?: string | null;
+  /** Öğretmen kadrosundaki ünvan (Müdür Yardımcısı, Uzman Öğretmen…) */
+  teacherTitle?: string | null;
+  /** Meslek öğretmeni (branşı meslek alanı ya da işletme dersi var) */
+  vocational?: boolean;
   /** Üyelik yok, okulun verdiği süreli destek erişimi (platform yöneticisi) */
   support?: boolean;
 }

@@ -16,6 +16,10 @@ export interface SchoolAccess {
   permissions: Permission[];
   /** Bağlı öğretmen kaydı: kendi nöbetleri ve ders programı */
   teacherId: string | null;
+  /** Öğretmen kadrosundaki ünvan (Müdür Yardımcısı, Uzman Öğretmen…) */
+  teacherTitle?: string | null;
+  /** Meslek öğretmeni (branşı meslek alanı ya da işletme dersi var) */
+  vocational?: boolean;
   /** Üyelik yok, okulun (müdürün) verdiği süreli destek erişimi (platform yöneticisi) */
   support?: boolean;
 }
@@ -35,8 +39,8 @@ const CONTENT_PERMISSIONS: Permission[] = ['announcements.manage', 'highlights.m
 /**
  * Uygulamadaki rol: menüler buna göre kurulur.
  * - platform: platform yöneticisinin kendi görünümü (okullar, abonelikler, MEB takvimi)
- * - owner: okul sahibi (müdür) · admin: yönetici · editor: verilen yetkiler · teacher: öğretmen
- * Platform yöneticisi üyesi olduğu okulda üyeliğindeki rolle (okul sahibi, öğretmen…) çalışır; o görünüme geçebilir.
+ * - owner: okul müdürü · admin: yönetici · editor: verilen yetkiler · teacher: öğretmen
+ * Platform yöneticisi üyesi olduğu okulda üyeliğindeki rolle (okul müdürü, öğretmen…) çalışır; o görünüme geçebilir.
  */
 export type AppRole = 'platform' | 'owner' | 'admin' | 'editor' | 'teacher';
 
@@ -177,9 +181,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-/** Okuldaki üyelik rolü: "Okul sahibi", "Öğretmen"… (platform yöneticisinin okul görünümüne geçişinde) */
+/**
+ * Kişinin okuldaki adı: öğretmen kaydı bağlıysa kadrodaki ünvanı (Müdür Yardımcısı, Uzman Öğretmen…),
+ * değilse rolü ("Okul müdürü", "Yönetici", "Öğretmen", "Editör")
+ */
 export function membershipLabel(s: SchoolAccess): string {
-  if (s.role === 'owner') return 'Okul sahibi';
+  if (s.teacherTitle) return s.teacherTitle;
+  if (s.role === 'owner') return 'Okul müdürü';
   if (s.role === 'admin') return 'Yönetici';
   return s.teacherId ? 'Öğretmen' : 'Editör';
 }

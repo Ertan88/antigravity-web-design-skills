@@ -60,7 +60,7 @@ describe('aydınlatma metni', () => {
 });
 
 describe('verileri dışa aktarma', () => {
-  it('okul sahibi bütün verileri indirir; şifre ve anahtar özetleri yoktur', async () => {
+  it('okul müdürü bütün verileri indirir; şifre ve anahtar özetleri yoktur', async () => {
     const res = await owner.get(path('export'));
     expectStatus(res, 200);
     expect(res.headers['content-disposition']).toContain('okul-pano-kvkk-okulu');
@@ -71,7 +71,7 @@ describe('verileri dışa aktarma', () => {
     expect(res.body).not.toMatch(/passwordHash|tokenHash|password_hash/);
   });
 
-  it('okul sahibi olmayan indiremez', async () => {
+  it('okul müdürü olmayan indiremez', async () => {
     expectStatus(await editor.get(path('export')), 403);
   });
 });
@@ -88,7 +88,7 @@ describe('okulu silme', () => {
     expect(res.json().removedUsers).toBe(1);
     const list = (await root.get('/api/platform/schools')).json() as { id: string }[];
     expect(list.map((s) => s.id)).not.toContain(schoolId);
-    // Okul sahibinin hesabı silindi; editör diğer okulda çalıştığı için hesabı duruyor
+    // Okul müdürünün hesabı silindi; editör diğer okulda çalıştığı için hesabı duruyor
     expectStatus(await t.app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'mudur@kvkk.local', password: 'MudurKV123!' } }), 401);
     const ed = await login(t.app, 'editor@kvkk.local', 'EditorKV123!');
     const me = (await client(t.app, ed.token).get('/api/me')).json();

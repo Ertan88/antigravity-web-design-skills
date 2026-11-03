@@ -56,7 +56,7 @@ describe('kimlik doğrulama', () => {
     expect((await t.app.inject({ method: 'GET', url: `/api/schools/${schoolA}/announcements` })).statusCode).toBe(401);
   });
 
-  it('okul sahibi yalnızca kendi okulunu görür', async () => {
+  it('okul müdürü yalnızca kendi okulunu görür', async () => {
     const me = await client(t.app, ownerToken).get('/api/me');
     expectStatus(me, 200);
     expect(me.json().schools).toHaveLength(1);
@@ -157,7 +157,7 @@ describe('yetkiler ve okul izolasyonu', () => {
     expect(res.statusCode).toBe(404);
   });
 
-  it('okul sahibi kendi üyeliğini ya da sahibi değiştiremez', async () => {
+  it('okul müdürü kendi üyeliğini ya da sahibi değiştiremez', async () => {
     const members = (await client(t.app, ownerToken).get(`/api/schools/${schoolA}/members`)).json();
     const owner = members.find((m: { role: string }) => m.role === 'owner');
     const res = await client(t.app, ownerToken).patch(`/api/schools/${schoolA}/members/${owner.id}`, { role: 'editor' });
