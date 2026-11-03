@@ -1,4 +1,5 @@
 import {
+  businessInfoSchema,
   businessSchema,
   businessStudentsSchema,
   internCells,
@@ -13,6 +14,8 @@ import {
   schoolHalvesFromTimetable,
   zonedParts,
   type SchoolHalves,
+  addIsoDays,
+  formatDays,
   type InternDay,
   type InternHalf,
   type InternMark,
@@ -132,9 +135,15 @@ async function marksInRange(deps: AppDeps, schoolId: string, from: string, to: s
   return out;
 }
 
+/** Ayın son günü (YYYY-AA-GG) */
+const monthLast = (month: string) => {
+  const [y, m] = month.split('-').map(Number) as [number, number];
+  return `${month}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0')}`;
+};
+
 async function monthDays(deps: AppDeps, schoolId: string, month: string): Promise<InternDay[]> {
   const from = `${month}-01`;
-  const to = `${month}-31`;
+  const to = monthLast(month);
   const { holidays, halfDays } = await holidaysAndHalfDays(deps.db, schoolId, from, to);
   return internMonthDays(month, holidays, halfDays);
 }
@@ -180,6 +189,11 @@ export async function internshipRoutes(app: FastifyInstance) {
           name: businesses.name,
           phone: businesses.phone,
           address: businesses.address,
+          contactName: businesses.contactName,
+          trainerName: businesses.trainerName,
+          email: businesses.email,
+          field: businesses.field,
+          notes: businesses.notes,
           coordinatorTeacherId: businesses.coordinatorTeacherId,
           coordinatorName: teachers.fullName,
           isActive: businesses.isActive,
@@ -236,6 +250,22 @@ export async function internshipRoutes(app: FastifyInstance) {
     if (!row) throw notFound();
     await audit(req, 'delete', 'İşletme', id, row.name);
     return { ok: true };
+  });
+
+  /** İşletme bilgileri: idare ya da işletmenin koordinatör öğretmeni düzenler (ziyarette güncel bilgi) */
+  app.patch(`${base}/businesses/:id/info`, member, async (req) => {
+    const s = await scope(deps, req);
+    const id = idParam(req);
+    if (!s.canEdit(id)) throw forbidden('Yalnızca koordinatör olduğunuz işletmenin bilgilerini düzenleyebilirsiniz.');
+    const body = parse(businessInfoSchema, req.body);
+    const [row] = await db
+      .update(businesses)
+      .set({ ...body, updatedAt: new Date() })
+      .where(and(eq(businesses.id, id), eq(businesses.schoolId, req.ctx.schoolId)))
+      .returning();
+    if (!row) throw notFound();
+    await audit(req, 'update', 'İşletme', id, `${row.name}: bilgiler`);
+    return row;
   });
 
   async function checkTeacher(req: FastifyRequest, teacherId: string | null | undefined) {
@@ -308,7 +338,7 @@ export async function internshipRoutes(app: FastifyInstance) {
     const [days, weekdays, marks] = await Promise.all([
       monthDays(deps, req.ctx.schoolId, month),
       schoolWeekdays(deps, req.ctx.schoolId, classes.map((c) => c.id)),
-      marksInRange(deps, req.ctx.schoolId, `${month}-01`, `${month}-31`),
+      marksInRange(deps, req.ctx.schoolId, `${month}-01`, monthLast(month)),
     ]);
     const now = today(req);
     const settings = settingsOf(req);
@@ -346,17 +376,38 @@ export async function internshipRoutes(app: FastifyInstance) {
     const list = (await internStudents(deps, req.ctx.schoolId)).filter((st) => s.all || s.own.has(st.businessId!));
     const month = date.slice(0, 7);
     const classIds = [...new Set(list.map((x) => x.classId).filter((x): x is string => Boolean(x)))];
-    const [days, weekdays, marks] = await Promise.all([
+    const [days, weekdays, marks, infoRows] = await Promise.all([
       monthDays(deps, req.ctx.schoolId, month),
       schoolWeekdays(deps, req.ctx.schoolId, classIds),
       marksInRange(deps, req.ctx.schoolId, date, date),
+      db
+        .select({
+          id: businesses.id,
+          phone: businesses.phone,
+          address: businesses.address,
+          contactName: businesses.contactName,
+          trainerName: businesses.trainerName,
+          email: businesses.email,
+          field: businesses.field,
+          notes: businesses.notes,
+        })
+        .from(businesses)
+        .where(eq(businesses.schoolId, req.ctx.schoolId)),
     ]);
+    const info = new Map(infoRows.map(({ id, ...rest }) => [id, rest]));
     const day = days.find((d) => d.date === date)!;
     const now = today(req);
-    const groups = new Map<string, { id: string; name: string; own: boolean; students: unknown[] }>();
+    const groups = new Map<string, { id: string; name: string; own: boolean; editable: boolean; info: unknown; students: unknown[] }>();
     for (const st of list) {
       const [cell] = internCells([day], { school: weekdays.get(st.classId ?? '') ?? NO_SCHOOL, marks: marks.get(st.id) ?? new Map(), today: now });
-      const g = groups.get(st.businessId!) ?? { id: st.businessId!, name: st.businessName, own: s.own.has(st.businessId!), students: [] };
+      const g = groups.get(st.businessId!) ?? {
+        id: st.businessId!,
+        name: st.businessName,
+        own: s.own.has(st.businessId!),
+        editable: s.canEdit(st.businessId),
+        info: info.get(st.businessId!) ?? null,
+        students: [],
+      };
       g.students.push({ id: st.id, fullName: st.fullName, schoolNo: st.schoolNo, className: st.className, am: cell![0], pm: cell![1], editable: s.canEdit(st.businessId) });
       groups.set(g.id, g);
     }
@@ -376,80 +427,107 @@ export async function internshipRoutes(app: FastifyInstance) {
    */
   app.post(`${base}/marks`, member, async (req) => {
     const s = await scope(deps, req);
-    const { date, items } = parse(internMarksSchema, req.body);
+    const { date, until, items } = parse(internMarksSchema, req.body);
+    const last = until && until > date ? until : date;
+    const dates: string[] = [];
+    for (let d = date; d <= last; d = addIsoDays(d, 1)) dates.push(d);
+    if (dates.length > 31) throw badRequest('En çok 31 günlük aralık girilebilir.');
+    const now = today(req);
+    if (last > now && items.some((i) => i.code === 'D')) throw badRequest('İleri tarihe devamsızlık (D) girilemez; yalnızca rapor (R), tatil (T) ya da işletme kapalı (K) girilebilir.');
+    const single = dates.length === 1;
     const list = await internStudents(deps, req.ctx.schoolId);
     const byId = new Map(list.map((x) => [x.id, x]));
-    const [days, weekdays, before] = await Promise.all([
-      monthDays(deps, req.ctx.schoolId, date.slice(0, 7)),
-      schoolWeekdays(deps, req.ctx.schoolId, [...new Set(list.map((x) => x.classId).filter((x): x is string => Boolean(x)))]),
-      marksInRange(deps, req.ctx.schoolId, date, date),
-    ]);
-    const day = days.find((d) => d.date === date)!;
-    const prev = (studentId: string, half: InternHalf) => before.get(studentId)?.get(internKey(date, half)) ?? null;
-    /** İşletme günü mü (okul günü, hafta sonu ve takvim tatili değil) */
-    const workHalf = (studentId: string, half: InternHalf) => {
-      const st = byId.get(studentId)!;
-      const [c] = internCells([day], { school: weekdays.get(st.classId ?? '') ?? NO_SCHOOL, marks: new Map(), today: '9999-12-31' });
-      return c![half === 'am' ? 0 : 1] === 'X';
-    };
-
-    // Son durum: öğrenci|bölüm -> kod (null: kaldır)
-    const next = new Map<string, InternMark | null>();
-    const set = (studentId: string, half: InternHalf, code: InternMark | null) => {
-      if (workHalf(studentId, half)) next.set(`${studentId}|${half}`, code);
-    };
     for (const it of items) {
       const st = byId.get(it.studentId);
       if (!st) throw badRequest('Öğrenci işletmeye bağlı değil.');
       if (!s.canEdit(st.businessId)) throw forbidden(`${st.fullName} sizin koordinatör olduğunuz bir işletmede değil.`);
-      if (!workHalf(st.id, it.half)) throw badRequest(`${dateText(date)} ${internHalfText([it.half])} okul günü ya da tatil; işaretlenemez.`);
-      const old = prev(st.id, it.half);
-      if (it.code === 'T') {
-        for (const x of list) set(x.id, it.half, 'T');
-      } else if (it.code === 'K') {
-        for (const x of list) if (x.businessId === st.businessId) set(x.id, it.half, 'K');
-      } else if (it.code === 'X' && old === 'T') {
-        for (const x of list) if (prev(x.id, it.half) === 'T') set(x.id, it.half, null);
-      } else if (it.code === 'X' && old === 'K') {
-        for (const x of list) if (x.businessId === st.businessId && prev(x.id, it.half) === 'K') set(x.id, it.half, null);
-      } else {
-        set(st.id, it.half, it.code === 'X' ? null : it.code);
+    }
+    const months = [...new Set(dates.map((d) => d.slice(0, 7)))];
+    const [monthList, weekdays, before] = await Promise.all([
+      Promise.all(months.map((m) => monthDays(deps, req.ctx.schoolId, m))),
+      schoolWeekdays(deps, req.ctx.schoolId, [...new Set(list.map((x) => x.classId).filter((x): x is string => Boolean(x)))]),
+      marksInRange(deps, req.ctx.schoolId, date, last),
+    ]);
+    const dayOf = new Map(monthList.flat().map((d) => [d.date, d]));
+
+    // Değişiklikler: öğrenci, gün, bölüm, yeni kod (null: kaldır)
+    const changed: { studentId: string; date: string; half: InternHalf; code: InternMark | null }[] = [];
+    for (const dt of dates) {
+      const day = dayOf.get(dt)!;
+      const prev = (studentId: string, half: InternHalf) => before.get(studentId)?.get(internKey(dt, half)) ?? null;
+      /** İşletme günü mü (okul günü, hafta sonu ve takvim tatili değil) */
+      const workHalf = (studentId: string, half: InternHalf) => {
+        const st = byId.get(studentId)!;
+        const [c] = internCells([day], { school: weekdays.get(st.classId ?? '') ?? NO_SCHOOL, marks: new Map(), today: '9999-12-31' });
+        return c![half === 'am' ? 0 : 1] === 'X';
+      };
+      const next = new Map<string, InternMark | null>();
+      const set = (studentId: string, half: InternHalf, code: InternMark | null) => {
+        if (workHalf(studentId, half)) next.set(`${studentId}|${half}`, code);
+      };
+      for (const it of items) {
+        const st = byId.get(it.studentId)!;
+        if (!workHalf(st.id, it.half)) {
+          // Aralıkta okul günleri ve tatiller atlanır; tek günde uyarılır
+          if (single) throw badRequest(`${dateText(dt)} ${internHalfText([it.half])} okul günü ya da tatil; işaretlenemez.`);
+          continue;
+        }
+        const old = prev(st.id, it.half);
+        if (it.code === 'T') {
+          for (const x of list) set(x.id, it.half, 'T');
+        } else if (it.code === 'K') {
+          for (const x of list) if (x.businessId === st.businessId) set(x.id, it.half, 'K');
+        } else if (it.code === 'X' && old === 'T') {
+          for (const x of list) if (prev(x.id, it.half) === 'T') set(x.id, it.half, null);
+        } else if (it.code === 'X' && old === 'K') {
+          for (const x of list) if (x.businessId === st.businessId && prev(x.id, it.half) === 'K') set(x.id, it.half, null);
+        } else {
+          set(st.id, it.half, it.code === 'X' ? null : it.code);
+        }
+      }
+      // Öğrencinin kendi satırındaki seçim, toplu (T, K) uygulamadan sonra gelir
+      for (const it of items) if (it.code === 'D' || it.code === 'R') set(it.studentId, it.half, it.code);
+      for (const [k, code] of next) {
+        const [studentId, half] = k.split('|') as [string, InternHalf];
+        if (prev(studentId, half) !== code) changed.push({ studentId, date: dt, half, code });
       }
     }
-    // Öğrencinin kendi satırındaki seçim, toplu (T, K) uygulamadan sonra gelir
-    for (const it of items) if (it.code === 'D' || it.code === 'R') set(it.studentId, it.half, it.code);
-
-    const changed = [...next].filter(([k, code]) => {
-      const [studentId, half] = k.split('|') as [string, InternHalf];
-      return prev(studentId, half) !== code;
-    });
-    if (!changed.length) return { changed: 0 };
+    if (!changed.length) {
+      if (!single) throw badRequest('Seçilen günlerde işaretlenecek işletme günü yok (okul günü ya da tatil).');
+      return { changed: 0 };
+    }
     const name = await userName(deps, req.ctx.userId);
     await db.transaction(async (tx) => {
-      for (const [k, code] of changed) {
-        const [studentId, half] = k.split('|') as [string, InternHalf];
+      for (const c of changed) {
         await tx
           .delete(internshipMarks)
-          .where(and(eq(internshipMarks.studentId, studentId), eq(internshipMarks.date, date), eq(internshipMarks.half, half)));
-        if (code) await tx.insert(internshipMarks).values({ schoolId: req.ctx.schoolId, studentId, date, half, code, userId: req.ctx.userId, userName: name });
+          .where(and(eq(internshipMarks.studentId, c.studentId), eq(internshipMarks.date, c.date), eq(internshipMarks.half, c.half)));
+        if (c.code) await tx.insert(internshipMarks).values({ schoolId: req.ctx.schoolId, studentId: c.studentId, date: c.date, half: c.half, code: c.code, userId: req.ctx.userId, userName: name });
       }
     });
 
-    // Yeni D ve R: öğrenci ve koda göre bölümler birleşir ("tam gün")
-    const news = new Map<string, InternHalf[]>();
-    for (const [k, code] of changed) {
-      if (code !== 'D' && code !== 'R') continue;
-      const [studentId, half] = k.split('|') as [string, InternHalf];
-      const key = `${studentId}|${code}`;
-      news.set(key, [...(news.get(key) ?? []), half]);
+    // Yeni D ve R: öğrenci ve koda göre günler ve bölümler birleşir
+    const news = new Map<string, { date: string; half: InternHalf }[]>();
+    for (const c of changed) {
+      if (c.code !== 'D' && c.code !== 'R') continue;
+      const key = `${c.studentId}|${c.code}`;
+      news.set(key, [...(news.get(key) ?? []), { date: c.date, half: c.half }]);
     }
-    await audit(req, 'update', 'İşletmede devam', null, `${dateText(date)}: ${changed.length} işaret`);
+    await audit(req, 'update', 'İşletmede devam', null, `${dateText(date)}${single ? '' : ` – ${dateText(last)}`}: ${changed.length} işaret`);
     if (news.size) await notifyManager(req, date, news, byId);
     return { changed: changed.length, notified: news.size };
   });
 
-  /** Koordinatör müdür yardımcısına bildirim (uygulama bildirimi ve bildirim kutusu) */
-  async function notifyManager(req: FastifyRequest, date: string, news: Map<string, InternHalf[]>, byId: Map<string, { fullName: string; className: string | null; businessName: string }>) {
+  /**
+   * Koordinatör müdür yardımcısına bildirim. Ayrıntı (öğrenci adı, rapor) yalnızca uygulamanın bildirim kutusunda
+   * görünür; kilit ekranına düşen telefon bildiriminde ad ve sağlık bilgisi yazmaz (KVKK).
+   */
+  async function notifyManager(
+    req: FastifyRequest,
+    date: string,
+    news: Map<string, { date: string; half: InternHalf }[]>,
+    byId: Map<string, { fullName: string; className: string | null; businessName: string }>,
+  ) {
     const vp = settingsOf(req).internshipManagerUserId;
     if (!vp || vp === req.ctx.userId) return;
     const [m] = await db
@@ -458,25 +536,31 @@ export async function internshipRoutes(app: FastifyInstance) {
       .where(and(eq(memberships.schoolId, req.ctx.schoolId), eq(memberships.userId, vp)));
     if (!m) return;
     const by = await userName(deps, req.ctx.userId);
-    const lines = [...news].map(([k, halves]) => {
+    const short = (iso: string) => new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));
+    const lines = [...news].map(([k, parts]) => {
       const [studentId, code] = k.split('|') as [string, 'D' | 'R'];
       const st = byId.get(studentId)!;
       const what = code === 'R' ? 'raporlu (özürlü)' : 'devamsız (özürsüz)';
-      return `${st.fullName}${st.className ? ` (${st.className})` : ''}: ${internHalfText(halves)} ${what} · ${st.businessName}`;
+      const days = [...new Set(parts.map((p) => p.date))].sort();
+      const when =
+        days.length === 1
+          ? `${short(days[0]!)} ${internHalfText(parts.map((p) => p.half))}`
+          : `${short(days[0]!)} – ${short(days[days.length - 1]!)}, ${formatDays(parts.length / 2)} gün`;
+      return `${st.fullName}${st.className ? ` (${st.className})` : ''}: ${when} ${what} · ${st.businessName}`;
     });
     const anyD = [...news.keys()].some((k) => k.endsWith('|D'));
     const anyR = [...news.keys()].some((k) => k.endsWith('|R'));
     const title = anyD && anyR ? 'İşletmede devamsızlık ve rapor' : anyR ? 'İşletmede rapor bildirimi' : 'İşletmede devamsızlık';
-    const head = `${dateText(date)} · bildiren: ${by}`;
-    const body = lines.length > 3 ? `${head}\n${lines.length} öğrenci için devam bildirimi. Ayrıntı uygulamada.` : `${head}\n${lines.join('\n')}`;
+    const what = anyD && anyR ? 'devamsızlık ve rapor' : anyR ? 'rapor' : 'devamsızlık';
+    const studentCount = new Set([...news.keys()].map((k) => k.split('|')[0])).size;
     await addToInbox(db, [vp], {
       key: `internship:${randomUUID()}`,
       kind: 'internship',
       title,
-      body: `${head}\n${lines.join('\n')}`,
+      body: `Bildiren: ${by}\n${lines.join('\n')}`,
       to: `/isletme-devam?ay=${date.slice(0, 7)}&gun=${date}`,
       schoolId: req.ctx.schoolId,
     });
-    notifyUsers(deps, [vp], { title, body, url: `/isletme?tarih=${date}` });
+    notifyUsers(deps, [vp], { title, body: `${studentCount === 1 ? 'Bir öğrenci' : `${studentCount} öğrenci`} için ${what} bildirildi. Ayrıntı uygulamada.`, url: '/bildirimler' });
   }
 }

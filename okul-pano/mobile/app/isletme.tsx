@@ -1,13 +1,14 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Linking, Pressable, ScrollView, View } from 'react-native';
 import { api } from '../src/api.ts';
 import { useAuth, useSchoolPath } from '../src/auth.tsx';
 import { useSchoolQuery } from '../src/data.ts';
 import { Text } from '../src/text.tsx';
 import { colors, radius } from '../src/theme.ts';
-import { Button, Card, Chip, Empty, ErrorNote, Loading, Screen, T } from '../src/ui.tsx';
+import { Sheet } from '../src/sheet.tsx';
+import { Button, Card, Chip, Empty, ErrorNote, Field, Loading, Screen, T } from '../src/ui.tsx';
 
 /*
  * İşletme ziyareti (koordinatör öğretmen): o gün işletmedeki öğrencilerin devamı. Her gün iki bölümdür (öğleden önce,
@@ -28,12 +29,30 @@ interface DayStudent {
   pm: Cell;
   editable: boolean;
 }
+interface BusinessInfo {
+  phone: string | null;
+  address: string | null;
+  contactName: string | null;
+  trainerName: string | null;
+  email: string | null;
+  field: string | null;
+  notes: string | null;
+}
+const INFO_FIELDS: { key: keyof BusinessInfo; label: string; multiline?: boolean; keyboard?: 'phone-pad' | 'email-address' }[] = [
+  { key: 'field', label: 'Faaliyet alanı / dal' },
+  { key: 'contactName', label: 'İşletme yetkilisi' },
+  { key: 'trainerName', label: 'Usta öğretici / eğitici personel' },
+  { key: 'phone', label: 'Telefon', keyboard: 'phone-pad' },
+  { key: 'email', label: 'E-posta', keyboard: 'email-address' },
+  { key: 'address', label: 'Adres', multiline: true },
+  { key: 'notes', label: 'Notlar', multiline: true },
+];
 interface DayData {
   date: string;
   today: string;
   day: { date: string; weekday: number; holiday: string | null; halfDay: string | null };
   managerAssigned: boolean;
-  businesses: { id: string; name: string; own: boolean; students: DayStudent[] }[];
+  businesses: { id: string; name: string; own: boolean; editable: boolean; info: BusinessInfo | null; students: DayStudent[] }[];
 }
 
 const editable = (c: Cell) => c === 'X' || c === 'D' || c === 'R' || c === 'T' || c === 'K' || c === '';
@@ -83,6 +102,9 @@ export default function Isletme() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
+  /** Birkaç günlük rapor girilen öğrenci */
+  const [report, setReport] = useState<DayStudent | null>(null);
+  const [infoOpen, setInfoOpen] = useState(false);
 
   useEffect(() => {
     setEdits(new Map());
@@ -101,7 +123,7 @@ export default function Isletme() {
   const set = (s: DayStudent, half: Half, code: Code) =>
     setEdits((m) => {
       const n = new Map(m);
-      if (s[half] === code || (code === 'X' && s[half] === 'X')) n.delete(`${s.id}|${half}`);
+      if (s[half] === code || (code === 'X' && (s[half] === 'X' || s[half] === ''))) n.delete(`${s.id}|${half}`);
       else n.set(`${s.id}|${half}`, code);
       return n;
     });
@@ -148,6 +170,11 @@ export default function Isletme() {
   };
 
   const shown = d?.date ?? date;
+  const future = Boolean(d && d.date > d.today);
+  const done = (msg: string) => {
+    setSaved(msg);
+    void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === school?.id && String(q.queryKey[1] ?? '').startsWith('internship') });
+  };
   const off = d && (d.day.weekday >= 6 || d.day.holiday);
 
   return (
@@ -175,7 +202,7 @@ export default function Isletme() {
           </Button>
         )}
         <View style={{ flex: 1 }} />
-        <Button variant="secondary" size="sm" onPress={() => d && setDate(addDays(d.date, 1))} disabled={!d || d.date >= d.today}>
+        <Button variant="secondary" size="sm" onPress={() => d && setDate(addDays(d.date, 1))} disabled={!d || d.date >= addDays(d.today, 90)}>
           Sonraki gün
         </Button>
       </View>
@@ -186,7 +213,7 @@ export default function Isletme() {
         <Empty icon="business-outline" title="İşletme yok" text="Koordinatör olduğunuz işletme ya da işletmeye bağlı öğrenci yok. İşletmeleri yönetim panelinden idare tanımlar." />
       ) : (
         <>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
             {d.businesses.map((b) => (
               <Chip key={b.id} label={`${b.name} · ${b.students.length}`} selected={b.id === bizId} onPress={() => setBizId(b.id)} />
             ))}
@@ -196,6 +223,7 @@ export default function Isletme() {
               <T size={13}>Koordinatör müdür yardımcısı seçilmemiş; devamsızlık bildirimi kimseye gitmez. Okul yönetimi Genel Ayarlar'dan seçer.</T>
             </Card>
           )}
+          {biz && <BusinessCard name={biz.name} info={biz.info} canEdit={biz.editable} onEdit={() => setInfoOpen(true)} />}
           {off ? (
             <Card>
               <T weight="700">{d.day.holiday ?? 'Hafta sonu'}</T>
@@ -206,6 +234,13 @@ export default function Isletme() {
           ) : (
             biz && (
               <>
+                {future && (
+                  <Card>
+                    <T size={13} color={colors.info}>
+                      İleri tarih: rapor (R), tatil (T) ya da işletme kapalı (K) girilebilir. Birkaç günlük rapor için öğrencinin altındaki "Birkaç günlük rapor" düğmesini kullanın.
+                    </T>
+                  </Card>
+                )}
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <Button variant="secondary" size="sm" onPress={() => setAll('K')}>
                     İşletme kapalı (K)
@@ -226,8 +261,13 @@ export default function Isletme() {
                       </T>
                     </View>
                     {(['am', 'pm'] as Half[]).map((half) => (
-                      <HalfRow key={half} half={half} cell={current(s, half)} base={s[half]} canEdit={s.editable} onPick={(c) => set(s, half, c)} />
+                      <HalfRow key={half} half={half} cell={current(s, half)} base={s[half]} canEdit={s.editable} future={future} onPick={(c) => set(s, half, c)} />
                     ))}
+                    {s.editable && (editable(s.am) || editable(s.pm)) && (
+                      <Pressable accessibilityRole="button" onPress={() => setReport(s)} style={{ alignSelf: 'flex-start', paddingVertical: 4 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.info }}>+ Birkaç günlük rapor</Text>
+                      </Pressable>
+                    )}
                   </Card>
                 ))}
                 {(changes.some((c) => c.code === 'T') || changes.some((c) => c.code === 'K')) && (
@@ -251,11 +291,34 @@ export default function Isletme() {
           <Legend />
         </>
       )}
+      {d && report && (
+        <ReportSheet
+          student={report}
+          from={d.date}
+          onClose={() => setReport(null)}
+          onSaved={(msg) => {
+            setReport(null);
+            done(msg);
+          }}
+        />
+      )}
+      {biz && infoOpen && (
+        <InfoSheet
+          businessId={biz.id}
+          name={biz.name}
+          info={biz.info}
+          onClose={() => setInfoOpen(false)}
+          onSaved={() => {
+            setInfoOpen(false);
+            done('İşletme bilgileri kaydedildi.');
+          }}
+        />
+      )}
     </Screen>
   );
 }
 
-function HalfRow({ half, cell, base, canEdit, onPick }: { half: Half; cell: Cell; base: Cell; canEdit: boolean; onPick: (c: Code) => void }) {
+function HalfRow({ half, cell, base, canEdit, future, onPick }: { half: Half; cell: Cell; base: Cell; canEdit: boolean; future: boolean; onPick: (c: Code) => void }) {
   const label = half === 'am' ? 'ÖÖ' : 'ÖS';
   if (!editable(base) || !canEdit) {
     const t = TONE[cell];
@@ -275,7 +338,8 @@ function HalfRow({ half, cell, base, canEdit, onPick }: { half: Half; cell: Cell
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
       <Text style={{ width: 30, fontSize: 11.5, fontWeight: '800', color: colors.faint }}>{label}</Text>
-      {[...CHOICES, ...extra].map((c) => {
+      {/* İleri tarihte devamsızlık (D) girilemez; "İşletmede" yerine "Boş" */}
+      {[...CHOICES.filter((c) => !(future && c.code === 'D')).map((c) => (future && c.code === 'X' ? { ...c, label: 'Boş' } : c)), ...extra].map((c) => {
         const on = now === c.code;
         const t = TONE[c.code]!;
         return (
@@ -323,5 +387,152 @@ function Legend() {
         Üst satır öğleden önce (ÖÖ), alt satır öğleden sonra (ÖS); her biri yarım gün sayılır. D ve R kaydedilince koordinatör müdür yardımcısına bildirim gider.
       </T>
     </View>
+  );
+}
+
+/** İşletme bilgileri: yetkili, usta öğretici, telefon (dokununca arar), adres (dokununca harita) */
+function BusinessCard({ name, info, canEdit, onEdit }: { name: string; info: BusinessInfo | null; canEdit: boolean; onEdit: () => void }) {
+  const rows = INFO_FIELDS.filter((f) => info?.[f.key]);
+  const open = (key: keyof BusinessInfo, value: string) => {
+    if (key === 'phone') void Linking.openURL(`tel:${value.replace(/[^\d+]/g, '')}`);
+    else if (key === 'email') void Linking.openURL(`mailto:${value}`);
+    else if (key === 'address') void Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name} ${value}`)}`);
+  };
+  return (
+    <Card style={{ gap: 6 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Text style={{ flex: 1, fontSize: 15, fontWeight: '800', color: colors.ink }}>İşletme bilgileri</Text>
+        {canEdit && (
+          <Pressable accessibilityRole="button" onPress={onEdit} hitSlop={8}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.info }}>{rows.length ? 'Düzenle' : 'Bilgi ekle'}</Text>
+          </Pressable>
+        )}
+      </View>
+      {!rows.length ? (
+        <T size={13} color={colors.faint}>
+          Yetkili, usta öğretici, telefon ve adres henüz girilmemiş.
+        </T>
+      ) : (
+        rows.map((f) => {
+          const value = info![f.key]!;
+          const link = f.key === 'phone' || f.key === 'email' || f.key === 'address';
+          return (
+            <Pressable key={f.key} disabled={!link} onPress={() => open(f.key, value)} style={{ flexDirection: 'row', gap: 10 }}>
+              <Text style={{ width: 118, fontSize: 12.5, fontWeight: '600', color: colors.faint }}>{f.label}</Text>
+              <Text style={{ flex: 1, fontSize: 13.5, fontWeight: '600', color: link ? colors.info : colors.ink }}>{value}</Text>
+            </Pressable>
+          );
+        })
+      )}
+    </Card>
+  );
+}
+
+function InfoSheet({ businessId, name, info, onClose, onSaved }: { businessId: string; name: string; info: BusinessInfo | null; onClose: () => void; onSaved: () => void }) {
+  const path = useSchoolPath(`internship/businesses/${businessId}/info`);
+  const [form, setForm] = useState<Record<keyof BusinessInfo, string>>(() =>
+    Object.fromEntries(INFO_FIELDS.map((f) => [f.key, info?.[f.key] ?? ''])) as Record<keyof BusinessInfo, string>,
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api(path, { method: 'PATCH', body: Object.fromEntries(INFO_FIELDS.map((f) => [f.key, form[f.key].trim() || null])) });
+      onSaved();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Kaydedilemedi');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Sheet open onClose={onClose}>
+      <Text style={{ fontSize: 17, fontWeight: '800', color: colors.ink, marginBottom: 10 }}>{name}</Text>
+      <ScrollView style={{ maxHeight: 420 }} contentContainerStyle={{ gap: 10 }} keyboardShouldPersistTaps="handled">
+        {INFO_FIELDS.map((f) => (
+          <Field
+            key={f.key}
+            label={f.label}
+            value={form[f.key]}
+            onChangeText={(v) => setForm((x) => ({ ...x, [f.key]: v }))}
+            multiline={f.multiline}
+            keyboardType={f.keyboard}
+            autoCapitalize={f.keyboard === 'email-address' ? 'none' : 'sentences'}
+          />
+        ))}
+      </ScrollView>
+      {error && (
+        <T size={13} color={colors.danger} style={{ marginTop: 8 }}>
+          {error}
+        </T>
+      )}
+      <View style={{ marginTop: 12 }}>
+        <Button loading={busy} onPress={() => void save()}>
+          Kaydet
+        </Button>
+      </View>
+    </Sheet>
+  );
+}
+
+/** Birkaç günlük rapor: başlangıç günü ve gün sayısı; okul günleri ve tatiller sunucuda atlanır */
+function ReportSheet({ student, from, onClose, onSaved }: { student: DayStudent; from: string; onClose: () => void; onSaved: (msg: string) => void }) {
+  const path = useSchoolPath('internship/marks');
+  const [days, setDays] = useState(3);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const until = addDays(from, days - 1);
+  const short = (iso: string) => new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api<{ changed: number; notified?: number }>(path, {
+        method: 'POST',
+        body: { date: from, until, items: (['am', 'pm'] as Half[]).map((half) => ({ studentId: student.id, half, code: 'R' })) },
+      });
+      onSaved(r.notified ? 'Rapor kaydedildi; koordinatör müdür yardımcısına bildirim gönderildi.' : 'Rapor kaydedildi.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Kaydedilemedi');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Sheet open onClose={onClose}>
+      <Text style={{ fontSize: 17, fontWeight: '800', color: colors.ink }}>{student.fullName} · rapor</Text>
+      <T size={12.5} color={colors.faint} style={{ marginTop: 4 }}>
+        Raporlu günler tam gün R (özürlü) işaretlenir. Aradaki okul günleri, hafta sonu ve tatiller atlanır.
+      </T>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 16, alignSelf: 'center' }}>
+        <Button variant="secondary" onPress={() => setDays((n) => Math.max(1, n - 1))} disabled={days <= 1}>
+          −
+        </Button>
+        <View style={{ alignItems: 'center', minWidth: 110 }}>
+          <Text style={{ fontSize: 28, fontWeight: '800', color: colors.ink }}>{days}</Text>
+          <T size={12} color={colors.faint}>
+            takvim günü
+          </T>
+        </View>
+        <Button variant="secondary" onPress={() => setDays((n) => Math.min(31, n + 1))} disabled={days >= 31}>
+          +
+        </Button>
+      </View>
+      <T size={14} weight="700" style={{ textAlign: 'center', marginTop: 10 }}>
+        {days === 1 ? short(from) : `${short(from)} – ${short(until)}`}
+      </T>
+      {error && (
+        <T size={13} color={colors.danger} style={{ marginTop: 8 }}>
+          {error}
+        </T>
+      )}
+      <View style={{ marginTop: 14 }}>
+        <Button loading={busy} onPress={() => void save()}>
+          Raporu kaydet
+        </Button>
+      </View>
+    </Sheet>
   );
 }

@@ -17,7 +17,7 @@ import { Building2, ChevronLeft, ChevronRight, Pencil, Plus, Printer, Search, Us
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useToast } from '../components/Toast.tsx';
-import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Select, Spinner, Table, Td } from '../components/ui.tsx';
+import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Select, Spinner, Table, Td, Textarea } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useList, useSchoolPath, type Teacher } from '../lib/data.ts';
@@ -32,6 +32,11 @@ interface Business {
   name: string;
   phone: string | null;
   address: string | null;
+  contactName: string | null;
+  trainerName: string | null;
+  email: string | null;
+  field: string | null;
+  notes: string | null;
   coordinatorTeacherId: string | null;
   coordinatorName: string | null;
   isActive: boolean;
@@ -220,7 +225,7 @@ export function InternshipSheet() {
           <InternLegend />
         </div>
       </Card>
-      {picked && <CellMenu picked={picked} onClose={() => setPicked(null)} />}
+      {picked && data && <CellMenu picked={picked} today={data.today} onClose={() => setPicked(null)} />}
     </div>
   );
 }
@@ -275,7 +280,8 @@ function SheetTable({ days, rows, onPick }: { days: InternDay[]; rows: SheetStud
                 <td key={d.date} className="border-b border-slate-100 px-px py-1">
                   {s.cells[di]!.map((c, hi) => {
                     const half: InternHalf = hi ? 'pm' : 'am';
-                    const can = s.editable && internEditable(c);
+                    // Gelecek işletme günleri (boş) de seçilebilir: ileri tarihli rapor, tatil, işletme kapalı
+                    const can = s.editable && pickable(c);
                     return (
                       <button
                         key={half}
@@ -313,8 +319,10 @@ const CHOICES: { code: 'X' | 'D' | 'R' | 'T' | 'K'; label: string; cell: InternC
   { code: 'K', label: 'K', cell: 'K' },
 ];
 
-/** Hücreye tıklayınca: kod seçimi; diğer bölüme de uygulanabilir */
-function CellMenu({ picked, onClose }: { picked: Picked; onClose: () => void }) {
+const pickable = (c: InternCell) => internEditable(c) || c === '';
+
+/** Hücreye tıklayınca: kod seçimi; diğer bölüme ya da (rapor için) birkaç güne uygulanabilir */
+function CellMenu({ picked, today, onClose }: { picked: Picked; today: string; onClose: () => void }) {
   const { schoolId } = useAuth();
   const path = useSchoolPath('internship/marks');
   const qc = useQueryClient();
@@ -324,6 +332,10 @@ function CellMenu({ picked, onClose }: { picked: Picked; onClose: () => void }) 
   const otherCell = picked.student.cells[Number(picked.day.date.slice(8)) - 1]![other === 'am' ? 0 : 1];
   const [both, setBoth] = useState(false);
   const [code, setCode] = useState<(typeof CHOICES)[number]['code'] | null>(null);
+  const [until, setUntil] = useState(picked.day.date);
+  const future = picked.day.date > today;
+  const range = code === 'R' && until > picked.day.date;
+  const choices = CHOICES.filter((c) => !(future && c.code === 'D'));
 
   useEffect(() => {
     const close = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && onClose();
@@ -338,10 +350,11 @@ function CellMenu({ picked, onClose }: { picked: Picked; onClose: () => void }) 
 
   const save = useMutation({
     mutationFn: (c: string) => {
-      const halves = both && internEditable(otherCell) ? [picked.half, other] : [picked.half];
+      // Birkaç günlük raporda günler tam gün işaretlenir; okul günleri ve tatiller atlanır
+      const halves: InternHalf[] = range ? ['am', 'pm'] : both && pickable(otherCell) ? [picked.half, other] : [picked.half];
       return api<{ changed: number; notified?: number }>(path, {
         method: 'POST',
-        body: { date: picked.day.date, items: halves.map((half) => ({ studentId: picked.student.id, half, code: c })) },
+        body: { date: picked.day.date, ...(range ? { until } : {}), items: halves.map((half) => ({ studentId: picked.student.id, half, code: c })) },
       });
     },
     onSuccess: (r) => {
@@ -378,9 +391,9 @@ function CellMenu({ picked, onClose }: { picked: Picked; onClose: () => void }) 
       <div className="font-extrabold">
         {picked.student.fullName} · {Number(d.slice(8))} {MONTHS[Number(d.slice(5, 7)) - 1]}
       </div>
-      <div className="mb-3 text-xs font-semibold text-slate-500">{INTERN_HALF_LABELS[picked.half]}</div>
-      <div className="grid grid-cols-5 gap-1.5">
-        {CHOICES.map((c) => (
+      <div className="mb-3 text-xs font-semibold text-slate-500">{range ? 'Tam gün, bitiş tarihine kadar (okul günleri ve tatiller atlanır)' : INTERN_HALF_LABELS[picked.half]}</div>
+      <div className={clsx('grid gap-1.5', choices.length === 5 ? 'grid-cols-5' : 'grid-cols-4')}>
+        {choices.map((c) => (
           <button
             key={c.code}
             type="button"
@@ -391,11 +404,18 @@ function CellMenu({ picked, onClose }: { picked: Picked; onClose: () => void }) 
               (code ?? (picked.cell === 'TA' ? null : picked.cell)) === c.code && 'outline-3 outline-offset-1 outline-ink',
             )}
           >
-            {c.label}
+            {future && c.code === 'X' ? 'Boş' : c.label}
           </button>
         ))}
       </div>
-      {internEditable(otherCell) && (
+      {code === 'R' && (
+        <label className="mt-3 flex items-center gap-2 text-xs font-semibold text-slate-600">
+          Rapor bitişi
+          <Input type="date" value={until} min={picked.day.date} onChange={(e) => e.target.value && setUntil(e.target.value)} className="h-8! w-40! text-xs" />
+        </label>
+      )}
+      {future && <div className="mt-2 text-xs text-slate-500">İleri tarihe rapor (R), tatil (T) ya da işletme kapalı (K) girilebilir.</div>}
+      {!range && pickable(otherCell) && (
         <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-600">
           <input type="checkbox" checked={both} onChange={(e) => setBoth(e.target.checked)} className="size-4 accent-ink" />
           {other === 'pm' ? 'Öğleden sonraya' : 'Öğleden önceye'} de uygula (tam gün)
@@ -460,12 +480,16 @@ export function Businesses() {
         ) : !list.data?.length ? (
           <EmptyState icon={<Building2 className="size-6" />} title="Henüz işletme yok" description="İşletme ekleyip koordinatör öğretmenini ve öğrencilerini seçin." />
         ) : (
-          <Table head={['İşletme', 'Koordinatör öğretmen', 'Öğrenci', 'Telefon', '']}>
+          <Table head={['İşletme', 'Yetkili / usta öğretici', 'Koordinatör öğretmen', 'Öğrenci', 'Telefon', '']}>
             {list.data.map((b) => (
               <tr key={b.id}>
                 <Td>
                   <div className="font-bold">{b.name}</div>
-                  {b.address && <div className="max-w-xs truncate text-xs text-slate-500">{b.address}</div>}
+                  {(b.field || b.address) && <div className="max-w-xs truncate text-xs text-slate-500">{[b.field, b.address].filter(Boolean).join(' · ')}</div>}
+                </Td>
+                <Td>
+                  <div className="text-sm">{b.contactName ?? '–'}</div>
+                  {b.trainerName && <div className="text-xs text-slate-500">Usta öğretici: {b.trainerName}</div>}
                 </Td>
                 <Td>{b.coordinatorName ?? <Badge tone="amber">Seçilmedi</Badge>}</Td>
                 <Td>
@@ -497,17 +521,34 @@ function BusinessForm({ editing, onClose }: { editing: Business | 'new' | null; 
   const teachers = useList<Teacher>('teachers');
   const qc = useQueryClient();
   const toast = useToast();
-  const [form, setForm] = useState({ name: '', phone: '', address: '', coordinatorTeacherId: '' });
+  const EMPTY_FORM = { name: '', field: '', contactName: '', trainerName: '', phone: '', email: '', address: '', notes: '', coordinatorTeacherId: '' };
+  const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     if (!editing) return;
     const b = editing === 'new' ? null : editing;
-    setForm({ name: b?.name ?? '', phone: b?.phone ?? '', address: b?.address ?? '', coordinatorTeacherId: b?.coordinatorTeacherId ?? '' });
+    setForm(
+      b
+        ? {
+            name: b.name,
+            field: b.field ?? '',
+            contactName: b.contactName ?? '',
+            trainerName: b.trainerName ?? '',
+            phone: b.phone ?? '',
+            email: b.email ?? '',
+            address: b.address ?? '',
+            notes: b.notes ?? '',
+            coordinatorTeacherId: b.coordinatorTeacherId ?? '',
+          }
+        : EMPTY_FORM,
+    );
     setError(null);
   }, [editing]);
   const save = useMutation({
     mutationFn: () => {
-      const body = businessSchema.parse({ ...form, coordinatorTeacherId: form.coordinatorTeacherId || null });
+      const parsed = businessSchema.safeParse({ ...form, coordinatorTeacherId: form.coordinatorTeacherId || null });
+      if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Bilgileri kontrol edin.');
+      const body = parsed.data;
       return editing === 'new' ? api(path, { method: 'POST', body }) : api(`${path}/${(editing as Business).id}`, { method: 'PATCH', body });
     },
     onSuccess: () => {
@@ -515,7 +556,7 @@ function BusinessForm({ editing, onClose }: { editing: Business | 'new' | null; 
       toast.success(editing === 'new' ? 'İşletme eklendi' : 'İşletme güncellendi');
       onClose();
     },
-    onError: (e) => setError(e instanceof Error ? (e.message.startsWith('[') ? 'İşletme adı gerekli.' : e.message) : 'Kaydedilemedi.'),
+    onError: (e) => setError(e instanceof Error ? e.message : 'Kaydedilemedi.'),
   });
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm((f) => ({ ...f, [k]: e.target.value }));
   return (
@@ -553,8 +594,17 @@ function BusinessForm({ editing, onClose }: { editing: Business | 'new' | null; 
             </Select>
           )}
         </Field>
-        <Field label="Telefon">{(id) => <Input id={id} value={form.phone} onChange={set('phone')} inputMode="tel" />}</Field>
-        <Field label="Adres">{(id) => <Input id={id} value={form.address} onChange={set('address')} />}</Field>
+        <Field label="Faaliyet alanı / dal">{(id) => <Input id={id} value={form.field} onChange={set('field')} placeholder="Ör. Mobilya, elektrik tesisatı" />}</Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="İşletme yetkilisi">{(id) => <Input id={id} value={form.contactName} onChange={set('contactName')} />}</Field>
+          <Field label="Usta öğretici / eğitici personel">{(id) => <Input id={id} value={form.trainerName} onChange={set('trainerName')} />}</Field>
+          <Field label="Telefon">{(id) => <Input id={id} value={form.phone} onChange={set('phone')} inputMode="tel" />}</Field>
+          <Field label="E-posta">{(id) => <Input id={id} value={form.email} onChange={set('email')} inputMode="email" />}</Field>
+        </div>
+        <Field label="Adres">{(id) => <Textarea id={id} value={form.address} onChange={set('address')} rows={2} />}</Field>
+        <Field label="Notlar" help="Giriş saati, servis, iş güvenliği gibi koordinatörün bilmesi gerekenler.">
+          {(id) => <Textarea id={id} value={form.notes} onChange={set('notes')} rows={3} />}
+        </Field>
       </div>
     </Modal>
   );

@@ -162,10 +162,21 @@ export const businessSchema = z.object({
   name: z.string().trim().min(1, 'İşletme adı gerekli').max(120),
   phone: optionalText(30),
   address: optionalText(300),
+  /** İşletme yetkilisi */
+  contactName: optionalText(120),
+  /** Usta öğretici / eğitici personel */
+  trainerName: optionalText(120),
+  email: optionalText(120).refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), 'Geçerli bir e-posta yazın'),
+  /** Faaliyet alanı / dal */
+  field: optionalText(120),
+  notes: optionalText(1000),
   /** Koordinatör öğretmen */
   coordinatorTeacherId: z.uuid().nullish().transform((v) => v ?? null),
   isActive: z.boolean().default(true),
 });
+
+/** Koordinatör öğretmenin düzenleyebildiği işletme bilgileri (koordinatör ataması idarede) */
+export const businessInfoSchema = businessSchema.omit({ coordinatorTeacherId: true, isActive: true }).partial();
 
 export const businessStudentsSchema = z.object({ studentIds: z.array(z.uuid()).max(500) });
 
@@ -177,6 +188,8 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Tarih YYYY-AA-GG olmal�
  */
 export const internMarksSchema = z.object({
   date: isoDate,
+  /** Aralık (ör. birkaç günlük rapor): date ile until arasındaki işletme günlerine uygulanır; okul günleri ve tatiller atlanır */
+  until: isoDate.optional(),
   items: z
     .array(z.object({ studentId: z.uuid(), half: z.enum(INTERN_HALVES), code: z.enum(['X', ...INTERN_MARKS]) }))
     .min(1)

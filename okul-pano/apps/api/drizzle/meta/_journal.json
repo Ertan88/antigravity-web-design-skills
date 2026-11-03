@@ -232,6 +232,13 @@
       "when": 1795000000000,
       "tag": "0032_internship",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1795100000000,
+      "tag": "0033_business_info",
+      "breakpoints": true
     }
   ]
 }

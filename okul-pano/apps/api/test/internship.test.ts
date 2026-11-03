@@ -99,6 +99,9 @@ describe('işletmelerde mesleki eğitim', () => {
     expect(arda.cells[27]).toEqual(['X', 'TA']); // 28 Ekim arife
     expect(arda.cells[28]).toEqual(['TA', 'TA']); // 29 Ekim
     // Koordinatör yalnızca kendi işletmesindeki öğrencileri görür
+    // 30 günlük ay
+    expect((await owner.get(`${base}/internship/sheet?month=2026-11`)).json().days).toHaveLength(30);
+    expectStatus(await coord.get(`${base}/internship/day?date=2026-11-30`), 200);
     const mine = (await coord.get(`${base}/internship/sheet?month=2026-10`)).json();
     expect(mine.students.map((s: { fullName: string }) => s.fullName)).toEqual(['Arda Kaya', 'Elif Demir']);
   });
@@ -117,10 +120,12 @@ describe('işletmelerde mesleki eğitim', () => {
     await vi.waitFor(() => expect(sentPushes.filter((p) => p.to.includes(VP_TOKEN))).toHaveLength(1));
     const push = sentPushes.find((p) => p.to.includes(VP_TOKEN))!.message;
     expect(push.title).toBe('İşletmede devamsızlık ve rapor');
-    expect(push.body).toContain('Arda Kaya (12-A): tam gün devamsız (özürsüz)');
-    expect(push.body).toContain('Elif Demir (12-A): öğleden sonra raporlu (özürlü)');
-    const inbox = (await vp.get(`${base}/inbox`)).json();
-    expect(JSON.stringify(inbox)).toContain('İşletmede devamsızlık ve rapor');
+    // Kilit ekranında ad ve rapor bilgisi yazmaz; ayrıntı uygulamanın bildirim kutusunda
+    expect(push.body).toBe('2 öğrenci için devamsızlık ve rapor bildirildi. Ayrıntı uygulamada.');
+    const inbox = JSON.stringify((await vp.get(`${base}/inbox`)).json());
+    expect(inbox).toContain('İşletmede devamsızlık ve rapor');
+    expect(inbox).toContain('Arda Kaya (12-A): 8 Ekim tam gün devamsız (özürsüz)');
+    expect(inbox).toContain('Elif Demir (12-A): 8 Ekim öğleden sonra raporlu (özürlü)');
 
     const sheet = (await owner.get(`${base}/internship/sheet?month=2026-10`)).json();
     expect(sheet.students[0].cells[7]).toEqual(['D', 'D']);
@@ -159,5 +164,35 @@ describe('işletmelerde mesleki eğitim', () => {
     const mine = (await coord.get(`${base}/internship/day?date=2026-10-08`)).json();
     expect(mine.businesses).toHaveLength(1);
     expect(mine.businesses[0].students[0]).toMatchObject({ fullName: 'Arda Kaya', am: 'D', pm: 'D', editable: true });
+  });
+
+  it('ileri tarihli rapor aralığı: okul günleri ve tatiller atlanır; ileri tarihe D girilemez', async () => {
+    const r = await coord.post(`${base}/internship/marks`, {
+      date: '2027-05-05',
+      until: '2027-05-11',
+      items: [
+        { studentId: ids['Elif Demir'], half: 'am', code: 'R' },
+        { studentId: ids['Elif Demir'], half: 'pm', code: 'R' },
+      ],
+    });
+    expectStatus(r, 200);
+    // 5–7 Mayıs (Çar–Cum) işletme günü; hafta sonu ve 10–11 Mayıs (Pzt–Sal, okulda) atlanır
+    expect(r.json().changed).toBe(6);
+    const sheet = (await owner.get(`${base}/internship/sheet?month=2027-05`)).json();
+    const elif = sheet.students.find((x: { fullName: string }) => x.fullName === 'Elif Demir');
+    expect(elif.cells.slice(4, 11)).toEqual([['R', 'R'], ['R', 'R'], ['R', 'R'], ['W', 'W'], ['W', 'W'], ['O', 'O'], ['O', 'O']]);
+    expect(elif.totals.excused).toBe(3);
+    const inbox = JSON.stringify((await vp.get(`${base}/inbox`)).json());
+    expect(inbox).toContain('Elif Demir (12-A): 5 Mayıs – 7 Mayıs, 3 gün raporlu (özürlü)');
+    expect((await coord.post(`${base}/internship/marks`, { date: '2027-05-12', items: [{ studentId: ids['Elif Demir'], half: 'am', code: 'D' }] })).statusCode).toBe(400);
+  });
+
+  it('işletme bilgileri: koordinatör kendi işletmesini düzenler, ziyaret ekranında görünür', async () => {
+    const info = { contactName: 'Hasan Usta', trainerName: 'Mehmet Kalfa', email: 'usta@mobilya.test', field: 'Mobilya', notes: 'Sabah 08.00 giriş' };
+    expectStatus(await coord.patch(`${base}/internship/businesses/${biz.usta}/info`, info), 200);
+    expect((await coord.patch(`${base}/internship/businesses/${biz.kent}/info`, { notes: 'x' })).statusCode).toBe(403);
+    expect((await coord.patch(`${base}/internship/businesses/${biz.usta}/info`, { email: 'yanlis' })).statusCode).toBe(400);
+    const day = (await coord.get(`${base}/internship/day?date=2026-10-08`)).json();
+    expect(day.businesses[0]).toMatchObject({ name: 'Usta Mobilya', editable: true, info });
   });
 });

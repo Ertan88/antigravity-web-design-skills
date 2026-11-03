@@ -327,6 +327,14 @@ export const businesses = pgTable(
     name: text('name').notNull(),
     phone: text('phone'),
     address: text('address'),
+    /** İşletme yetkilisi (sahibi / müdürü) */
+    contactName: text('contact_name'),
+    /** Usta öğretici / eğitici personel: öğrenciyle işletmede ilgilenen kişi */
+    trainerName: text('trainer_name'),
+    email: text('email'),
+    /** Faaliyet alanı / dal (ör. "Mobilya", "Elektrik tesisatı") */
+    field: text('field'),
+    notes: text('notes'),
     coordinatorTeacherId: uuid('coordinator_teacher_id').references((): AnyPgColumn => teachers.id, { onDelete: 'set null' }),
     isActive: isActive(),
     createdAt: createdAt(),
