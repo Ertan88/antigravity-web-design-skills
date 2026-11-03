@@ -135,6 +135,10 @@ export const schoolSettingsSchema = z.object({
   lunchThresholdMin: z.number().int().min(10).max(180).default(30),
   /** İkili öğretim: sabahçı ve öğlenci sınıfların zilleri ayrı */
   dualShift: z.boolean().default(false),
+  /** İşletmelerde mesleki eğitim modülü (meslek liseleri): işletmeler ve aylık devam çizelgesi */
+  internshipEnabled: z.boolean().default(false),
+  /** Koordinatör müdür yardımcısı (kullanıcı): işletmede devamsızlık ve rapor bildirimlerini alır */
+  internshipManagerUserId: z.uuid().nullable().default(null),
   /** Arifede (yarım gün) derslerin bittiği saat; kamuda arife 13.00'ten itibaren tatildir */
   halfDayEnd: clock.default('13:00'),
   /** Okulun kendi adlandırdığı başlıklar (kart ve sekme adları); boş olan varsayılanı kullanır */

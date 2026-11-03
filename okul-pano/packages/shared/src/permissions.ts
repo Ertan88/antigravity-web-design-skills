@@ -21,6 +21,7 @@ export const PERMISSIONS = {
   'labels.manage': 'Başlıkları düzenleme',
   'users.manage': 'Kullanıcılar ve yetkiler',
   'conduct.manage': 'Gözlem kriterleri ve ayın öğrencisi',
+  'internship.manage': 'İşletmeler ve işletmede devam çizelgesi',
   /** Rehber öğretmen: bütün öğrencilerin gözlem kayıtlarını görür (panelde "Rehber öğretmen" rolü olarak verilir) */
   'conduct.counsel': 'Rehber öğretmen (bütün gözlem kayıtları)',
 } as const;

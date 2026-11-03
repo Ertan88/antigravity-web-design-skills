@@ -24,3 +24,4 @@ export * from './headlines.ts';
 export * from './control.ts';
 export * from './labels.ts';
 export * from './conduct.ts';
+export * from './internship.ts';

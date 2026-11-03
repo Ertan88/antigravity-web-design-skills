@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
 import { Text } from '../../src/text.tsx';
 import { membershipLabel, useAuth, type AppRole } from '../../src/auth.tsx';
-import { useInbox, useMyLeaves } from '../../src/data.ts';
+import { useInbox, useInternshipAccess, useMyLeaves } from '../../src/data.ts';
 import { useOpenSchool } from '../../src/platform.tsx';
 import { registerForPush } from '../../src/push.ts';
 import { colors, radius, tiles, type TileTone } from '../../src/theme.ts';
@@ -124,6 +124,7 @@ export default function Menu() {
   const theme = useThemeMode();
   const inbox = useInbox('unread');
   const leaves = useMyLeaves();
+  const internship = useInternshipAccess();
   const [push, setPush] = useState<string | null>(null);
   const pendingLeaves = (leaves.data ?? []).filter((l) => l.approvalStatus === 'pending').length;
   const unread = inbox.data?.unread ?? 0;
@@ -198,6 +199,20 @@ export default function Menu() {
           : []),
         { title: 'Tatil takvimi', subtitle: 'MEB takvimi, bayramlar, köprü günleri', icon: 'sunny-outline', to: '/tatiller' },
         { title: 'Etkinlik geçmişi', subtitle: 'Kim ne zaman neyi değiştirdi', icon: 'time-outline', tone: 'muted', to: '/gecmis' },
+      ],
+    });
+  }
+
+  if (role !== 'platform' && internship.data?.enabled && (internship.data.all || internship.data.coordinator)) {
+    sections.push({
+      title: 'Mesleki eğitim',
+      items: [
+        {
+          title: 'İşletme ziyareti',
+          subtitle: 'Devamsızlık (D), rapor (R), işletme kapalı (K)',
+          icon: 'business-outline',
+          to: '/isletme',
+        },
       ],
     });
   }

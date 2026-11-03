@@ -189,6 +189,9 @@ export const useScreens = (fast = false) => useSchoolQuery<Screen[]>('screens', 
 export const useAnnouncements = () => useSchoolQuery<Announcement[]>('announcements', { refetchInterval: 60_000 });
 export const useLeaves = (enabled = true) => useSchoolQuery<Leave[]>('leaves', { enabled });
 export const useMyLeaves = () => useSchoolQuery<Leave[]>('me/leaves');
+/** İşletmelerde mesleki eğitim: menüde "Ziyaret kaydı" görünsün mü (modül açık; idare ya da koordinatör öğretmen) */
+export const useInternshipAccess = () =>
+  useSchoolQuery<{ enabled: boolean; all: boolean; coordinator: boolean; manage: boolean }>('internship/access');
 /** Bildirim kutusu: okul seçiliyse okulun ve platformun bildirimleri, değilse (platform yöneticisi) yalnızca platformunkiler */
 export function useInbox(filter: 'all' | 'unread' = 'all') {
   const { school } = useAuth();

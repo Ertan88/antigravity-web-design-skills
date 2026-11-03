@@ -310,10 +310,51 @@ export const students = pgTable(
     birthDate: date('birth_date', { mode: 'string' }).notNull(),
     /** e-Okul sınıf listesindeki sıra numarası (S.No) */
     listNo: integer('list_no'),
+    /** İşletmelerde mesleki eğitim: öğrencinin gittiği işletme */
+    businessId: uuid('business_id').references((): AnyPgColumn => businesses.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [index('students_school_idx').on(t.schoolId), uniqueIndex('students_school_no_uq').on(t.schoolId, t.schoolNo)],
+);
+
+/** İşletmelerde mesleki eğitim: öğrencilerin gittiği işletmeler ve koordinatör öğretmenleri */
+export const businesses = pgTable(
+  'businesses',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    name: text('name').notNull(),
+    phone: text('phone'),
+    address: text('address'),
+    coordinatorTeacherId: uuid('coordinator_teacher_id').references((): AnyPgColumn => teachers.id, { onDelete: 'set null' }),
+    isActive: isActive(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index('businesses_school_idx').on(t.schoolId)],
+);
+
+/**
+ * İşletmede devam işaretleri (yarım gün): yalnızca istisnalar saklanır (D, R, T, K). Okul günü (O), takvim tatili ve
+ * işletmede devam (X) kendiliğinden hesaplanır.
+ */
+export const internshipMarks = pgTable(
+  'internship_marks',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => students.id, { onDelete: 'cascade' }),
+    date: date('date', { mode: 'string' }).notNull(),
+    half: text('half').$type<'am' | 'pm'>().notNull(),
+    code: text('code').$type<'D' | 'R' | 'T' | 'K'>().notNull(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    userName: text('user_name').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('internship_marks_uq').on(t.studentId, t.date, t.half), index('internship_marks_school_idx').on(t.schoolId, t.date)],
 );
 
 /** Gözlem kriterleri: okul düzeyine göre ayrı şablon (artı / eksi puanlı davranışlar) */

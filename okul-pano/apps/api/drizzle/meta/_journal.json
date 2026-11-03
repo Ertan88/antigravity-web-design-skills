@@ -225,6 +225,13 @@
       "when": 1794900000000,
       "tag": "0031_class_advisor",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1795000000000,
+      "tag": "0032_internship",
+      "breakpoints": true
     }
   ]
 }

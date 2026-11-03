@@ -1,5 +1,5 @@
 import { SCHOOL_TYPES, splitSchoolName, updateSchoolSchema, type SchoolSettings } from '@okulpano/shared';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Download, ExternalLink, FileText, MapPin, Search } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ImageUpload } from '../components/ImageUpload.tsx';
@@ -7,7 +7,7 @@ import { SampleDataCard } from '../components/Onboarding.tsx';
 import { SupportAccessCard } from '../components/SupportAccess.tsx';
 import { SaveBar } from '../components/SaveBar.tsx';
 import { useToast } from '../components/Toast.tsx';
-import { Alert, Button, Card, Field, Input, PageHeader, Spinner, Textarea, Toggle } from '../components/ui.tsx';
+import { Alert, Button, Card, Field, Input, PageHeader, Select, Spinner, Textarea, Toggle } from '../components/ui.tsx';
 import { downloadJson } from '../lib/download.ts';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.ts';
@@ -203,6 +203,27 @@ function PrivacySection({ value, onChange, slug }: { value: string; onChange: (v
   );
 }
 
+/** Koordinatör müdür yardımcısı: işletmede devamsızlık (D) ve rapor (R) bildirimlerini alır */
+function InternshipManagerField({ value, onChange }: { value: string | null; onChange: (v: string | null) => void }) {
+  const path = useSchoolPath('internship/manager-candidates');
+  const { schoolId } = useAuth();
+  const list = useQuery({ queryKey: [schoolId, 'internship', 'candidates'], queryFn: () => api<{ userId: string; fullName: string }[]>(path) });
+  return (
+    <Field label="Koordinatör müdür yardımcısı" help="İşletmede devamsızlık (D) ya da rapor (R) kaydedilince bu kişiye uygulama bildirimi gider.">
+      {(id) => (
+        <Select id={id} value={value ?? ''} onChange={(e) => onChange(e.target.value || null)} className="max-w-sm">
+          <option value="">Seçilmedi (bildirim gitmez)</option>
+          {(list.data ?? []).map((u) => (
+            <option key={u.userId} value={u.userId}>
+              {u.fullName}
+            </option>
+          ))}
+        </Select>
+      )}
+    </Field>
+  );
+}
+
 export function Settings() {
   const { schoolId, reloadMe } = useAuth();
   const path = useSchoolPath();
@@ -338,6 +359,13 @@ export function Settings() {
             label="Duyurular onaydan sonra yayınlansın"
             description="Açıkken 'Duyuruları onaylama' yetkisi olmayan kullanıcıların (ör. öğretmenler) eklediği ya da değiştirdiği duyurular, okul sahibi, yöneticiler veya bu yetkiyi verdiğiniz kişiler (ör. müdür yardımcısı) onaylayınca panoya çıkar. Yetkiyi Kullanıcılar ve Yetkiler sayfasından verin."
           />
+          <Toggle
+            checked={Boolean(s.internshipEnabled)}
+            onChange={(x) => setting('internshipEnabled', x)}
+            label="İşletmelerde mesleki eğitim"
+            description="Meslek liseleri için: işletmeler, koordinatör öğretmenler ve aylık işletmede devam çizelgesi. Koordinatör öğretmenler devamsızlık ve raporu mobil uygulamadan girer."
+          />
+          {s.internshipEnabled && <InternshipManagerField value={s.internshipManagerUserId ?? null} onChange={(x) => setting('internshipManagerUserId', x)} />}
           <p className="text-sm text-slate-500">
             Panodaki kartların yeri, renkler ve slayt süreleri{' '}
             <Link to="/ekranlar" className="font-semibold text-brand-700 hover:underline">

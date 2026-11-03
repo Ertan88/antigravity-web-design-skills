@@ -74,7 +74,8 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   );
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
-  const { me, can, logout } = useAuth();
+  const { me, can, logout, school: access } = useAuth();
+  const who = { userId: me?.user.id ?? null, teacherId: access?.teacherId ?? null, can };
   const school = useSchool();
   const settings = school.data?.settings;
   return (
@@ -92,7 +93,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </div>
       <nav className="relative flex-1 space-y-5 overflow-y-auto px-3 pb-4 [scrollbar-width:thin]">
         {NAV.map((group) => {
-          const items = group.items.filter((i) => (!i.permission || can(i.permission)) && (!i.when || i.when(settings)));
+          const items = group.items.filter((i) => (!i.permission || can(i.permission)) && (!i.when || i.when(settings, who)));
           if (!items.length) return null;
           return (
             <div key={group.title || 'root'}>

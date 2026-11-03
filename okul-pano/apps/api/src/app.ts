@@ -17,6 +17,7 @@ import { DbStorage, LocalStorage, type FileStorage } from './lib/storage.ts';
 import { UUID_RE } from './context.ts';
 import { academicCalendarRoutes } from './routes/academicCalendar.ts';
 import { conductRoutes, runConductRetention } from './routes/conduct.ts';
+import { internshipRoutes } from './routes/internship.ts';
 import { authRoutes } from './routes/auth.ts';
 import { contentRoutes } from './routes/content.ts';
 import { dutyRoutes } from './routes/duties.ts';
@@ -118,6 +119,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   await app.register(signupRoutes);
   await app.register(academicCalendarRoutes);
   await app.register(conductRoutes);
+  await app.register(internshipRoutes);
 
   // Deneme süresi hatırlatmaları: açılıştan kısa süre sonra ve saatte bir (testlerde elle çağrılır)
   if (env.NODE_ENV !== 'test') {
