@@ -595,6 +595,7 @@ export function HomeHeader({
   role,
   title,
   titleMuted,
+  inline,
   children,
 }: {
   name?: string | null;
@@ -602,6 +603,8 @@ export function HomeHeader({
   role: string;
   title: string;
   titleMuted?: string | null;
+  /** Başlık ve soluk kısım yan yana tek satır (sığmazsa yazı küçülür) */
+  inline?: boolean;
   children?: ReactNode;
 }) {
   return (
@@ -620,10 +623,17 @@ export function HomeHeader({
         </View>
         {children ? <View style={{ flexDirection: 'row', gap: 8 }}>{children}</View> : null}
       </View>
-      <Text style={{ fontSize: 34, lineHeight: 38, fontWeight: '800', letterSpacing: -1.2, color: colors.ink }} accessibilityRole="header">
-        {title}
-        {titleMuted ? <Text style={{ color: colors.subtle }}>{`\n${titleMuted}`}</Text> : null}
-      </Text>
+      {inline ? (
+        <Text style={{ fontSize: 28, lineHeight: 34, fontWeight: '800', letterSpacing: -0.9, color: colors.ink }} accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+          {title}
+          {titleMuted ? <Text style={{ color: colors.subtle }}>{` ${titleMuted}`}</Text> : null}
+        </Text>
+      ) : (
+        <Text style={{ fontSize: 34, lineHeight: 38, fontWeight: '800', letterSpacing: -1.2, color: colors.ink }} accessibilityRole="header">
+          {title}
+          {titleMuted ? <Text style={{ color: colors.subtle }}>{`\n${titleMuted}`}</Text> : null}
+        </Text>
+      )}
     </View>
   );
 }

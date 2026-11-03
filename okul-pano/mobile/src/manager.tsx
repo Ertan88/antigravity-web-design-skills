@@ -4,7 +4,8 @@ import { Pressable, View } from 'react-native';
 import { Text } from './text.tsx';
 import { useAuth } from './auth.tsx';
 import { useControlCenter, useMeToday, type ControlCenter } from './data.ts';
-import { clock, homeTitle, localIso, timeAgo } from './day.ts';
+import { clock, dayTitle, localIso, timeAgo } from './day.ts';
+import { LiveLesson } from './lesson.tsx';
 import { MenuButton, QuickAdd } from './quick.tsx';
 import { DayBanner, MyDayCard, NotificationsButton } from './teacher.tsx';
 import { tiles } from './theme.ts';
@@ -49,7 +50,9 @@ export function ManagerHome() {
   const center = useControlCenter();
   const me = useMeToday();
   const c = center.data;
-  const [day, date] = homeTitle(c?.today ?? localIso());
+  const iso = c?.today ?? localIso();
+  const day = `${dayTitle(iso, { weekday: 'long' })},`;
+  const date = dayTitle(iso, { day: 'numeric', month: 'long', year: 'numeric' });
   const pending = c ? c.pending.announcements + c.pending.leaves : 0;
 
   // Pano ve onay durumu kutularda; listede yalnızca kutulara sığmayan işler kalır
@@ -80,7 +83,7 @@ export function ManagerHome() {
 
   return (
     <Screen refreshing={center.isRefetching} onRefresh={() => void center.refetch()}>
-      <HomeHeader name={account?.user.fullName} school={school?.name} role={school?.support ? 'Destek erişimi' : role === 'owner' ? 'Okul sahibi' : 'Yönetici'} title={day} titleMuted={date}>
+      <HomeHeader name={account?.user.fullName} school={school?.name} role={school?.support ? 'Destek erişimi' : role === 'owner' ? 'Okul sahibi' : 'Yönetici'} title={day} titleMuted={date} inline>
         <NotificationsButton />
         <MenuButton />
       </HomeHeader>
@@ -95,6 +98,7 @@ export function ManagerHome() {
             </Pressable>
           )}
           {me.data ? <DayBanner data={me.data} /> : c.holiday ? <Banner icon="sunny" title="Bugün tatil" text={`${c.holiday} · zil çalmıyor`} /> : null}
+          {isTeacher && me.data && <LiveLesson data={me.data} link />}
 
           <BentoRow>
             <ScreensTile screens={c.screens} />
@@ -123,7 +127,7 @@ export function ManagerHome() {
             </>
           )}
 
-          <QuickAdd />
+          <QuickAdd only={['Duyuru', 'Kayan yazı']} />
 
           {isTeacher && me.data?.teacher && (
             <>

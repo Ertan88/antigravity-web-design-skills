@@ -49,9 +49,9 @@ export function ChipLinks({ items }: { items: { label: string; icon: IconName; t
 }
 
 /** Hızlı ekle: yetkiye göre içerik türleri; ilki (genelde duyuru) koyu. Kalanlar Menü › İçerik'te. */
-export function QuickAdd({ max = 6, title = 'Hızlı ekle' }: { max?: number; title?: string }) {
+export function QuickAdd({ max = 6, title = 'Hızlı ekle', only }: { max?: number; title?: string; only?: string[] }) {
   const { can } = useAuth();
-  const items = QUICK.filter((q) => can(q.permission)).slice(0, max);
+  const items = QUICK.filter((q) => can(q.permission) && (!only || only.includes(q.label))).slice(0, max);
   if (!items.length) return null;
   return (
     <View style={{ gap: 10 }}>
