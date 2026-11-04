@@ -560,7 +560,13 @@ function SheetTable({
               S.No
             </th>
             <th rowSpan={2} className="px-2 text-left font-bold">
-              No · Sınıf · Adı Soyadı
+              No
+            </th>
+            <th rowSpan={2} className="px-2 text-left font-bold">
+              Sınıf
+            </th>
+            <th rowSpan={2} className="px-2 text-left font-bold">
+              Adı Soyadı
             </th>
             <th rowSpan={2} />
             {days.map((d) => (
@@ -604,18 +610,16 @@ function SheetTable({
               <td className="border-b border-slate-100 px-1.5 text-center font-bold text-slate-400">
                 {i + 1}
               </td>
-              <td className="border-b border-slate-100 px-2 py-1">
-                <div className="flex items-baseline gap-2 text-[13px] whitespace-nowrap">
-                  <span className="w-9 font-bold text-slate-500 tabular-nums">
-                    {s.schoolNo}
-                  </span>
-                  <span className="w-[68px] font-bold text-slate-600">
-                    {s.className ?? "–"}
-                  </span>
-                  <b className="font-extrabold">{s.fullName}</b>
-                </div>
-                {/* Okul no (w-9) + sınıf (68px) + iki boşluk: işletme adı öğrenci adının tam altında */}
-                <div className="pl-[120px] text-[11px] font-medium whitespace-nowrap text-slate-400">
+              {/* No, sınıf ve ad ayrı sütunlarda: uzun sınıf adında (ör. AMP 12-B) işletme adı yine öğrenci adının altında */}
+              <td className="border-b border-slate-100 px-2 text-[13px] font-bold whitespace-nowrap text-slate-500 tabular-nums">
+                {s.schoolNo}
+              </td>
+              <td className="border-b border-slate-100 px-2 text-[13px] font-bold whitespace-nowrap text-slate-600">
+                {s.className ?? "–"}
+              </td>
+              <td className="border-b border-slate-100 px-2 py-1 whitespace-nowrap">
+                <div className="text-[13px] font-extrabold">{s.fullName}</div>
+                <div className="text-[11px] font-medium text-slate-400">
                   {s.businessName}
                 </div>
               </td>
