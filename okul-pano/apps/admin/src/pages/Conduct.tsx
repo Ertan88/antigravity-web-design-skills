@@ -11,11 +11,12 @@ import {
   type ConductTerm,
   type SchoolLevel,
   type SchoolSettings,
+  gradeOf,
 } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { ArrowUpRight, Check, ClipboardCheck, Download, FileSpreadsheet, Gauge, HeartHandshake, Pencil, Plus, Star, Undo2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Select, Spinner, Table, Td, Textarea, Toggle } from '../components/ui.tsx';
 import { api, downloadFile, excelFileName } from '../lib/api.ts';
@@ -248,14 +249,90 @@ function StudentCard({ studentId, month, criteria, onClose, readOnly }: { studen
 
 /* ---------- Öğrenci Gözlemleri ---------- */
 
+/** Seçilen sınıf Öğrenci Gözlemleri ve Dönem Göstergesi arasında hatırlanır */
+function useConductClass(schoolId: string | null, classes: ConductClass[] | undefined) {
+  const key = `conduct-class:${schoolId ?? ''}`;
+  const [picked, setPicked] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  });
+  const valid = picked && classes?.some((c) => c.id === picked) ? picked : null;
+  const active = valid ?? classes?.find((c) => c.students > 0)?.id ?? classes?.[0]?.id ?? null;
+  const choose = (id: string) => {
+    setPicked(id);
+    try {
+      localStorage.setItem(key, id);
+    } catch {
+      /* tarayıcı depolaması kapalı */
+    }
+  };
+  return [active, choose] as const;
+}
+
+/**
+ * Sınıf seçimi: üstte düzey sekmeleri (9, 10, 11, 12…), altında yalnızca seçili düzeyin şubeleri. Çok şubeli okulda da
+ * tek satır kalır. Düzeyi okunamayan sınıflar "Diğer" sekmesinde.
+ */
+function ClassPicker({ classes, active, onPick }: { classes: ConductClass[]; active: string | null; onPick: (id: string) => void }) {
+  const levelOf = (c: ConductClass) => {
+    const g = gradeOf(c.name);
+    return g === null ? 'other' : String(g);
+  };
+  const levels = [...new Set(classes.map(levelOf))];
+  const activeLevel = classes.find((c) => c.id === active);
+  const [level, setLevel] = useState<string>(activeLevel ? levelOf(activeLevel) : (levels[0] ?? 'other'));
+  // Seçili sınıf dışarıdan değişirse (ör. hatırlanan sınıf yüklenince) düzey sekmesi de ona geçer
+  useEffect(() => {
+    if (activeLevel) setLevel(levelOf(activeLevel));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
+  const shown = classes.filter((c) => levelOf(c) === level);
+  return (
+    <div className="space-y-2.5">
+      {levels.length > 1 && (
+        <div className="flex flex-wrap items-center gap-3">
+          <Segmented
+            value={level}
+            onChange={(v) => {
+              setLevel(v);
+              const first = classes.find((c) => levelOf(c) === v && c.students > 0) ?? classes.find((c) => levelOf(c) === v);
+              if (first) onPick(first.id);
+            }}
+            options={levels.map((l) => ({ value: l, label: l === 'other' ? 'Diğer' : `${l}. sınıflar` }))}
+          />
+          <span className="text-sm font-semibold text-slate-500">{shown.length} şube</span>
+        </div>
+      )}
+      <div className="flex flex-wrap gap-1.5">
+        {shown.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => onPick(c.id)}
+            className={clsx(
+              'h-9 rounded-full px-4 text-sm font-bold transition',
+              c.id === active ? 'bg-brand-600 text-white' : 'bg-surface text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100',
+            )}
+          >
+            {c.name}
+            <span className="ml-1.5 text-xs opacity-60">{c.students}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ConductStudents() {
   const { schoolId } = useAuth();
   const path = useSchoolPath('conduct');
   const [month, setMonth] = useState(thisMonth());
-  const [classId, setClassId] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const classes = useQuery({ queryKey: [schoolId, 'conduct', 'classes'], queryFn: () => api<ConductClass[]>(`${path}/classes`) });
-  const active = classId ?? classes.data?.find((c) => c.students > 0)?.id ?? null;
+  const [active, setClassId] = useConductClass(schoolId, classes.data);
   const screen = useQuery({
     queryKey: [schoolId, 'conduct', 'class', active, month],
     queryFn: () => api<ClassScreen>(`${path}/classes/${active}/students?month=${month}`),
@@ -277,22 +354,7 @@ export function ConductStudents() {
         </Card>
       ) : (
         <div className="space-y-4">
-          <div className="flex flex-wrap gap-1.5">
-            {classes.data.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setClassId(c.id)}
-                className={clsx(
-                  'h-9 rounded-full px-4 text-sm font-bold transition',
-                  c.id === active ? 'bg-brand-600 text-white' : 'bg-surface text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100',
-                )}
-              >
-                {c.name}
-                <span className="ml-1.5 text-xs opacity-60">{c.students}</span>
-              </button>
-            ))}
-          </div>
+          <ClassPicker classes={classes.data} active={active} onPick={setClassId} />
           <Card>
             {!s ? (
               <Spinner />
@@ -810,13 +872,12 @@ export function ConductReport() {
   const toast = useToast();
   const [term, setTerm] = useState<ConductTerm | null>(null);
   const [mine, setMine] = useState(false);
-  const [classId, setClassId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<'class' | 'all' | null>(null);
   const classes = useQuery({
     queryKey: [schoolId, 'conduct', 'classes'],
     queryFn: () => api<ConductClass[]>(`${path}/classes`),
   });
-  const active = classId ?? classes.data?.find((c) => c.students > 0)?.id ?? null;
+  const [active, setClassId] = useConductClass(schoolId, classes.data);
   const query = (extra: Record<string, string> = {}) =>
     new URLSearchParams({
       ...(term ? { term: String(term) } : {}),
@@ -887,21 +948,7 @@ export function ConductReport() {
               </Button>
             </div>
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {classes.data.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setClassId(c.id)}
-                className={clsx(
-                  'h-9 rounded-full px-4 text-sm font-bold transition',
-                  c.id === active ? 'bg-brand-600 text-white' : 'bg-surface text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100',
-                )}
-              >
-                {c.name}
-              </button>
-            ))}
-          </div>
+          <ClassPicker classes={classes.data} active={active} onPick={setClassId} />
           {!r ? (
             <Spinner />
           ) : (
