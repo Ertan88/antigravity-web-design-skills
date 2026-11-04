@@ -1,13 +1,12 @@
 import { router } from 'expo-router';
-import { View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Text } from './text.tsx';
 import { membershipLabel, useAuth } from './auth.tsx';
-import { useInbox, useMeToday, useNow, type MeToday } from './data.ts';
-import { classLabel, teacherDay } from './day.ts';
-import { colors, type TileTone } from './theme.ts';
+import { useEvents, useExams, useInbox, useMeToday, useNow, useUpcomingHolidays, type MeToday } from './data.ts';
+import { classLabel, clock, dative, dayTitle, localIso, teacherDay } from './day.ts';
+import { colors, tiles, type TileTone } from './theme.ts';
 import { LiveLesson } from './lesson.tsx';
-import { Banner, Card, HeaderButton, HomeHeader, Icon, ListRow, Loading, Screen, T, Tile, type IconName } from './ui.tsx';
-import { ChipLinks } from './quick.tsx';
+import { Banner, Card, HeaderButton, HomeHeader, Icon, ListRow, Loading, Screen, SectionTitle, T, Tile, type IconName } from './ui.tsx';
 
 /** Sağ üstteki bildirim zili (okunmamış sayısıyla) */
 export function NotificationsButton() {
@@ -69,40 +68,193 @@ export function IconTile({ name, tone = 'primary', size = 48 }: { name: IconName
 
 
 
-/** Öğretmenin ana ekranı: zil kutusu, ders ve nöbet kutuları, hızlı işlemler, günün programı */
+/** Öğretmenin ana ekranı: şu an kartı, nöbet, ders sırasında gözlem kısayolu, hızlı işlemler, yaklaşanlar */
 export function TeacherHome() {
   const { me, school, can } = useAuth();
   const today = useMeToday();
   const now = useNow(60_000);
-  const actions: { label: string; icon: IconName; to: string }[] = [
-    // Öğretmen görünümünde duyurular yalnızca okunur (yayındakiler); ders programı alt menüde
-    { label: 'Duyurular', icon: 'megaphone-outline', to: '/duyurular' },
-    { label: 'İzin bildir', icon: 'calendar-outline', to: '/izin' },
+  const day = today.data ? teacherDay(today.data, now) : null;
+  const linked = Boolean(today.data?.teacher);
+  const quick: { label: string; emoji: string; tone: TileTone; to: string }[] = [
+    { label: 'Gözlem', emoji: '📝', tone: 'mint', to: '/gozlem' },
+    { label: 'İzin bildir', emoji: '🗓️', tone: 'peach', to: '/izin' },
+    // Öğretmen görünümünde duyurular yalnızca okunur (yayındakiler)
+    { label: 'Duyurular', emoji: '📣', tone: 'sky', to: '/duyurular' },
+    ...(linked ? [{ label: 'Hatırlatma', emoji: '⏰', tone: 'sun' as TileTone, to: '/hatirlatmalar' }] : []),
   ];
   return (
     <Screen refreshing={today.isRefetching} onRefresh={() => void today.refetch()}>
       <HomeHeader name={me?.user.fullName} school={school?.name} schoolType={school?.schoolType} role={school ? membershipLabel(school) : 'Öğretmen'}>
         <NotificationsButton />
       </HomeHeader>
-      {today.isLoading || !today.data ? (
+      {today.isLoading || !today.data || !day ? (
         <Loading />
       ) : (
         <>
-          {teacherDay(today.data, now).holiday ? <DayBanner data={today.data} /> : <LiveLesson data={today.data} link />}
-          {!today.data.teacher && can('conduct.counsel') ? null : !today.data.teacher ? (
+          {day.holiday ? <DayBanner data={today.data} /> : <LiveLesson data={today.data} link />}
+          {!linked && can('conduct.counsel') ? null : !linked ? (
             <Card tone="warning">
               <T weight="700">Hesabınız bir öğretmen kaydına bağlı değil</T>
               <T size={13} color={colors.muted}>
                 Kendi nöbetlerinizi ve ders programınızı görmek için okul yöneticiniz panelde Kullanıcılar sayfasından hesabınızı öğretmen kaydınızla eşleştirsin.
               </T>
             </Card>
-          ) : !teacherDay(today.data, now).holiday ? (
+          ) : !day.holiday ? (
             <DutyTile data={today.data} />
           ) : null}
-          <ChipLinks items={actions} />
+          {!day.holiday && <ObserveCard className={day.lessons.find((l) => l.state === 'now')?.className} />}
+          <SectionTitle>Hızlı işlemler</SectionTitle>
+          <QuickGrid items={quick} />
+          <UpcomingCard />
         </>
       )}
     </Screen>
+  );
+}
+
+/** Ders sürerken: o sınıfa tek dokunuşla gözlem (Gözlem sekmesi şu anki dersin sınıfıyla açılır) */
+function ObserveCard({ className }: { className?: string }) {
+  if (!className) return null;
+  const name = classLabel(className);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${dative(name)} gözlem ekle`}
+      onPress={() => router.push('/gozlem')}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        paddingVertical: 13,
+        paddingHorizontal: 14,
+        borderRadius: 22,
+        borderWidth: 1,
+        borderColor: tiles.mint.bg,
+        backgroundColor: colors.successSoft,
+        opacity: pressed ? 0.85 : 1,
+      })}
+    >
+      <Text style={{ fontSize: 24 }}>📝</Text>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={{ fontSize: 15, fontWeight: '800', color: colors.ink }}>{dative(name)} gözlem ekle</Text>
+        <Text style={{ fontSize: 12.5, color: colors.muted, marginTop: 1 }}>Şu anki dersiniz · artı / eksi tek dokunuş</Text>
+      </View>
+      <Icon name="chevron-forward" size={18} color={colors.ink} />
+    </Pressable>
+  );
+}
+
+/** Dört eşit kutu: emoji ve kısa ad */
+function QuickGrid({ items }: { items: { label: string; emoji: string; tone: TileTone; to: string }[] }) {
+  return (
+    <View style={{ flexDirection: 'row', gap: 8 }}>
+      {items.map((q) => (
+        <Pressable
+          key={q.to}
+          accessibilityRole="button"
+          accessibilityLabel={q.label}
+          onPress={() => router.push(q.to as never)}
+          style={({ pressed }) => ({
+            flex: 1,
+            alignItems: 'center',
+            gap: 6,
+            paddingVertical: 12,
+            paddingHorizontal: 4,
+            borderRadius: 18,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.card,
+            opacity: pressed ? 0.8 : 1,
+          })}
+        >
+          <View style={{ width: 40, height: 40, borderRadius: 13, backgroundColor: tiles[q.tone].bg, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 19 }}>{q.emoji}</Text>
+          </View>
+          <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '700', color: colors.ink }}>
+            {q.label}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+const DAY = 86400_000;
+const isoMs = (iso: string) => Date.parse(`${iso}T12:00:00Z`);
+const shortDay = (iso: string) => dayTitle(iso, { day: 'numeric', month: 'long' });
+
+/** Yaklaşanlar: önümüzdeki 30 günün en yakın 3 sınavı, etkinliği ya da tatili */
+function UpcomingCard() {
+  const exams = useExams();
+  const events = useEvents();
+  const holidays = useUpcomingHolidays();
+  const now = useNow(60_000);
+  const today = localIso(now);
+  const until = new Date(isoMs(today) + 30 * DAY).toISOString().slice(0, 10);
+
+  const rows: { key: string; date: string; emoji: string; tone: TileTone; title: string; when: string }[] = [];
+  for (const e of exams.data ?? []) {
+    const d = localIso(new Date(e.examAt));
+    if (e.isActive && Date.parse(e.examAt) >= now.getTime() && d <= until)
+      rows.push({ key: `x${e.id}`, date: d, emoji: '⏳', tone: 'lilac', title: e.title, when: `${dayTitle(d)} · ${clock(e.examAt)}` });
+  }
+  for (const e of events.data ?? []) {
+    if (e.isActive && e.date >= today && e.date <= until)
+      rows.push({ key: `e${e.id}`, date: e.date, emoji: '📅', tone: 'sky', title: e.title, when: [dayTitle(e.date), e.time, e.place].filter(Boolean).join(' · ') });
+  }
+  // Ardışık (hafta sonu arada olsa da) aynı adlı tatil günleri tek satır: "16 – 20 Kasım"
+  const hs = [...(holidays.data?.holidays ?? [])].filter((h) => h.date >= today && h.date <= until).sort((a, b) => a.date.localeCompare(b.date));
+  const groups: { name: string; from: string; to: string }[] = [];
+  for (const h of hs) {
+    const g = groups[groups.length - 1];
+    if (g && g.name === h.name && isoMs(h.date) - isoMs(g.to) <= 3 * DAY) g.to = h.date;
+    else groups.push({ name: h.name, from: h.date, to: h.date });
+  }
+  for (const g of groups) {
+    const sameMonth = g.from.slice(0, 7) === g.to.slice(0, 7);
+    const when = g.from === g.to ? dayTitle(g.from) : sameMonth ? `${Number(g.from.slice(8))} – ${shortDay(g.to)}` : `${shortDay(g.from)} – ${shortDay(g.to)}`;
+    rows.push({ key: `h${g.from}`, date: g.from, emoji: '🏖️', tone: 'sun', title: g.name, when });
+  }
+  const list = rows.sort((a, b) => a.date.localeCompare(b.date)).slice(0, 3);
+  if (!list.length) return null;
+
+  return (
+    <>
+      <SectionTitle
+        right={
+          <Pressable accessibilityRole="link" onPress={() => router.push('/yaklasanlar')} hitSlop={8}>
+            <T size={13} weight="700" color={colors.faint}>
+              Tümü ›
+            </T>
+          </Pressable>
+        }
+      >
+        Yaklaşanlar
+      </SectionTitle>
+      <Card style={{ padding: 0, gap: 0, overflow: 'hidden' }}>
+        {list.map((r, i) => {
+          const n = Math.round((isoMs(r.date) - isoMs(today)) / DAY);
+          return (
+            <View key={r.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14, borderTopWidth: i ? 1 : 0, borderTopColor: colors.divider }}>
+              <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: tiles[r.tone].bg, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontSize: 18 }}>{r.emoji}</Text>
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text numberOfLines={1} style={{ fontSize: 14.5, fontWeight: '700', color: colors.ink }}>
+                  {r.title}
+                </Text>
+                <Text numberOfLines={1} style={{ fontSize: 12.5, color: colors.faint, marginTop: 1 }}>
+                  {r.when}
+                </Text>
+              </View>
+              <View style={{ paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: tiles[r.tone].bg }}>
+                <Text style={{ fontSize: 12, fontWeight: '800', color: tiles[r.tone].fg }}>{n <= 0 ? 'Bugün' : n === 1 ? 'Yarın' : `${n} gün`}</Text>
+              </View>
+            </View>
+          );
+        })}
+      </Card>
+    </>
   );
 }
 

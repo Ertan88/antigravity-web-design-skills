@@ -187,6 +187,24 @@ export const useMeToday = () => useSchoolQuery<MeToday>('me/today', { refetchInt
 export const useControlCenter = (enabled = true) => useSchoolQuery<ControlCenter>('control-center', { refetchInterval: 30_000, enabled });
 export const useScreens = (fast = false) => useSchoolQuery<Screen[]>('screens', { refetchInterval: fast ? 3000 : 30_000 });
 export const useAnnouncements = () => useSchoolQuery<Announcement[]>('announcements', { refetchInterval: 60_000 });
+export interface Exam {
+  id: string;
+  title: string;
+  examAt: string;
+  isActive: boolean;
+}
+export interface SchoolEvent {
+  id: string;
+  title: string;
+  organizer: string | null;
+  date: string;
+  time: string | null;
+  place: string | null;
+  isActive: boolean;
+}
+/** Panodaki sınav sayacı ve etkinlik takvimi (okulun bütün üyeleri okuyabilir) */
+export const useExams = () => useSchoolQuery<Exam[]>('exams', { refetchInterval: 30 * 60_000 });
+export const useEvents = () => useSchoolQuery<SchoolEvent[]>('events', { refetchInterval: 30 * 60_000 });
 export const useLeaves = (enabled = true) => useSchoolQuery<Leave[]>('leaves', { enabled });
 export const useMyLeaves = () => useSchoolQuery<Leave[]>('me/leaves');
 /** İşletmelerde mesleki eğitim: menüde "Ziyaret kaydı" görünsün mü (modül açık; idare ya da koordinatör öğretmen) */

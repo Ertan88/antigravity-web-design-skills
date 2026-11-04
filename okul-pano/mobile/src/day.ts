@@ -113,6 +113,35 @@ export function greeting(hour: number): string {
 /** Sınıf adı: e-Okul'daki "AMP" (Anadolu Meslek Programı) ön eki yazılmaz ("AMP 11-B" → "11-B"); ATP gibi diğerleri kalır */
 export const classLabel = (name: string) => name.replace(/^AMP\s+/i, '');
 
+/** Yönelme eki: "11-B" → "11-B'ye", "12-A" → "12-A'ya", "10" → "10'a" (harf ve sayılar okunuşuna göre) */
+export function dative(name: string): string {
+  const t = name.trim();
+  const ch = t.slice(-1);
+  const back = (v: string) => 'aıou'.includes(v);
+  let vowel: string | null = null;
+  let consonant = false;
+  if (/\d/.test(ch)) {
+    const num = t.match(/(\d+)$/)![1]!.replace(/^0+(?=\d)/, '');
+    // Sondaki basamağın okunuşu; sıfırla bitenlerde onlar/yüzler basamağı
+    const ones: Record<string, [string, boolean]> = { '1': ['i', true], '2': ['i', false], '3': ['ü', true], '4': ['ö', true], '5': ['e', true], '6': ['ı', false], '7': ['i', false], '8': ['i', true], '9': ['u', true] };
+    const tens: Record<string, [string, boolean]> = { '1': ['o', true], '2': ['i', false], '3': ['u', true], '4': ['ı', true], '5': ['i', false], '6': ['ı', true], '7': ['i', true], '8': ['e', true], '9': ['a', true] };
+    const last = num.slice(-1);
+    const hit = last !== '0' ? ones[last] : num.length === 1 ? (['ı', true] as [string, boolean]) : num.slice(-2, -1) !== '0' ? tens[num.slice(-2, -1)!] : num.length >= 4 && num.slice(-3) === '000' ? (['i', true] as [string, boolean]) : (['ü', true] as [string, boolean]);
+    [vowel, consonant] = hit ?? ['e', true];
+  } else if (/[A-ZÇĞİÖŞÜ]/.test(ch) && !/[a-zçğıöşü]/.test(t.slice(-2, -1))) {
+    // Tek büyük harf: harfin adı ("be", "ka", "a")
+    const named: Record<string, string> = { A: 'a', I: 'ı', O: 'o', U: 'u', K: 'a', Ö: 'ö', Ü: 'ü', İ: 'i', E: 'e' };
+    vowel = named[ch] ?? 'e';
+  } else {
+    const lower = t.toLocaleLowerCase('tr-TR');
+    const vs = lower.match(/[aeıioöuü]/g);
+    vowel = vs ? vs[vs.length - 1]! : 'e';
+    consonant = !/[aeıioöuü]$/.test(lower);
+  }
+  const a = back(vowel) ? 'a' : 'e';
+  return `${t}'${consonant ? '' : 'y'}${a}`;
+}
+
 /** "2026-10-29" → "29 Ekim Perşembe" */
 export function dayTitle(iso: string, opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', weekday: 'long' }): string {
   return new Intl.DateTimeFormat('tr-TR', { ...opts, timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));

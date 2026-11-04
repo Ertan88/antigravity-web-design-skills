@@ -1,29 +1,13 @@
 import { View } from 'react-native';
-import { useSchoolQuery } from '../src/data.ts';
+import { useEvents, useExams } from '../src/data.ts';
 import { clock, fullDate, localIso } from '../src/day.ts';
 import { colors } from '../src/theme.ts';
 import { Card, Empty, ErrorNote, Loading, Screen, SectionTitle, T } from '../src/ui.tsx';
 
-interface Exam {
-  id: string;
-  title: string;
-  examAt: string;
-  isActive: boolean;
-}
-interface SchoolEvent {
-  id: string;
-  title: string;
-  organizer: string | null;
-  date: string;
-  time: string | null;
-  place: string | null;
-  isActive: boolean;
-}
-
 /** Sınavlar ve etkinlikler: panodaki sınav sayacı ve etkinlik takviminin yaklaşan kayıtları */
 export default function Yaklasanlar() {
-  const exams = useSchoolQuery<Exam[]>('exams');
-  const events = useSchoolQuery<SchoolEvent[]>('events');
+  const exams = useExams();
+  const events = useEvents();
   const now = Date.now();
   const today = localIso();
   const upcomingExams = (exams.data ?? []).filter((e) => e.isActive && Date.parse(e.examAt) >= now).sort((a, b) => a.examAt.localeCompare(b.examAt));

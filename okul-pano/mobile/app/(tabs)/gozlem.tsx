@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../../src/api.ts';
 import { useAuth, useSchoolPath } from '../../src/auth.tsx';
 import { useConductAlerts, useConductClass, useConductClasses, useMeToday, useNow, type ConductCriterion, type ConductGroup } from '../../src/data.ts';
-import { teacherDay } from '../../src/day.ts';
+import { classLabel, teacherDay } from '../../src/day.ts';
 import { Text, TextInput } from '../../src/text.tsx';
 import { colors, radius, tiles } from '../../src/theme.ts';
 import { Sheet } from '../../src/sheet.tsx';
@@ -89,7 +89,7 @@ export default function Gozlem() {
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={{ color: tiles.ink.sub, fontSize: 12.5, fontWeight: '700' }}>{isLesson ? `Şu an · ${lesson!.period.no}. ders` : 'Sınıf'}</Text>
           <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800', letterSpacing: -0.6 }} numberOfLines={1}>
-            {s ? `${s.class.name}${isLesson ? ` · ${lesson!.subject}` : ''}` : classes.isLoading ? '…' : 'Sınıf seçin'}
+            {s ? `${classLabel(s.class.name)}${isLesson ? ` · ${lesson!.subject}` : ''}` : classes.isLoading ? '…' : 'Sınıf seçin'}
           </Text>
         </View>
         <Pressable accessibilityRole="button" onPress={() => setPicking(true)} style={{ backgroundColor: tiles.ink.chip, borderRadius: radius.pill, paddingHorizontal: 13, paddingVertical: 8 }}>
@@ -191,7 +191,7 @@ export default function Gozlem() {
         criteria={s?.criteria ?? []}
         names={chosen.map((c) => c.fullName)}
         net={chosen.length === 1 ? chosen[0]!.net : null}
-        className={s?.class.name ?? ''}
+        className={classLabel(s?.class.name ?? '')}
         onClose={() => setSheet(false)}
         onSave={async (criterion, note) => {
           const r = await api<{ batchId: string; count: number; label: string; points: number; names: string[] }>(`${path}/entries`, {
@@ -287,7 +287,7 @@ function ClassPicker({
               style={{ minWidth: 76, paddingHorizontal: 14, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? colors.primary : colors.primarySoft }}
             >
               <Text style={{ fontSize: 14, fontWeight: '800', color: on ? colors.onPrimary : colors.ink }}>
-                {c.name}
+                {classLabel(c.name)}
                 {c.id === lessonClassId ? ' · şimdi' : ''}
               </Text>
             </Pressable>
