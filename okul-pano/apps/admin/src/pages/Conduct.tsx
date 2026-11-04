@@ -119,6 +119,23 @@ function Avatar({ name, size = 'size-10' }: { name: string; size?: string }) {
 
 /* ---------- Öğrenci kartı (panel) ---------- */
 
+/** Mobildeki gibi Akademik, Davranış, Sosyal başlıkları altında; boş grup yazılmaz */
+function GroupedRows<T extends { group: ConductGroup }>({ items, render }: { items: T[]; render: (item: T) => React.ReactNode }) {
+  return (
+    <div className="space-y-3">
+      {(Object.keys(CONDUCT_GROUPS) as ConductGroup[])
+        .map((g) => ({ g, list: items.filter((i) => i.group === g) }))
+        .filter((x) => x.list.length)
+        .map(({ g, list }) => (
+          <div key={g}>
+            <div className="mb-1.5 text-[11px] font-extrabold tracking-wider text-slate-500">{CONDUCT_GROUPS[g].toLocaleUpperCase("tr-TR")}</div>
+            <div className="flex flex-wrap gap-1.5">{list.map(render)}</div>
+          </div>
+        ))}
+    </div>
+  );
+}
+
 function StudentCard({ studentId, month, criteria, onClose, readOnly }: { studentId: string | null; month: string; criteria: Criterion[]; onClose: () => void; readOnly?: boolean }) {
   const { schoolId, can } = useAuth();
   const path = useSchoolPath('conduct');
@@ -176,21 +193,23 @@ function StudentCard({ studentId, month, criteria, onClose, readOnly }: { studen
           {d.byCriterion.length > 0 && (
             <div>
               <div className="mb-2 text-sm font-extrabold">Kriterlere göre</div>
-              <div className="flex flex-wrap gap-1.5">
-                {d.byCriterion.map((c) => (
+              <GroupedRows
+                items={d.byCriterion}
+                render={(c) => (
                   <span key={`${c.label}${c.points}`} className={clsx('rounded-full px-3 py-1 text-xs font-bold', c.points > 0 ? 'bg-tile-mint text-tile-mint-ink' : 'bg-tile-rose text-tile-rose-ink')}>
                     {signed(c.points)} {c.label} · {c.count}×
                   </span>
-                ))}
-              </div>
+                )}
+              />
             </div>
           )}
 
           {!readOnly && (
           <div className="rounded-3xl p-4 ring-1 ring-slate-200">
             <div className="mb-2 text-sm font-extrabold">Puan ver</div>
-            <div className="flex flex-wrap gap-1.5">
-              {criteria.map((c) => (
+            <GroupedRows
+              items={criteria}
+              render={(c) => (
                 <button
                   key={c.id}
                   type="button"
@@ -203,9 +222,9 @@ function StudentCard({ studentId, month, criteria, onClose, readOnly }: { studen
                 >
                   {signed(c.points)} {c.label}
                 </button>
-              ))}
-              {!criteria.length && <span className="text-sm text-slate-500">Bu düzey için kriter yok (Gözlem Kriterleri).</span>}
-            </div>
+              )}
+            />
+            {!criteria.length && <span className="text-sm text-slate-500">Bu düzey için kriter yok (Gözlem Kriterleri).</span>}
             {picked && (
               <div className="mt-3 flex gap-2">
                 <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={picked.noteRequired ? 'Not (zorunlu)' : 'Not (isteğe bağlı)'} maxLength={200} />
@@ -228,7 +247,7 @@ function StudentCard({ studentId, month, criteria, onClose, readOnly }: { studen
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-bold">{e.label}</div>
                       <div className="truncate text-xs text-slate-500">
-                        {e.mine ? 'Siz' : (e.userName ?? 'Bir öğretmen')}
+                        {e.mine ? 'Siz' : (e.userName ?? 'Bir öğretmen')} · {CONDUCT_GROUPS[e.group]}
                         {e.note ? ` · “${e.note}”` : ''}
                       </div>
                     </div>
