@@ -23,7 +23,7 @@ import {
 } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { BellRing, CopyPlus, Pencil, Plus, Trash2, Wand2 } from 'lucide-react';
+import { BellRing, Coffee, CopyPlus, Pencil, Plus, Trash2, Utensils, Wand2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Alert, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Spinner } from '../components/ui.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -32,7 +32,7 @@ import { useAuth } from '../lib/auth.tsx';
 import { useList, useResource, useSchool, useSchoolPath, type BellSchedule, type ClassGroup, type TimetableEntry } from '../lib/data.ts';
 import { useForm } from '../lib/form.ts';
 import { BellClassSettings } from './bell/BellPlan.tsx';
-import { BellTag, DayFlow, NowCards, WeekStrip, type FlowBell, type OverrideRow } from './bell/DayFlow.tsx';
+import { BellTag, DayFlow, NowCards, TimeBox, WeekStrip, type FlowBell, type OverrideRow } from './bell/DayFlow.tsx';
 import { useUpcomingHolidays, useWeekHolidays } from './bell/HolidaysCard.tsx';
 import { shortDate, useNow } from './bell/ScheduleView.tsx';
 
@@ -81,18 +81,45 @@ function Editor({ form, classes, lunchThresholdMin }: { form: ReturnType<typeof 
   const [gen, setGen] = useState(() => ({ ...(v.periods.length ? deriveRule(v.periods) : defaultGen), count: Number(v.lessonCount) || v.periods.length || defaultGen.count }));
   const [showGen, setShowGen] = useState(v.periods.length === 0);
 
-  /** i. dersten itibaren tüm derslerin başlangıç ve bitişini kaydırır */
-  const shiftFrom = (i: number, minutes: number) =>
-    set(
-      'periods',
-      v.periods.map((p, j) => (j >= i ? { ...p, start: addMinutes(p.start, minutes), end: addMinutes(p.end, minutes) } : p)),
-    );
-  const updatePeriod = (i: number, patch: Partial<Period>) => set('periods', v.periods.map((p, j) => (j === i ? { ...p, ...patch } : p)));
-  const addPeriod = () => {
-    const last = v.periods[v.periods.length - 1];
-    const no = (last?.no ?? 0) + 1;
-    set('periods', [...v.periods, { no, start: last?.end ?? '08:30', end: last?.end ?? '09:10', label: null }]);
+  // Ders listesi her zaman saate göre sıralı ve 1'den numaralı: adlar "1. Ders, 2. Ders…" (elle yazılmaz)
+  const lessons = sortPeriods(v.periods);
+  const commit = (list: Period[]) => {
+    const next = sortPeriods(list).map((p, i) => ({ ...p, no: i + 1 }));
+    // "Kaç derslik gün" ders sayısını izliyorsa birlikte güncellenir
+    if (v.lessonCount === '' || Number(v.lessonCount) === lessons.length) set('lessonCount', next.length || '');
+    set('periods', next);
   };
+  const len = (p: Period) => minutesBetween(p.start, p.end);
+  const gapAfter = (i: number) => (lessons[i + 1] ? minutesBetween(lessons[i]!.end, lessons[i + 1]!.start) : null);
+  /** i. dersten itibaren bütün dersleri kaydırır */
+  const shiftFrom = (i: number, minutes: number) =>
+    commit(lessons.map((p, j) => (j >= i ? { ...p, start: addMinutes(p.start, minutes), end: addMinutes(p.end, minutes) } : p)));
+  const updatePeriod = (i: number, patch: Partial<Period>) => commit(lessons.map((p, j) => (j === i ? { ...p, ...patch } : p)));
+  /**
+   * i. dersten sonra yeni ders (i = -1: liste boş): süresi önceki dersin süresi, önündeki ara önceki teneffüs (öğle arası
+   * değil); eski ara yeni dersin arkasında kalır, sonraki dersler kayar. Liste boşsa 08:30, 40 dk.
+   */
+  const newAfter = (i: number): Period => {
+    const prev = lessons[i];
+    if (!prev) return { no: 1, start: '08:30', end: '09:10', label: null };
+    const before = i > 0 ? minutesBetween(lessons[i - 1]!.end, prev.start) : null;
+    const after = gapAfter(i);
+    const brk = before ?? (after !== null && lessons[i + 1]!.no !== lunchNo ? after : null) ?? defaultGen.breakMin;
+    const start = addMinutes(prev.end, brk);
+    return { no: i + 2, start, end: addMinutes(start, len(prev)), label: null };
+  };
+  const insertAfter = (i: number) => {
+    const added = newAfter(i);
+    const push = i >= 0 ? minutesBetween(lessons[i]!.end, added.end) : 0;
+    commit([...lessons.slice(0, i + 1), added, ...lessons.slice(i + 1).map((p) => ({ ...p, start: addMinutes(p.start, push), end: addMinutes(p.end, push) }))]);
+  };
+  /** Dersi siler; sonraki dersler önündeki arayla birlikte yukarı kayar (öğle arası korunur) */
+  const removeAt = (i: number) => {
+    const p = lessons[i]!;
+    const pull = i > 0 ? minutesBetween(lessons[i - 1]!.end, p.end) : lessons[i + 1] ? minutesBetween(p.start, lessons[i + 1]!.start) : 0;
+    commit([...lessons.slice(0, i), ...lessons.slice(i + 1).map((x) => ({ ...x, start: addMinutes(x.start, -pull), end: addMinutes(x.end, -pull) }))]);
+  };
+  const nextNew = newAfter(lessons.length - 1);
 
   return (
     <div className="space-y-5">
@@ -162,62 +189,74 @@ function Editor({ form, classes, lunchThresholdMin }: { form: ReturnType<typeof 
       </div>
 
       <div>
-        <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-medium text-slate-700">Ders saatleri</span>
-          <Button size="sm" variant="secondary" icon={<Plus className="size-3.5" />} onClick={addPeriod}>
-            Ders ekle
-          </Button>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <span className="text-sm font-semibold text-ink">Ders saatleri</span>
+          <span className="text-xs text-slate-500">Aranın süresini değiştirince sonraki dersler birlikte kayar</span>
         </div>
         {errors.periods && (
           <div className="mb-2">
             <Alert tone="red">{errors.periods}</Alert>
           </div>
         )}
-        <div className="space-y-1.5">
-          {v.periods.map((p, i) => {
-            const next = v.periods[i + 1];
-            const gap = next ? minutesBetween(p.end, next.start) : null;
+        <div className="space-y-1">
+          {lessons.map((p, i) => {
+            const gap = gapAfter(i);
+            const lunch = lessons[i + 1]?.no === lunchNo;
             return (
-              <div key={i}>
-                <div className="grid grid-cols-[3.5rem_1fr_1fr_1.4fr_auto] items-center gap-2">
-                  <Input type="number" min={1} max={30} value={p.no} onChange={(e) => updatePeriod(i, { no: Number(e.target.value) })} aria-label="Ders no" />
-                  <Input type="time" value={p.start} onChange={(e) => updatePeriod(i, { start: e.target.value })} aria-label="Başlangıç" />
-                  <Input type="time" value={p.end} onChange={(e) => updatePeriod(i, { end: e.target.value })} aria-label="Bitiş" />
-                  <Input value={p.label ?? ''} onChange={(e) => updatePeriod(i, { label: e.target.value || null })} placeholder={`${p.no}. Ders`} aria-label="Etiket" />
-                  <IconButton label="Sil" onClick={() => set('periods', v.periods.filter((_, j) => j !== i))}>
+              <div key={`${i}-${p.start}`}>
+                <div className="flex items-center gap-2">
+                  <span className="w-[5.5rem] shrink-0 rounded-lg bg-slate-100 py-1.5 text-center text-sm font-bold text-ink">{i + 1}. Ders</span>
+                  <TimeBox value={p.start} onChange={(t) => updatePeriod(i, { start: t })} label={`${i + 1}. ders başlangıç`} className="w-[4.6rem] rounded-lg border border-slate-200 bg-surface px-2 py-1.5 text-center text-sm font-bold text-ink tabular-nums" />
+                  <span className="text-slate-400">–</span>
+                  <TimeBox value={p.end} onChange={(t) => updatePeriod(i, { end: t })} label={`${i + 1}. ders bitiş`} className="w-[4.6rem] rounded-lg border border-slate-200 bg-surface px-2 py-1.5 text-center text-sm font-bold text-ink tabular-nums" />
+                  <span className="w-12 text-xs font-semibold text-slate-400 tabular-nums">{len(p)} dk</span>
+                  <span className="flex-1" />
+                  <IconButton label={`${i + 1}. dersi sil`} onClick={() => removeAt(i)}>
                     <Trash2 className="size-4" />
                   </IconButton>
                 </div>
                 {gap !== null && (
-                  <div className="flex items-center gap-2 py-1 pl-16 text-xs text-slate-500">
-                    <span className="min-w-28">
-                      {next?.no === lunchNo ? 'Öğle arası' : 'Teneffüs'} · <span className="font-semibold text-slate-700 tabular-nums">{gap} dk</span>
+                  <div
+                    className={clsx(
+                      'my-1 ml-[6rem] flex items-center gap-2 rounded-xl py-1 pr-1.5 pl-3 text-xs font-semibold',
+                      lunch ? 'bg-tile-sun text-tile-sun-ink' : 'bg-tile-mint text-tile-mint-ink',
+                    )}
+                  >
+                    {lunch ? <Utensils className="size-3.5" /> : <Coffee className="size-3.5" />}
+                    <span className="w-20">{lunch ? 'Öğle arası' : 'Teneffüs'}</span>
+                    <span className="inline-flex items-center rounded-lg bg-surface/80 ring-1 ring-black/5">
+                      <button type="button" disabled={gap < 5} onClick={() => shiftFrom(i + 1, -5)} className="px-2 py-0.5 text-sm font-bold disabled:opacity-40" aria-label="Arayı 5 dakika kısalt">
+                        −
+                      </button>
+                      <span className="min-w-14 text-center font-bold tabular-nums">{gap} dk</span>
+                      <button type="button" onClick={() => shiftFrom(i + 1, 5)} className="px-2 py-0.5 text-sm font-bold" aria-label="Arayı 5 dakika uzat">
+                        +
+                      </button>
                     </span>
-                    {/* Arayı uzatıp kısaltır; sonraki tüm dersler birlikte kayar (ör. cuma namazı) */}
                     <button
                       type="button"
-                      disabled={gap < 5}
-                      onClick={() => shiftFrom(i + 1, -5)}
-                      className="rounded-md px-1.5 py-0.5 font-semibold text-slate-500 ring-1 ring-slate-200 hover:bg-slate-100 disabled:opacity-40"
-                      aria-label="Arayı 5 dakika kısalt"
+                      onClick={() => insertAfter(i)}
+                      className="ml-auto rounded-lg border border-dashed border-current/30 bg-surface/60 px-2 py-0.5 text-[11px] font-bold opacity-80 hover:opacity-100"
                     >
-                      −5
+                      + Araya ders
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => shiftFrom(i + 1, 5)}
-                      className="rounded-md px-1.5 py-0.5 font-semibold text-slate-500 ring-1 ring-slate-200 hover:bg-slate-100"
-                      aria-label="Arayı 5 dakika uzat"
-                    >
-                      +5
-                    </button>
-                    <span className="hidden text-[11px] text-slate-400 sm:inline">sonraki dersler kayar</span>
                   </div>
                 )}
               </div>
             );
           })}
-          {v.periods.length === 0 && <p className="py-4 text-center text-sm text-slate-500">Henüz ders saati yok. Otomatik oluşturun ya da tek tek ekleyin.</p>}
+          <button
+            type="button"
+            onClick={() => insertAfter(lessons.length - 1)}
+            className="mt-2 flex w-full items-center justify-between gap-3 rounded-xl border-2 border-dashed border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <Plus className="size-4" /> Ders ekle
+            </span>
+            <span className="text-xs font-medium text-slate-400">
+              {lessons.length + 1}. Ders {nextNew.start} – {nextNew.end} olarak eklenir
+            </span>
+          </button>
         </div>
       </div>
     </div>

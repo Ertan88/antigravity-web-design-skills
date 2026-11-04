@@ -544,7 +544,8 @@ export function DayFlow({
 }
 
 /** 24 saatlik saat kutusu (SS:DD): tarayıcı diline bağlı 12 saat biçimi olmasın diye düz yazı; geçerli olunca uygulanır */
-function TimeBox({ value, onChange, label, small }: { value: string; onChange: (v: string) => void; label: string; small?: boolean }) {
+/** 24 saat biçiminde saat kutusu ("0830", "8.30" de olur); Enter ya da odaktan çıkınca kaydedilir */
+export function TimeBox({ value, onChange, label, small, className }: { value: string; onChange: (v: string) => void; label: string; small?: boolean; className?: string }) {
   const [text, setText] = useState(value);
   useEffect(() => setText(value), [value]);
   const commit = () => {
@@ -562,7 +563,7 @@ function TimeBox({ value, onChange, label, small }: { value: string; onChange: (
       onChange={(e) => setText(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-      className={clsx('w-[3.6rem] rounded-md border border-slate-200 bg-surface px-1.5 text-right tabular-nums', small ? 'mt-0.5 text-xs text-slate-500' : 'text-sm font-bold text-ink')}
+      className={className ?? clsx('w-[3.6rem] rounded-md border border-slate-200 bg-surface px-1.5 text-right tabular-nums', small ? 'mt-0.5 text-xs text-slate-500' : 'text-sm font-bold text-ink')}
     />
   );
 }
