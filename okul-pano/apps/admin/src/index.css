@@ -210,3 +210,117 @@
 input[list]::-webkit-calendar-picker-indicator {
   display: none !important;
 }
+
+/*
+ * Açılır kutular: tarayıcının kendi okunu kaldırıp sağda düzgün aralıklı ince bir ok çizilir (her tarayıcıda aynı).
+ * Destekleyen tarayıcılarda (Chrome/Edge 135+, Android Chrome) açılan liste de özelleştirilir: yuvarlak köşeli kart,
+ * gölge, seçenek satırlarında üzerine gelince zemin ve seçili seçenekte tik. Desteklemeyenlerde (Safari, Firefox)
+ * sistemin kendi listesi açılır.
+ */
+select:not([multiple]) {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2378716c' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  background-size: 1rem 1rem;
+  padding-right: 2.5rem !important;
+  cursor: pointer;
+}
+.dark select:not([multiple]) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b0a9a1' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+select:not([multiple]):disabled {
+  cursor: default;
+}
+
+@supports (appearance: base-select) {
+  select:not([multiple]),
+  select:not([multiple])::picker(select) {
+    appearance: base-select;
+  }
+  select:not([multiple]) {
+    background-image: none !important;
+    padding-right: 0.85rem !important;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .dark select:not([multiple]) {
+    background-image: none !important;
+  }
+  /* Kutunun içindeki seçili metin taşarsa üç noktayla kısalır */
+  select:not([multiple]) > button selectedcontent,
+  select:not([multiple]) selectedcontent {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  select:not([multiple])::picker-icon {
+    content: '';
+    width: 1rem;
+    height: 1rem;
+    margin-left: auto;
+    flex: none;
+    background-color: var(--color-slate-500);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+    transition: rotate 0.2s ease;
+  }
+  select:not([multiple]):open::picker-icon {
+    rotate: 180deg;
+  }
+  select:not([multiple])::picker(select) {
+    margin-top: 6px;
+    padding: 6px;
+    border: 1px solid var(--color-slate-200);
+    border-radius: 16px;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    box-shadow: 0 18px 40px -16px rgb(0 0 0 / 0.35), 0 2px 6px rgb(0 0 0 / 0.06);
+    max-height: min(22rem, 60vh);
+    overflow-y: auto;
+    min-width: anchor-size(width);
+  }
+  select:not([multiple]) option {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 0.75rem;
+    border-radius: 10px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-ink);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  select:not([multiple]) option:hover,
+  select:not([multiple]) option:focus-visible {
+    background: var(--color-slate-100);
+    outline: none;
+  }
+  select:not([multiple]) option:checked {
+    font-weight: 700;
+    background: var(--color-slate-100);
+  }
+  select:not([multiple]) option::checkmark {
+    order: 1;
+    margin-left: auto;
+    content: '✓';
+    font-weight: 800;
+    color: var(--color-ink);
+  }
+  select:not([multiple]) option:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  select:not([multiple]) optgroup {
+    padding-top: 0.25rem;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-slate-500);
+  }
+}

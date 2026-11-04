@@ -146,7 +146,7 @@ export function Textarea({ className, invalid, ...rest }: TextareaHTMLAttributes
 
 export function Select({ className, invalid, children, ...rest }: SelectHTMLAttributes<HTMLSelectElement> & { invalid?: boolean }) {
   return (
-    <select className={clsx(control, 'h-10 pr-8', invalid && 'ring-red-400', className)} {...rest}>
+    <select className={clsx(control, 'h-10', invalid && 'ring-red-400', className)} {...rest}>
       {children}
     </select>
   );
