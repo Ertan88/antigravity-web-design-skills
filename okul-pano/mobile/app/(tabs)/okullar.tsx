@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { api } from '../../src/api.ts';
+import { splitSchoolName } from '@okulpano/shared/schoolName';
 import { usePlatformSchools, type PlatformSchool } from '../../src/data.ts';
 import { fullDate } from '../../src/day.ts';
 import { useOpenSchool } from '../../src/platform.tsx';
@@ -28,6 +29,9 @@ function planTone(plan: Plan | 'off') {
   return { bg, fg };
 }
 
+/** Okul adı ve türü: ayarlardaki tür, yoksa addaki tür ekinden ("… MTAL" → Mesleki ve Teknik Anadolu Lisesi) */
+const nameParts = (s: PlatformSchool) => splitSchoolName(s.name, s.settings?.schoolType);
+
 const daysLeft = (iso: string | null) => (iso ? Math.ceil((Date.parse(iso) - Date.now()) / 86400_000) : null);
 const initials = (name: string) =>
   name
@@ -46,7 +50,7 @@ export default function Abonelikler() {
   const needle = q.trim().toLocaleLowerCase('tr-TR');
   const match = (s: PlatformSchool, f: Filter) =>
     f === 'all' || (f === 'trial' ? s.plan === 'trial' && s.isActive : f === 'paid' ? s.plan !== 'trial' && s.isActive : !s.isActive);
-  const list = all.filter((s) => (!needle || `${s.name} ${s.city ?? ''}`.toLocaleLowerCase('tr-TR').includes(needle)) && match(s, filter));
+  const list = all.filter((s) => (!needle || `${s.name} ${nameParts(s).type ?? ''} ${s.city ?? ''}`.toLocaleLowerCase('tr-TR').includes(needle)) && match(s, filter));
   const active = all.filter((s) => s.isActive);
   const screens = active.reduce((n, s) => n + s.screenCount, 0);
   const current = all.find((s) => s.id === open) ?? null;
@@ -91,27 +95,36 @@ export default function Abonelikler() {
 function SchoolRow({ s, last, onPress }: { s: PlatformSchool; last: boolean; onPress: () => void }) {
   const left = s.plan === 'trial' ? daysLeft(s.trialEndsAt) : null;
   const tone = planTone(s.isActive ? s.plan : 'off');
+  const parts = nameParts(s);
   const badge = !s.isActive ? 'Kapalı' : left != null ? `${PLAN[s.plan]} · ${left < 0 ? 'bitti' : `${left} g`}` : PLAN[s.plan];
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${s.name}, ${badge}`}
       onPress={onPress}
-      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, borderBottomWidth: last ? 0 : 1, borderBottomColor: colors.divider, opacity: pressed ? 0.7 : 1 })}
+      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: last ? 0 : 1, borderBottomColor: colors.divider, opacity: pressed ? 0.7 : 1 })}
     >
       <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: planTone(s.plan).bg, alignItems: 'center', justifyContent: 'center' }}>
         <Text style={{ fontSize: 14, fontWeight: '800', color: planTone(s.plan).fg }}>{initials(s.name)}</Text>
       </View>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ fontSize: 14.5, fontWeight: '800', color: colors.ink }} numberOfLines={1}>
-          {s.name}
+      {/* Ad tam görünsün diye paket rozeti alt satırda */}
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        <Text style={{ fontSize: 14.5, fontWeight: '800', color: colors.ink, lineHeight: 19 }} numberOfLines={2}>
+          {parts.name}
         </Text>
-        <Text style={{ fontSize: 12.5, fontWeight: '600', color: colors.faint }} numberOfLines={1}>
-          {[s.city, `${s.screenCount}/${s.maxScreens} pano`, s.member ? 'üyesiniz' : null].filter(Boolean).join(' · ')}
-        </Text>
-      </View>
-      <View style={{ paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999, backgroundColor: tone.bg }}>
-        <Text style={{ fontSize: 11.5, fontWeight: '800', color: left != null && left < 7 && s.isActive ? (dark ? '#fecaca' : '#b91c1c') : tone.fg }}>{badge}</Text>
+        {parts.type && (
+          <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.muted }} numberOfLines={2}>
+            {parts.type}
+          </Text>
+        )}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 }}>
+          <View style={{ paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999, backgroundColor: tone.bg }}>
+            <Text style={{ fontSize: 11.5, fontWeight: '800', color: left != null && left < 7 && s.isActive ? (dark ? '#fecaca' : '#b91c1c') : tone.fg }}>{badge}</Text>
+          </View>
+          <Text style={{ flex: 1, fontSize: 12.5, fontWeight: '600', color: colors.faint }} numberOfLines={1}>
+            {[s.city, `${s.screenCount}/${s.maxScreens} pano`, s.member ? 'üyesiniz' : null].filter(Boolean).join(' · ')}
+          </Text>
+        </View>
       </View>
       <Icon name="chevron-forward" size={16} color={colors.subtle} />
     </Pressable>
@@ -146,9 +159,12 @@ function SchoolSheet({ s, onClose }: { s: PlatformSchool; onClose: () => void })
             <Text style={{ fontSize: 15, fontWeight: '800', color: tone.fg }}>{initials(s.name)}</Text>
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={{ fontSize: 17, fontWeight: '800', color: colors.ink }} numberOfLines={2}>
-              {s.name}
-            </Text>
+            <Text style={{ fontSize: 17, fontWeight: '800', color: colors.ink }}>{nameParts(s).name}</Text>
+            {nameParts(s).type && (
+              <T size={13} weight="700" color={colors.muted}>
+                {nameParts(s).type}
+              </T>
+            )}
             <T size={12.5} color={colors.faint}>
               {[s.city, `kayıt ${fullDate(s.createdAt).replace(/\s\S+$/, '')}`, `${s.screenCount}/${s.maxScreens} pano`].filter(Boolean).join(' · ')}
             </T>
@@ -178,7 +194,7 @@ function SchoolSheet({ s, onClose }: { s: PlatformSchool; onClose: () => void })
             <View style={{ flex: 1 }}>
               {label('DENEME')}
               <T size={14} weight="800" color={left != null && left < 7 ? colors.danger : colors.ink}>
-                {s.trialEndsAt ? (left != null && left < 0 ? `${fullDate(s.trialEndsAt)} bitti` : `${fullDate(s.trialEndsAt)} · ${left} gün`) : 'Bitiş tarihi yok'}
+                {s.trialEndsAt ? (left != null && left < 0 ? `${fullDate(s.trialEndsAt).replace(/\s\S+$/, '')} bitti` : `${fullDate(s.trialEndsAt).replace(/\s\S+$/, '')} · ${left} gün`) : 'Bitiş tarihi yok'}
               </T>
             </View>
             {[7, 30].map((d) => (

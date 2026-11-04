@@ -306,6 +306,7 @@ export interface PlatformSchool {
   id: string;
   name: string;
   slug: string;
+  settings?: { schoolType?: string };
   city: string | null;
   plan: 'trial' | 'basic' | 'pro';
   maxScreens: number;
