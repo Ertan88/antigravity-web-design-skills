@@ -11,7 +11,7 @@ import { EmergencyBanner, EmergencyButton } from './Emergency.tsx';
 import { WelcomeDialog } from './Onboarding.tsx';
 import { TrialBanner } from './TrialBanner.tsx';
 import { NotificationBell } from './Notifications.tsx';
-import { Spinner } from './ui.tsx';
+import { Select, Spinner } from './ui.tsx';
 
 function SchoolSwitcher() {
   const { me, school, setSchoolId } = useAuth();
@@ -32,9 +32,10 @@ function SchoolSwitcher() {
     <label className="relative flex items-center gap-3 rounded-2xl bg-surface p-2.5 ring-1 ring-slate-200 transition hover:ring-slate-300 focus-within:ring-ink">
       {body}
       <ChevronsUpDown className="size-4 text-slate-400" />
-      <select
+      <Select
+        plain
         aria-label="Okul seç"
-        className="absolute inset-0 cursor-pointer opacity-0"
+        className="absolute inset-0 opacity-0"
         value={school?.id ?? ''}
         onChange={(e) => setSchoolId(e.target.value)}
       >
@@ -43,7 +44,7 @@ function SchoolSwitcher() {
             {s.support ? `${s.name} (destek erişimi)` : s.name}
           </option>
         ))}
-      </select>
+      </Select>
     </label>
   );
 }

@@ -15,7 +15,7 @@ import {
 } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { ArrowUpRight, Check, ClipboardCheck, Download, FileSpreadsheet, Gauge, HeartHandshake, Pencil, Plus, Star, Undo2 } from 'lucide-react';
+import { ArrowUpRight, Check, ClipboardCheck, Download, FileSpreadsheet, Gauge, HeartHandshake, Pencil, Plus, Star, Undo2, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Select, Spinner, Table, Td, Textarea, Toggle } from '../components/ui.tsx';
@@ -133,6 +133,71 @@ function GroupedRows<T extends { group: ConductGroup }>({ items, render }: { ite
           </div>
         ))}
     </div>
+  );
+}
+
+/** Seçilen öğrencilere (ya da bütün sınıfa) aynı kriterle birlikte puan verilir */
+function BulkGive({ names, studentIds, className, criteria, onClose, onDone }: { names: string[]; studentIds: string[]; className: string; criteria: Criterion[]; onClose: () => void; onDone: () => void }) {
+  const { schoolId } = useAuth();
+  const path = useSchoolPath('conduct');
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [pick, setPick] = useState<string | null>(null);
+  const [note, setNote] = useState('');
+  const picked = criteria.find((c) => c.id === pick);
+  const give = useMutation({
+    mutationFn: () => api<{ count: number; label: string; points: number }>(`${path}/entries`, { method: 'POST', body: { studentIds, criterionId: pick, note: note || null } }),
+    onSuccess: (r) => {
+      toast.success(`${r.count} öğrenciye ${signed(r.points)} ${r.label}`);
+      void qc.invalidateQueries({ queryKey: [schoolId, 'conduct'] });
+      onDone();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      size="lg"
+      title={`${studentIds.length} öğrenciye puan ver`}
+      description={`${className} · ${names.slice(0, 6).join(', ')}${names.length > 6 ? ` ve ${names.length - 6} öğrenci daha` : ''}`}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Vazgeç
+          </Button>
+          <Button loading={give.isPending} disabled={!picked || (picked.noteRequired && !note.trim())} onClick={() => give.mutate()}>
+            {picked ? `${studentIds.length} öğrenciye ${signed(picked.points)} ${picked.label}` : 'Kriter seçin'}
+          </Button>
+        </>
+      }
+    >
+      {criteria.length ? (
+        <GroupedRows
+          items={criteria}
+          render={(c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => setPick(pick === c.id ? null : c.id)}
+              className={clsx(
+                'rounded-full px-3 py-1.5 text-xs font-bold transition',
+                c.points > 0 ? 'bg-tile-mint text-tile-mint-ink' : 'bg-tile-rose text-tile-rose-ink',
+                pick === c.id && 'ring-2 ring-ink',
+              )}
+            >
+              {signed(c.points)} {c.label}
+            </button>
+          )}
+        />
+      ) : (
+        <p className="text-sm text-slate-500">Bu düzey için kriter yok (Gözlem Kriterleri).</p>
+      )}
+      <div className="mt-4">
+        <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={picked?.noteRequired ? 'Not (zorunlu)' : 'Not (isteğe bağlı)'} maxLength={200} />
+        {picked?.noteRequired && !note.trim() && <div className="mt-2 text-xs font-semibold text-rose-600">"{picked.label}" için kısa bir not yazın.</div>}
+      </div>
+    </Modal>
   );
 }
 
@@ -351,7 +416,14 @@ export function ConductStudents() {
   const [month, setMonth] = useState(thisMonth());
   const [open, setOpen] = useState<string | null>(null);
   const classes = useQuery({ queryKey: [schoolId, 'conduct', 'classes'], queryFn: () => api<ConductClass[]>(`${path}/classes`) });
-  const [active, setClassId] = useConductClass(schoolId, classes.data);
+  const [active, setClassIdRaw] = useConductClass(schoolId, classes.data);
+  // Birkaç öğrenci ya da bütün sınıf seçilip birlikte puan verilir (mobildeki gibi)
+  const [selected, setSelected] = useState<string[]>([]);
+  const [bulk, setBulk] = useState(false);
+  const setClassId = (id: string) => {
+    setClassIdRaw(id);
+    setSelected([]);
+  };
   const screen = useQuery({
     queryKey: [schoolId, 'conduct', 'class', active, month],
     queryFn: () => api<ClassScreen>(`${path}/classes/${active}/students?month=${month}`),
@@ -380,9 +452,66 @@ export function ConductStudents() {
             ) : !s.students.length ? (
               <EmptyState icon={<ClipboardCheck className="size-6" />} title="Bu sınıfta öğrenci yok" />
             ) : (
-              <Table head={['Okul no', 'Ad soyad', 'Artı', 'Eksi', 'Net', '']}>
+              <>
+              <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-5 py-3">
+                <Button
+                  size="sm"
+                  icon={<Users className="size-4" />}
+                  onClick={() => {
+                    setSelected(s.students.map((x) => x.id));
+                    setBulk(true);
+                  }}
+                >
+                  Tüm sınıfa puan ver
+                </Button>
+                <span className="text-sm text-slate-500">
+                  {selected.length
+                    ? `${selected.length} öğrenci seçili`
+                    : 'Birkaç öğrenciye birlikte puan vermek için soldaki kutuları işaretleyin.'}
+                </span>
+                {selected.length > 0 && (
+                  <>
+                    <Button size="sm" variant="secondary" onClick={() => setSelected([])}>
+                      Seçimi temizle
+                    </Button>
+                    <Button size="sm" className="ml-auto" onClick={() => setBulk(true)}>
+                      {selected.length} öğrenciye puan ver
+                    </Button>
+                  </>
+                )}
+              </div>
+              <Table
+                head={[
+                  <input
+                    key="all"
+                    type="checkbox"
+                    aria-label="Bütün sınıfı seç"
+                    className="size-4 accent-ink"
+                    checked={selected.length === s.students.length}
+                    ref={(el) => {
+                      if (el) el.indeterminate = selected.length > 0 && selected.length < s.students.length;
+                    }}
+                    onChange={(e) => setSelected(e.target.checked ? s.students.map((x) => x.id) : [])}
+                  />,
+                  'Okul no',
+                  'Ad soyad',
+                  'Artı',
+                  'Eksi',
+                  'Net',
+                  '',
+                ]}
+              >
                 {s.students.map((st) => (
-                  <tr key={st.id} className="cursor-pointer hover:bg-slate-50" onClick={() => setOpen(st.id)}>
+                  <tr key={st.id} className={clsx('cursor-pointer hover:bg-slate-50', selected.includes(st.id) && 'bg-slate-50')} onClick={() => setOpen(st.id)}>
+                    <td className="w-10 py-3 pl-5 align-middle" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        aria-label={`${st.fullName} seç`}
+                        className="size-4 accent-ink"
+                        checked={selected.includes(st.id)}
+                        onChange={() => setSelected((cur) => (cur.includes(st.id) ? cur.filter((x) => x !== st.id) : [...cur, st.id]))}
+                      />
+                    </td>
                     <Td className="font-semibold text-slate-500 tabular-nums">{st.schoolNo}</Td>
                     <Td>
                       <span className="flex items-center gap-3 font-bold text-ink">
@@ -401,9 +530,23 @@ export function ConductStudents() {
                   </tr>
                 ))}
               </Table>
+              </>
             )}
           </Card>
         </div>
+      )}
+      {bulk && s && (
+        <BulkGive
+          names={s.students.filter((x) => selected.includes(x.id)).map((x) => x.fullName)}
+          studentIds={selected}
+          className={s.class.name}
+          criteria={s.criteria}
+          onClose={() => setBulk(false)}
+          onDone={() => {
+            setBulk(false);
+            setSelected([]);
+          }}
+        />
       )}
       <StudentCard studentId={open} month={month} criteria={s?.criteria ?? []} onClose={() => setOpen(null)} />
     </>

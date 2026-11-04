@@ -19,7 +19,7 @@ import clsx from 'clsx';
 import { BellRing, CalendarOff, Coffee, FastForward, Flag, Hand, Scissors, Sunrise, Sunset, Undo2, Utensils, Zap } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Button, Input, Toggle } from '../../components/ui.tsx';
+import { Button, Input, Select, Toggle } from '../../components/ui.tsx';
 import { shortDate } from './ScheduleView.tsx';
 
 /*
@@ -458,14 +458,14 @@ export function DayFlow({
             {bells.length > 1 && (
               <span className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-slate-600">
                 Hızlı işlemler:
-                <select value={scope} onChange={(e) => setScope(e.target.value)} className="rounded-full border border-slate-200 bg-surface px-2 py-1 text-xs font-bold">
+                <Select plain aria-label="Hızlı işlemlerin kapsamı" value={scope} onChange={(e) => setScope(e.target.value)} className="h-8 rounded-full border border-slate-200 bg-surface px-3 text-xs font-bold">
                   <option value="all">Herkes</option>
                   {bells.map((b) => (
                     <option key={b.target} value={b.target}>
                       {b.label}
                     </option>
                   ))}
-                </select>
+                </Select>
               </span>
             )}
           </div>

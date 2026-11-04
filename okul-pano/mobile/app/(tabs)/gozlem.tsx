@@ -82,7 +82,23 @@ export default function Gozlem() {
           <HeaderButton icon="speedometer-outline" label="Dönem göstergesi" onPress={() => router.push('/donem')} />
         </View>
       }
-      refreshing={screen.isRefetching} onRefresh={() => void screen.refetch()}>
+      refreshing={screen.isRefetching} onRefresh={() => void screen.refetch()}
+      // Birkaç kişi seçerken puan verme düğmesi ekranın altında sabit (liste uzunken de görünür)
+      footer={
+        multi ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !selected.length }}
+            disabled={!selected.length}
+            onPress={() => setSheet(true)}
+            style={{ height: 50, borderRadius: 25, backgroundColor: selected.length ? colors.primary : colors.borderStrong, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Text style={{ color: selected.length ? colors.onPrimary : colors.faint, fontSize: 15, fontWeight: '800' }}>
+              {selected.length ? `${selected.length} öğrenciye puan ver` : 'Öğrencilere dokunarak seçin'}
+            </Text>
+          </Pressable>
+        ) : undefined
+      }>
       <ErrorNote error={classes.error ?? screen.error} />
       {/* Sınıf: dersteyken ders programından; "Sınıf değiştir" ile okuldaki her sınıf seçilebilir */}
       <View style={{ backgroundColor: tiles.ink.bg, borderRadius: radius.lg, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -167,11 +183,6 @@ export default function Gozlem() {
         </T>
       )}
 
-      {multi && selected.length > 0 && (
-        <Pressable accessibilityRole="button" onPress={() => setSheet(true)} style={{ height: 50, borderRadius: 25, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ color: colors.onPrimary, fontSize: 15, fontWeight: '800' }}>{selected.length} öğrenciye puan ver</Text>
-        </Pressable>
-      )}
 
       <ClassPicker
         open={picking}

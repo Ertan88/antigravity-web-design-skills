@@ -5,7 +5,7 @@ import { Bus, Sunrise, Sunset, Utensils, Wand2 } from 'lucide-react';
 import { useState } from 'react';
 import { ExcelImportDialog, NewTeachersOption, type ImportPreview } from '../components/ExcelImportDialog.tsx';
 import { useToast } from '../components/Toast.tsx';
-import { Alert, Badge, Button, Card, EmptyState, Spinner } from '../components/ui.tsx';
+import { Alert, Badge, Button, Card, EmptyState, Select, Spinner } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useList, useSchool, useSchoolPath, type Duty, type Teacher } from '../lib/data.ts';
@@ -70,7 +70,8 @@ function TransportCell({
     <DayShell day={day} isToday={isToday} tone="amber" aside={<SaveMark state={state} />} holiday={holiday}>
       <div className="space-y-1">
         {Array.from({ length: Math.max(SLOTS, ids.length) }, (_, i) => (
-          <select
+          <Select
+            plain
             key={i}
             value={ids[i] ?? ''}
             disabled={!editable || i > ids.length}
@@ -96,7 +97,7 @@ function TransportCell({
                 </option>
               ))}
             </optgroup>
-          </select>
+          </Select>
         ))}
       </div>
     </DayShell>
