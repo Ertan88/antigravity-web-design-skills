@@ -35,12 +35,25 @@ export function gradeOf(className: string): number | null {
   return m ? Number(m[1]) : null;
 }
 
-/** Doğal sıralama: 9-A, 9-B, 10-A, 11-A… (alfabetik "10-A" < "9-A" hatası olmadan) */
+/**
+ * Doğal sıralama: 9-A, 9-B, 10-A, 11-A… (alfabetik "10-A" < "9-A" hatası olmadan). Aynı düzeyde öneksiz ve AMP
+ * (ana program) şubeleri birlikte, harf sırasıyla; ATP gibi diğer programlar ardından. Sayısız adlar en sonda.
+ */
 export function compareClassNames(a: string, b: string): number {
   const ga = gradeOf(a);
   const gb = gradeOf(b);
   if (ga !== null && gb !== null && ga !== gb) return ga - gb;
   if (ga === null !== (gb === null)) return ga === null ? 1 : -1;
+  const pa = parseClassName(a);
+  const pb = parseClassName(b);
+  if (pa && pb) {
+    const rank = (p: string | null) => (!p || p === 'AMP' ? '' : p);
+    const ra = rank(pa.program);
+    const rb = rank(pb.program);
+    if (ra !== rb) return ra === '' ? -1 : rb === '' ? 1 : ra.localeCompare(rb, 'tr');
+    const bySection = pa.section.localeCompare(pb.section, 'tr', { numeric: true, sensitivity: 'base' });
+    if (bySection) return bySection;
+  }
   return a.localeCompare(b, 'tr', { numeric: true, sensitivity: 'base' });
 }
 

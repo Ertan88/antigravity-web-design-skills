@@ -24,6 +24,7 @@ import {
   SCHOOL_LEVEL_KEYS,
   trCompare,
   type SchoolLevel,
+  compareClassNames,
 } from '@okulpano/shared';
 import { and, asc, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
@@ -87,6 +88,7 @@ async function schoolClasses(deps: AppDeps, schoolId: string) {
     .from(classGroups)
     .where(eq(classGroups.schoolId, schoolId))
     .orderBy(asc(classGroups.sortOrder), asc(classGroups.name));
+  rows.sort((a, b) => compareClassNames(a.name, b.name));
   const counts = new Map<SchoolLevel, number>();
   for (const r of rows) {
     const known = r.level ?? levelFromClassName(r.name);

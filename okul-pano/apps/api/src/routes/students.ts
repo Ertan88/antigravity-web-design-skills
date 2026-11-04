@@ -1,4 +1,4 @@
-import { normalizeClassName, normalizeName, studentImportSchema, studentSchema, trCompare, schoolFullName } from '@okulpano/shared';
+import { compareClassNames, normalizeClassName, normalizeName, studentImportSchema, studentSchema, trCompare, schoolFullName } from '@okulpano/shared';
 import { asc, eq } from 'drizzle-orm';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
@@ -25,6 +25,7 @@ async function loadClasses(db: DB | Tx, schoolId: string) {
     .from(classGroups)
     .where(eq(classGroups.schoolId, schoolId))
     .orderBy(asc(classGroups.sortOrder), asc(classGroups.name));
+  rows.sort((a, b) => compareClassNames(a.name, b.name));
   return { rows, byKey: new Map(rows.map((c) => [classKey(c.name), c])), byId: new Map(rows.map((c) => [c.id, c])) };
 }
 

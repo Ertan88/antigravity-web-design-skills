@@ -15,6 +15,11 @@ describe('sınıf kademesi', () => {
   it('doğal sıralar', () => {
     expect(['10-A', '9-B', 'Hazırlık', '9-A', '11-A', '10-B'].sort(compareClassNames)).toEqual(['9-A', '9-B', '10-A', '10-B', '11-A', 'Hazırlık']);
   });
+
+  it('öneksiz ve AMP şubeleri birlikte, diğer programlar ardından sıralar', () => {
+    const list = ['AMP 10-A', '9-C', 'ATP 9-A', 'AMP 9-B', '12-A', '9-A', 'ATP 9-B', '10-B', 'AMP 11-Ç', 'AMP 11-C'];
+    expect(list.sort(compareClassNames)).toEqual(['9-A', 'AMP 9-B', '9-C', 'ATP 9-A', 'ATP 9-B', 'AMP 10-A', '10-B', 'AMP 11-C', 'AMP 11-Ç', '12-A']);
+  });
 });
 
 describe('joinClassNames', () => {

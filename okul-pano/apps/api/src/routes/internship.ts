@@ -28,6 +28,7 @@ import {
   isInternshipSubject,
   vocationalLessonShare,
   parseClassName,
+  compareClassNames,
 } from '@okulpano/shared';
 import { and, asc, eq, gte, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
@@ -165,8 +166,7 @@ async function internStudents(deps: AppDeps, schoolId: string) {
   const num = (v: string) => (/^\d+$/.test(v) ? Number(v) : Number.MAX_SAFE_INTEGER);
   return rows.sort(
     (a, b) =>
-      (a.classOrder ?? 0) - (b.classOrder ?? 0) ||
-      trCompare(a.className ?? '', b.className ?? '') ||
+      compareClassNames(a.className ?? '', b.className ?? '') ||
       (a.listNo ?? 9999) - (b.listNo ?? 9999) ||
       num(a.schoolNo) - num(b.schoolNo) ||
       trCompare(a.fullName, b.fullName),
@@ -432,8 +432,7 @@ export async function internshipRoutes(app: FastifyInstance) {
       .sort(
         (a, b) =>
           Number(eligible.withLesson.has(b.classId!)) - Number(eligible.withLesson.has(a.classId!)) ||
-          (a.classOrder ?? 0) - (b.classOrder ?? 0) ||
-          trCompare(a.className ?? '', b.className ?? '') ||
+          compareClassNames(a.className ?? '', b.className ?? '') ||
           (a.listNo ?? 9999) - (b.listNo ?? 9999),
       )
       // KVKK: öğretmen başka işletmenin adını görmez, yalnızca "başka işletmede" bilgisini
@@ -441,7 +440,7 @@ export async function internshipRoutes(app: FastifyInstance) {
     const classes = eligible.classes
       .filter((c) => eligible.ids.has(c.id))
       .map((c) => ({ id: c.id, name: c.name, withLesson: eligible.withLesson.has(c.id) }))
-      .sort((a, b) => Number(b.withLesson) - Number(a.withLesson) || trCompare(a.name, b.name));
+      .sort((a, b) => Number(b.withLesson) - Number(a.withLesson) || compareClassNames(a.name, b.name));
     return { students: shown, classes, fallback: eligible.fallback };
   });
 

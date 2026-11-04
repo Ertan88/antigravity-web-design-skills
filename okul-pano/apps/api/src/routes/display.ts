@@ -1,4 +1,5 @@
 import {
+  compareClassNames,
   filterHeadlines,
   resolveLayout,
   resolveScreenDisplay,
@@ -291,7 +292,7 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
     ticker: tickerRows.map((t) => ({ id: t.id, text: t.text, startsAt: iso(t.startsAt), endsAt: iso(t.endsAt) })),
     bellSchedules: bellRows.map((b) => ({ id: b.id, name: b.name, weekdays: b.weekdays, periods: b.periods, sortOrder: b.sortOrder, lessonCount: b.lessonCount, shift: b.shift })),
     timetable: mergeCells(ttRows),
-    classes: classRows,
+    classes: [...classRows].sort((a, b) => compareClassNames(a.name, b.name)),
     achievements: achievementRows.map((a) => ({
       id: a.id,
       kind: a.kind,
@@ -417,7 +418,8 @@ function mergeCells(rows: { weekday: number; periodNo: number; className: string
     if (!cell.subjects.includes(r.subject)) cell.subjects.push(r.subject);
     if (r.teacherName && !cell.teachers.includes(r.teacherName)) cell.teachers.push(r.teacherName);
   }
-  return [...cells.values()].map((c) => ({
+  // Sınıf sırası: oluşturulma sırası (sortOrder) değil doğal sıra (9-A, 9-B, 10-A…)
+  return [...cells.values()].sort((a, b) => a.weekday - b.weekday || a.periodNo - b.periodNo || compareClassNames(a.className, b.className)).map((c) => ({
     weekday: c.weekday,
     periodNo: c.periodNo,
     className: c.className,

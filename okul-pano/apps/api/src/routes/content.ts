@@ -1,4 +1,5 @@
 import {
+  compareClassNames,
   achievementSchema,
   announcementSchema,
   bellScheduleSchema,
@@ -191,7 +192,9 @@ export async function contentRoutes(app: FastifyInstance) {
     table: classGroups,
     permission: 'directory.manage',
     schema: classGroupSchema,
-    orderBy: [asc(classGroups.sortOrder), asc(classGroups.name)],
+    // Doğal sıra (9-A, 9-B, 10-A…): sortOrder oluşturulma sırasını tutar, içe aktarımlarda karışabilir
+    list: async (req) =>
+      (await app.deps.db.select().from(classGroups).where(eq(classGroups.schoolId, req.ctx.schoolId))).sort((a, b) => compareClassNames(a.name, b.name)),
   });
 
   registerResource(app, {

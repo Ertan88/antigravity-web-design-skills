@@ -2,6 +2,7 @@ import {
   achievementDesign,
   announcementOnAir,
   addIsoDays,
+  compareClassNames,
   nextSchoolDay,
   boardBell,
   shortClassLabeler,
@@ -151,14 +152,16 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
   const bell = periods ? computeBellStatus(periods, today.secondsOfDay, s.lunchThresholdMin) : ({ kind: 'off' } as const);
   const lessonPeriod = bell.kind === 'lesson' ? bell.period : bell.kind === 'break' || bell.kind === 'before' ? bell.next : null;
   // O ders saatinde dersi olan sınıflar (dersleri bitmiş sınıflar listelenmez)
-  const lessons = (day.holiday ? [] : lessonsNow(timetable, today.isoDate, calendar, classInfo, dual, today.secondsOfDay, s.lunchThresholdMin)).map(withShort);
+  // Doğal sınıf sırası (9-A, 9-B, 10-A…); kısa ada çevirmeden önce sıralanır
+  const byClass = (x: { className: string }, y: { className: string }) => compareClassNames(x.className, y.className);
+  const lessons = (day.holiday ? [] : lessonsNow(timetable, today.isoDate, calendar, classInfo, dual, today.secondsOfDay, s.lunchThresholdMin)).sort(byClass).map(withShort);
   // Dersler bitince ya da tatilde: sonraki ders günü (bayram, hafta sonu ve köprü tatili atlanır)
   const nextDay = bell.kind === 'after' || bell.kind === 'off' ? nextSchoolDay(today.isoDate, calendar) : null;
   const nextFirst = nextDay?.periods[0] ?? null;
   const shiftOf = new Map(classInfo.map((c) => [c.id, classShift(c, dual)]));
   const nextLessons =
     nextDay && nextFirst
-      ? timetable.filter((e) => e.weekday === nextDay.weekday && e.periodNo === nextFirst.no && (shiftOf.get(e.classId ?? '') ?? 'morning') === 'morning').map(withShort)
+      ? timetable.filter((e) => e.weekday === nextDay.weekday && e.periodNo === nextFirst.no && (shiftOf.get(e.classId ?? '') ?? 'morning') === 'morning').sort(byClass).map(withShort)
       : [];
   const tomorrow = schoolDay(addIsoDays(today.isoDate, 1), calendar);
   const nextLabel = nextDay ? (nextDay.date === tomorrow.date ? 'Yarın' : dayLabel(nextDay.date)) : '';
