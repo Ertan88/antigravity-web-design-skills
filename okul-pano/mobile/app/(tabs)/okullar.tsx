@@ -14,7 +14,7 @@ import { Button, Card, Chip, confirm, Empty, ErrorNote, Icon, Loading, Screen, S
 /*
  * Abonelikler (platform yöneticisi): her okul tek satır (baş harf rozeti, ad, il, pano kullanımı, paket ve denemede
  * kalan gün). Satıra dokununca alttan pencere: paket, deneme uzatma (+7 / +30 gün), pano sınırı, Kaydet, Okulu aç,
- * Okulu kapat / yeniden aç.
+ * Aboneliği kapat (onaylı) / yeniden başlat.
  */
 
 type Plan = PlatformSchool['plan'];
@@ -131,7 +131,7 @@ function SchoolRow({ s, last, onPress }: { s: PlatformSchool; last: boolean; onP
   );
 }
 
-/** Okulun aboneliği: paket, deneme uzatma, pano sınırı; okulu aç, kapat / yeniden aç */
+/** Okulun aboneliği: paket, deneme uzatma, pano sınırı; okulu aç; aboneliği kapat / yeniden başlat */
 function SchoolSheet({ s, onClose }: { s: PlatformSchool; onClose: () => void }) {
   const qc = useQueryClient();
   const openSchool = useOpenSchool();
@@ -172,7 +172,7 @@ function SchoolSheet({ s, onClose }: { s: PlatformSchool; onClose: () => void })
         </View>
         {!s.isActive && (
           <T size={13} color={colors.danger} weight="700">
-            Okul kapalı: panolar ve panel girişi durdu.
+            Abonelik kapalı: panolar ve panel girişi durdu, veriler duruyor.
           </T>
         )}
 
@@ -244,17 +244,34 @@ function SchoolSheet({ s, onClose }: { s: PlatformSchool; onClose: () => void })
             </View>
           )}
         </View>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() =>
-            void (s.isActive ? confirm('Okul kapatılsın mı?', `${s.name} panoları ve panel girişi durur. Daha sonra yeniden açabilirsiniz.`, 'Kapat') : Promise.resolve(true)).then(
-              (ok) => ok && patch.mutate({ isActive: !s.isActive }),
-            )
-          }
-          style={{ alignSelf: 'center', paddingVertical: 6, paddingHorizontal: 12 }}
-        >
-          <Text style={{ fontSize: 13.5, fontWeight: '800', color: s.isActive ? colors.danger : colors.success }}>{s.isActive ? 'Okulu kapat' : 'Okulu yeniden aç'}</Text>
-        </Pressable>
+        {/* Abonelik kapatma: pencerenin kapatma düğmesine benzemesin diye ayrı, açıklamalı bir bölümde ve onaylı */}
+        <View style={{ marginTop: 6, borderTopWidth: 1, borderTopColor: colors.divider, paddingTop: 14, gap: 8 }}>
+          {s.isActive ? (
+            <>
+              <T size={12.5} color={colors.faint}>
+                Abonelik kapatılınca okulun panoları ve panel girişi durur. Veriler silinmez; abonelik yeniden başlatılınca her şey kaldığı yerden devam eder.
+              </T>
+              <Button
+                variant="secondary"
+                icon="pause-circle-outline"
+                loading={patch.isPending && patch.variables?.isActive === false}
+                onPress={() =>
+                  void confirm(
+                    'Abonelik kapatılsın mı?',
+                    `${nameParts(s).name}: panolar ve panel girişi durur. Veriler silinmez, abonelik sonra yeniden başlatılabilir.`,
+                    'Aboneliği kapat',
+                  ).then((ok) => ok && patch.mutate({ isActive: false }))
+                }
+              >
+                Aboneliği kapat
+              </Button>
+            </>
+          ) : (
+            <Button icon="play-circle-outline" loading={patch.isPending && patch.variables?.isActive === true} onPress={() => patch.mutate({ isActive: true })}>
+              Aboneliği yeniden başlat
+            </Button>
+          )}
+        </View>
       </View>
     </Sheet>
   );

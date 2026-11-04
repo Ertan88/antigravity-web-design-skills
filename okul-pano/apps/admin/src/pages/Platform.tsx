@@ -173,7 +173,7 @@ export function Platform() {
         ) : !list.data?.length ? (
           <EmptyState icon={<Building2 className="size-6" />} title="Henüz okul yok" />
         ) : (
-          <Table head={['Okul', 'Paket', 'Ekran', 'Deneme bitişi', 'Aktif', '']}>
+          <Table head={['Okul', 'Paket', 'Ekran', 'Deneme bitişi', 'Abonelik', '']}>
             {list.data.map((s) => (
               <tr key={s.id}>
                 <Td>
@@ -234,7 +234,14 @@ export function Platform() {
                   })()}
                 </Td>
                 <Td>
-                  <Toggle checked={s.isActive} onChange={(x) => patch.mutate({ id: s.id, body: { isActive: x } })} />
+                  {/* Abonelik: kapatmak onay ister (yanlışlıkla tıklanmasın); veriler silinmez */}
+                  <Toggle
+                    checked={s.isActive}
+                    onChange={(x) =>
+                      (x || window.confirm(`${s.name} aboneliği kapatılsın mı?\n\nPanolar ve panel girişi durur. Veriler silinmez; abonelik yeniden başlatılınca kaldığı yerden devam eder.`)) &&
+                      patch.mutate({ id: s.id, body: { isActive: x } })
+                    }
+                  />
                 </Td>
                 <Td className="w-px">
                   <div className="flex justify-end">
