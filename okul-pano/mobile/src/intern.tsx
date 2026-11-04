@@ -5,7 +5,7 @@ import { api } from './api.ts';
 import { useAuth, useSchoolPath } from './auth.tsx';
 import { Sheet } from './sheet.tsx';
 import { Text } from './text.tsx';
-import { colors } from './theme.ts';
+import { colors, dark } from './theme.ts';
 import { Button, Field, Icon, T } from './ui.tsx';
 
 /*
@@ -28,8 +28,10 @@ export const letter = (c: Cell) => (c === 'TA' ? 'T' : c === 'W' || c === '' ? '
 /** Geri al için önceki kod: işaretsiz bölüm "-" (sil) */
 export const prevCode = (c: Cell): Code => (c === 'X' || c === 'D' || c === 'İ' || c === 'R' || c === 'H' || c === 'T' || c === 'K' ? c : '-');
 
-/** Kod renkleri (panel çizelgesiyle aynı) */
-export const TONE: Record<string, { bg: string; fg: string; border?: string; dashed?: boolean }> = {
+type Tone = { bg: string; fg: string; border?: string; dashed?: boolean };
+
+/** Kod renkleri (panel çizelgesiyle aynı), açık tema */
+const TONE_LIGHT: Record<string, Tone> = {
   X: { bg: '#ffffff', fg: '#334155', border: '#94a3b8' },
   D: { bg: '#ef4444', fg: '#ffffff' },
   İ: { bg: '#99f6e4', fg: '#134e4a' },
@@ -43,6 +45,27 @@ export const TONE: Record<string, { bg: string; fg: string; border?: string; das
   '?': { bg: '#ffffff', fg: '#a8a29e', border: '#d6d3d1', dashed: true },
   '': { bg: '#ffffff', fg: '#a8a29e', border: '#e7e3dc' },
 };
+
+/** Koyu tema: koyu zemin, açık harf (panelin koyu temasıyla aynı) */
+const TONE_DARK: Record<string, Tone> = {
+  X: { bg: '#26231f', fg: '#f5f3ef', border: '#a8a29e' },
+  D: { bg: '#dc2626', fg: '#ffffff' },
+  İ: { bg: '#134e4a', fg: '#99f6e4', border: '#0f766e' },
+  R: { bg: '#3b2a6b', fg: '#ddd6fe', border: '#7c3aed' },
+  H: { bg: '#5a2a10', fg: '#fed7aa', border: '#c2410c' },
+  T: { bg: '#0c3a5a', fg: '#bae6fd', border: '#38bdf8' },
+  TA: { bg: '#0c3a5a', fg: '#bae6fd' },
+  K: { bg: '#5a430c', fg: '#fde68a', border: '#b45309' },
+  O: { bg: '#123d2c', fg: '#a7f3d0', border: '#1f6b4d' },
+  W: { bg: '#2a2723', fg: '#8a837b' },
+  '?': { bg: 'transparent', fg: '#d6d1c8', border: '#8a837b', dashed: true },
+  '': { bg: 'transparent', fg: '#8a837b', border: '#4d4740' },
+};
+
+/** Kod renkleri: o anki temaya göre (tema değişince ekranlar yeniden çizilir) */
+export const TONE: Record<string, Tone> = new Proxy({} as Record<string, Tone>, {
+  get: (_t, k: string) => (dark ? TONE_DARK : TONE_LIGHT)[k],
+});
 
 /** "Devamsızlığın gösterileceği semboller" bandı (e-Okul sırası) */
 export const LEGEND_BAND: [string, string][] = [
@@ -239,11 +262,12 @@ const PENDING_TEXT: Record<PendingMark['code'], string> = { D: 'özürsüz', İ:
 /** Altta: "N devamsızlık gönderilmedi · Gönder…" */
 export function PendingStrip({ rows, onPress }: { rows: PendingMark[]; onPress: () => void }) {
   const students = new Set(rows.map((r) => r.studentId)).size;
+  const ink = dark ? '#fde68a' : '#92400e';
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#fcd34d', borderRadius: 16, paddingVertical: 10, paddingHorizontal: 12 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: dark ? '#2e2208' : '#fef3c7', borderWidth: 1, borderColor: dark ? '#b45309' : '#fcd34d', borderRadius: 16, paddingVertical: 10, paddingHorizontal: 12 }}>
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#92400e' }}>{days(rows.length / 2)} günlük devamsızlık gönderilmedi</Text>
-        <Text style={{ fontSize: 11.5, color: '#92400e' }}>{students} öğrenci · müdür yardımcısına henüz gitmedi</Text>
+        <Text style={{ fontSize: 13.5, fontWeight: '800', color: ink }}>{days(rows.length / 2)} günlük devamsızlık gönderilmedi</Text>
+        <Text style={{ fontSize: 11.5, color: ink }}>{students} öğrenci · müdür yardımcısına henüz gitmedi</Text>
       </View>
       <Button size="sm" onPress={onPress}>
         Gönder…
