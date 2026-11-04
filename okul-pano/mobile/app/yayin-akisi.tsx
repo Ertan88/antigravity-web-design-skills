@@ -8,7 +8,7 @@ import { useAuth, useSchoolPath } from '../src/auth.tsx';
 import { useAnnouncements, type Announcement } from '../src/data.ts';
 import { dayTitle } from '../src/day.ts';
 import { colors } from '../src/theme.ts';
-import { Button, Card, Empty, Icon, Loading, Screen, Segmented, T } from '../src/ui.tsx';
+import { Button, Card, Empty, Icon, Loading, Screen, Segmented, switchColors, T } from '../src/ui.tsx';
 
 type Tab = 'live' | 'planned' | 'ended';
 
@@ -126,7 +126,7 @@ export default function YayinAkisi() {
                   </T>
                 </View>
                 {editable && tab !== 'ended' && (
-                  <Switch value={a.isActive} onValueChange={() => void toggle(a)} trackColor={{ true: colors.primary, false: colors.borderStrong }} thumbColor="#fff" accessibilityLabel={`${a.title} yayında`} />
+                  <Switch value={a.isActive} onValueChange={() => void toggle(a)} {...switchColors()} accessibilityLabel={`${a.title} yayında`} />
                 )}
               </View>
             );

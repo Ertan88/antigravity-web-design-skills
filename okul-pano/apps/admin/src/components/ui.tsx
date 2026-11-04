@@ -175,12 +175,13 @@ export function Toggle({
         onClick={() => onChange(!checked)}
         className={clsx(
           'relative mt-0.5 inline-flex h-6 w-11 shrink-0 rounded-full transition-colors',
-          checked ? 'bg-emerald-500' : 'bg-slate-300',
+          // Açık: yeşil, kapalı: kırmızı (koyu temada biraz daha yumuşak tonlar; renk ölçeği dönüşümünden etkilenmez)
+          checked ? 'bg-[#16a34a] dark:bg-[#22a55a]' : 'bg-[#dc2626] dark:bg-[#c53030]',
         )}
       >
         <span
           className={clsx(
-            'absolute top-0.5 left-0.5 size-5 rounded-full bg-surface shadow transition-transform',
+            'absolute top-0.5 left-0.5 size-5 rounded-full bg-[#ffffff] shadow transition-transform',
             checked && 'translate-x-5',
           )}
         />

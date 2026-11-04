@@ -4,7 +4,7 @@ import { sendTestNotification } from '../src/push.ts';
 import { useReminderSettings, type ReminderSettings } from '../src/reminders.ts';
 import { Text } from '../src/text.tsx';
 import { colors, tiles, type TileTone } from '../src/theme.ts';
-import { Button, Card, Loading, Screen, T } from '../src/ui.tsx';
+import { Button, Card, Loading, Screen, switchColors, T } from '../src/ui.tsx';
 
 /*
  * Nöbet hatırlatmaları: her biri ayrı açılır, saatleri seçilir. Bildirimleri uygulama telefonun kendisinde kurar
@@ -86,8 +86,7 @@ export default function Hatirlatmalar() {
                   accessibilityLabel={r.title}
                   value={on}
                   onValueChange={(v) => set(r.key, { on: v } as never)}
-                  trackColor={{ true: colors.success, false: colors.borderStrong }}
-                  thumbColor="#ffffff"
+                  {...switchColors()}
                 />
               </View>
               {on && r.choices && (

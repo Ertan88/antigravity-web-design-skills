@@ -346,7 +346,7 @@ export function ToggleRow({ label, description, value, onChange }: { label: stri
         <Text style={{ fontSize: 15, fontWeight: '600', color: colors.ink }}>{label}</Text>
         {description && <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>{description}</Text>}
       </View>
-      <Switch value={value} onValueChange={onChange} trackColor={{ true: colors.success, false: colors.borderStrong }} thumbColor="#fff" accessibilityLabel={label} />
+      <Switch value={value} onValueChange={onChange} {...switchColors()} accessibilityLabel={label} />
     </View>
   );
 }
@@ -781,4 +781,11 @@ export function HolidayCard({ label, name }: { label: string; name: string }) {
       </View>
     </View>
   );
+}
+
+/** Aç/kapa anahtarı renkleri (bütün uygulamada): açık yeşil, kapalı kırmızı; koyu temada biraz daha yumuşak tonlar */
+export function switchColors() {
+  const on = dark ? '#22a55a' : '#16a34a';
+  const off = dark ? '#c53030' : '#dc2626';
+  return { trackColor: { true: on, false: off }, thumbColor: '#ffffff', ios_backgroundColor: off };
 }
