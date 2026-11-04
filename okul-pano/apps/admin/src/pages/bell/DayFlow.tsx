@@ -16,16 +16,16 @@ import {
   type Period,
 } from '@okulpano/shared';
 import clsx from 'clsx';
-import { BellRing, CalendarOff, Coffee, FastForward, Flag, GripVertical, Hand, Scissors, Sunrise, Sunset, Undo2, Utensils, Zap } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { BellRing, CalendarOff, Coffee, FastForward, Flag, Hand, Scissors, Sunrise, Sunset, Undo2, Utensils, Zap } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Input, Toggle } from '../../components/ui.tsx';
 import { shortDate } from './ScheduleView.tsx';
 
 /*
  * Günün zil akışı: öğle arasına kadar herkes aynı saatlerdeyse tek akış, sonra her zil kendi sütununda ("ayrılan akış").
- * "Bu günü düzenle" açılınca saatler yerinde değişir (saat kutuları, aralarda ±5 dk, dersi sürükleyerek kaydırma, hızlı
- * işlemler); kayıt yalnızca o gün içindir, düzen değişmez.
+ * "Bu günü düzenle" açılınca saatler yerinde değişir (saat kutuları, aralarda ±5 dk, hızlı işlemler); kayıt yalnızca o
+ * gün içindir, düzen değişmez.
  */
 
 export interface OverrideRow {
@@ -53,9 +53,6 @@ const duration = (min: number) => (min >= 60 ? `${Math.floor(min / 60)} sa${min 
 const weekdayOf = (iso: string) => ((new Date(`${iso}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
 const same = (a?: Period, b?: Period) => Boolean(a && b && a.no === b.no && a.start === b.start && a.end === b.end);
 const samePeriods = (a: readonly Period[], b: readonly Period[]) => a.length === b.length && sortPeriods(a).every((p, i) => same(p, sortPeriods(b)[i]));
-
-/** Sürüklemede 12 piksel = 5 dakika */
-const PX_PER_STEP = 12;
 
 export function bellTone(special: boolean) {
   return special ? 'bg-tile-peach text-tile-peach-ink' : 'bg-tile-sky text-tile-sky-ink';
@@ -105,9 +102,6 @@ export function DayFlow({
   const [shortened, setShortened] = useState<{ lesson: number; brk: number } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [drag, setDrag] = useState<{ no: number; targets: string[]; startY: number; dy: number } | null>(null);
-  const dragRef = useRef(drag);
-  dragRef.current = drag;
 
   // Gün değişince düzenleme kapanır
   useEffect(() => {
@@ -136,34 +130,8 @@ export function DayFlow({
       return next;
     });
 
-  // Sürükle-bırak: dersi tutup aşağı / yukarı çekince o ders ve sonrakiler 5 dk adımlarla kayar
-  const dragDelta = drag ? Math.round(drag.dy / PX_PER_STEP) * 5 : 0;
-  useEffect(() => {
-    if (!drag) return;
-    const move = (e: PointerEvent) => setDrag((d) => (d ? { ...d, dy: e.clientY - d.startY } : d));
-    const up = () => {
-      const d = dragRef.current;
-      setDrag(null);
-      if (!d) return;
-      const delta = Math.round(d.dy / PX_PER_STEP) * 5;
-      if (delta) apply((p) => shiftPeriods(p, d.no, delta), d.targets);
-      else setSelected({ no: d.no, targets: d.targets });
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up, { once: true });
-    return () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drag !== null]);
-
-  // Ekranda gösterilen saatler: düzenlemede taslak (sürüklenirken önizleme)
-  const shown: FlowBell[] = bells.map((b) => {
-    let periods = editing ? (drafts[b.target] ?? b.periods) : b.periods;
-    if (drag && dragDelta && drag.targets.includes(b.target)) periods = shiftPeriods(periods, drag.no, dragDelta);
-    return { ...b, periods: sortPeriods(periods) };
-  });
+  // Ekranda gösterilen saatler: düzenlemede taslak
+  const shown: FlowBell[] = bells.map((b) => ({ ...b, periods: sortPeriods(editing ? (drafts[b.target] ?? b.periods) : b.periods) }));
   const changed = editing ? bells.filter((b) => !samePeriods(drafts[b.target] ?? b.periods, b.periods)) : [];
 
   // Ortak gövde: bütün zillerde aynı olan baştaki dersler (öğle arasına kadar genelde aynı)
@@ -282,7 +250,6 @@ export function DayFlow({
       const active = live?.kind === 'lesson' && live.period.no === p.no && live.period.start === p.start;
       const progress = active && live?.kind === 'lesson' ? 1 - live.remainingSec / live.totalSec : null;
       const isSel = selected?.no === p.no && selected.targets.join() === targets.join();
-      const dragging = drag?.no === p.no && drag.targets.join() === targets.join();
       items.push(
         <li key={`p${p.no}`} className="grid grid-cols-[4.5rem_1.5rem_1fr] items-stretch">
           <span className="flex flex-col justify-center pr-3 text-right tabular-nums">
@@ -304,17 +271,10 @@ export function DayFlow({
             <span className={clsx('relative z-10 my-auto size-3.5 rounded-full ring-4 ring-surface', active ? 'bg-brand-500' : 'bg-brand-300')} />
           </span>
           <span
-            onPointerDown={
-              editing
-                ? (e) => {
-                    e.preventDefault();
-                    setDrag({ no: p.no, targets, startY: e.clientY, dy: 0 });
-                  }
-                : undefined
-            }
-            title={editing ? 'Sürükleyin: bu ders ve sonrakiler 5 dk adımlarla kayar. Tıklayın: seçin.' : undefined}
+            onClick={editing ? () => setSelected(isSel ? null : { no: p.no, targets }) : undefined}
+            title={editing ? 'Seçin: hızlı işlemler bu dersten itibaren uygulanır' : undefined}
             className={clsx(
-              'relative my-1 flex min-w-0 touch-none items-center gap-3 rounded-xl px-4 py-2.5 ring-1 select-none',
+              'relative my-1 flex min-w-0 items-center gap-3 rounded-xl px-4 py-2.5 ring-1 select-none',
               active
                 ? 'bg-brand-600 text-white shadow-md ring-brand-600'
                 : moved
@@ -322,12 +282,10 @@ export function DayFlow({
                   : opts.tone === 'alt'
                     ? 'bg-tile-peach/45 ring-orange-200'
                     : 'bg-slate-50/70 ring-slate-200/80',
-              editing && 'cursor-grab active:cursor-grabbing',
+              editing && 'cursor-pointer',
               isSel && 'ring-2 ring-ink',
-              dragging && 'shadow-lg',
             )}
           >
-            {editing && <GripVertical className="size-4 shrink-0 text-slate-400" />}
             <span className="min-w-0 flex-1">
               <span className={clsx('block truncate text-[15px] font-bold', active ? 'text-white' : 'text-ink')}>{periodLabel(p)}</span>
               {progress !== null && (
@@ -336,12 +294,7 @@ export function DayFlow({
                 </span>
               )}
             </span>
-            {dragging && dragDelta ? (
-              <span className="shrink-0 rounded-full bg-rose-600 px-2 py-0.5 text-[11px] font-bold text-white">
-                {dragDelta > 0 ? '+' : ''}
-                {dragDelta} dk
-              </span>
-            ) : active ? (
+            {active ? (
               <span className="shrink-0 rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-semibold">Şu an · {Math.ceil((live as { remainingSec: number }).remainingSec / 60)} dk</span>
             ) : moved ? (
               <span className="shrink-0 rounded-full bg-tile-rose px-2 py-0.5 text-[11px] font-bold text-tile-rose-ink">
@@ -430,8 +383,9 @@ export function DayFlow({
 
   return (
     <section className="min-w-0 overflow-hidden rounded-2xl bg-surface shadow-sm ring-1 ring-slate-200/70">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
-        <div className="min-w-0">
+      {/* Başlık solda, düzen seçimi ve "Bu günü düzenle" her gün sağ üstte aynı yerde */}
+      <header className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
+        <div className="min-w-0 flex-1">
           <h2 className="text-lg font-semibold text-ink">
             {isToday ? 'Bugün · ' : ''}
             {WEEKDAY_NAMES[weekday]}, {shortDate(date)}
@@ -440,10 +394,10 @@ export function DayFlow({
           <p className="text-sm text-slate-500">
             {holiday
               ? 'Tatil'
-              : bells.map((b) => `${b.label}: ${b.scheduleName ?? 'zil'}${b.lessonCount ? ` (${b.lessonCount} ders)` : ''}`).join(' · ')}
+              : bells.map((b) => `${b.special ? `${b.label}: ` : ''}${b.scheduleName ?? 'zil'}${b.lessonCount ? ` (${b.lessonCount} ders)` : ''}`).join(' · ')}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex shrink-0 items-center gap-3">
           {onPickSchedule && editable && !editing && !holiday && (
             <Button size="sm" variant="ghost" onClick={onPickSchedule}>
               Bu güne düzen seç
@@ -560,7 +514,7 @@ export function DayFlow({
             </div>
           )}
           <p className="text-xs text-slate-500">
-            Saat kutularına yazın, aralardaki −5 / +5 ile teneffüsü ve öğle arasını değiştirin ya da dersi tutup sürükleyin (o ders ve sonrakiler kayar). Bir derse tıklayınca seçilir.
+            Saat kutularına yazın ya da aralardaki −5 / +5 ile teneffüsü ve öğle arasını değiştirin (sonraki dersler kayar). Bir derse tıklayınca seçilir; hızlı işlemler o dersten itibaren uygulanır.
           </p>
         </div>
       )}
@@ -693,8 +647,9 @@ export function WeekStrip({
                 {d.bells
                   .filter((b) => b.periods.length)
                   .map((b) => (
+                    // Sınıf adı yalnızca sınıfa özel zilde (kimler için); okul geneli zilde yalnızca düzen adı
                     <span key={b.target} className="flex min-w-0 items-center justify-between gap-2 text-xs text-slate-600">
-                      <span className="truncate">{b.label}</span>
+                      {b.special && <span className="truncate">{b.label}</span>}
                       <BellTag bell={b} />
                     </span>
                   ))}

@@ -6,6 +6,8 @@ import {
   compareClassNames,
   dayBells,
   generatePeriods,
+  lunchBeforeNo,
+  WEEKDAY_SHORT,
   gradeOf,
   isoWeekday,
   lessonCounts,
@@ -34,7 +36,7 @@ import { BellTag, DayFlow, NowCards, WeekStrip, type FlowBell, type OverrideRow 
 import { useUpcomingHolidays, useWeekHolidays } from './bell/HolidaysCard.tsx';
 import { shortDate, useNow } from './bell/ScheduleView.tsx';
 
-type Form = { name: string; lessonCount: number | ''; periods: Period[]; classIds: string[] };
+type Form = { name: string; lessonCount: number | ''; periods: Period[]; classIds: string[]; weekdays: number[] };
 
 const defaultGen = { firstStart: '08:30', lessonMin: 40, breakMin: 10, count: 8, lunchAfter: 5, lunchMin: 45, afternoonBreakMin: '' as number | '' };
 
@@ -72,8 +74,10 @@ function minutesBetween(a: string, b: string) {
   return toMin(b) - toMin(a);
 }
 
-function Editor({ form, classes }: { form: ReturnType<typeof useForm<Form>>; classes: ClassGroup[] }) {
+function Editor({ form, classes, lunchThresholdMin }: { form: ReturnType<typeof useForm<Form>>; classes: ClassGroup[]; lunchThresholdMin: number }) {
   const { values: v, set, errors } = form;
+  // Öğle arası: günün en uzun arası (panodaki hesapla aynı)
+  const lunchNo = lunchBeforeNo(v.periods, lunchThresholdMin);
   const [gen, setGen] = useState(() => ({ ...(v.periods.length ? deriveRule(v.periods) : defaultGen), count: Number(v.lessonCount) || v.periods.length || defaultGen.count }));
   const [showGen, setShowGen] = useState(v.periods.length === 0);
 
@@ -96,7 +100,7 @@ function Editor({ form, classes }: { form: ReturnType<typeof useForm<Form>>; cla
         <Field label="Düzen adı" error={errors.name}>
           {(id) => <Input id={id} value={v.name} onChange={(ev) => set('name', ev.target.value)} placeholder="ör. 9 derslik gün, Cuma" invalid={Boolean(errors.name)} />}
         </Field>
-        <Field label="Kaç derslik gün" error={errors.lessonCount} help="Günün ders sayısı bu olunca seçilir">
+        <Field label="Kaç derslik gün" error={errors.lessonCount} help={v.weekdays.length ? 'Seçili günlerde ders sayısına bakılmaz' : 'Günün ders sayısı bu olunca seçilir'}>
           {(id) => (
             <Input
               id={id}
@@ -111,7 +115,9 @@ function Editor({ form, classes }: { form: ReturnType<typeof useForm<Form>>; cla
         </Field>
       </div>
 
-      <ClassScope classes={classes} value={v.classIds} onChange={(ids) => set('classIds', ids)} lessonCount={Number(v.lessonCount) || v.periods.length} />
+      <DayScope value={v.weekdays} onChange={(days) => set('weekdays', days)} lessonCount={Number(v.lessonCount) || v.periods.length} />
+
+      <ClassScope classes={classes} value={v.classIds} onChange={(ids) => set('classIds', ids)} lessonCount={Number(v.lessonCount) || v.periods.length} days={v.weekdays} />
 
       <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200/70">
         <button type="button" onClick={() => setShowGen((s) => !s)} className="flex items-center gap-2 text-sm font-semibold text-brand-700">
@@ -185,7 +191,7 @@ function Editor({ form, classes }: { form: ReturnType<typeof useForm<Form>>; cla
                 {gap !== null && (
                   <div className="flex items-center gap-2 py-1 pl-16 text-xs text-slate-500">
                     <span className="min-w-28">
-                      {gap >= 30 ? 'Öğle arası' : 'Teneffüs'} · <span className="font-semibold text-slate-700 tabular-nums">{gap} dk</span>
+                      {next?.no === lunchNo ? 'Öğle arası' : 'Teneffüs'} · <span className="font-semibold text-slate-700 tabular-nums">{gap} dk</span>
                     </span>
                     {/* Arayı uzatıp kısaltır; sonraki tüm dersler birlikte kayar (ör. cuma namazı) */}
                     <button
@@ -218,8 +224,35 @@ function Editor({ form, classes }: { form: ReturnType<typeof useForm<Form>>; cla
   );
 }
 
-/** Düzen kimler için: boşsa okul geneli; seçilirse yalnızca bu sınıflar, o gün ders sayıları tutunca */
-function ClassScope({ classes, value, onChange, lessonCount }: { classes: ClassGroup[]; value: string[]; onChange: (ids: string[]) => void; lessonCount: number }) {
+/** Düzen hangi günler: boşsa ders sayısı tutan her gün; seçilirse yalnızca bu günler (ders sayısına bakılmaz) */
+function DayScope({ value, onChange, lessonCount }: { value: number[]; onChange: (days: number[]) => void; lessonCount: number }) {
+  const picked = new Set(value);
+  const toggle = (d: number) => onChange(picked.has(d) ? value.filter((x) => x !== d) : [...value, d].sort((a, b) => a - b));
+  const chip = (on: boolean) => clsx('rounded-full px-3 py-1 text-xs font-bold ring-1', on ? 'bg-ink text-surface ring-ink' : 'ring-slate-200 hover:bg-slate-100');
+  return (
+    <div className="rounded-xl p-4 ring-1 ring-slate-200/70">
+      <div className="text-sm font-semibold text-ink">Hangi günler?</div>
+      <p className="text-xs text-slate-500">
+        {value.length
+          ? `Her hafta ${value.map((d) => WEEKDAY_NAMES[d]).join(', ')} günleri bu zil çalar; o günün ders sayısına bakılmaz.`
+          : `Otomatik: ${lessonCount ? `${lessonCount} dersli` : 'ders sayısı tutan'} her gün kendiliğinden seçilir. Belirli günlerde çalması için gün seçin.`}
+      </p>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        <button type="button" onClick={() => onChange([])} className={chip(!value.length)}>
+          Otomatik
+        </button>
+        {[1, 2, 3, 4, 5, 6, 7].map((d) => (
+          <button key={d} type="button" onClick={() => toggle(d)} className={chip(picked.has(d))} aria-pressed={picked.has(d)} title={WEEKDAY_NAMES[d]}>
+            {WEEKDAY_SHORT[d]}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Düzen kimler için: boşsa okul geneli; seçilirse yalnızca bu sınıflar, o gün ders sayıları tutunca (ya da seçili günlerde) */
+function ClassScope({ classes, value, onChange, lessonCount, days }: { classes: ClassGroup[]; value: string[]; onChange: (ids: string[]) => void; lessonCount: number; days: number[] }) {
   const sorted = [...classes].sort((a, b) => compareClassNames(a.name, b.name));
   const grades = [...new Set(sorted.map((c) => gradeOf(c.name)).filter((g): g is number => g !== null))];
   const picked = new Set(value);
@@ -231,8 +264,8 @@ function ClassScope({ classes, value, onChange, lessonCount }: { classes: ClassG
           <div className="text-sm font-semibold text-ink">Hangi sınıflar için?</div>
           <p className="text-xs text-slate-500">
             {value.length
-              ? `Yalnızca seçili sınıflar, o gün ${lessonCount || 'bu kadar'} dersleri olunca bu zile geçer; diğerleri okul geneli zilde kalır.`
-              : 'Okul geneli: günün ders sayısına göre bütün okul için seçilir. Belirli sınıflara (ör. 12. sınıflar) özel zil için sınıf seçin.'}
+              ? `Yalnızca seçili sınıflar, ${days.length ? 'seçili günlerde ders varsa' : `o gün ${lessonCount || 'bu kadar'} dersleri olunca`} bu zile geçer; diğerleri okul geneli zilde kalır.`
+              : `Okul geneli: ${days.length ? 'seçili günlerde' : 'günün ders sayısına göre'} bütün okul için çalar. Belirli sınıflara (ör. 12. sınıflar) özel zil için sınıf seçin.`}
           </p>
         </div>
         {value.length > 0 && (
@@ -289,7 +322,7 @@ export function BellSchedules() {
   const classes = useList<ClassGroup>('classes');
   const timetable = useList<TimetableEntry>('timetable');
   const overrides = useList<OverrideRow>('bell-overrides');
-  const form = useForm<Form>({ name: '', lessonCount: '', periods: [], classIds: [] });
+  const form = useForm<Form>({ name: '', lessonCount: '', periods: [], classIds: [], weekdays: [] });
   const [editing, setEditing] = useState<BellSchedule | null>(null);
   const [open, setOpen] = useState(false);
   const [picking, setPicking] = useState<number | null>(null);
@@ -341,7 +374,8 @@ export function BellSchedules() {
         : classList
             .filter((c) => !c.bellExempt && classShiftOf(c) === shift && !specialIds.has(c.id) && (bellClasses?.find((x) => x.id === c.id)?.counts[wd] ?? 0) > 0)
             .map((c) => c.name);
-      const label = b.classIds ? classSetLabel(names, allNames) : specialIds.size ? classSetLabel(names, allNames) || 'Diğer sınıflar' : 'Bütün sınıflar';
+      // Okul geneli zilin sınıfları tek tek yazılmaz; yalnızca sınıfa özel zilin kimler için olduğu yazılır
+      const label = b.classIds ? classSetLabel(names, allNames) : specialIds.size ? 'Diğer sınıflar' : 'Bütün sınıflar';
       return {
         ...b,
         label,
@@ -378,18 +412,18 @@ export function BellSchedules() {
     setEditing(null);
     const base = [...inShift].filter((s) => !s.weekdays.length && !s.classIds?.length).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))[0];
     const periods = count && base ? generatePeriods({ ...deriveRule(base.periods), count, lunchAfter: deriveRule(base.periods).lunchAfter || null, afternoonBreakMin: null }) : [];
-    form.reset({ name: count ? `${count} derslik gün${shiftName}` : '', lessonCount: count ?? '', periods, classIds: [] });
+    form.reset({ name: count ? `${count} derslik gün${shiftName}` : '', lessonCount: count ?? '', periods, classIds: [], weekdays: [] });
     setOpen(true);
   };
   const openEditor = (s: BellSchedule) => {
     setEditing(s);
-    form.reset({ name: s.name, lessonCount: s.lessonCount ?? '', periods: s.periods, classIds: s.classIds ?? [] });
+    form.reset({ name: s.name, lessonCount: s.lessonCount ?? '', periods: s.periods, classIds: s.classIds ?? [], weekdays: s.weekdays });
     setOpen(true);
   };
   /** Kopya: aynı saatlerle başka bir gün ya da başka sınıflar için (ör. cuma namazı, 12. sınıfların uzun günü) */
   const openCopy = (s: BellSchedule) => {
     setEditing(null);
-    form.reset({ name: `${s.name} (kopya)`, lessonCount: s.lessonCount ?? '', periods: s.periods, classIds: s.classIds ?? [] });
+    form.reset({ name: `${s.name} (kopya)`, lessonCount: s.lessonCount ?? '', periods: s.periods, classIds: s.classIds ?? [], weekdays: [] });
     setOpen(true);
   };
 
@@ -398,7 +432,7 @@ export function BellSchedules() {
       name: form.values.name,
       periods: form.values.periods,
       lessonCount: form.values.lessonCount === '' ? null : form.values.lessonCount,
-      weekdays: editing?.weekdays ?? [],
+      weekdays: form.values.weekdays,
       shift: editing ? editing.shift : shift === 'afternoon' ? 'afternoon' : null,
       sortOrder: editing?.sortOrder ?? schedules.length,
       classIds: form.values.classIds.length ? form.values.classIds : null,
@@ -407,6 +441,15 @@ export function BellSchedules() {
     try {
       if (editing) await ops.update.mutateAsync({ id: editing.id, body: payload });
       else await ops.create.mutateAsync(payload);
+      // Okul geneli bir güne tek düzen sabitlenir: aynı günü tutan öteki okul geneli düzenlerden o gün kaldırılır
+      if (!payload.classIds?.length && payload.weekdays.length) {
+        for (const s of inShift.filter((x) => x.id !== editing?.id && !x.classIds?.length && x.weekdays.some((d) => payload.weekdays.includes(d)))) {
+          await ops.update.mutateAsync({
+            id: s.id,
+            body: { name: s.name, periods: s.periods, lessonCount: s.lessonCount, shift: s.shift, sortOrder: s.sortOrder, weekdays: s.weekdays.filter((d) => !payload.weekdays.includes(d)), classIds: null },
+          });
+        }
+      }
       setOpen(false);
     } catch (err) {
       form.fail(err);
@@ -691,7 +734,7 @@ export function BellSchedules() {
             <Alert tone="red">{form.errors._form}</Alert>
           </div>
         )}
-        <Editor form={form} classes={classList} />
+        <Editor form={form} classes={classList} lunchThresholdMin={lunchThresholdMin} />
       </Modal>
     </>
   );
