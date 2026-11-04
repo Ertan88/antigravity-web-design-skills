@@ -614,13 +614,9 @@ function SheetTable({
                   </span>
                   <b className="font-extrabold">{s.fullName}</b>
                 </div>
-                <div className="pl-[90px] text-[11px] font-medium whitespace-nowrap text-slate-400">
+                {/* Okul no (w-9) + sınıf (68px) + iki boşluk: işletme adı öğrenci adının tam altında */}
+                <div className="pl-[120px] text-[11px] font-medium whitespace-nowrap text-slate-400">
                   {s.businessName}
-                  {s.totals.unchecked > 0 && (
-                    <span className="ml-2 font-bold text-amber-700 dark:text-amber-300">
-                      · {formatDays(s.totals.unchecked)} gün kontrol edilmedi
-                    </span>
-                  )}
                 </div>
               </td>
               <td className="border-b border-slate-100 pr-1 text-right text-[9px] leading-[21px] font-bold text-slate-400">

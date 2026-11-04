@@ -6,7 +6,7 @@ import { useAuth, useSchoolPath } from './auth.tsx';
 import { Sheet } from './sheet.tsx';
 import { Text } from './text.tsx';
 import { colors } from './theme.ts';
-import { Button, Field, T } from './ui.tsx';
+import { Button, Field, Icon, T } from './ui.tsx';
 
 /*
  * İşletmelerde mesleki eğitim: mobil ekranların ortak parçaları (kodlar, renkler, açıklama bandı, anında kayıt ve Geri al).
@@ -308,15 +308,19 @@ export function SendSheet({ rows, onClose, onSent }: { rows: PendingMark[]; onCl
               }
               style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, borderTopWidth: 1, borderTopColor: colors.divider }}
             >
-              <View style={{ width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: on ? colors.ink : colors.subtle, backgroundColor: on ? colors.ink : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
-                {on && <Text style={{ color: colors.bg, fontSize: 12, fontWeight: '900' }}>✓</Text>}
+              <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: on ? 0 : 2, borderColor: colors.subtle, backgroundColor: on ? colors.ink : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                {on && <Icon name="checkmark" size={16} color={colors.bg} />}
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={{ fontSize: 13.5, fontWeight: '800', color: colors.ink }} numberOfLines={1}>
                   {r.fullName}
-                  {r.businessName ? ` · ${r.businessName}` : ''}
                 </Text>
-                <Text style={{ fontSize: 11.5, color: colors.faint }}>{when(g.list)}</Text>
+                {r.businessName && (
+                  <Text style={{ fontSize: 11.5, color: colors.subtle }} numberOfLines={1}>
+                    {r.businessName}
+                  </Text>
+                )}
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.ink, marginTop: 1 }}>{when(g.list)}</Text>
               </View>
               <View style={{ paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999, backgroundColor: t.bg }}>
                 <Text style={{ fontSize: 11.5, fontWeight: '800', color: t.fg }}>
