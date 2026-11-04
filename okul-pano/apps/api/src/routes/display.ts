@@ -43,6 +43,7 @@ import { feedTitlesNow } from '../lib/rss.ts';
 import { getWeather } from '../lib/weather.ts';
 import { addDays, holidaysAndHalfDays } from '../lib/dayinfo.ts';
 import { DEVICE_TOKEN_PREFIX } from './screens.ts';
+import { noteScreenSeen, noticeScreenPaired } from '../lib/screenSecurity.ts';
 
 const PAIRING_TTL_MS = 10 * 60 * 1000;
 /** Sunucu her başlatıldığında (güncelleme yayınlanınca) değişir; panolar bunu görünce kendini yeniler */
@@ -64,6 +65,8 @@ async function resolveDisplay(app: FastifyInstance, req: FastifyRequest, queryTo
   if (token.startsWith(`${DEVICE_TOKEN_PREFIX}_`)) {
     const [screen] = await app.deps.db.select().from(screens).where(eq(screens.tokenHash, sha256(token)));
     if (!screen) throw unauthorized('Ekran anahtarı geçersiz ya da ekran silinmiş.');
+    // Adres değiştiyse kaydedilir; kısa sürede iki farklı adres: anahtar kopyalanmış olabilir, yönetici uyarılır
+    if (req.ip !== screen.lastIp) await noteScreenSeen(app.deps, screen, req.ip).catch(() => {});
     if (!screen.lastSeenAt || Date.now() - screen.lastSeenAt.getTime() > 60_000) {
       await app.deps.db.update(screens).set({ lastSeenAt: new Date() }).where(eq(screens.id, screen.id));
     }
@@ -353,8 +356,14 @@ export async function displayRoutes(app: FastifyInstance) {
     if (!p.screenId) return { status: 'pending' as const };
 
     const token = randomToken(DEVICE_TOKEN_PREFIX);
-    await db.update(screens).set({ tokenHash: sha256(token), lastSeenAt: new Date() }).where(eq(screens.id, p.screenId));
+    const [paired] = await db
+      .update(screens)
+      .set({ tokenHash: sha256(token), lastSeenAt: new Date(), lastIp: req.ip ?? null, ipAlertAt: null })
+      .where(eq(screens.id, p.screenId))
+      .returning({ schoolId: screens.schoolId, name: screens.name });
     await db.delete(displayPairings).where(eq(displayPairings.id, p.id));
+    // Yeni cihaz bağlandı: ekranları yönetenlere bildirim (eşleştirmeyi onlar yapmadıysa hemen kaldırabilirler)
+    if (paired) void noticeScreenPaired(app.deps, paired).catch(() => {});
     return { status: 'paired' as const, token };
   });
 

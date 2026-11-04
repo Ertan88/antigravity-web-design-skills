@@ -18,6 +18,7 @@ import { UUID_RE } from './context.ts';
 import { academicCalendarRoutes } from './routes/academicCalendar.ts';
 import { conductRoutes, runConductRetention } from './routes/conduct.ts';
 import { internshipRoutes } from './routes/internship.ts';
+import { runScreenKeyExpiry } from './lib/screenSecurity.ts';
 import { authRoutes } from './routes/auth.ts';
 import { contentRoutes } from './routes/content.ts';
 import { dutyRoutes } from './routes/duties.ts';
@@ -128,6 +129,8 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     const run = () => {
       void runTrialReminders(deps).catch((err) => app.log.error(err, 'deneme hatırlatması'));
       void runConductRetention(deps).catch((err) => app.log.error(err, 'gözlem saklama süresi'));
+      // Uzun süre bağlanmayan panoların anahtarı iptal edilir
+      void runScreenKeyExpiry(deps).catch((err) => app.log.error(err, 'pano anahtarı süresi'));
       // MEB çalışma takvimi: haziran ortasından itibaren yayımlanır; her yıl için günde bir deneme
       if (deps.env.MEB_INDEX_URLS) void runMebCalendarJob(deps).catch((err) => app.log.error(err, 'MEB çalışma takvimi'));
     };

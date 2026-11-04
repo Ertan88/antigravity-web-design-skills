@@ -671,6 +671,10 @@ export const screens = pgTable(
     location: text('location'),
     tokenHash: text('token_hash').unique(),
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+    /** Panonun son bağlandığı adres: aynı anahtar kısa sürede başka adresten açılırsa yöneticiye uyarı */
+    lastIp: text('last_ip'),
+    /** Son "başka yerden açıldı" uyarısı (günde en çok bir kez) */
+    ipAlertAt: timestamp('ip_alert_at', { withTimezone: true }),
     /** Bu panoya özel kart düzeni; null ise okulun varsayılanı */
     layout: jsonb('layout').$type<BoardLayout>(),
     /** Ekran biçimi: yatay / dikey, yalnızca duyurular, video duvarı */

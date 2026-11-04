@@ -253,6 +253,13 @@
       "when": 1795300000000,
       "tag": "0035_bell_overrides",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1795400000000,
+      "tag": "0036_screen_security",
+      "breakpoints": true
     }
   ]
 }

@@ -257,6 +257,9 @@ export function Screens() {
                   <Badge tone="green" dot>
                     Çevrimiçi
                   </Badge>
+                ) : !s.hasKey ? (
+                  // Anahtar iptal edildi (ör. uzun süre bağlanmadı): cihaz anahtarı yenilenerek ya da yeniden eşleştirilerek kurulur
+                  <Badge tone="red">Anahtar iptal · yeniden kurun</Badge>
                 ) : (
                   <Badge tone={s.lastSeenAt ? 'amber' : 'slate'}>{s.lastSeenAt ? `Son görülme ${timeAgo(s.lastSeenAt)}` : 'Hiç bağlanmadı'}</Badge>
                 )}
