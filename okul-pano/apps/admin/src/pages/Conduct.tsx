@@ -18,7 +18,7 @@ import clsx from 'clsx';
 import { ArrowUpRight, Check, ClipboardCheck, Download, FileSpreadsheet, Gauge, HeartHandshake, Pencil, Plus, Star, Undo2, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useToast } from '../components/Toast.tsx';
-import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Select, Spinner, Table, Td, Textarea, Toggle } from '../components/ui.tsx';
+import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, MonthPicker, PageHeader, Segmented, Select, Spinner, Table, Td, Textarea, Toggle } from '../components/ui.tsx';
 import { api, downloadFile, excelFileName } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useSchool, useSchoolPath, type School } from '../lib/data.ts';
@@ -100,7 +100,7 @@ function NetPill({ n }: { n: number }) {
 }
 
 function MonthInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return <Input type="month" value={value} max={thisMonth()} onChange={(e) => e.target.value && onChange(e.target.value)} className="w-44" aria-label="Ay" />;
+  return <MonthPicker value={value} max={thisMonth()} onChange={onChange} />;
 }
 
 function initials(name: string) {

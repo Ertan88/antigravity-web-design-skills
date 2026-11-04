@@ -18,8 +18,6 @@ import {
   Building2,
   CheckCheck,
   Send,
-  ChevronLeft,
-  ChevronRight,
   GraduationCap,
   Plus,
   Printer,
@@ -39,9 +37,9 @@ import {
   DeleteButton,
   EmptyState,
   Field,
-  IconButton,
   Input,
   Modal,
+  MonthPicker,
   PageHeader,
   Select,
   Spinner,
@@ -158,12 +156,6 @@ const monthTitle = (m: string) =>
   `${MONTHS[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
 const dayTitle = (iso: string) =>
   `${Number(iso.slice(8))} ${MONTHS[Number(iso.slice(5, 7)) - 1]}`;
-const shiftMonth = (m: string, n: number) => {
-  const d = new Date(
-    Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1 + n, 1),
-  );
-  return d.toISOString().slice(0, 7);
-};
 const thisMonth = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -383,23 +375,7 @@ export function InternshipSheet() {
               </div>
             </div>
             <div className="no-print flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1 rounded-full border border-slate-200 p-0.5">
-                <IconButton
-                  label="Önceki ay"
-                  onClick={() => setMonth(shiftMonth(month, -1))}
-                >
-                  <ChevronLeft className="size-4" />
-                </IconButton>
-                <span className="w-28 text-center text-sm font-bold">
-                  {monthTitle(month)}
-                </span>
-                <IconButton
-                  label="Sonraki ay"
-                  onClick={() => setMonth(shiftMonth(month, 1))}
-                >
-                  <ChevronRight className="size-4" />
-                </IconButton>
-              </div>
+              <MonthPicker value={month} onChange={setMonth} />
               {Boolean(data?.areas.length) && (
                 <Select
                   value={areaId}

@@ -2,7 +2,7 @@ import { achievementDesign, achievementSchema, bookSchema, schoolEventSchema } f
 import { CalendarDays, Library, Trophy } from 'lucide-react';
 import { CrudPage } from '../components/CrudPage.tsx';
 import { ImageUpload } from '../components/ImageUpload.tsx';
-import { Badge, Field, Input, Segmented, Textarea, Toggle } from '../components/ui.tsx';
+import { Badge, Field, Input, MonthPicker, Segmented, Textarea, Toggle } from '../components/ui.tsx';
 import type { Achievement, Book, SchoolEvent } from '../lib/data.ts';
 import { expiredRowState, isoToLocalInput, localInputToIso, sortByPublish } from '../lib/format.ts';
 
@@ -175,13 +175,11 @@ export function Achievements() {
               error={v.month && v.month < thisMonth() ? 'Geçmiş bir ay seçildi; panoda görünmez.' : undefined}
             >
               {(id) => (
-                <Input
+                <MonthPicker
                   id={id}
-                  type="month"
                   min={thisMonth()}
-                  value={v.month}
-                  onChange={(e) => {
-                    const month = e.target.value;
+                  value={v.month || thisMonth()}
+                  onChange={(month) => {
                     set('month', month);
                     // Başlık hâlâ önerilen başlıksa ay değişince o da değişir
                     if (!v.title || /ayının öğrencisi$/.test(v.title)) set('title', month ? `${monthTitle(month)} ayının öğrencisi` : '');

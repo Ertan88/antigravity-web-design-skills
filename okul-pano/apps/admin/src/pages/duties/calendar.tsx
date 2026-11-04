@@ -1,10 +1,10 @@
 import { holidayFullName, isHalfDayHoliday, WEEKDAY_NAMES, WEEKDAY_SHORT } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Check, ChevronLeft, ChevronRight, Eraser, Loader2 } from 'lucide-react';
+import { Check, Eraser, Loader2 } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useToast } from '../../components/Toast.tsx';
-import { IconButton } from '../../components/ui.tsx';
+import { MonthPicker } from '../../components/ui.tsx';
 import { api } from '../../lib/api.ts';
 import { useAuth } from '../../lib/auth.tsx';
 import { useSchoolPath } from '../../lib/data.ts';
@@ -49,25 +49,9 @@ export const schoolDays = (month: string): DayInfo[] => monthDays(month).filter(
 
 /* ---------- Ortak parçalar ---------- */
 
+/** Ay seçimi: panelin ortak ay seçicisi (bütün sayfalarda tek tip) */
 export function MonthNav({ month, onMonth }: { month: string; onMonth: (m: string) => void }) {
-  return (
-    <div className="flex items-center gap-1 rounded-2xl bg-surface p-1 shadow-[0_1px_2px_rgba(15,23,42,0.05)] ring-1 ring-slate-200">
-      <IconButton label="Önceki ay" onClick={() => onMonth(shiftMonth(month, -1))}>
-        <ChevronLeft className="size-4" />
-      </IconButton>
-      <button
-        type="button"
-        onClick={() => onMonth(currentMonth())}
-        title="Bu aya dön"
-        className="w-32 rounded-lg py-1 text-center text-sm font-semibold text-slate-800 hover:bg-slate-50"
-      >
-        {monthLabel(month)}
-      </button>
-      <IconButton label="Sonraki ay" onClick={() => onMonth(shiftMonth(month, 1))}>
-        <ChevronRight className="size-4" />
-      </IconButton>
-    </div>
-  );
+  return <MonthPicker value={month} onChange={onMonth} />;
 }
 
 export interface Holiday {

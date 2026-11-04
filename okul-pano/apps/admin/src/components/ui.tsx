@@ -1,6 +1,6 @@
 import { WEEKDAY_SHORT } from '@okulpano/shared';
 import clsx from 'clsx';
-import { AlertTriangle, Check, ChevronDown, Eye, EyeOff, Loader2, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, Loader2, Trash2, X } from 'lucide-react';
 import {
   Children,
   Fragment,
@@ -733,4 +733,156 @@ export function Table({ head, children }: { head: ReactNode[]; children: ReactNo
 
 export function Td({ children, className }: { children?: ReactNode; className?: string }) {
   return <td className={clsx('px-4 py-3 align-middle first:pl-5 last:pr-5', className)}>{children}</td>;
+}
+
+/* ---------- Ay seçici (bütün panelde tek tip) ---------- */
+
+const MONTH_NAMES = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+const ym = (y: number, m: number) => `${y}-${String(m).padStart(2, '0')}`;
+const nowMonth = () => {
+  const d = new Date();
+  return ym(d.getFullYear(), d.getMonth() + 1);
+};
+const addMonths = (month: string, n: number) => {
+  const y = Number(month.slice(0, 4));
+  const m = Number(month.slice(5, 7)) - 1 + n;
+  return ym(y + Math.floor(m / 12), (((m % 12) + 12) % 12) + 1);
+};
+/** "2026-11" → "Kasım 2026" */
+export const monthName = (month: string) => `${MONTH_NAMES[Number(month.slice(5, 7)) - 1]} ${month.slice(0, 4)}`;
+
+/**
+ * Ay seçici: "‹ Kasım 2026 ›" şeridi; oklar bir önceki / sonraki aya geçer, ay adına tıklayınca yıl ve 12 ayın ızgarası
+ * açılır ("Bu ay" ile bugüne döner). min / max (YYYY-AA) dışındaki aylar seçilemez. Bütün sayfalarda aynı görünür.
+ */
+export function MonthPicker({
+  value,
+  onChange,
+  min,
+  max,
+  id,
+  className,
+  'aria-label': ariaLabel = 'Ay',
+}: {
+  value: string;
+  onChange: (month: string) => void;
+  min?: string;
+  max?: string;
+  id?: string;
+  className?: string;
+  'aria-label'?: string;
+}) {
+  const valid = /^\d{4}-\d{2}$/.test(value) ? value : nowMonth();
+  const [open, setOpen] = useState(false);
+  const [year, setYear] = useState(Number(valid.slice(0, 4)));
+  const [pos, setPos] = useState<{ left: number; top: number; up: boolean } | null>(null);
+  const label = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const allowed = (m: string) => (!min || m >= min) && (!max || m <= max);
+  const go = (m: string) => {
+    if (!allowed(m)) return;
+    onChange(m);
+    setOpen(false);
+  };
+  const show = () => {
+    const r = label.current?.getBoundingClientRect();
+    if (!r) return;
+    const up = window.innerHeight - r.bottom < 300 && r.top > 300;
+    setPos({ left: Math.max(8, Math.min(r.left + r.width / 2 - 140, window.innerWidth - 288)), top: up ? r.top - 6 : r.bottom + 6, up });
+    setYear(Number(valid.slice(0, 4)));
+    setOpen(true);
+  };
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (!label.current?.contains(t) && !panel.current?.contains(t)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    const hide = () => setOpen(false);
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', esc);
+    window.addEventListener('resize', hide);
+    window.addEventListener('scroll', hide, true);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', esc);
+      window.removeEventListener('resize', hide);
+      window.removeEventListener('scroll', hide, true);
+    };
+  }, [open]);
+  const prev = addMonths(valid, -1);
+  const next = addMonths(valid, 1);
+  const today = nowMonth();
+  return (
+    <div className={clsx('inline-flex h-10 shrink-0 items-center gap-0.5 rounded-xl bg-surface p-1 ring-1 ring-slate-200', className)}>
+      <IconButton label="Önceki ay" disabled={!allowed(prev)} onClick={() => go(prev)} className="size-8! disabled:opacity-30">
+        <ChevronLeft className="size-4" />
+      </IconButton>
+      <button
+        ref={label}
+        id={id}
+        type="button"
+        aria-label={`${ariaLabel}: ${monthName(valid)}`}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => (open ? setOpen(false) : show())}
+        className="flex h-8 min-w-32 flex-1 items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-bold text-ink hover:bg-slate-100"
+      >
+        {monthName(valid)}
+        <ChevronDown className={clsx('size-3.5 text-slate-500 transition-transform', open && 'rotate-180')} />
+      </button>
+      <IconButton label="Sonraki ay" disabled={!allowed(next)} onClick={() => go(next)} className="size-8! disabled:opacity-30">
+        <ChevronRight className="size-4" />
+      </IconButton>
+      {open &&
+        pos &&
+        createPortal(
+          <div
+            ref={panel}
+            role="dialog"
+            aria-label="Ay seç"
+            style={{ left: pos.left, top: pos.top, transform: pos.up ? 'translateY(-100%)' : undefined }}
+            className="fixed z-[70] w-[280px] rounded-2xl border border-slate-200 bg-surface p-3 text-ink shadow-[0_18px_40px_-16px_rgb(0_0_0/0.35),0_2px_6px_rgb(0_0_0/0.06)]"
+          >
+            <div className="mb-2 flex items-center justify-between">
+              <IconButton label="Önceki yıl" disabled={Boolean(min) && year - 1 < Number(min!.slice(0, 4))} onClick={() => setYear((y) => y - 1)} className="size-8! disabled:opacity-30">
+                <ChevronLeft className="size-4" />
+              </IconButton>
+              <span className="text-sm font-extrabold tabular-nums">{year}</span>
+              <IconButton label="Sonraki yıl" disabled={Boolean(max) && year + 1 > Number(max!.slice(0, 4))} onClick={() => setYear((y) => y + 1)} className="size-8! disabled:opacity-30">
+                <ChevronRight className="size-4" />
+              </IconButton>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {MONTH_NAMES.map((n, i) => {
+                const m = ym(year, i + 1);
+                const on = m === valid;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    disabled={!allowed(m)}
+                    onClick={() => go(m)}
+                    className={clsx(
+                      'h-9 rounded-lg text-sm font-semibold transition disabled:cursor-default disabled:opacity-30',
+                      on ? 'bg-ink font-bold text-surface' : 'hover:bg-slate-100',
+                      !on && m === today && 'ring-1 ring-slate-300',
+                    )}
+                  >
+                    {n}
+                  </button>
+                );
+              })}
+            </div>
+            {valid !== today && allowed(today) && (
+              <button type="button" onClick={() => go(today)} className="mt-2 w-full rounded-lg py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100">
+                Bu aya dön ({monthName(today)})
+              </button>
+            )}
+          </div>,
+          document.body,
+        )}
+    </div>
+  );
 }
