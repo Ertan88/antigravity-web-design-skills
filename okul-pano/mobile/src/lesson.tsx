@@ -14,8 +14,11 @@ import { Card, Icon } from './ui.tsx';
 
 export type Lesson = MeToday['lessons'][number];
 
-/** Sınıf renkleri (bento kutuları): haftadaki sınıflara sırayla verilir, aynı sınıf hep aynı renkte */
-const TONES: TileTone[] = ['lilac', 'mint', 'sky', 'peach', 'rose', 'sun'];
+/**
+ * Sınıf renkleri (bento kutuları): haftadaki sınıflara sırayla verilir, aynı sınıf hep aynı renkte. Turuncu (peach) nöbet
+ * kartına ayrılmıştır; şu anki ders kartı nöbet kartıyla aynı renge düşmesin diye sınıflara verilmez.
+ */
+const TONES: TileTone[] = ['lilac', 'mint', 'sky', 'rose', 'sun'];
 export const ACCENT: Record<TileTone, string> = { lilac: '#8b5cf6', mint: '#22c55e', sky: '#0ea5e9', peach: '#f97316', rose: '#f43f5e', sun: '#eab308', ink: '#57534e', paper: '#a8a29e' };
 
 export function classTones(lessons: Lesson[]) {
