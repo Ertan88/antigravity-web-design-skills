@@ -11,7 +11,7 @@ import { Badge, Button, Card, confirm, Empty, ErrorNote, Field, Loading, Screen,
 const PLAN = { trial: 'Deneme', basic: 'Temel', pro: 'Profesyonel' } as const;
 type Filter = 'all' | 'trial' | 'paid' | 'passive';
 
-/** Okullar ve abonelikler: paket, pano sayısı, deneme süresi; destek erişimi süren okula geçiş */
+/** Abonelikler: paket, pano sayısı, deneme süresi; destek erişimi süren okula geçiş */
 export default function Okullar() {
   const schools = usePlatformSchools();
   const openSchool = useOpenSchool();
@@ -30,7 +30,7 @@ export default function Okullar() {
   );
 
   return (
-    <Screen title="Okullar" subtitle="Paketler, pano sayısı ve deneme süreleri" refreshing={schools.isRefetching} onRefresh={() => void schools.refetch()}>
+    <Screen title="Abonelikler" subtitle="Paketler, pano sayısı ve deneme süreleri" refreshing={schools.isRefetching} onRefresh={() => void schools.refetch()}>
       <Field label="Ara" value={q} onChangeText={setQ} placeholder="Okul adı ya da il" />
       <Segmented
         value={filter}

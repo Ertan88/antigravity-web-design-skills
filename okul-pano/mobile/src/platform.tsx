@@ -1,7 +1,7 @@
 import { academicYearOf } from '@okulpano/shared/academicCalendar';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { Text } from './text.tsx';
 import { api } from './api.ts';
 import { membershipLabel, useAuth } from './auth.tsx';
@@ -28,15 +28,10 @@ export function PlatformHome() {
   const signups = useSignups();
   const calendars = useAcademicCalendars();
   const openSchool = useOpenSchool();
-  const qc = useQueryClient();
   const membership = (id: string) => {
     const access = me?.schools.find((s) => s.id === id);
     return access ? membershipLabel(access) : 'Okul';
   };
-  const approve = useMutation({
-    mutationFn: (id: string) => api(`/api/platform/signups/${id}/approve`, { method: 'POST' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['platform'] }),
-  });
 
   const list = schools.data ?? [];
   const now = Date.now();
@@ -51,7 +46,7 @@ export function PlatformHome() {
 
   return (
     <Screen refreshing={schools.isRefetching} onRefresh={() => void Promise.all([schools.refetch(), signups.refetch(), calendars.refetch()])}>
-      <HomeHeader name={me?.user.fullName} school="Platform" role="Platform yöneticisi">
+      <HomeHeader name={me?.user.fullName} role="Platform yöneticisi">
         <MenuButton />
       </HomeHeader>
       <ErrorNote error={schools.error} />
@@ -128,28 +123,7 @@ export function PlatformHome() {
           {waiting.length > 0 && (
             <>
               <SectionTitle>Kayıt onayları</SectionTitle>
-              {waiting.map((s) => (
-                <Card key={s.id} style={{ gap: 6 }}>
-                  <T weight="700">{s.schoolName}</T>
-                  <T size={13} color={colors.muted}>
-                    {s.ownerName} · {s.email}
-                    {s.city ? ` · ${s.city}` : ''} · {timeAgo(s.createdAt)}
-                  </T>
-                  <T size={12} color={colors.muted}>
-                    E-postasını doğrulamadı. Elle onaylarsanız okul açılır, başvuran kendi şifresiyle girer.
-                  </T>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    icon="checkmark"
-                    loading={approve.isPending && approve.variables === s.id}
-                    onPress={() => approve.mutate(s.id)}
-                  >
-                    Onayla ve okulu aç
-                  </Button>
-                </Card>
-              ))}
-              <ErrorNote error={approve.error} />
+              <SignupList />
             </>
           )}
 
@@ -209,3 +183,41 @@ export const initials = (name: string) =>
     .slice(0, 2)
     .map((w) => w.charAt(0).toLocaleUpperCase('tr-TR'))
     .join('');
+
+/** Kayıt onayları: e-postasını doğrulamamış okul başvuruları; elle onaylanınca okul açılır */
+export function SignupList() {
+  const signups = useSignups();
+  const qc = useQueryClient();
+  const approve = useMutation({
+    mutationFn: (id: string) => api(`/api/platform/signups/${id}/approve`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['platform'] }),
+  });
+  const waiting = (signups.data ?? []).filter((s) => !s.expired);
+  if (signups.isLoading) return <Loading />;
+  return (
+    <>
+      <ErrorNote error={signups.error ?? approve.error} />
+      {!waiting.length ? (
+        <Card>
+          <Empty icon="checkmark-done-outline" title="Bekleyen başvuru yok" text="E-postasını doğrulamamış okul başvuruları burada listelenir." />
+        </Card>
+      ) : (
+        waiting.map((s) => (
+          <Card key={s.id} style={{ gap: 6 }}>
+            <T weight="700">{s.schoolName}</T>
+            <T size={13} color={colors.muted}>
+              {s.ownerName} · {s.email}
+              {s.city ? ` · ${s.city}` : ''} · {timeAgo(s.createdAt)}
+            </T>
+            <T size={12} color={colors.muted}>
+              E-postasını doğrulamadı. Elle onaylarsanız okul açılır, başvuran kendi şifresiyle girer.
+            </T>
+            <Button size="sm" variant="secondary" icon="checkmark" loading={approve.isPending && approve.variables === s.id} onPress={() => approve.mutate(s.id)}>
+              Onayla ve okulu aç
+            </Button>
+          </Card>
+        ))
+      )}
+    </>
+  );
+}

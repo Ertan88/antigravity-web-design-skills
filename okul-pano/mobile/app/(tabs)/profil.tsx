@@ -65,7 +65,7 @@ const EMOJI_BY_TITLE: Record<string, Emoji> = {
   'Destek erişimi': { char: '🔐', tone: 'sun' },
   'Destek erişimi olan okullar': { char: '🔑', tone: 'sun' },
   'Platform görünümüne dön': { char: '🧭', tone: 'lilac' },
-  'Okullar ve abonelikler': { char: '🏫', tone: 'sky' },
+  Abonelikler: { char: '🏫', tone: 'sky' },
   'Kayıt onayları': { char: '✅', tone: 'mint' },
   'Sınavlar ve etkinlikler': { char: '🎓', tone: 'lilac' },
 };
@@ -205,8 +205,8 @@ export default function Menu() {
     sections.push({
       title: 'Platform',
       items: [
-        { title: 'Okullar ve abonelikler', subtitle: 'Paketler, pano sayısı, deneme süreleri', icon: 'business-outline', to: '/okullar' },
-        { title: 'Kayıt onayları', subtitle: 'E-postası doğrulanmamış başvurular', icon: 'checkmark-done-outline', to: '/' },
+        { title: 'Abonelikler', subtitle: 'Paketler, pano sayısı, deneme süreleri', icon: 'business-outline', to: '/okullar' },
+        { title: 'Kayıt onayları', subtitle: 'E-postası doğrulanmamış başvurular', icon: 'checkmark-done-outline', to: '/kayit-onaylari' },
         { title: 'MEB çalışma takvimi', subtitle: 'Tara · onayla', icon: 'calendar-outline', to: '/takvim' },
       ],
     });

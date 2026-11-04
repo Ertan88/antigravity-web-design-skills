@@ -14,7 +14,7 @@ type TabName = 'index' | 'onaylar' | 'panolar' | 'nobet' | 'acil' | 'duyurular' 
 
 /**
  * Alt menü role göre kurulur (en çok 5 sekme; geri kalanı profil menüsünde):
- * - Platform yöneticisi: Platform · Okullar · Takvim · Bildirimler
+ * - Platform yöneticisi: Platform · Abonelikler · Takvim · Bildirimler
  * - Okul müdürü ve yönetici: Merkez · Onaylar · Panolar · Nöbet · Acil
  * - Editör: İçerik + yetkilerinden gelen sekmeler (Duyurular, Onaylar, Panolar, Nöbet, Acil) + Bildirimler
  * - Öğretmen: Bugün · Nöbetim · Gözlem · Program · Profil (Duyurular ve İzin bildir ana sayfada, İzinlerim Menü'de)
@@ -79,7 +79,7 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: HOME_TITLE[role], tabBarIcon: icon(...HOME_ICON[role]) }} />
-      <Tabs.Screen name="okullar" options={{ title: 'Okullar', ...hide('okullar'), tabBarIcon: icon('business-outline', 'business') }} />
+      <Tabs.Screen name="okullar" options={{ title: 'Abonelikler', ...hide('okullar'), tabBarIcon: icon('business-outline', 'business') }} />
       <Tabs.Screen name="takvim" options={{ title: 'Takvim', ...hide('takvim'), tabBarIcon: icon('calendar-outline', 'calendar') }} />
       <Tabs.Screen
         name="onaylar"
