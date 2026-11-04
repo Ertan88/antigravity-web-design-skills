@@ -23,7 +23,7 @@ import {
 } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { BellRing, Coffee, CopyPlus, Pencil, Plus, Trash2, Utensils, Wand2 } from 'lucide-react';
+import { BellRing, Check, ChevronDown, Coffee, CopyPlus, Minus, Pencil, Plus, Trash2, Utensils, Wand2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Alert, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Spinner } from '../components/ui.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -290,59 +290,95 @@ function DayScope({ value, onChange, lessonCount }: { value: number[]; onChange:
   );
 }
 
-/** Düzen kimler için: boşsa okul geneli; seçilirse yalnızca bu sınıflar, o gün ders sayıları tutunca (ya da seçili günlerde) */
+/**
+ * Düzen kimler için: boşsa okul geneli; seçilirse yalnızca bu sınıflar, o gün ders sayıları tutunca (ya da seçili günlerde).
+ * Her düzey tek satır (kutusu bütün şubeleri seçer); şubeler yalnızca istenince, bir düzey için açılır.
+ */
 function ClassScope({ classes, value, onChange, lessonCount, days }: { classes: ClassGroup[]; value: string[]; onChange: (ids: string[]) => void; lessonCount: number; days: number[] }) {
+  const [open, setOpen] = useState<string | null>(null);
   const sorted = [...classes].sort((a, b) => compareClassNames(a.name, b.name));
-  const grades = [...new Set(sorted.map((c) => gradeOf(c.name)).filter((g): g is number => g !== null))];
+  const groups: { key: string; title: string; items: ClassGroup[] }[] = [];
+  for (const c of sorted) {
+    const g = gradeOf(c.name);
+    const key = g === null ? 'other' : String(g);
+    let group = groups.find((x) => x.key === key);
+    if (!group) groups.push((group = { key, title: g === null ? 'Diğer sınıflar' : `${g}. sınıflar`, items: [] }));
+    group.items.push(c);
+  }
   const picked = new Set(value);
   const toggle = (ids: string[], on: boolean) => onChange(on ? [...new Set([...value, ...ids])] : value.filter((id) => !ids.includes(id)));
+  // Özet: tamamı seçili düzey "12. sınıflar (7 şube)", kısmen seçilende şube adları
+  const summary = groups.flatMap((g) => {
+    const on = g.items.filter((c) => picked.has(c.id));
+    if (!on.length) return [];
+    return on.length === g.items.length ? [`${g.title} (${g.items.length} şube)`] : [on.map((c) => c.name).join(', ')];
+  });
   return (
     <div className="rounded-xl p-4 ring-1 ring-slate-200/70">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold text-ink">Hangi sınıflar için?</div>
           <p className="text-xs text-slate-500">
             {value.length
               ? `Yalnızca seçili sınıflar, ${days.length ? 'seçili günlerde ders varsa' : `o gün ${lessonCount || 'bu kadar'} dersleri olunca`} bu zile geçer; diğerleri okul geneli zilde kalır.`
-              : `Okul geneli: ${days.length ? 'seçili günlerde' : 'günün ders sayısına göre'} bütün okul için çalar. Belirli sınıflara (ör. 12. sınıflar) özel zil için sınıf seçin.`}
+              : `Okul geneli: ${days.length ? 'seçili günlerde' : 'günün ders sayısına göre'} bütün okul için çalar. Belirli sınıflara (ör. 12. sınıflar) özel zil için düzey ya da şube seçin.`}
           </p>
         </div>
         {value.length > 0 && (
-          <Button size="sm" variant="ghost" onClick={() => onChange([])}>
+          <Button size="sm" variant="secondary" className="shrink-0" onClick={() => onChange([])}>
             Okul geneli yap
           </Button>
         )}
       </div>
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {grades.map((g) => {
-          const ids = sorted.filter((c) => gradeOf(c.name) === g).map((c) => c.id);
-          const all = ids.every((id) => picked.has(id));
+      {summary.length > 0 && <div className="mt-3 rounded-lg bg-tile-peach/60 px-3 py-2 text-xs font-semibold text-tile-peach-ink">Seçili: {summary.join(' · ')}</div>}
+      <div className="mt-3 space-y-1.5">
+        {groups.map((g) => {
+          const ids = g.items.map((c) => c.id);
+          const n = ids.filter((id) => picked.has(id)).length;
+          const all = n === ids.length;
+          const isOpen = open === g.key;
           return (
-            <button
-              key={g}
-              type="button"
-              onClick={() => toggle(ids, !all)}
-              className={clsx('rounded-full px-3 py-1 text-xs font-bold ring-1', all ? 'bg-tile-peach text-tile-peach-ink ring-transparent' : 'ring-slate-200 hover:bg-slate-100')}
-            >
-              {g}. sınıflar
-            </button>
+            <div key={g.key}>
+              <div className={clsx('flex items-center gap-3 rounded-xl px-3 py-2 ring-1', isOpen ? 'ring-2 ring-ink' : 'ring-slate-200')}>
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={all ? 'true' : n ? 'mixed' : 'false'}
+                  aria-label={`${g.title}: bütün şubeler`}
+                  onClick={() => toggle(ids, !all)}
+                  className={clsx('grid size-[18px] shrink-0 place-items-center rounded-[5px] border-2', n ? 'border-ink bg-ink text-surface' : 'border-slate-400')}
+                >
+                  {all ? <Check className="size-3" strokeWidth={3.5} /> : n ? <Minus className="size-3" strokeWidth={3.5} /> : null}
+                </button>
+                <button type="button" onClick={() => toggle(ids, !all)} className="w-28 text-left text-sm font-bold text-ink">
+                  {g.title}
+                </button>
+                <span className="text-xs text-slate-500">
+                  {ids.length} şube{all ? ' · hepsi seçili' : n ? ` · ${n} seçili` : ''}
+                </span>
+                <button type="button" onClick={() => setOpen(isOpen ? null : g.key)} className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-ink" aria-expanded={isOpen}>
+                  <ChevronDown className={clsx('size-3.5 transition-transform', isOpen && 'rotate-180')} /> şubeler
+                </button>
+              </div>
+              {isOpen && (
+                <div className="flex flex-wrap gap-1.5 py-2 pl-9">
+                  {g.items.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => toggle([c.id], !picked.has(c.id))}
+                      aria-pressed={picked.has(c.id)}
+                      className={clsx('rounded-full px-3 py-1 text-xs font-semibold ring-1', picked.has(c.id) ? 'bg-ink text-surface ring-ink' : 'text-slate-600 ring-slate-200 hover:bg-slate-50')}
+                    >
+                      {c.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
-      {value.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {sorted.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => toggle([c.id], !picked.has(c.id))}
-              className={clsx('rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1', picked.has(c.id) ? 'bg-ink text-surface ring-ink' : 'text-slate-500 ring-slate-200')}
-            >
-              {c.name}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
