@@ -1,4 +1,4 @@
-import type { Period } from '@okulpano/shared/bell';
+import { lunchBeforeNo, type Period } from '@okulpano/shared/bell';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Text } from '../src/text.tsx';
@@ -53,9 +53,11 @@ export function ProgramimScreen({ back }: { back?: boolean }) {
     const last = s.slots.reduce((m, x, i) => (x.lesson ? i : m), -1);
     if (last < 0) continue;
     if (sections.length > 1) items.push({ kind: 'shift', label: s.shift === 'morning' ? 'Sabahçı' : 'Öğlenci' });
+    // Öğle arası: günün en uzun arası (panodaki hesapla aynı); öteki aralar teneffüs, satır olarak yazılmaz
+    const lunchNo = lunchBeforeNo(s.slots.map((x) => x.period), data.lunchThresholdMin);
     s.slots.slice(0, last + 1).forEach((x, i, arr) => {
       const prev = arr[i - 1];
-      if (prev && toMin(x.period.start) - toMin(prev.period.end) >= 25) items.push({ kind: 'lunch', from: prev.period.end, to: x.period.start });
+      if (prev && x.period.no === lunchNo) items.push({ kind: 'lunch', from: prev.period.end, to: x.period.start });
       items.push({ kind: 'slot', period: x.period, lesson: x.lesson });
     });
   }

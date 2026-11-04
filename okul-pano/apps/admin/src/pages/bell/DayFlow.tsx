@@ -2,6 +2,8 @@ import {
   compressDay,
   computeBellStatus,
   endAfter,
+  lunchBeforeNo,
+  lunchIndex,
   parseClock,
   periodLabel,
   ringNow,
@@ -222,11 +224,13 @@ export function DayFlow({
     const baseByNo = new Map(base.map((p) => [p.no, p]));
     const live = opts.bellsFor.map(status).find((s) => s && (s.kind === 'lesson' || s.kind === 'break'));
     const prevOf = (i: number) => (i === 0 ? (opts.leadGap ?? null) : periods[i - 1]!);
+    // Öğle arası: zilin bütün günündeki en uzun ara (liste günün bir parçası olabilir)
+    const lunchNos = new Set(opts.bellsFor.map((b) => lunchBeforeNo(b.periods, lunchThresholdMin)));
     periods.forEach((p, i) => {
       const prev = prevOf(i);
       if (prev) {
         const gap = toMin(p.start) - toMin(prev.end);
-        const lunch = gap >= lunchThresholdMin;
+        const lunch = lunchNos.has(p.no);
         const gapNow = live?.kind === 'break' && live.prev.no === prev.no;
         const baseGap = baseByNo.get(p.no) && baseByNo.get(prev.no) ? toMin(baseByNo.get(p.no)!.start) - toMin(baseByNo.get(prev.no)!.end) : gap;
         items.push(
@@ -368,7 +372,7 @@ export function DayFlow({
     flow = <p className="p-6 text-sm text-slate-500">Bu gün ders yok.</p>;
   } else if (shown.length === 1) {
     const ps = first.periods;
-    const lunchAt = ps.findIndex((p, i) => i > 0 && toMin(p.start) - toMin(ps[i - 1]!.end) >= lunchThresholdMin);
+    const lunchAt = lunchIndex(ps, lunchThresholdMin);
     const halves = lunchAt > 0 ? [ps.slice(0, lunchAt), ps.slice(lunchAt)] : [ps];
     flow = (
       <div className={clsx('grid gap-x-8 p-4 sm:p-6', halves.length > 1 && 'lg:grid-cols-2')}>

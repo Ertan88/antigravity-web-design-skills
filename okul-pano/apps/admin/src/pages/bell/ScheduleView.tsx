@@ -1,4 +1,4 @@
-import { computeBellStatus, halfDayPeriods, parseClock, periodLabel, pickSchedule, sortPeriods, WEEKDAY_NAMES, WEEKDAY_SHORT, zonedParts, type Period } from '@okulpano/shared';
+import { computeBellStatus, halfDayPeriods, lunchIndex, parseClock, periodLabel, pickSchedule, sortPeriods, WEEKDAY_NAMES, WEEKDAY_SHORT, zonedParts, type Period } from '@okulpano/shared';
 import clsx from 'clsx';
 import { BellRing, CalendarOff, Clock, Coffee, CopyPlus, Pencil, Sunrise, Sunset, Utensils } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -12,6 +12,7 @@ type Segment =
 
 function segments(periods: Period[], lunchMin: number): Segment[] {
   const sorted = sortPeriods(periods);
+  const lunchAt = lunchIndex(sorted, lunchMin);
   const out: Segment[] = [];
   sorted.forEach((p, i) => {
     const start = parseClock(p.start);
@@ -20,7 +21,7 @@ function segments(periods: Period[], lunchMin: number): Segment[] {
     const next = sorted[i + 1];
     if (next) {
       const ns = parseClock(next.start);
-      if (ns > end) out.push({ kind: ns - end >= lunchMin * 60 ? 'lunch' : 'break', start: end, end: ns });
+      if (ns > end) out.push({ kind: i + 1 === lunchAt ? 'lunch' : 'break', start: end, end: ns });
     }
   });
   return out;

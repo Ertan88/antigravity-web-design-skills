@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeBellStatus, generatePeriods, pickSchedule, validatePeriods, type Period } from './bell.ts';
+import { computeBellStatus, generatePeriods, lunchIndex, pickSchedule, validatePeriods, type Period } from './bell.ts';
 import { parseClock } from './time.ts';
 
 const periods: Period[] = generatePeriods({
@@ -47,6 +47,24 @@ describe('computeBellStatus', () => {
   it('uzun arayı öğle arası olarak tanır', () => {
     const s = computeBellStatus(periods, parseClock('12:00'));
     expect(s).toMatchObject({ kind: 'break', isLunch: true, remainingSec: 25 * 60 });
+  });
+
+  it('öğle arası eşiği teneffüs süresine eşit ya da altında girilse de teneffüsler teneffüs kalır', () => {
+    expect(computeBellStatus(periods, parseClock('09:12'), 10)).toMatchObject({ kind: 'break', isLunch: false });
+    expect(computeBellStatus(periods, parseClock('12:00'), 10)).toMatchObject({ kind: 'break', isLunch: true });
+    // Öğle arası olmayan gün (aralar eşit): eşik düşük olsa da öğle arası yok
+    const flat = generatePeriods({ firstStart: '08:30', lessonMin: 40, breakMin: 15, count: 5 });
+    expect(lunchIndex(flat, 10)).toBe(-1);
+    expect(computeBellStatus(flat, parseClock('09:15'), 10)).toMatchObject({ kind: 'break', isLunch: false });
+  });
+
+  it('öğle arası günün en uzun arasıdır ve günde bir tanedir', () => {
+    expect(lunchIndex(periods)).toBe(4);
+    // Arife: dersler öğleden önce bitince öğle arası kalmaz
+    expect(lunchIndex(periods.slice(0, 4), 10)).toBe(-1);
+    // Tek ara eşikten uzunsa öğle arası
+    expect(lunchIndex(periods.slice(3, 5))).toBe(1);
+    expect(lunchIndex(periods.slice(0, 2))).toBe(-1);
   });
 
   it('ders bitiş anında teneffüse geçer (sınır değeri)', () => {

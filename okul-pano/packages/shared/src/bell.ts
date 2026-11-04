@@ -80,8 +80,29 @@ export function pickSchedule<T extends BellScheduleLike>(
 }
 
 /**
- * Zil durumunu hesaplar. İki ders arasındaki boşluk `lunchThresholdMin` dakikadan
- * uzunsa öğle arası, değilse teneffüs kabul edilir.
+ * Öğle arası: günün en uzun arası; eşikten (`lunchThresholdMin`) kısa değilse ve öteki aralardan uzunsa. Bütün aralar
+ * aynı uzunluktaysa (eşik teneffüs süresine eşit ya da altında girilmiş olsa bile) öğle arası yoktur; günde en çok bir
+ * öğle arası olur. Döner: öğle arasından sonraki dersin saate göre sıralı listedeki yeri; yoksa -1.
+ */
+export function lunchIndex(periods: readonly Period[], lunchThresholdMin = 30): number {
+  const sorted = sortPeriods(periods);
+  const gaps = sorted.slice(1).map((p, i) => parseClock(p.start) - parseClock(sorted[i]!.end));
+  if (!gaps.length) return -1;
+  const max = Math.max(...gaps);
+  const min = Math.min(...gaps);
+  if (max < lunchThresholdMin * 60 || (gaps.length > 1 && max <= min)) return -1;
+  return gaps.indexOf(max) + 1;
+}
+
+/** Öğle arasından sonraki dersin numarası (yoksa null): parça parça çizilen listelerde aranın öğle olup olmadığı için */
+export function lunchBeforeNo(periods: readonly Period[], lunchThresholdMin = 30): number | null {
+  const i = lunchIndex(periods, lunchThresholdMin);
+  return i < 0 ? null : sortPeriods(periods)[i]!.no;
+}
+
+/**
+ * Zil durumunu hesaplar. İki ders arasındaki boşluk günün öğle arasıysa (bkz. `lunchIndex`) öğle arası, değilse
+ * teneffüs kabul edilir.
  */
 export function computeBellStatus(
   periods: readonly Period[],
@@ -98,6 +119,7 @@ export function computeBellStatus(
     return { kind: 'before', next: first, remainingSec: firstStart - secondsOfDay };
   }
 
+  const lunchAt = lunchIndex(sorted, lunchThresholdMin);
   for (let i = 0; i < sorted.length; i++) {
     const p = sorted[i]!;
     const start = parseClock(p.start);
@@ -118,7 +140,7 @@ export function computeBellStatus(
         const totalSec = nextStart - end;
         return {
           kind: 'break',
-          isLunch: totalSec >= lunchThresholdMin * 60,
+          isLunch: i + 1 === lunchAt,
           prev: p,
           next,
           remainingSec: nextStart - secondsOfDay,
@@ -224,16 +246,17 @@ export function setLessonLength(periods: readonly Period[], no: number, lessonMi
 
 /**
  * Kısaltılmış gün: ilk ders aynı saatte başlar; her ders `lessonMin`, teneffüsler `breakMin` dakika olur, öğle arası
- * (eşikten uzun ara) aynı süresiyle korunur.
+ * (bkz. `lunchIndex`) aynı süresiyle korunur.
  */
 export function compressDay(periods: readonly Period[], lessonMin: number, breakMin: number, lunchThresholdMin = 30): Period[] {
   const sorted = sortPeriods(periods);
   if (!sorted.length) return sorted;
   let t = parseClock(sorted[0]!.start);
+  const lunchAt = lunchIndex(sorted, lunchThresholdMin);
   return sorted.map((p, i) => {
     if (i > 0) {
       const gap = parseClock(p.start) - parseClock(sorted[i - 1]!.end);
-      t += gap >= lunchThresholdMin * 60 ? gap : breakMin * 60;
+      t += i === lunchAt ? gap : breakMin * 60;
     }
     const out = { ...p, start: formatClock(Math.min(DAY_MAX, t)), end: formatClock(Math.min(DAY_MAX, t + lessonMin * 60)) };
     t += lessonMin * 60;

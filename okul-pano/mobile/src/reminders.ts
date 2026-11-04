@@ -1,4 +1,4 @@
-import type { Period } from '@okulpano/shared/bell';
+import { lunchIndex, type Period } from '@okulpano/shared/bell';
 import { useEffect, useState } from 'react';
 import { useMeToday, useMyDuties } from './data.ts';
 import { scheduleReminders } from './push.ts';
@@ -137,9 +137,9 @@ export function buildReminders(me: MeToday, duties: MyDuties, s: ReminderSetting
         out.push({ at: at(d.date, p.end), title: `Teneffüs · nöbet yeriniz ${area}`, body: `${next.start}'de ${next.no}. ders başlar`, url: '/nobet' });
       });
     if (s.transport.on && transport) {
-      // Öğle arası: teneffüsten uzun ilk ara
-      const lunchIdx = periods.findIndex((p, i) => i < periods.length - 1 && toMin(periods[i + 1]!.start) - toMin(p.end) >= me.lunchThresholdMin);
-      if (lunchIdx >= 0) out.push({ at: at(d.date, addMin(periods[lunchIdx]!.end, -10)), title: 'Öğle nöbeti 10 dk sonra', body: 'Taşımalı öğrencilerin öğle yemeği', url: '/nobet' });
+      // Öğle arası: günün en uzun arası (panodaki hesapla aynı)
+      const lunchAt = lunchIndex(periods, me.lunchThresholdMin);
+      if (lunchAt > 0) out.push({ at: at(d.date, addMin(periods[lunchAt - 1]!.end, -10)), title: 'Öğle nöbeti 10 dk sonra', body: 'Taşımalı öğrencilerin öğle yemeği', url: '/nobet' });
       out.push({ at: at(d.date, addMin(last.end, -10)), title: 'Servis nöbeti 10 dk sonra', body: `Son ders ${last.end}'de biter · taşımalı öğrencilerin uğurlanması`, url: '/nobet' });
     }
     if (s.logbook.on && mine.length) out.push({ at: at(d.date, addMin(last.end, 5)), title: 'Nöbet defteri', body: 'Nöbet defterini imzalamayı unutmayın', url: '/nobet' });

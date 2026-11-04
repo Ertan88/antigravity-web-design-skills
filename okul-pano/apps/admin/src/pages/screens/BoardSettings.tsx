@@ -205,7 +205,7 @@ export function Appearance({ editable }: { editable: boolean }) {
               </Select>
             )}
           </Field>
-          <Field label="Öğle arası eşiği (dk)" help="Bundan uzun aralar 'Öğle Arası' yazar">
+          <Field label="Öğle arası eşiği (dk)" help="Günün en uzun arası bundan uzunsa 'Öğle Arası' yazar; öteki aralar teneffüs">
             {(id) => <Input id={id} type="number" min={10} max={180} disabled={!editable} value={s.lunchThresholdMin} onChange={(e) => set('lunchThresholdMin', Number(e.target.value))} />}
           </Field>
         </div>
