@@ -25,6 +25,7 @@ import {
   displayPairings,
   duties,
   dutySubstitutions,
+  bellOverrides,
   dutySupervisors,
   exams,
   schools,
@@ -113,7 +114,7 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
 
   const settingsEarly = schoolSettingsSchema.parse(school.settings ?? {});
 
-  const [examRows, dutyRows, holidayRows, supervisorRows, transportRows, leaveRows, birthdayRows, annRows, tickerRows, bellRows, ttRows, achievementRows, eventRows, bookRows, rssRows, subRows] = await Promise.all([
+  const [examRows, dutyRows, holidayRows, supervisorRows, transportRows, leaveRows, birthdayRows, annRows, tickerRows, bellRows, ttRows, achievementRows, eventRows, bookRows, rssRows, subRows, overrideRows] = await Promise.all([
     db
       .select({ id: exams.id, title: exams.title, examAt: exams.examAt })
       .from(exams)
@@ -237,6 +238,11 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
       .from(dutySubstitutions)
       .innerJoin(teachers, eq(teachers.id, dutySubstitutions.teacherId))
       .where(and(eq(dutySubstitutions.schoolId, id), gte(dutySubstitutions.date, today), lte(dutySubstitutions.date, weekAheadDate))),
+    // Zil saatlerine elle müdahaleler (bugünden bir hafta)
+    db
+      .select({ date: bellOverrides.date, target: bellOverrides.target, periods: bellOverrides.periods, note: bellOverrides.note })
+      .from(bellOverrides)
+      .where(and(eq(bellOverrides.schoolId, id), gte(bellOverrides.date, today), lte(bellOverrides.date, weekAheadDate))),
   ]);
 
   const iso = (d: Date | null) => (d ? d.toISOString() : null);
@@ -290,7 +296,8 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
       endsAt: iso(a.endsAt),
     })),
     ticker: tickerRows.map((t) => ({ id: t.id, text: t.text, startsAt: iso(t.startsAt), endsAt: iso(t.endsAt) })),
-    bellSchedules: bellRows.map((b) => ({ id: b.id, name: b.name, weekdays: b.weekdays, periods: b.periods, sortOrder: b.sortOrder, lessonCount: b.lessonCount, shift: b.shift })),
+    bellSchedules: bellRows.map((b) => ({ id: b.id, name: b.name, weekdays: b.weekdays, periods: b.periods, sortOrder: b.sortOrder, lessonCount: b.lessonCount, shift: b.shift, classIds: b.classIds ?? null })),
+    bellOverrides: overrideRows,
     timetable: mergeCells(ttRows),
     classes: [...classRows].sort((a, b) => compareClassNames(a.name, b.name)),
     achievements: achievementRows.map((a) => ({

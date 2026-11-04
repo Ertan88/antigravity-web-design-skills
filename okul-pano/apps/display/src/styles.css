@@ -3183,3 +3183,20 @@ p {
 :is(.style-bento, .style-vivid) .school-logo-icon {
   color: inherit;
 }
+
+/* Aynı anda başka zil çalan sınıflar (sınıfa özel düzen): kartın altında tek satır */
+.bell-extra {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, currentColor 9%, transparent);
+  font-size: 15px;
+  font-weight: 700;
+}
+.bell-extra-label {
+  opacity: 0.75;
+  font-weight: 600;
+}

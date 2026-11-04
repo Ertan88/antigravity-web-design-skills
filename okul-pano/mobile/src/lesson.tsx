@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { useNow, type MeToday } from './data.ts';
-import { classLabel, dayBellPeriods, greeting, teacherDay } from './day.ts';
+import { classDayPeriods, classLabel, dateOfWeekday, dayBellPeriods, greeting, teacherDay } from './day.ts';
 import { Text } from './text.tsx';
 import { colors, tiles, type TileTone } from './theme.ts';
 import { Card, Icon } from './ui.tsx';
@@ -27,14 +27,27 @@ export const toMin = (hm: string) => Number(hm.slice(0, 2)) * 60 + Number(hm.sli
 export const duration = (min: number) => (min >= 60 ? `${Math.floor(min / 60)} sa${min % 60 ? ` ${min % 60} dk` : ''}` : `${min} dk`);
 export const shiftOf = (data: Pick<MeToday, 'dualShift'>, l: Lesson): Shift => (data.dualShift && l.shift === 'afternoon' ? 'afternoon' : 'morning');
 
-/** Bir günün ders saatleri ve o saatteki ders (ikili öğretimde vardiya vardiya); arifede yarım gün saatinden sonrası düşer */
-export function daySlots(data: MeToday, weekday: number, endsAt?: string | null) {
+/**
+ * Bir günün ders saatleri ve o saatteki ders (ikili öğretimde vardiya vardiya); arifede yarım gün saatinden sonrası düşer.
+ * Sınıfa özel zile geçen sınıftaki dersin saati o zilden gelir (ör. 12. sınıfların 11 dersli günü); tarih verilmezse
+ * bu haftanın o günü.
+ */
+export function daySlots(data: MeToday, weekday: number, endsAt?: string | null, date?: string) {
+  const day = date ?? dateOfWeekday(data.today, weekday);
   const lessons = data.lessons.filter((l) => l.weekday === weekday);
   const shifts: Shift[] = data.dualShift ? [...new Set(lessons.map((l) => shiftOf(data, l)))].sort() : ['morning'];
   return shifts.map((shift) => {
-    let periods = dayBellPeriods(data, weekday, shift);
-    if (endsAt) periods = periods.filter((p) => p.start < endsAt);
-    return { shift, slots: periods.map((period) => ({ period, lesson: lessons.find((l) => l.periodNo === period.no && shiftOf(data, l) === shift) })) };
+    const school = dayBellPeriods(data, weekday, shift, day);
+    const mine = lessons.filter((l) => shiftOf(data, l) === shift);
+    const slots = new Map<number, { period: Period; lesson?: Lesson }>(school.map((p) => [p.no, { period: p }]));
+    for (const l of mine) {
+      const period = classDayPeriods(data, day, l.classId, shift).find((p) => p.no === l.periodNo);
+      if (period) slots.set(l.periodNo, { period, lesson: l });
+    }
+    const list = [...slots.values()]
+      .filter((x) => !endsAt || x.period.start < endsAt)
+      .sort((a, b) => toMin(a.period.start) - toMin(b.period.start) || a.period.no - b.period.no);
+    return { shift, slots: list };
   });
 }
 
@@ -45,7 +58,7 @@ export function liveLesson(data: MeToday, now: Date) {
   const today = teacherDay(data, now);
   if (today.holiday || today.now.weekday > 7) return null;
   const nowMin = Math.floor(today.now.secondsOfDay / 60);
-  const slots = daySlots(data, today.now.weekday, today.endsAt).flatMap((s) => s.slots.filter((x): x is Slot => Boolean(x.lesson)));
+  const slots = daySlots(data, today.now.weekday, today.endsAt, today.now.isoDate).flatMap((s) => s.slots.filter((x): x is Slot => Boolean(x.lesson)));
   const same = (a: Slot, b: Slot) => a.lesson.className === b.lesson.className && a.lesson.subject === b.lesson.subject;
   const i = slots.findIndex((s) => toMin(s.period.start) <= nowMin && nowMin < toMin(s.period.end));
   const current = i >= 0 ? slots[i]! : null;

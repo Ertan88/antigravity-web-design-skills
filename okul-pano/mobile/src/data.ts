@@ -1,5 +1,6 @@
 import { academicYearOf, type AcademicCalendarData } from '@okulpano/shared/academicCalendar';
 import type { BellScheduleLike } from '@okulpano/shared/bell';
+import type { BellClass, BellOverrideLike } from '@okulpano/shared/schoolDay';
 import type { ScreenLiveStatus } from '@okulpano/shared/control';
 import type { AnnouncementDesign } from '@okulpano/shared/designs';
 import type { EmergencyType } from '@okulpano/shared/emergency';
@@ -34,6 +35,10 @@ export interface MeToday {
   dualShift?: boolean;
   /** Günün ders sayısı ("<vardiya>:<gün>"); zil düzeni buna göre seçilir */
   lessonCounts?: Record<string, number> | null;
+  /** Sınıfların gün gün ders sayıları: sınıfa özel zil (ör. 12. sınıfların 11 dersli günü) bundan seçilir */
+  bellClasses?: BellClass[] | null;
+  /** Zil saatlerine elle müdahaleler (tarih ve zile göre) */
+  bellOverrides?: BellOverrideLike[];
   lessons: { weekday: number; periodNo: number; className: string; classId?: string; shift?: 'morning' | 'afternoon' | null; subject: string }[];
   leaves: { id: string; startDate: string; endDate: string; note: string | null; status: 'approved' | 'pending' | 'rejected' }[];
   week: {

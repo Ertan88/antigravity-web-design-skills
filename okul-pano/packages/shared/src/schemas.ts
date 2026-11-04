@@ -590,11 +590,29 @@ export const bellScheduleSchema = z
     lessonCount: z.number().int().min(1).max(30).nullable().default(null),
     /** İkili öğretimde vardiya (boş: sabahçı) */
     shift: z.enum(['morning', 'afternoon']).nullable().default(null),
+    /** Sınıfa özel düzen: yalnızca bu sınıflar (boş: okul geneli) */
+    classIds: z.array(id).max(300).nullable().default(null),
   })
   .superRefine((v, ctx) => {
     const problem = validatePeriods(v.periods);
     if (problem) ctx.addIssue({ code: 'custom', path: ['periods'], message: problem });
   });
+
+/** Bir günün zil saatlerine elle müdahale (yalnızca o tarih ve o zil) */
+export const bellOverrideSchema = z
+  .object({
+    date: isoDate,
+    target: z.string().regex(/^(school:(morning|afternoon)|schedule:[0-9a-f-]{36})$/, 'Geçersiz zil'),
+    periods: z.array(periodSchema).min(1, 'En az bir ders saati kalmalı').max(30),
+    note: optionalText(120),
+    /** Öğretmenlere telefon bildirimi gönderilsin mi */
+    notify: z.boolean().default(false),
+  })
+  .superRefine((v, ctx) => {
+    const problem = validatePeriods(v.periods);
+    if (problem) ctx.addIssue({ code: 'custom', path: ['periods'], message: problem });
+  });
+export type BellOverrideInput = z.infer<typeof bellOverrideSchema>;
 
 export const timetableEntrySchema = z.object({
   weekday,

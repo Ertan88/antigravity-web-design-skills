@@ -95,7 +95,7 @@ const DAY_NAMES = ['', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 
 
 /** O günün zil saatleri (arifede yarım gün saatinden sonrası düşer) */
 function periodsOf(me: MeToday, date: string, weekday: number): Period[] {
-  let periods = dayBellPeriods(me, weekday);
+  let periods = dayBellPeriods(me, weekday, 'morning', date);
   if (me.halfDays?.some((h) => h.date === date) && me.halfDayEnd) periods = periods.filter((p) => p.start < me.halfDayEnd!);
   return periods;
 }

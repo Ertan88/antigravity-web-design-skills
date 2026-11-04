@@ -1,4 +1,5 @@
 import type { BellScheduleLike } from './bell.ts';
+import type { BellOverrideLike } from './schoolDay.ts';
 import type { BoardLayout } from './layout.ts';
 import type { AnnouncementDesign } from './designs.ts';
 import type { DisplayEmergency } from './emergency.ts';
@@ -58,6 +59,8 @@ export interface DisplayState {
   books?: { id: string; title: string; author: string; coverUrl: string | null; note: string | null; startsAt: string | null; endsAt: string | null }[];
   /** Kayan yazıya eklenen RSS başlıkları (ör. MEB duyuruları) */
   rss?: { source: string; title: string }[];
+  /** Zil saatlerine elle müdahaleler (bugünden itibaren; tarih ve zile göre) */
+  bellOverrides?: BellOverrideLike[];
   /** Nöbet yerine görevlendirme: o tarihte nöbeti başka öğretmen tutar */
   dutySubstitutions?: { date: string; dutyId: string; teacherName: string }[];
 }

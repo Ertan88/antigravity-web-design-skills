@@ -130,3 +130,18 @@ export function shortClassLabeler(allNames: readonly string[]): (name: string) =
     return `${p.program && p.program !== main ? `${p.program} ` : ''}${p.grade}/${p.section}`;
   };
 }
+
+/**
+ * Bir sınıf kümesinin kısa adı: bir düzeyin bütün şubeleriyse "12. sınıflar", birkaç düzeyin bütün şubeleriyse
+ * "11 ve 12. sınıflar", değilse birleşik ad ("AMP 12-AB"). `all` okulun bütün sınıf adlarıdır.
+ */
+export function classSetLabel(names: readonly string[], all: readonly string[]): string {
+  if (!names.length) return '';
+  const grades = [...new Set(names.map(gradeOf))];
+  const whole = grades.every((g) => g !== null && all.filter((n) => gradeOf(n) === g).every((n) => names.includes(n)));
+  if (whole && grades.length <= 3) {
+    const sorted = (grades as number[]).sort((a, b) => a - b);
+    return `${sorted.length > 1 ? `${sorted.slice(0, -1).join(', ')} ve ${sorted.at(-1)}` : sorted[0]}. sınıflar`;
+  }
+  return joinClassNames([...names]);
+}

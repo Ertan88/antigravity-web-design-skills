@@ -610,11 +610,33 @@ export const bellSchedules = pgTable(
     lessonCount: integer('lesson_count'),
     /** İkili öğretimde vardiya (boş: sabahçı) */
     shift: text('shift').$type<'morning' | 'afternoon'>(),
+    /** Sınıfa özel düzen: yalnızca bu sınıflar (boş: okul geneli) */
+    classIds: jsonb('class_ids').$type<string[] | null>(),
     sortOrder: sortOrder(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [index('bell_schedules_school_idx').on(t.schoolId)],
+);
+
+/**
+ * Zil saatlerine elle müdahale: yalnızca o tarih ve o zil için (`school:<vardiya>` ya da `schedule:<id>`).
+ * Düzen değişmez; tarih geçince etkisi kalmaz, kayıt geçmiş olarak durur.
+ */
+export const bellOverrides = pgTable(
+  'bell_overrides',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    date: date('date', { mode: 'string' }).notNull(),
+    target: text('target').notNull(),
+    periods: jsonb('periods').$type<Period[]>().notNull(),
+    note: text('note'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex('bell_overrides_school_date_target_uq').on(t.schoolId, t.date, t.target)],
 );
 
 export const timetableEntries = pgTable(

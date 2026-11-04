@@ -1,9 +1,10 @@
 import { computeBellStatus, scheduleLessonCount, type BellScheduleLike, type Period, type Shift } from './bell.ts';
-import { isoWeekday, lessonCountKey, schoolDay, type SchoolCalendar } from './schoolDay.ts';
+import { classBell, dayBells, isoWeekday, lessonCountKey, schoolDay, type BellClass, type DayBell, type SchoolCalendar } from './schoolDay.ts';
 import { parseClock } from './time.ts';
 
 /*
- * Zil düzeni: okulda tek zil çalar ve zil o günün ders sayısına göre değişir. Hiçbir saat ya da ders sayısı
+ * Zil düzeni: okul geneli zil o günün ders sayısına göre değişir; sınıfa özel düzenler (ör. 12. sınıfların 11 dersli
+ * günü) yalnızca seçili sınıflar için, ders sayıları tutan günlerde çalar. Hiçbir saat ya da ders sayısı
  * sabit değildir: okul "N derslik gün" düzenlerini tanımlar, sistem her gün ders programına bakıp uyanı seçer.
  * İkili öğretimde her vardiyanın (sabahçı / öğlenci) ders sayısı ve zili ayrıdır.
  */
@@ -40,6 +41,23 @@ export function lessonCounts(
   return out;
 }
 
+/** Sınıfların her hafta günü son ders numarası (sınıfa özel zil ve okul geneli ders sayısı için); program yoksa null */
+export function bellClassDays(
+  entries: readonly { weekday: number; periodNo: number; classId?: string | null; classGroupId?: string | null }[],
+  classes: readonly ClassBell[],
+): BellClass[] | null {
+  if (!entries.length) return null;
+  const counts = new Map<string, Record<number, number>>();
+  for (const e of entries) {
+    const id = e.classId ?? e.classGroupId;
+    if (!id) continue;
+    const c = counts.get(id) ?? {};
+    c[e.weekday] = Math.max(c[e.weekday] ?? 0, e.periodNo);
+    counts.set(id, c);
+  }
+  return classes.map((c) => ({ id: c.id, name: c.name, bellExempt: c.bellExempt ?? false, shift: c.shift ?? null, counts: counts.get(c.id) ?? {} }));
+}
+
 /** Sınıfları o gün en geç bitenler (gün kartındaki "en geç biten" bilgisi için) */
 export function latestClasses(
   entries: readonly { weekday: number; periodNo: number; classGroupId: string }[],
@@ -67,7 +85,7 @@ function currentNo(periods: readonly Period[], secondsOfDay: number, lunchThresh
   return p?.no ?? null;
 }
 
-/** Şu an derste olan kayıtlar: o ders saatinde dersi olmayan sınıf listelenmez; ikili öğretimde o saatteki vardiya */
+/** Şu an derste olan kayıtlar: her sınıf kendi zilinin o anki dersine göre; ikili öğretimde o saatteki vardiya */
 export function lessonsNow<E extends { weekday: number; periodNo: number; classId?: string | null }>(
   entries: readonly E[],
   date: string,
@@ -79,12 +97,27 @@ export function lessonsNow<E extends { weekday: number; periodNo: number; classI
 ): E[] {
   const weekday = isoWeekday(date);
   const byId = new Map(classes.map((c) => [c.id, c]));
+  const c = { ...cal, dualShift };
   // İkili öğretimde yalnızca o saatteki vardiya (sabah öğlenci sınıflar "sıradaki ders" olarak görünmez)
-  const active = boardBell(date, cal, dualShift, secondsOfDay);
-  const no = currentNo(active.periods, secondsOfDay, lunchThresholdMin);
-  const now: Record<Shift, number | null> = { morning: null, afternoon: null };
-  now[active.shift] = no;
-  return entries.filter((e) => e.weekday === weekday && now[classShift(byId.get(e.classId ?? ''), dualShift)] === e.periodNo);
+  const active = boardBell(date, c, dualShift, secondsOfDay);
+  const bells = dayBells(date, c);
+  const nos = new Map<string, number | null>();
+  const noOf = (b: DayBell | null) => {
+    if (!b) return null;
+    if (!nos.has(b.target)) nos.set(b.target, currentNo(b.periods, secondsOfDay, lunchThresholdMin));
+    return nos.get(b.target)!;
+  };
+  return entries.filter((e) => {
+    if (e.weekday !== weekday) return false;
+    const shift = classShift(byId.get(e.classId ?? ''), dualShift);
+    if (shift !== active.shift) return false;
+    return noOf(classBell(bells, e.classId, shift)) === e.periodNo;
+  });
+}
+
+/** Panoda ana zilin yanında gösterilecek diğer ziller (aynı vardiyada o gün çalan sınıfa özel düzenler) */
+export function otherBells(date: string, cal: SchoolCalendar, shift: Shift): DayBell[] {
+  return dayBells(date, cal).filter((b) => b.classIds && b.shift === shift && b.periods.length);
 }
 
 /**
@@ -92,6 +125,7 @@ export function lessonsNow<E extends { weekday: number; periodNo: number; classI
  * öğlenci zili.
  */
 export function boardBell(date: string, cal: SchoolCalendar, dualShift: boolean, secondsOfDay: number): { shift: Shift; periods: Period[] } {
+  cal = { ...cal, dualShift };
   const morning = schoolDay(date, cal, 'morning').periods;
   if (!dualShift) return { shift: 'morning', periods: morning };
   const afternoon = schoolDay(date, cal, 'afternoon').periods;

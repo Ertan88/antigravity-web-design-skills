@@ -25,7 +25,15 @@ export interface BellScheduleLike {
   lessonCount?: number | null;
   /** İkili öğretimde hangi vardiyanın zili (boş: sabahçı) */
   shift?: Shift | null;
+  /**
+   * Sınıfa özel düzen: yalnızca bu sınıflar için ve sınıfın o günkü ders sayısı düzenin ders sayısına eşitse
+   * (ya da düzen o güne sabitlenmişse) çalar. Boşsa okul geneli düzendir.
+   */
+  classIds?: string[] | null;
 }
+
+/** Sınıfa özel düzen mi (okul geneli seçime katılmaz) */
+export const isClassSchedule = (s: Pick<BellScheduleLike, 'classIds'>) => Boolean(s.classIds?.length);
 
 export const scheduleShift = (s: Pick<BellScheduleLike, 'shift'>): Shift => (s.shift === 'afternoon' ? 'afternoon' : 'morning');
 export const scheduleLessonCount = (s: Pick<BellScheduleLike, 'lessonCount' | 'periods'>) => s.lessonCount ?? s.periods.length;
@@ -57,7 +65,8 @@ export function pickSchedule<T extends BellScheduleLike>(
   opts?: { shift?: Shift | null; lessonCount?: number | null },
 ): T | null {
   const shift = opts?.shift === 'afternoon' ? 'afternoon' : 'morning';
-  const pool = schedules.filter((s) => s.periods.length > 0 && scheduleShift(s) === shift);
+  // Sınıfa özel düzenler okul genelinin zilini belirlemez (bkz. schoolDay)
+  const pool = schedules.filter((s) => s.periods.length > 0 && scheduleShift(s) === shift && !isClassSchedule(s));
   const order = (a: T, b: T) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
   const fixed = pool.filter((s) => s.weekdays.includes(weekday)).sort((a, b) => a.weekdays.length - b.weekdays.length || order(a, b));
   if (fixed[0]) return fixed[0];
@@ -174,4 +183,84 @@ export function validatePeriods(periods: readonly Period[]): string | null {
     }
   }
   return null;
+}
+
+/*
+ * Elle müdahale yardımcıları: bir günün saatlerini düzeni değiştirmeden dönüştürür (panelde "Bu günü düzenle").
+ * Hepsi yeni dizi döndürür; saatler gün içinde kalır.
+ */
+
+const DAY_MAX = 23 * 3600 + 59 * 60;
+const moveClock = (hm: string, deltaMin: number) => formatClock(Math.min(DAY_MAX, Math.max(0, parseClock(hm) + deltaMin * 60)));
+
+/** `fromNo` numaralı dersten (dahil) sonraki bütün dersleri `deltaMin` dakika kaydırır */
+export function shiftPeriods(periods: readonly Period[], fromNo: number, deltaMin: number): Period[] {
+  const sorted = sortPeriods(periods);
+  const at = sorted.findIndex((p) => p.no === fromNo);
+  if (at < 0 || !deltaMin) return sorted;
+  return sorted.map((p, i) => (i >= at ? { ...p, start: moveClock(p.start, deltaMin), end: moveClock(p.end, deltaMin) } : p));
+}
+
+/** `afterNo` numaralı dersten sonraki arayı `gapMin` dakika yapar; sonraki dersler buna göre kayar */
+export function setGapAfter(periods: readonly Period[], afterNo: number, gapMin: number): Period[] {
+  const sorted = sortPeriods(periods);
+  const i = sorted.findIndex((p) => p.no === afterNo);
+  const next = sorted[i + 1];
+  if (i < 0 || !next) return sorted;
+  const current = (parseClock(next.start) - parseClock(sorted[i]!.end)) / 60;
+  return shiftPeriods(sorted, next.no, Math.max(0, gapMin) - current);
+}
+
+/** Bir dersin süresini değiştirir (bitişi kayar); sonraki dersler aynı miktarda kayar */
+export function setLessonLength(periods: readonly Period[], no: number, lessonMin: number): Period[] {
+  const sorted = sortPeriods(periods);
+  const i = sorted.findIndex((p) => p.no === no);
+  if (i < 0) return sorted;
+  const p = sorted[i]!;
+  const delta = Math.max(5, lessonMin) - (parseClock(p.end) - parseClock(p.start)) / 60;
+  const moved = sorted.map((x, j) => (j === i ? { ...x, end: moveClock(x.end, delta) } : j > i ? { ...x, start: moveClock(x.start, delta), end: moveClock(x.end, delta) } : x));
+  return moved;
+}
+
+/**
+ * Kısaltılmış gün: ilk ders aynı saatte başlar; her ders `lessonMin`, teneffüsler `breakMin` dakika olur, öğle arası
+ * (eşikten uzun ara) aynı süresiyle korunur.
+ */
+export function compressDay(periods: readonly Period[], lessonMin: number, breakMin: number, lunchThresholdMin = 30): Period[] {
+  const sorted = sortPeriods(periods);
+  if (!sorted.length) return sorted;
+  let t = parseClock(sorted[0]!.start);
+  return sorted.map((p, i) => {
+    if (i > 0) {
+      const gap = parseClock(p.start) - parseClock(sorted[i - 1]!.end);
+      t += gap >= lunchThresholdMin * 60 ? gap : breakMin * 60;
+    }
+    const out = { ...p, start: formatClock(Math.min(DAY_MAX, t)), end: formatClock(Math.min(DAY_MAX, t + lessonMin * 60)) };
+    t += lessonMin * 60;
+    return out;
+  });
+}
+
+/** Erken bitir: `lastNo` numaralı dersten sonrası yapılmaz */
+export function endAfter(periods: readonly Period[], lastNo: number): Period[] {
+  const sorted = sortPeriods(periods);
+  const i = sorted.findIndex((p) => p.no === lastNo);
+  return i < 0 ? sorted : sorted.slice(0, i + 1);
+}
+
+/**
+ * Zili şimdi çal: o anki ders `now` (SS:DD) saatinde biter, sonraki dersler aynı miktarda öne alınır (teneffüs
+ * süreleri korunur). Teneffüsteyse sıradaki ders hemen başlar. Ders dışında bir şey değişmez.
+ */
+export function ringNow(periods: readonly Period[], now: string): Period[] {
+  const sorted = sortPeriods(periods);
+  const t = parseClock(now);
+  const cur = sorted.findIndex((p) => parseClock(p.start) <= t && t < parseClock(p.end));
+  if (cur >= 0) {
+    const delta = (t - parseClock(sorted[cur]!.end)) / 60;
+    return sorted.map((p, i) => (i === cur ? { ...p, end: formatClock(t) } : i > cur ? { ...p, start: moveClock(p.start, delta), end: moveClock(p.end, delta) } : p));
+  }
+  const next = sorted.findIndex((p, i) => i > 0 && parseClock(sorted[i - 1]!.end) <= t && t < parseClock(p.start));
+  if (next < 0) return sorted;
+  return shiftPeriods(sorted, sorted[next]!.no, (t - parseClock(sorted[next]!.start)) / 60);
 }

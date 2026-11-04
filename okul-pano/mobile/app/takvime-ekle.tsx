@@ -34,7 +34,7 @@ export default function TakvimeEkle() {
     if (d.holiday) return [];
     const own = d.duties.filter((x) => !x.coveredBy);
     if (!own.length || !data) return [];
-    const periods = dayBellPeriods(data, d.weekday);
+    const periods = dayBellPeriods(data, d.weekday, 'morning', d.date);
     if (!periods.length) return [];
     const half = data.halfDays?.find((h) => h.date === d.date);
     const end = half && data.halfDayEnd ? data.halfDayEnd : periods[periods.length - 1]!.end;

@@ -1,5 +1,5 @@
-import { computeBellStatus, periodLabel, pickSchedule, sortPeriods, type BellStatus, type Period, type Shift } from '@okulpano/shared/bell';
-import { schoolDay } from '@okulpano/shared/schoolDay';
+import { computeBellStatus, periodLabel, type BellStatus, type Period, type Shift } from '@okulpano/shared/bell';
+import { addIsoDays, classBell, dayBells, isoWeekday, schoolDay, type SchoolCalendar } from '@okulpano/shared/schoolDay';
 import { zonedParts, type ZonedParts } from '@okulpano/shared/time';
 import type { MeToday } from './data.ts';
 
@@ -18,34 +18,56 @@ export interface TeacherDay {
   lessons: { period: Period; className: string; subject: string; state: 'past' | 'now' | 'next' | 'later' }[];
 }
 
+/** Panoyla aynı zil takvimi: düzenler, tatiller, sınıfa özel ziller ve elle müdahaleler */
+export function bellCalendar(data: MeToday, opts: { holidays?: boolean } = {}): SchoolCalendar {
+  const withHolidays = opts.holidays !== false;
+  return {
+    schedules: data.bellSchedules,
+    holidays: withHolidays ? data.holidays : [],
+    halfDays: withHolidays ? (data.halfDays ?? []) : [],
+    halfDayEnd: data.halfDayEnd,
+    lessonCounts: data.lessonCounts ?? null,
+    bellClasses: data.bellClasses ?? null,
+    overrides: data.bellOverrides ?? [],
+    dualShift: Boolean(data.dualShift),
+  };
+}
+
+/** Bu haftanın (bugünün haftası) o gününün tarihi */
+export function dateOfWeekday(today: string, weekday: number): string {
+  return addIsoDays(today, weekday - isoWeekday(today));
+}
+
 /**
- * Bir hafta gününün zil saatleri (panoyla aynı seçim): günün ders sayısına uyan düzen ya da o güne sabitlenen düzen;
- * zil o gün en geç biten sınıfın son dersinde biter. İkili öğretimde vardiyanın zili.
+ * Bir günün okul geneli zil saatleri (panoyla aynı seçim): günün ders sayısına uyan düzen ya da o güne sabitlenen düzen;
+ * o gün elle değiştirildiyse o saatler. Tarih verilmezse bu haftanın o günü. Tatiller burada düşülmez.
  */
-export function dayBellPeriods(data: Pick<MeToday, 'bellSchedules' | 'lessonCounts'>, weekday: number, shift: Shift = 'morning'): Period[] {
-  const count = data.lessonCounts ? (data.lessonCounts[`${shift}:${weekday}`] ?? 0) : null;
-  const schedule = pickSchedule(data.bellSchedules, weekday, { shift, lessonCount: count });
-  return schedule ? sortPeriods(schedule.periods).filter((p) => !count || p.no <= count) : [];
+export function dayBellPeriods(data: MeToday, weekday: number, shift: Shift = 'morning', date?: string): Period[] {
+  return schoolDay(date ?? dateOfWeekday(data.today, weekday), bellCalendar(data, { holidays: false }), shift).periods;
+}
+
+/** Bir sınıfın o günkü ders saatleri: sınıfa özel zile geçtiyse onun, değilse okul geneli zilin saatleri */
+export function classDayPeriods(data: MeToday, date: string, classId: string | null | undefined, shift: Shift = 'morning'): Period[] {
+  return classBell(dayBells(date, bellCalendar(data, { holidays: false })), classId, shift)?.periods ?? [];
 }
 
 /** Öğretmenin bugünü: zil durumu ve dersleri (panoyla aynı hesap) */
 export function teacherDay(data: MeToday, date: Date): TeacherDay {
   const now = zonedParts(date, data.timezone);
-  // Panoyla aynı hesap: tek zil, günün ders sayısına göre; tatilde ders yok, arifede dersler yarım gün saatinde biter.
-  // İkili öğretimde her ders kendi vardiyasının zilini izler; zil kartı öğretmenin o günkü vardiyasını gösterir
-  const cal = { schedules: data.bellSchedules, holidays: data.holidays, halfDays: data.halfDays ?? [], halfDayEnd: data.halfDayEnd, lessonCounts: data.lessonCounts ?? null };
+  // Panoyla aynı hesap: günün ders sayısına göre okul geneli zil; sınıfa özel zile geçen sınıfların dersleri kendi
+  // zillerinden; tatilde ders yok, arifede dersler yarım gün saatinde biter. İkili öğretimde her ders kendi vardiyasının
+  // zilini izler; zil kartı öğretmenin o anki (yoksa sıradaki) dersinin zilini gösterir
+  const cal = bellCalendar(data);
   const dual = Boolean(data.dualShift);
   const shiftOf = (l: { shift?: Shift | null }): Shift => (dual && l.shift === 'afternoon' ? 'afternoon' : 'morning');
   const todays = data.lessons.filter((l) => l.weekday === now.weekday);
-  const myShift = todays.length ? shiftOf(todays[0]!) : 'morning';
-  const days = { morning: schoolDay(now.isoDate, cal, 'morning'), afternoon: dual ? schoolDay(now.isoDate, cal, 'afternoon') : null };
-  const day = (myShift === 'afternoon' && days.afternoon) || days.morning;
-  const { holiday, halfDay, endsAt, periods } = day;
-  const bell: BellStatus = periods.length ? computeBellStatus(periods, now.secondsOfDay, data.lunchThresholdMin) : { kind: 'off' };
+  const bells = dayBells(now.isoDate, cal);
+  const school = schoolDay(now.isoDate, cal, 'morning');
+  const { holiday, halfDay, endsAt } = school;
   let seenNext = false;
   const lessons = todays
     .flatMap((l) => {
-      const period = ((shiftOf(l) === 'afternoon' && days.afternoon) || days.morning).periods.find((p) => p.no === l.periodNo);
+      const period = classBell(bells, l.classId, shiftOf(l))?.periods.find((p) => p.no === l.periodNo);
       return period ? [{ l, period }] : [];
     })
     .sort((a, b) => toSec(a.period.start) - toSec(b.period.start))
@@ -57,9 +79,15 @@ export function teacherDay(data: MeToday, date: Date): TeacherDay {
         state = 'next';
         seenNext = true;
       }
-      return { period, className: l.className, subject: l.subject, state };
+      return { period, className: l.className, classId: l.classId, shift: shiftOf(l), subject: l.subject, state };
     });
-  return { now, periods, bell, holiday, halfDay, endsAt, lessons };
+  // Zil kartı: şu anki ya da sıradaki dersin zili (ör. 12. sınıfa giren öğretmen 12'lerin zilini görür); dersi yoksa
+  // vardiyasının okul geneli zili
+  const focus = lessons.find((x) => x.state === 'now') ?? lessons.find((x) => x.state === 'next');
+  const myShift = todays.length ? shiftOf(todays[0]!) : 'morning';
+  const periods = holiday ? [] : (classBell(bells, focus?.classId, focus?.shift ?? myShift)?.periods ?? []);
+  const bell: BellStatus = periods.length ? computeBellStatus(periods, now.secondsOfDay, data.lunchThresholdMin) : { kind: 'off' };
+  return { now, periods, bell, holiday, halfDay, endsAt, lessons: lessons.map(({ classId: _c, shift: _s, ...x }) => x) };
 }
 
 const toSec = (hm: string) => Number(hm.slice(0, 2)) * 3600 + Number(hm.slice(3, 5)) * 60;

@@ -4,11 +4,10 @@ import {
   formatPersonName,
   isBirthdayToday,
   boardBell,
+  bellClassDays,
   lessonCounts,
-  pickSchedule,
   schoolDay,
   periodLabel,
-  lessonCountKey,
   zonedParts,
   type BellStatus,
   type DisplayState,
@@ -127,13 +126,14 @@ export function TodaySummary() {
     halfDays: st.halfDays ?? [],
     halfDayEnd: s.halfDayEnd,
     lessonCounts: st.timetable.length ? lessonCounts(st.timetable, st.classes ?? [], dual) : null,
+    bellClasses: st.timetable.length ? bellClassDays(st.timetable, st.classes ?? []) : null,
+    overrides: st.bellOverrides ?? [],
+    dualShift: dual,
   };
   const day = schoolDay(today.isoDate, cal);
   const active = day.holiday ? { shift: 'morning' as const, periods: [] } : boardBell(today.isoDate, cal, dual, today.secondsOfDay);
-  const schedule = pickSchedule(st.bellSchedules, today.weekday, {
-    shift: active.shift,
-    lessonCount: cal.lessonCounts ? (cal.lessonCounts[lessonCountKey(active.shift, today.weekday)] ?? 0) : null,
-  });
+  const activeDay = schoolDay(today.isoDate, cal, active.shift);
+  const schedule = st.bellSchedules.find((b) => b.id === activeDay.scheduleId) ?? null;
   const halfDay = day.halfDay;
   const periods = active.periods.length ? active.periods : null;
   const bell = bellText(periods ? computeBellStatus(periods, today.secondsOfDay, s.lunchThresholdMin) : { kind: 'off' });

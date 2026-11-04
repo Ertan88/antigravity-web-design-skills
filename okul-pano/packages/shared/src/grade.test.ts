@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classLongName, compareClassNames, gradeHue, gradeOf, joinClassNames, shortClassLabeler } from './grade.ts';
+import { classLongName, classSetLabel, compareClassNames, gradeHue, gradeOf, joinClassNames, shortClassLabeler } from './grade.ts';
 
 describe('sınıf kademesi', () => {
   it('aynı kademedeki şubeler aynı renktedir', () => {
@@ -43,5 +43,14 @@ describe('sınıf adı biçimleri', () => {
     expect(short('AMP 9-B')).toBe('9/B');
     expect(short('ATP 9-A')).toBe('ATP 9/A');
     expect(shortClassLabeler(['9-A', '10-B'])('10-B')).toBe('10/B');
+  });
+});
+
+describe('classSetLabel', () => {
+  const all = ['9-A', '9-B', '11-A', 'AMP 12-A', 'AMP 12-B'];
+  it('bütün şubeler düzey adıyla, eksikse birleşik adla', () => {
+    expect(classSetLabel(['AMP 12-A', 'AMP 12-B'], all)).toBe('12. sınıflar');
+    expect(classSetLabel(['11-A', 'AMP 12-A', 'AMP 12-B'], all)).toBe('11 ve 12. sınıflar');
+    expect(classSetLabel(['AMP 12-A'], all)).toBe('AMP 12-A');
   });
 });

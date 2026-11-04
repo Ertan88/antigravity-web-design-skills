@@ -1,4 +1,4 @@
-import { pickSchedule, sortPeriods, type BellScheduleLike, type Period, type Shift } from './bell.ts';
+import { isClassSchedule, pickSchedule, scheduleLessonCount, scheduleShift, sortPeriods, type BellScheduleLike, type Period, type Shift } from './bell.ts';
 import { formatClock, parseClock } from './time.ts';
 
 /**
@@ -48,11 +48,42 @@ export interface SchoolDay {
   holiday: string | null;
   /** Arife (yarım gün) adı */
   halfDay: string | null;
-  /** O gün çalan ders saatleri: tatilde boş, arifede kısaltılmış */
+  /** O gün çalan ders saatleri: tatilde boş, arifede kısaltılmış, elle değiştirildiyse o günün saatleri */
   periods: Period[];
   /** Arifede derslerin bittiği saat */
   endsAt: string | null;
+  /** Seçilen düzen */
+  scheduleId?: string | null;
+  /** Günün ders sayısı (okul geneli; sınıfa özel zile geçen sınıflar sayılmaz) */
+  lessonCount?: number | null;
+  /** Düzenden gelen saatler (elle değiştirilmeden önce) */
+  basePeriods?: Period[];
+  /** O gün için saatler elle değiştirildi */
+  overridden?: boolean;
+  overrideNote?: string | null;
 }
+
+/** Sınıfın zil hesabına girdisi: vardiyası, zil hesabına katılıp katılmadığı ve her hafta günü son ders numarası */
+export interface BellClass {
+  id: string;
+  name?: string;
+  bellExempt?: boolean | null;
+  shift?: Shift | null;
+  /** Hafta günü (1–7) → o gün son dersin numarası */
+  counts: Record<number, number>;
+}
+
+/** Bir günün zil saatlerine elle müdahale: yalnızca o tarih ve o zil için geçerli */
+export interface BellOverrideLike {
+  date: string;
+  /** Hangi zil: `school:<vardiya>` (okul geneli) ya da `schedule:<düzen id>` (sınıfa özel düzen) */
+  target: string;
+  periods: Period[];
+  note?: string | null;
+}
+
+export const schoolTarget = (shift?: Shift | null) => `school:${shift === 'afternoon' ? 'afternoon' : 'morning'}`;
+export const scheduleTarget = (id: string) => `schedule:${id}`;
 
 export interface SchoolCalendar<T extends BellScheduleLike = BellScheduleLike> {
   schedules: readonly T[];
@@ -62,25 +93,165 @@ export interface SchoolCalendar<T extends BellScheduleLike = BellScheduleLike> {
   halfDayEnd?: string;
   /**
    * Günün ders sayısı (vardiya ve hafta gününe göre, `lessonCountKey`): o gün en geç biten sınıfın son dersi.
-   * Verilmezse ders programı yok sayılır.
+   * Verilmezse ders programı yok sayılır. `bellClasses` verilirse ondan hesaplanır.
    */
   lessonCounts?: Record<string, number> | null;
+  /** Sınıfların ders sayıları: sınıfa özel düzenler ve okul geneli ders sayısı bundan hesaplanır */
+  bellClasses?: readonly BellClass[] | null;
+  /** Elle müdahaleler (tarih ve zile göre) */
+  overrides?: readonly BellOverrideLike[] | null;
+  /** İkili öğretim (sınıfların vardiyası dikkate alınır) */
+  dualShift?: boolean;
 }
 
 export const lessonCountKey = (shift: Shift | null | undefined, weekday: number) => `${shift === 'afternoon' ? 'afternoon' : 'morning'}:${weekday}`;
 
-/** Bir günün okul planı: tatil mi, yarım gün mü, hangi ders saatleri çalar (ikili öğretimde vardiyanın zili) */
+const classShiftOf = (c: Pick<BellClass, 'shift'> | undefined, dual: boolean | undefined): Shift => (dual && c?.shift === 'afternoon' ? 'afternoon' : 'morning');
+
+/**
+ * Sınıfa özel düzenlerin o gün hangi sınıflara uyduğu: düzen bir güne sabitlenmişse o gün dersi olan seçili sınıflar,
+ * değilse o gün ders sayısı düzenin ders sayısına eşit olan seçili sınıflar. Bir sınıf en fazla bir düzene geçer.
+ */
+export function classAssignments<T extends BellScheduleLike>(cal: SchoolCalendar<T>, weekday: number, shift?: Shift | null): Map<string, T> {
+  const out = new Map<string, T>();
+  if (!cal.bellClasses?.length) return out;
+  const want = shift === 'afternoon' ? 'afternoon' : 'morning';
+  const byId = new Map(cal.bellClasses.map((c) => [c.id, c]));
+  const pool = cal.schedules
+    .filter((s) => isClassSchedule(s) && s.periods.length > 0 && scheduleShift(s) === want)
+    .sort((a, b) => Number(Boolean(b.weekdays.length)) - Number(Boolean(a.weekdays.length)) || (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  for (const s of pool) {
+    for (const id of s.classIds ?? []) {
+      const c = byId.get(id);
+      if (!c || out.has(id) || classShiftOf(c, cal.dualShift) !== want) continue;
+      const n = c.counts[weekday] ?? 0;
+      if (!n) continue;
+      if (s.weekdays.length ? s.weekdays.includes(weekday) : n === scheduleLessonCount(s)) out.set(id, s);
+    }
+  }
+  return out;
+}
+
+/** Okul geneli zilin ders sayısı: sınıfa özel zile geçenler ve zil hesabına katılmayanlar dışındaki en geç biten sınıf */
+function schoolLessonCount(cal: SchoolCalendar, weekday: number, shift: Shift | null | undefined, assigned: Map<string, unknown>): number | null {
+  if (cal.bellClasses) {
+    const want = shift === 'afternoon' ? 'afternoon' : 'morning';
+    let max = 0;
+    for (const c of cal.bellClasses) {
+      if (c.bellExempt || assigned.has(c.id) || classShiftOf(c, cal.dualShift) !== want) continue;
+      max = Math.max(max, c.counts[weekday] ?? 0);
+    }
+    return max;
+  }
+  return cal.lessonCounts ? (cal.lessonCounts[lessonCountKey(shift, weekday)] ?? 0) : null;
+}
+
+/** Okul geneli ders sayıları ("<vardiya>:<gün>"), sınıfa özel zile geçen sınıflar hariç (eksik düzen uyarısı için) */
+export function schoolLessonCounts(cal: SchoolCalendar): Record<string, number> | null {
+  if (!cal.bellClasses) return cal.lessonCounts ?? null;
+  const out: Record<string, number> = {};
+  for (const shift of cal.dualShift ? (['morning', 'afternoon'] as const) : (['morning'] as const))
+    for (let d = 1; d <= 7; d++) {
+      const n = schoolLessonCount(cal, d, shift, classAssignments(cal, d, shift));
+      if (n) out[lessonCountKey(shift, d)] = n;
+    }
+  return out;
+}
+
+const overrideFor = (cal: SchoolCalendar, date: string, target: string) => cal.overrides?.find((o) => o.date === date && o.target === target && o.periods.length) ?? null;
+
+/** Bir günün okul planı: tatil mi, yarım gün mü, hangi ders saatleri çalar (okul geneli zil; ikili öğretimde vardiyanın zili) */
 export function schoolDay(date: string, cal: SchoolCalendar, shift?: Shift | null): SchoolDay {
   const weekday = isoWeekday(date);
   const holiday = cal.holidays.find((h) => h.date === date)?.name ?? null;
   const halfDay = holiday ? null : (cal.halfDays.find((h) => h.date === date)?.name ?? null);
-  const count = cal.lessonCounts ? (cal.lessonCounts[lessonCountKey(shift, weekday)] ?? 0) : null;
+  const count = schoolLessonCount(cal, weekday, shift, classAssignments(cal, weekday, shift));
   const schedule = holiday ? null : pickSchedule(cal.schedules, weekday, { shift, lessonCount: count });
   const end = cal.halfDayEnd || HALF_DAY_END_DEFAULT;
   // Zil, o gün en geç biten sınıfın son dersinde biter
   const base = schedule ? sortPeriods(schedule.periods).filter((p) => !count || p.no <= count) : [];
-  const periods = halfDay ? halfDayPeriods(base, end) : base;
-  return { date, weekday, holiday, halfDay, periods, endsAt: halfDay ? end : null };
+  const basePeriods = halfDay ? halfDayPeriods(base, end) : base;
+  const override = holiday ? null : overrideFor(cal, date, schoolTarget(shift));
+  return {
+    date,
+    weekday,
+    holiday,
+    halfDay,
+    periods: override ? sortPeriods(override.periods) : basePeriods,
+    endsAt: halfDay ? end : null,
+    scheduleId: schedule?.id ?? null,
+    lessonCount: count,
+    basePeriods,
+    overridden: Boolean(override),
+    overrideNote: override?.note ?? null,
+  };
+}
+
+/** Bir günde çalan zillerden biri: okul geneli (vardiya başına) ya da sınıfa özel düzen */
+export interface DayBell {
+  target: string;
+  shift: Shift;
+  scheduleId: string | null;
+  /** Sınıfa özel zilin sınıfları; okul geneli zilde null (diğer bütün sınıflar) */
+  classIds: string[] | null;
+  /** O gün çalan saatler (elle değiştirildiyse onlar) */
+  periods: Period[];
+  /** Düzenden gelen saatler */
+  basePeriods: Period[];
+  lessonCount: number | null;
+  overridden: boolean;
+  note: string | null;
+}
+
+/** Bir günün bütün zilleri: okul geneli ve o gün devreye giren sınıfa özel düzenler (tatilde boş) */
+export function dayBells(date: string, cal: SchoolCalendar): DayBell[] {
+  const weekday = isoWeekday(date);
+  const out: DayBell[] = [];
+  for (const shift of cal.dualShift ? (['morning', 'afternoon'] as const) : (['morning'] as const)) {
+    const day = schoolDay(date, cal, shift);
+    if (day.holiday) return [];
+    out.push({
+      target: schoolTarget(shift),
+      shift,
+      scheduleId: day.scheduleId ?? null,
+      classIds: null,
+      periods: day.periods,
+      basePeriods: day.basePeriods ?? day.periods,
+      lessonCount: day.lessonCount ?? null,
+      overridden: Boolean(day.overridden),
+      note: day.overrideNote ?? null,
+    });
+    const groups = new Map<string, { schedule: BellScheduleLike; ids: string[] }>();
+    for (const [id, s] of classAssignments(cal, weekday, shift)) {
+      const g = groups.get(s.id) ?? { schedule: s, ids: [] };
+      g.ids.push(id);
+      groups.set(s.id, g);
+    }
+    const end = cal.halfDayEnd || HALF_DAY_END_DEFAULT;
+    for (const { schedule, ids } of groups.values()) {
+      const n = Math.max(0, ...ids.map((id) => cal.bellClasses?.find((c) => c.id === id)?.counts[weekday] ?? 0));
+      const base = sortPeriods(schedule.periods).filter((p) => !n || p.no <= n);
+      const basePeriods = day.halfDay ? halfDayPeriods(base, end) : base;
+      const override = overrideFor(cal, date, scheduleTarget(schedule.id));
+      out.push({
+        target: scheduleTarget(schedule.id),
+        shift,
+        scheduleId: schedule.id,
+        classIds: ids,
+        periods: override ? sortPeriods(override.periods) : basePeriods,
+        basePeriods,
+        lessonCount: n,
+        overridden: Boolean(override),
+        note: override?.note ?? null,
+      });
+    }
+  }
+  return out;
+}
+
+/** Bir sınıfın o günkü zili: sınıfa özel düzene geçtiyse o, değilse vardiyasının okul geneli zili */
+export function classBell(bells: readonly DayBell[], classId: string | null | undefined, shift?: Shift | null): DayBell | null {
+  return (classId ? bells.find((b) => b.classIds?.includes(classId)) : null) ?? bells.find((b) => b.target === schoolTarget(shift)) ?? null;
 }
 
 /** Bugünden sonraki ilk ders günü (tatil ve hafta sonu atlanır); `withinDays` içinde yoksa null */

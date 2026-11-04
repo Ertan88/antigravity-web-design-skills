@@ -116,6 +116,8 @@ export interface BellSchedule extends Base {
   lessonCount: number | null;
   /** İkili öğretimde vardiya (boş: sabahçı) */
   shift: 'morning' | 'afternoon' | null;
+  /** Sınıfa özel düzen: yalnızca bu sınıflar (boş: okul geneli) */
+  classIds?: string[] | null;
 }
 export interface TimetableEntry extends Base {
   weekday: number;

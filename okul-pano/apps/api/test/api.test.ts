@@ -204,6 +204,36 @@ describe('içerik doğrulama', () => {
     expect((await c.del(`/api/schools/${schoolA}/bell-schedules/${res.json().id}`)).statusCode).toBeLessThan(300);
   });
 
+  it('sınıfa özel zil düzeni ve günlük elle müdahale', async () => {
+    const c = client(t.app, ownerToken);
+    const cls = (await c.post(`/api/schools/${schoolA}/classes`, { name: '12-Z' })).json();
+    const periods = [
+      { no: 1, start: '08:30', end: '09:10' },
+      { no: 2, start: '09:20', end: '10:00' },
+    ];
+    const sched = await c.post(`/api/schools/${schoolA}/bell-schedules`, { name: '2 dersli gün (12)', weekdays: [], lessonCount: 2, periods, classIds: [cls.id] });
+    expectStatus(sched, 201);
+    expect(sched.json().classIds).toEqual([cls.id]);
+    const day = '2099-01-06';
+    const moved = [periods[0], { no: 2, start: '09:35', end: '10:15' }];
+    // Geçmiş gün ve bozuk saatler reddedilir
+    expect((await c.put(`/api/schools/${schoolA}/bell-overrides`, { date: '2000-01-04', target: 'school:morning', periods })).statusCode).toBe(400);
+    expect((await c.put(`/api/schools/${schoolA}/bell-overrides`, { date: day, target: 'school:morning', periods: [periods[0], { no: 2, start: '09:00', end: '09:40' }] })).statusCode).toBe(400);
+    const saved = await c.put(`/api/schools/${schoolA}/bell-overrides`, { date: day, target: `schedule:${sched.json().id}`, periods: moved, note: 'Tören' });
+    expectStatus(saved, 200);
+    // Aynı gün ve zil için ikinci kayıt öncekinin yerine geçer
+    const again = await c.put(`/api/schools/${schoolA}/bell-overrides`, { date: day, target: `schedule:${sched.json().id}`, periods: moved, note: 'Tören (güncel)' });
+    expect(again.json().id).toBe(saved.json().id);
+    const list = (await c.get(`/api/schools/${schoolA}/bell-overrides?from=${day}&to=${day}`)).json();
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ note: 'Tören (güncel)', target: `schedule:${sched.json().id}`, createdByName: expect.any(String) });
+    // Başka okulun düzenine müdahale edilemez
+    expect((await c.put(`/api/schools/${schoolA}/bell-overrides`, { date: day, target: 'schedule:00000000-0000-4000-8000-000000000000', periods })).statusCode).toBe(400);
+    expectStatus(await c.del(`/api/schools/${schoolA}/bell-overrides/${saved.json().id}`), 204);
+    expect((await c.get(`/api/schools/${schoolA}/bell-overrides?from=${day}&to=${day}`)).json()).toHaveLength(0);
+    expect((await c.del(`/api/schools/${schoolA}/bell-schedules/${sched.json().id}`)).statusCode).toBeLessThan(300);
+  });
+
   it('aynı öğretmeni aynı saatte iki sınıfa yazmaz', async () => {
     const c = client(t.app, ownerToken);
     const teacher = (await c.post(`/api/schools/${schoolA}/teachers`, { fullName: 'Kemal Tunç', branch: 'Matematik' })).json();

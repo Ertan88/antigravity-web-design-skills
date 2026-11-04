@@ -7,8 +7,11 @@ import {
   boardBell,
   shortClassLabeler,
   classShift,
+  bellClassDays,
+  classSetLabel,
   lessonCounts,
   lessonsNow,
+  otherBells,
   schoolDay,
   isSleepTime,
   quoteOfDay,
@@ -142,14 +145,38 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
     halfDays: state.halfDays ?? [],
     halfDayEnd: s.halfDayEnd,
     lessonCounts: state.timetable.length ? lessonCounts(state.timetable, classInfo, dual) : null,
+    // Sınıfa özel ziller (ör. 12. sınıfların 11 dersli günü) ve o güne elle müdahaleler
+    bellClasses: state.timetable.length ? bellClassDays(state.timetable, classInfo) : null,
+    overrides: state.bellOverrides ?? [],
+    dualShift: dual,
   };
   const day = schoolDay(today.isoDate, calendar);
   // Bu panoda gösterilen sınıflar (ekran ayarı; boşsa bütün okul)
   const screenClasses = new Set(resolveScreenDisplay(state.display).classIds);
   const timetable = screenClasses.size ? state.timetable.filter((e) => e.classId && screenClasses.has(e.classId)) : state.timetable;
   const mainBell = day.holiday ? { shift: 'morning' as const, periods: [] } : boardBell(today.isoDate, calendar, dual, today.secondsOfDay);
+  const schoolBellStatus = mainBell.periods.length ? computeBellStatus(mainBell.periods, today.secondsOfDay, s.lunchThresholdMin) : ({ kind: 'off' } as const);
+  // Aynı gün başka zil çalan sınıflar (sınıfa özel düzen): okul zili bittiyse ve onların dersi sürüyorsa kart onların
+  // zilini gösterir; ikisi birden sürüyorsa diğeri kartın altında tek satır
+  const allNames = classInfo.map((c) => c.name);
+  const nameOf = new Map(classInfo.map((c) => [c.id, c.name]));
+  const others = day.holiday
+    ? []
+    : otherBells(today.isoDate, calendar, mainBell.shift).map((b) => ({
+        label: classSetLabel(
+          (b.classIds ?? []).map((id) => nameOf.get(id) ?? '').filter(Boolean),
+          allNames,
+        ),
+        status: computeBellStatus(b.periods, today.secondsOfDay, s.lunchThresholdMin),
+      }));
+  const running = (k: string) => k === 'lesson' || k === 'break';
+  const takeover = !running(schoolBellStatus.kind) && schoolBellStatus.kind !== 'before' ? others.find((o) => running(o.status.kind)) : undefined;
+  const bell = takeover ? takeover.status : schoolBellStatus;
+  const bellExtras = (takeover ? [] : others)
+    .filter((o) => running(o.status.kind) && JSON.stringify(o.status) !== JSON.stringify(schoolBellStatus))
+    .map((o) => ({ label: o.label, text: bellLine(o.status) }));
+  const bellOwner = takeover?.label ?? null;
   const periods = mainBell.periods.length ? mainBell.periods : null;
-  const bell = periods ? computeBellStatus(periods, today.secondsOfDay, s.lunchThresholdMin) : ({ kind: 'off' } as const);
   const lessonPeriod = bell.kind === 'lesson' ? bell.period : bell.kind === 'break' || bell.kind === 'before' ? bell.next : null;
   // O ders saatinde dersi olan sınıflar (dersleri bitmiş sınıflar listelenmez)
   // Doğal sınıf sırası (9-A, 9-B, 10-A…); kısa ada çevirmeden önce sıralanır
@@ -175,7 +202,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         : nextDay && nextFirst
           ? `${nextDay.date === tomorrow.date ? 'Yarın ilk ders' : `Sonraki ders günü: ${nextLabel}`} · ${nextFirst.start}`
           : null;
-  const bellDay = { holiday: day.holiday, halfDay: day.halfDay, endsAt: day.endsAt, upcoming };
+  const bellDay = { holiday: day.holiday, halfDay: day.halfDay, endsAt: day.endsAt, upcoming, extras: bellExtras, owner: bellOwner };
 
   // Yayın akışı: duyurunun günü, saat aralığı ve zilin durumu (ör. yalnızca teneffüste)
   const phase = bell.kind === 'lesson' ? 'lesson' : bell.kind === 'break' ? 'break' : 'other';
@@ -531,4 +558,12 @@ const DAY_NAMES = ['', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 
 function dayLabel(iso: string): string {
   const weekday = ((new Date(`${iso}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
   return `${Number(iso.slice(8))} ${DAY_MONTHS[Number(iso.slice(5, 7)) - 1]} ${DAY_NAMES[weekday]}`;
+}
+
+/** Panoda ikinci zilin tek satırı: "7. Ders · 7 dk" / "Teneffüs · 3 dk" */
+function bellLine(b: ReturnType<typeof computeBellStatus>): string {
+  const min = 'remainingSec' in b ? Math.max(1, Math.ceil(b.remainingSec / 60)) : 0;
+  if (b.kind === 'lesson') return `${periodLabel(b.period)} · ${min} dk`;
+  if (b.kind === 'break') return `${b.isLunch ? 'Öğle arası' : 'Teneffüs'} · ${min} dk`;
+  return '';
 }

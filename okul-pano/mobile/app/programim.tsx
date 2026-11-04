@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Text } from '../src/text.tsx';
 import { useMeToday, useNow } from '../src/data.ts';
-import { classLabel, teacherDay, WEEKDAY_LONG, WEEKDAY_SHORT } from '../src/day.ts';
+import { classLabel, dateOfWeekday, teacherDay, WEEKDAY_LONG, WEEKDAY_SHORT } from '../src/day.ts';
 import { ACCENT, classTones, daySlots, LiveLesson, toMin, type Lesson } from '../src/lesson.tsx';
 import { colors } from '../src/theme.ts';
 import { Card, Empty, ErrorNote, HolidayCard, Icon, Loading, Screen, T } from '../src/ui.tsx';
@@ -46,7 +46,8 @@ export function ProgramimScreen({ back }: { back?: boolean }) {
   const nowMin = today ? Math.floor(today.now.secondsOfDay / 60) : 0;
 
   // Günün satırları: son dersten sonraki boş saatler yazılmaz; teneffüsten uzun ara (öğle arası) ayrı satır
-  const sections = daySlots(data, day, isToday ? today?.endsAt : null);
+  // Seçili günün bu haftaki tarihi (telefonun bugününe göre): o güne elle müdahale ve sınıfa özel zil ona göre
+  const sections = daySlots(data, day, isToday ? today?.endsAt : null, today ? dateOfWeekday(today.now.isoDate, day) : undefined);
   const items: Item[] = [];
   for (const s of sections) {
     const last = s.slots.reduce((m, x, i) => (x.lesson ? i : m), -1);

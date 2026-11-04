@@ -13,6 +13,10 @@ export interface BellDayContext {
   endsAt?: string | null;
   /** Dersler bitince ya da tatilde: "Yarın tatil · …", "Sonraki ders günü: …" */
   upcoming?: string | null;
+  /** Aynı anda başka zil çalan sınıflar: "12. sınıflar · 7. Ders · 7 dk" */
+  extras?: { label: string; text: string }[];
+  /** Kart okul zili yerine bir sınıf grubunun zilini gösteriyorsa grubun adı (ör. okul zili bitti, 12'ler derste) */
+  owner?: string | null;
 }
 
 export function describeBell(status: BellStatus, ctx: BellDayContext = {}) {
@@ -87,7 +91,7 @@ export function BellCard({ status, day }: { status: BellStatus; day?: BellDayCon
       <BellWatermarkIcon className="card-watermark watermark-bell" size={210} strokeWidth={1.4} />
       <div className="card-label">
         <Glyph size={22} /> {useLabel('bell')}
-        <span className="card-label-aside">{d.title}</span>
+        <span className="card-label-aside">{day?.owner ? `${day.owner} · ${d.title}` : d.title}</span>
       </div>
       {d.remaining != null ? (
         <div className="bell-main">
@@ -109,6 +113,12 @@ export function BellCard({ status, day }: { status: BellStatus; day?: BellDayCon
           {d.next && <span className="bell-next">{d.next}</span>}
         </div>
       )}
+      {day?.extras?.map((x) => (
+        <div key={x.label} className="bell-extra">
+          <span className="bell-extra-label">{x.label}</span>
+          <span>{x.text}</span>
+        </div>
+      ))}
     </section>
   );
 }

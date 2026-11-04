@@ -29,6 +29,7 @@ import { notificationRoutes } from './routes/notifications.ts';
 import { memberRoutes } from './routes/members.ts';
 import { controlRoutes } from './routes/control.ts';
 import { meRoutes } from './routes/me.ts';
+import { bellOverrideRoutes } from './routes/bellOverrides.ts';
 import { privacyRoutes } from './routes/privacy.ts';
 import { runTrialReminders, signupRoutes } from './routes/signup.ts';
 import { notifyUsers, usersWithPermission } from './lib/push.ts';
@@ -115,6 +116,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   await app.register(notificationRoutes);
   await app.register(controlRoutes);
   await app.register(meRoutes);
+  await app.register(bellOverrideRoutes);
   await app.register(privacyRoutes);
   await app.register(signupRoutes);
   await app.register(academicCalendarRoutes);
