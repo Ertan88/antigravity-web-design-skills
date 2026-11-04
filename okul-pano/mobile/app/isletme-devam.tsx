@@ -2,7 +2,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSchoolQuery } from '../src/data.ts';
-import { HALF_SHORT, HALVES, LegendBand, letter, pickable, prevCode, ReportSheet, shortDate, TONE, UndoBar, useMarks, type Cell, type Code, type Half } from '../src/intern.tsx';
+import { FillSheet, HALF_SHORT, HALVES, LegendBand, letter, PendingStrip, pickable, prevCode, ReportSheet, SendSheet, shortDate, TONE, UndoBar, useMarks, type Cell, type Code, type Half, type PendingMark } from '../src/intern.tsx';
 import { Text } from '../src/text.tsx';
 import { colors, radius } from '../src/theme.ts';
 import { Button, Chip, Empty, ErrorNote, Icon, Loading, Screen, T } from '../src/ui.tsx';
@@ -10,7 +10,8 @@ import { Button, Chip, Empty, ErrorNote, Icon, Loading, Screen, T } from '../src
 /*
  * İşletmede devam (aylık çizelge, webdeki sayfanın mobil hâli): ad sütunu sabit, günler yana kayar; her gün S (sabah) ve
  * Ö (öğle) iki hücre. Hücreye dokununca seçilir, alttaki rozetlerden biri seçilince o alan hemen işaretlenip kaydedilir;
- * yanlış işaret "Sil" ile kaldırılır (X "İşletmede" demektir).
+ * yanlış işaret "Sil" ile kaldırılır. X "İşletmede" de koordinatörün koyduğu işarettir; işaretsiz geçmiş gün "?".
+ * Devamsızlıklar turuncu noktalı (gönderilmedi) kalır; altta "Gönder…" ile müdür yardımcısına gider.
  */
 
 interface SheetStudent {
@@ -23,7 +24,8 @@ interface SheetStudent {
   businessName: string;
   editable: boolean;
   cells: [Cell, Cell][];
-  totals: { excused: number; unexcused: number };
+  unsent?: string[];
+  totals: { excused: number; unexcused: number; unchecked?: number };
 }
 interface SheetData {
   month: string;
@@ -55,7 +57,7 @@ const PALETTE: { code: Code; label: string }[] = [
   { code: 'K', label: 'K' },
   { code: 'T', label: 'T' },
 ];
-const CODE_TEXT: Record<Code, string> = { X: 'işletmede', D: 'özürsüz devamsız', İ: 'izinli', R: 'raporlu', H: 'hasta sevkli', T: 'tatil', K: 'işletme kapalı' };
+const CODE_TEXT: Record<Code, string> = { '-': 'işaret silindi', X: 'işletmede', D: 'özürsüz devamsız', İ: 'izinli', R: 'raporlu', H: 'hasta sevkli', T: 'tatil', K: 'işletme kapalı' };
 
 interface Sel {
   studentId: string;
@@ -69,6 +71,9 @@ export default function IsletmeDevam() {
   const sheet = useSchoolQuery<SheetData>(`internship/sheet${month ? `?month=${month}` : ''}`);
   const d = sheet.data;
   const marks = useMarks();
+  const pending = useSchoolQuery<PendingMark[]>('internship/pending');
+  const [filling, setFilling] = useState(false);
+  const [sending, setSending] = useState(false);
   const [classId, setClassId] = useState('');
   const [businessId, setBusinessId] = useState('');
   const [sel, setSel] = useState<Sel | null>(null);
@@ -86,7 +91,7 @@ export default function IsletmeDevam() {
   const future = Boolean(selDay && d && selDay.date > d.today);
   // Seçili alanda silinecek bir işaret var mı (D, İ, R, H, K, T)
   const marked = Boolean(
-    sel && student && (scope === 'day' ? student.cells[sel.di]! : [student.cells[sel.di]![sel.half === 'am' ? 0 : 1]!]).some((c) => prevCode(c) !== 'X'),
+    sel && student && (scope === 'day' ? student.cells[sel.di]! : [student.cells[sel.di]![sel.half === 'am' ? 0 : 1]!]).some((c) => prevCode(c) !== '-'),
   );
 
   const apply = (code: Code, clear = false) => {
@@ -166,7 +171,7 @@ export default function IsletmeDevam() {
             accessibilityRole="button"
             accessibilityLabel="İşareti sil"
             disabled={marks.busy || !marked}
-            onPress={() => apply('X', true)}
+            onPress={() => apply('-', true)}
             style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: colors.dangerBorder, backgroundColor: colors.dangerTint, opacity: marked ? 1 : 0.4 }}
           >
             <Icon name="trash-outline" size={15} color={colors.danger} />
@@ -175,8 +180,11 @@ export default function IsletmeDevam() {
         </View>
       </View>
     </View>
-  ) : marks.undo ? (
-    <UndoBar label={marks.undo.label} onUndo={marks.undoLast} />
+  ) : marks.undo || pending.data?.length ? (
+    <View style={{ gap: 8 }}>
+      {marks.undo && <UndoBar label={marks.undo.label} onUndo={marks.undoLast} />}
+      {Boolean(pending.data?.length) && <PendingStrip rows={pending.data!} onPress={() => setSending(true)} />}
+    </View>
   ) : undefined;
 
   return (
@@ -261,6 +269,7 @@ export default function IsletmeDevam() {
                           const can = s.editable && pickable(c);
                           const on = sel?.studentId === s.id && sel.di === di && (scope === 'day' || sel.half === half);
                           const t = TONE[c] ?? TONE['']!;
+                          const unsent = s.unsent?.includes(`${day.date}|${half}`);
                           return (
                             <Pressable
                               key={half}
@@ -279,9 +288,13 @@ export default function IsletmeDevam() {
                                 backgroundColor: t.bg,
                                 borderWidth: on ? 2 : t.border ? 1 : 0,
                                 borderColor: on ? colors.ink : t.border,
+                                borderStyle: t.dashed && !on ? 'dashed' : 'solid',
                               }}
                             >
                               <Text style={{ fontSize: 11, fontWeight: '800', color: t.fg }}>{letter(c)}</Text>
+                              {unsent && (
+                                <View style={{ position: 'absolute', top: -3, right: -3, width: 8, height: 8, borderRadius: 4, backgroundColor: '#f59e0b', borderWidth: 1.5, borderColor: '#fff' }} />
+                              )}
                             </Pressable>
                           );
                         })}
@@ -295,8 +308,13 @@ export default function IsletmeDevam() {
             </ScrollView>
           </View>
           <T size={12} color={colors.faint}>
-            Hücreye dokunun, alttaki rozetten işareti seçin; hemen kaydedilir. Devamsızlık birkaç dakika sonra müdür yardımcısına bildirilir.
+            Hücreye dokunun, alttaki rozetten işareti seçin; hemen kaydedilir. “?” kontrol edilmedi demektir. Devamsızlık, siz “Gönder” deyince müdür yardımcısına gider (turuncu nokta: henüz gönderilmedi).
           </T>
+          {rows.some((s) => s.editable) && (
+            <Button variant="secondary" icon="checkmark-done" onPress={() => setFilling(true)}>
+              İşaretsiz (?) günleri İşletmede yap…
+            </Button>
+          )}
           {marks.error && (
             <T size={13} color={colors.danger}>
               {marks.error}
@@ -308,6 +326,31 @@ export default function IsletmeDevam() {
             </T>
           )}
         </>
+      )}
+      {filling && d && (
+        <FillSheet
+          today={d.today}
+          businesses={d.businesses}
+          businessId={businessId}
+          onClose={() => setFilling(false)}
+          onDone={(msg) => {
+            setFilling(false);
+            setNotice(msg);
+            void sheet.refetch();
+          }}
+        />
+      )}
+      {sending && pending.data && (
+        <SendSheet
+          rows={pending.data}
+          onClose={() => setSending(false)}
+          onSent={(msg) => {
+            setSending(false);
+            setNotice(msg);
+            void sheet.refetch();
+            void pending.refetch();
+          }}
+        />
       )}
       {report && selDay && (
         <ReportSheet

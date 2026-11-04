@@ -363,11 +363,11 @@ export const internshipMarks = pgTable(
       .references(() => students.id, { onDelete: 'cascade' }),
     date: date('date', { mode: 'string' }).notNull(),
     half: text('half').$type<'am' | 'pm'>().notNull(),
-    code: text('code').$type<'D' | 'İ' | 'R' | 'H' | 'T' | 'K'>().notNull(),
+    code: text('code').$type<'X' | 'D' | 'İ' | 'R' | 'H' | 'T' | 'K'>().notNull(),
     userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
     userName: text('user_name').notNull(),
     createdAt: createdAt(),
-    /** Devamsızlık bildirimi gönderildi (ya da gerek kalmadı); birkaç dakika beklenir, düzeltilen işaret bildirilmez */
+    /** Devamsızlık müdür yardımcısına gönderildi (koordinatör "Gönder" dedi); boşsa gönderilmedi */
     notifiedAt: timestamp('notified_at', { withTimezone: true }),
   },
   (t) => [uniqueIndex('internship_marks_uq').on(t.studentId, t.date, t.half), index('internship_marks_school_idx').on(t.schoolId, t.date)],

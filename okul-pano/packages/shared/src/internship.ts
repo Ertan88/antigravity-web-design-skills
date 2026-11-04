@@ -27,11 +27,15 @@ export const INTERN_HALF_SHORT: Record<InternHalf, string> = { am: 'S', pm: 'Ö'
 /** Öğretmenin girdiği kodlar (veritabanında saklanır) */
 export const INTERN_MARKS = ['D', 'İ', 'R', 'H', 'T', 'K'] as const;
 export type InternMark = (typeof INTERN_MARKS)[number];
-/** Devamsızlık kodları: koordinatör müdür yardımcısına bildirilir */
+/** Veritabanında saklanan bütün kodlar: X (işletmede) da koordinatörün koyduğu bir işarettir */
+export const INTERN_STORED = ['X', ...INTERN_MARKS] as const;
+export type InternStored = (typeof INTERN_STORED)[number];
+/** Devamsızlık kodları: koordinatör kontrol edip "Gönder" deyince müdür yardımcısına bildirilir */
 export const INTERN_ABSENCES: readonly InternMark[] = ['D', 'İ', 'R', 'H'];
 /** Özürlü devamsızlık (izinli, raporlu, hasta sevkli) */
 export const INTERN_EXCUSED: readonly InternMark[] = ['İ', 'R', 'H'];
-export const INTERN_MARK_TEXT: Record<InternMark, string> = {
+export const INTERN_MARK_TEXT: Record<InternStored, string> = {
+  X: 'işletmede',
   D: 'devamsız (özürsüz)',
   İ: 'izinli (özürlü)',
   R: 'raporlu (özürlü)',
@@ -42,12 +46,14 @@ export const INTERN_MARK_TEXT: Record<InternMark, string> = {
 
 /**
  * Hücre kodu: saklanan kodlar ile kendiliğinden gelenler. 'TA' takvimden gelen (değiştirilemez) tatil, 'T' öğretmenin
- * işaretlediği tatil; ikisi de "T" yazılır. 'W' hafta sonu, '' henüz gelmemiş gün.
+ * işaretlediği tatil; ikisi de "T" yazılır. 'W' hafta sonu, '' henüz gelmemiş gün. '?' kontrol edilmemiş işletme günü
+ * (geçmiş ya da bugün, işaret yok): işletmede sayılmaz, koordinatör X ya da devamsızlık koyar.
  */
-export type InternCell = 'O' | 'X' | InternMark | 'TA' | 'W' | '';
+export type InternCell = 'O' | InternStored | 'TA' | 'W' | '?' | '';
 
 export const INTERN_LEGEND: { code: InternCell; letter: string; text: string }[] = [
-  { code: 'X', letter: 'X', text: 'İşletmede' },
+  { code: 'X', letter: 'X', text: 'İşletmede (koordinatör işaretledi)' },
+  { code: '?', letter: '?', text: 'Kontrol edilmedi' },
   { code: 'D', letter: 'D', text: 'Özürsüz devamsız' },
   { code: 'İ', letter: 'İ', text: 'İzinli' },
   { code: 'R', letter: 'R', text: 'Raporlu' },
@@ -61,7 +67,7 @@ export const INTERN_LEGEND: { code: InternCell; letter: string; text: string }[]
 export const internLetter = (c: InternCell) => (c === 'TA' ? 'T' : c === 'W' ? '' : c);
 
 /** Öğretmenin değiştirebileceği bölüm: işletme günü (okul günü, takvim tatili, hafta sonu ve gelecek değil) */
-export const internEditable = (c: InternCell) => c === 'X' || (INTERN_MARKS as readonly string[]).includes(c);
+export const internEditable = (c: InternCell) => c === '?' || (INTERN_STORED as readonly string[]).includes(c);
 /** Seçilebilir bölüm: işletme günü ya da henüz gelmemiş işletme günü (ileri tarihli rapor) */
 export const internPickable = (c: InternCell) => internEditable(c) || c === '';
 
@@ -121,7 +127,7 @@ export function schoolHalvesFromTimetable(entries: readonly { weekday: number; p
 /** Bir öğrencinin ay boyunca hücreleri: her gün [öğleden önce, öğleden sonra] */
 export function internCells(
   days: readonly InternDay[],
-  opts: { school: SchoolHalves; marks: ReadonlyMap<string, InternMark>; today: string },
+  opts: { school: SchoolHalves; marks: ReadonlyMap<string, InternStored>; today: string },
 ): [InternCell, InternCell][] {
   return days.map((d) =>
     INTERN_HALVES.map((half, i): InternCell => {
@@ -130,7 +136,8 @@ export function internCells(
       if (opts.school.get(d.weekday)?.[i]) return 'O';
       const mark = opts.marks.get(internKey(d.date, half));
       if (mark) return mark;
-      return d.date <= opts.today ? 'X' : '';
+      // İşaretsiz geçmiş/bugünkü işletme günü kendiliğinden "işletmede" sayılmaz: kontrol edilmedi
+      return d.date <= opts.today ? '?' : '';
     }) as [InternCell, InternCell],
   );
 }
@@ -147,10 +154,12 @@ export interface InternTotals {
   business: number;
   holiday: number;
   closed: number;
+  /** Kontrol edilmemiş işletme günü (işaret yok) */
+  unchecked: number;
 }
 
 export function internTotals(cells: readonly (readonly InternCell[])[]): InternTotals {
-  const t: InternTotals = { excused: 0, unexcused: 0, permitted: 0, report: 0, referred: 0, school: 0, business: 0, holiday: 0, closed: 0 };
+  const t: InternTotals = { excused: 0, unexcused: 0, permitted: 0, report: 0, referred: 0, school: 0, business: 0, holiday: 0, closed: 0, unchecked: 0 };
   for (const day of cells)
     for (const c of day) {
       if (c === 'İ' || c === 'R' || c === 'H') {
@@ -163,6 +172,7 @@ export function internTotals(cells: readonly (readonly InternCell[])[]): InternT
       else if (c === 'X') t.business += 0.5;
       else if (c === 'T' || c === 'TA') t.holiday += 0.5;
       else if (c === 'K') t.closed += 0.5;
+      else if (c === '?') t.unchecked += 0.5;
     }
   return t;
 }
@@ -277,16 +287,32 @@ export const businessStudentsSchema = z.object({ studentIds: z.array(z.uuid()).m
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Tarih YYYY-AA-GG olmalı');
 
 /**
- * Devam işaretleri. code 'X': işaret kaldırılır (işletmede, devam etti). 'T' bütün öğrencilere, 'K' öğrencinin
- * işletmesindeki bütün öğrencilere uygulanır; T ya da K kaldırılınca da aynı kapsamdan kalkar.
+ * Devam işaretleri. code 'X': işletmede (koordinatör işaretler), '-': işaret kaldırılır (kontrol edilmedi). 'T' bütün
+ * öğrencilere, 'K' öğrencinin işletmesindeki bütün öğrencilere uygulanır; T ya da K kaldırılınca da aynı kapsamdan kalkar.
  */
 export const internMarksSchema = z.object({
   date: isoDate,
   /** Aralık (ör. birkaç günlük rapor): date ile until arasındaki işletme günlerine uygulanır; okul günleri ve tatiller atlanır */
   until: isoDate.optional(),
   items: z
-    .array(z.object({ studentId: z.uuid(), half: z.enum(INTERN_HALVES), code: z.enum(['X', ...INTERN_MARKS]) }))
+    .array(z.object({ studentId: z.uuid(), half: z.enum(INTERN_HALVES), code: z.enum(['-', ...INTERN_STORED]) }))
     .min(1)
     .max(400),
 });
 export type InternMarksInput = z.infer<typeof internMarksSchema>;
+
+/** Toplu "İşletmede": aralıktaki işaretsiz (?) işletme günleri X olur; var olan işaretlere dokunulmaz */
+export const internFillSchema = z.object({
+  from: isoDate,
+  until: isoDate,
+  /** Yalnızca bu işletmenin öğrencileri; boşsa düzenleyebildiği bütün öğrenciler */
+  businessId: z.uuid().nullable().optional(),
+});
+export type InternFillInput = z.infer<typeof internFillSchema>;
+
+/** Gönderilmemiş devamsızlıkları koordinatör müdür yardımcısına gönder */
+export const internSendSchema = z.object({
+  ids: z.array(z.uuid()).min(1).max(1000),
+  note: z.string().trim().max(500).optional(),
+});
+export type InternSendInput = z.infer<typeof internSendSchema>;

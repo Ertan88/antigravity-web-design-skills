@@ -16,6 +16,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import {
   Building2,
+  CheckCheck,
+  Send,
   ChevronLeft,
   ChevronRight,
   GraduationCap,
@@ -53,8 +55,9 @@ import { useList, useSchoolPath, type Teacher } from "../lib/data.ts";
 
 /*
  * İşletmelerde mesleki eğitim: işletmeler ve aylık işletmede devam çizelgesi. Okul günleri ders programından,
- * tatiller okulun takviminden kendiliğinden dolar; koordinatör öğretmen D, İ, R, H, T ve K işaretler. İşaret tıklanınca
- * hemen kaydedilir (Geri al ile düzeltilir); devamsızlık müdür yardımcısına birkaç dakika sonra bildirilir.
+ * tatiller okulun takviminden kendiliğinden dolar; koordinatör öğretmen X (işletmede), D, İ, R, H, T ve K işaretler;
+ * işaretsiz geçmiş gün "?" (kontrol edilmedi) görünür. İşaret tıklanınca hemen kaydedilir (Geri al ile düzeltilir);
+ * devamsızlık müdür yardımcısına koordinatör "Gönder" deyince gider (turuncu nokta: henüz gönderilmedi).
  */
 
 interface Business {
@@ -108,7 +111,21 @@ interface SheetStudent {
   areaId: string | null;
   editable: boolean;
   cells: [InternCell, InternCell][];
+  /** Gönderilmemiş devamsızlıklar: "YYYY-AA-GG|am" */
+  unsent?: string[];
   totals: InternTotals;
+}
+
+interface PendingMark {
+  id: string;
+  studentId: string;
+  fullName: string;
+  className: string | null;
+  businessName: string | null;
+  date: string;
+  half: InternHalf;
+  code: "D" | "İ" | "R" | "H";
+  userName: string;
 }
 
 interface Sheet {
@@ -162,6 +179,7 @@ export const CELL_CLASS: Record<InternCell, string> = {
   TA: "bg-sky-200 text-sky-900 border-sky-200 dark:bg-sky-900/60 dark:text-sky-100 dark:border-sky-800",
   T: "bg-sky-200 text-sky-900 border-sky-700 border-2 dark:bg-sky-900/60 dark:text-sky-100 dark:border-sky-400",
   K: "bg-amber-200 text-amber-900 border-amber-300 dark:bg-amber-900/60 dark:text-amber-100 dark:border-amber-700",
+  "?": "bg-white text-slate-400 border-dashed border-slate-300 dark:bg-transparent dark:text-slate-500 dark:border-slate-600",
   W: "border-transparent bg-[repeating-linear-gradient(135deg,var(--color-slate-100)_0_4px,var(--color-slate-200)_4px_8px)]",
   "": "bg-white border-slate-200 dark:bg-transparent dark:border-slate-700",
 };
@@ -195,8 +213,10 @@ export function InternLegend() {
         Her gün iki bölümdür: S (sabah) ve Ö (öğle); her bölüm yarım gün
         sayılır. İzinli (İ), raporlu (R) ve hasta sevkli (H) özürlü, devamsız
         (D) özürsüz devamsızlığa eklenir. Arifede öğleden sonra kendiliğinden
-        tatildir. Hücreye tıklayıp harfe basmak da yeter (X, D, İ, R, H, K, T;
-        işareti silmek için Backspace).
+        tatildir. İşletmede (X) de koordinatörün koyduğu işarettir; işaretsiz
+        geçmiş gün “?” kontrol edilmedi görünür. Turuncu nokta: devamsızlık
+        henüz müdür yardımcısına gönderilmedi. Hücreye tıklayıp harfe basmak da
+        yeter (X, D, İ, R, H, K, T; işareti silmek için Backspace).
       </p>
     </div>
   );
@@ -212,7 +232,8 @@ interface Picked {
   rect: DOMRect;
 }
 
-type MarkCode = "X" | "D" | "İ" | "R" | "H" | "T" | "K";
+/** "-": işareti kaldırır (kontrol edilmedi) */
+type MarkCode = "-" | "X" | "D" | "İ" | "R" | "H" | "T" | "K";
 interface MarkBody {
   date: string;
   until?: string;
@@ -225,7 +246,7 @@ interface UndoState {
 }
 
 const prevCode = (c: InternCell): MarkCode =>
-  c === "X" || c === "" || c === "O" || c === "TA" || c === "W" ? "X" : c;
+  c === "?" || c === "" || c === "O" || c === "TA" || c === "W" ? "-" : c;
 
 export function InternshipSheet() {
   const { schoolId } = useAuth();
@@ -245,6 +266,12 @@ export function InternshipSheet() {
     queryKey: [schoolId, "internship", "sheet", month],
     queryFn: () => api<Sheet>(`${path}/sheet?month=${month}`),
   });
+  const pending = useQuery({
+    queryKey: [schoolId, "internship", "pending"],
+    queryFn: () => api<PendingMark[]>(`${path}/pending`),
+  });
+  const [filling, setFilling] = useState(false);
+  const [sending, setSending] = useState(false);
   const setMonth = (m: string) =>
     setParams((p) => (p.set("ay", m), p), { replace: true });
 
@@ -290,8 +317,17 @@ export function InternshipSheet() {
       }`}</style>
       <PageHeader
         title="İşletmede Devam"
-        description="İşletmelerde mesleki eğitim gören öğrencilerin aylık devam çizelgesi. Okul günleri ve tatiller kendiliğinden dolar; hücreye tıklayıp işareti seçin, hemen kaydedilir."
+        description="İşletmelerde mesleki eğitim gören öğrencilerin aylık devam çizelgesi. Okul günleri ve tatiller kendiliğinden dolar; kontrol ettiğiniz günleri X (işletmede) ya da devamsızlık olarak işaretleyin. Devamsızlıklar siz gönderince müdür yardımcısına gider."
         actions={
+          <>
+          <Button
+            variant="secondary"
+            icon={<CheckCheck className="size-4" />}
+            onClick={() => setFilling(true)}
+            disabled={!visible.some((s) => s.editable)}
+          >
+            İşaretsizleri İşletmede yap
+          </Button>
           <Button
             variant="secondary"
             icon={<Printer className="size-4" />}
@@ -300,8 +336,27 @@ export function InternshipSheet() {
           >
             Yazdır / PDF
           </Button>
+          </>
         }
       />
+      {Boolean(pending.data?.length) && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100">
+          <span className="size-2.5 rounded-full bg-amber-500" />
+          <div className="mr-auto">
+            <div className="font-extrabold">
+              {pending.data!.length / 2 >= 1 ? `${formatDays(pending.data!.length / 2)} günlük` : "Yarım günlük"} devamsızlık
+              gönderilmedi ({new Set(pending.data!.map((p) => p.studentId)).size} öğrenci)
+            </div>
+            <div className="text-xs">
+              Kontrol edip müdür yardımcısına gönderin; gönderilmeden
+              bildirim gitmez.
+            </div>
+          </div>
+          <Button icon={<Send className="size-4" />} onClick={() => setSending(true)}>
+            Gönder…
+          </Button>
+        </div>
+      )}
       {data && !data.managerAssigned && (
         <div className="mb-4">
           <Alert>
@@ -426,7 +481,7 @@ export function InternshipSheet() {
             const undoBody: MarkBody = {
               date: body.date,
               items: body.until
-                ? body.items.map((i) => ({ ...i, code: "X" as const }))
+                ? body.items.map((i) => ({ ...i, code: "-" as const }))
                 : body.items.map((i) => {
                     const cell =
                       picked.student.cells[Number(body.date.slice(8)) - 1]![
@@ -438,6 +493,31 @@ export function InternshipSheet() {
             };
             save.mutate({ body, undo: { label, body: undoBody } });
             setPicked(null);
+          }}
+        />
+      )}
+      {filling && data && (
+        <FillDialog
+          month={month}
+          today={data.today}
+          businesses={data.businesses}
+          businessId={businessId}
+          onClose={() => setFilling(false)}
+          onDone={(n) => {
+            setFilling(false);
+            void qc.invalidateQueries({ queryKey: [schoolId, "internship"] });
+            toast.success(n ? `${formatDays(n / 2)} gün “İşletmede” işaretlendi.` : "İşaretsiz gün yoktu.");
+          }}
+        />
+      )}
+      {sending && pending.data && (
+        <SendDialog
+          rows={pending.data}
+          onClose={() => setSending(false)}
+          onDone={(n) => {
+            setSending(false);
+            void qc.invalidateQueries({ queryKey: [schoolId, "internship"] });
+            toast.success(`${formatDays(n / 2)} günlük devamsızlık müdür yardımcısına gönderildi.`);
           }}
         />
       )}
@@ -536,6 +616,11 @@ function SheetTable({
                 </div>
                 <div className="pl-[90px] text-[11px] font-medium whitespace-nowrap text-slate-400">
                   {s.businessName}
+                  {s.totals.unchecked > 0 && (
+                    <span className="ml-2 font-bold text-amber-700 dark:text-amber-300">
+                      · {formatDays(s.totals.unchecked)} gün kontrol edilmedi
+                    </span>
+                  )}
                 </div>
               </td>
               <td className="border-b border-slate-100 pr-1 text-right text-[9px] leading-[21px] font-bold text-slate-400">
@@ -552,6 +637,7 @@ function SheetTable({
                     const half: InternHalf = hi ? "pm" : "am";
                     // Gelecek işletme günleri (boş) de seçilebilir: ileri tarihli rapor, izin, tatil, işletme kapalı
                     const can = s.editable && internPickable(c);
+                    const unsent = s.unsent?.includes(`${d.date}|${half}`);
                     const on =
                       picked?.student.id === s.id &&
                       picked.day.date === d.date &&
@@ -572,7 +658,7 @@ function SheetTable({
                           })
                         }
                         className={clsx(
-                          "my-px flex h-[19px] w-[25px] items-center justify-center rounded border text-[11px] font-extrabold",
+                          "relative my-px flex h-[19px] w-[25px] items-center justify-center rounded border text-[11px] font-extrabold",
                           CELL_CLASS[c],
                           can
                             ? "cursor-pointer hover:ring-2 hover:ring-ink/60"
@@ -581,6 +667,12 @@ function SheetTable({
                         )}
                       >
                         {internLetter(c)}
+                        {unsent && (
+                          <span
+                            title="Müdür yardımcısına gönderilmedi"
+                            className="absolute -top-1 -right-1 size-2 rounded-full border border-white bg-amber-500"
+                          />
+                        )}
                       </button>
                     );
                   })}
@@ -634,8 +726,8 @@ const KEY_CODE: Record<string, MarkCode> = {
   k: "K",
   t: "T",
   x: "X",
-  backspace: "X",
-  delete: "X",
+  backspace: "-",
+  delete: "-",
 };
 
 /** Hücreye tıklayınca: kod seçilir seçilmez kaydedilir; bölüm (S, Ö, tam gün) ve birkaç günlük aralık seçilebilir */
@@ -666,7 +758,7 @@ function CellMenu({
   const choices = CHOICES.filter(
     (c) => !(future && (c.code === "D" || c.code === "X")),
   );
-  const marked = picked.cell !== "X" && picked.cell !== "";
+  const marked = picked.cell !== "?" && picked.cell !== "";
 
   const commit = useCallback(
     (code: MarkCode, clear = false) => {
@@ -676,7 +768,7 @@ function CellMenu({
         range || (scope === "day" && internPickable(otherCell))
           ? ["am", "pm"]
           : [picked.half];
-      const what = CHOICES.find((c) => c.code === code)!.title.split(" (")[0];
+      const what = CHOICES.find((c) => c.code === code)?.title.split(" (")[0] ?? "";
       const when = range
         ? `${dayTitle(picked.day.date)} – ${dayTitle(until)}`
         : `${dayTitle(picked.day.date)} ${halves.length === 2 ? "tam gün" : picked.half === "am" ? "sabah" : "öğle"}`;
@@ -809,7 +901,7 @@ function CellMenu({
       <button
         type="button"
         disabled={busy || !marked}
-        onClick={() => commit("X", true)}
+        onClick={() => commit("-", true)}
         className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 py-1.5 text-xs font-bold text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-40 disabled:hover:bg-transparent"
       >
         <Trash2 className="size-3.5" /> İşareti sil
@@ -819,9 +911,168 @@ function CellMenu({
         (klavyede Backspace). K bu işletmedeki, T bütün öğrencilere işlenir.
         {future
           ? " İleri tarihe D girilemez."
-          : " Devamsızlık birkaç dakika sonra müdür yardımcısına bildirilir."}
+          : " Devamsızlık, siz “Gönder” deyince müdür yardımcısına gider."}
       </div>
     </div>
+  );
+}
+
+/** Toplu "İşletmede": aralıktaki işaretsiz (?) günler X olur; konan işaretlere dokunulmaz */
+function FillDialog({
+  month,
+  today,
+  businesses,
+  businessId,
+  onClose,
+  onDone,
+}: {
+  month: string;
+  today: string;
+  businesses: { id: string; name: string }[];
+  businessId: string;
+  onClose: () => void;
+  onDone: (changed: number) => void;
+}) {
+  const path = useSchoolPath("internship");
+  const toast = useToast();
+  const start = `${month}-01`;
+  const [from, setFrom] = useState(start <= today ? start : today);
+  const [until, setUntil] = useState(today.startsWith(month) || today < start ? today : `${month}-${String(new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate()).padStart(2, "0")}`);
+  const [biz, setBiz] = useState(businessId);
+  const run = useMutation({
+    mutationFn: () =>
+      api<{ changed: number }>(`${path}/marks/fill`, {
+        method: "POST",
+        body: { from, until: until > today ? today : until, businessId: biz || null },
+      }),
+    onSuccess: (r) => onDone(r.changed),
+    onError: (e) => toast.error(e.message),
+  });
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="İşaretsizleri “İşletmede” yap"
+      description="Seçilen günlerde yalnızca “?” (kontrol edilmedi) olan bölümler X olur. Koyduğunuz devamsızlık ve diğer işaretlere dokunulmaz. Önce devamsızlıkları işaretleyin."
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Vazgeç
+          </Button>
+          <Button loading={run.isPending} disabled={!from || !until || from > until || from > today} onClick={() => run.mutate()}>
+            İşletmede işaretle
+          </Button>
+        </>
+      }
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Başlangıç">
+          {(id) => <Input id={id} type="date" value={from} max={today} onChange={(e) => setFrom(e.target.value)} />}
+        </Field>
+        <Field label="Bitiş" help="Bugünden sonrası işaretlenmez">
+          {(id) => <Input id={id} type="date" value={until} min={from} max={today} onChange={(e) => setUntil(e.target.value)} />}
+        </Field>
+        <Field label="Öğrenciler" className="sm:col-span-2">
+          {(id) => (
+            <Select id={id} value={biz} onChange={(e) => setBiz(e.target.value)}>
+              <option value="">İşaretleyebildiğim bütün işletmeler</option>
+              {businesses.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
+      </div>
+    </Modal>
+  );
+}
+
+const PENDING_TEXT: Record<PendingMark["code"], string> = { D: "özürsüz devamsız", İ: "izinli", R: "raporlu", H: "hasta sevkli" };
+
+/** Gönderilmemiş devamsızlıklar: öğrenci ve koda göre gruplanır, seçilenler müdür yardımcısına gönderilir */
+function SendDialog({ rows, onClose, onDone }: { rows: PendingMark[]; onClose: () => void; onDone: (sent: number) => void }) {
+  const path = useSchoolPath("internship");
+  const toast = useToast();
+  const groups = useMemo(() => {
+    const m = new Map<string, PendingMark[]>();
+    for (const r of rows) m.set(`${r.studentId}|${r.code}`, [...(m.get(`${r.studentId}|${r.code}`) ?? []), r]);
+    return [...m.entries()].map(([key, list]) => ({ key, list }));
+  }, [rows]);
+  const [off, setOff] = useState<Set<string>>(new Set());
+  const [note, setNote] = useState("");
+  const ids = groups.filter((g) => !off.has(g.key)).flatMap((g) => g.list.map((r) => r.id));
+  const send = useMutation({
+    mutationFn: () => api<{ sent: number }>(`${path}/send`, { method: "POST", body: { ids, note: note.trim() || undefined } }),
+    onSuccess: (r) => onDone(r.sent),
+    onError: (e) => toast.error(e.message),
+  });
+  const when = (list: PendingMark[]) => {
+    const days = [...new Set(list.map((r) => r.date))].sort();
+    const half = days.length === 1 && list.length === 1 ? (list[0]!.half === "am" ? " sabah" : " öğle") : days.length === 1 ? " tam gün" : "";
+    return days.length === 1 ? `${dayTitle(days[0]!)}${half}` : `${dayTitle(days[0]!)} – ${dayTitle(days[days.length - 1]!)} · ${formatDays(list.length / 2)} gün`;
+  };
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      size="lg"
+      title="Müdür yardımcısına gönder"
+      description="Gönderilmemiş devamsızlıklar. Kontrol edip göndermek istediklerinizi seçin; seçmedikleriniz sonra gönderilmek üzere bekler."
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Vazgeç
+          </Button>
+          <Button icon={<Send className="size-4" />} loading={send.isPending} disabled={!ids.length} onClick={() => send.mutate()}>
+            {ids.length ? `${formatDays(ids.length / 2)} günü gönder` : "Seçim yok"}
+          </Button>
+        </>
+      }
+    >
+      <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+        {groups.map((g) => {
+          const r = g.list[0]!;
+          const on = !off.has(g.key);
+          return (
+            <li key={g.key}>
+              <label className="flex cursor-pointer items-center gap-3 px-4 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={on}
+                  onChange={() => setOff((s) => {
+                    const n = new Set(s);
+                    if (on) n.add(g.key);
+                    else n.delete(g.key);
+                    return n;
+                  })}
+                  className="size-4 accent-ink"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-bold">
+                    {r.fullName}
+                    {r.className ? ` · ${r.className}` : ""}
+                    {r.businessName ? <span className="font-medium text-slate-500"> · {r.businessName}</span> : null}
+                  </span>
+                  <span className="block text-xs text-slate-500">
+                    {when(g.list)} · işaretleyen {r.userName}
+                  </span>
+                </span>
+                <b className={clsx("rounded-full px-2.5 py-0.5 text-xs", CELL_CLASS[r.code])}>
+                  {r.code} · {PENDING_TEXT[r.code]}
+                </b>
+              </label>
+            </li>
+          );
+        })}
+      </ul>
+      <div className="mt-4">
+        <Field label="Not (isteğe bağlı)">
+          {(id) => <Textarea id={id} rows={2} maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} placeholder="ör. Veli ile görüşüldü, rapor işletmeye teslim edildi" />}
+        </Field>
+      </div>
+    </Modal>
   );
 }
 

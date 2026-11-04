@@ -6,28 +6,30 @@ import { useAuth, useSchoolPath } from './auth.tsx';
 import { Sheet } from './sheet.tsx';
 import { Text } from './text.tsx';
 import { colors } from './theme.ts';
-import { Button, T } from './ui.tsx';
+import { Button, Field, T } from './ui.tsx';
 
 /*
  * İşletmelerde mesleki eğitim: mobil ekranların ortak parçaları (kodlar, renkler, açıklama bandı, anında kayıt ve Geri al).
  * Kodlar e-Okul'daki gibidir: D özürsüz devamsız, İ izinli, R raporlu, H hasta sevkli, T tatil, K işletme kapalı;
- * X işletmede (işareti siler), O okulda. Her gün S (sabah) ve Ö (öğle) iki bölümdür.
+ * X işletmede (koordinatör işaretler), O okulda; ? kontrol edilmedi (işaret yok). Her gün S (sabah) ve Ö (öğle) iki
+ * bölümdür. Devamsızlıklar koordinatör "Gönder" deyince müdür yardımcısına gider.
  */
 
-export type Cell = 'O' | 'X' | 'D' | 'İ' | 'R' | 'H' | 'T' | 'TA' | 'K' | 'W' | '';
-export type Code = 'X' | 'D' | 'İ' | 'R' | 'H' | 'T' | 'K';
+export type Cell = 'O' | 'X' | 'D' | 'İ' | 'R' | 'H' | 'T' | 'TA' | 'K' | 'W' | '?' | '';
+/** '-': işareti kaldırır (kontrol edilmedi) */
+export type Code = '-' | 'X' | 'D' | 'İ' | 'R' | 'H' | 'T' | 'K';
 export type Half = 'am' | 'pm';
 export const HALVES: Half[] = ['am', 'pm'];
 export const HALF_SHORT: Record<Half, string> = { am: 'S', pm: 'Ö' };
 
 /** Öğretmenin değiştirebileceği bölüm: işletme günü ya da henüz gelmemiş işletme günü */
-export const pickable = (c: Cell) => c === 'X' || c === 'D' || c === 'İ' || c === 'R' || c === 'H' || c === 'T' || c === 'K' || c === '';
+export const pickable = (c: Cell) => c === '?' || c === 'X' || c === 'D' || c === 'İ' || c === 'R' || c === 'H' || c === 'T' || c === 'K' || c === '';
 export const letter = (c: Cell) => (c === 'TA' ? 'T' : c === 'W' || c === '' ? '' : c);
-/** Geri al için önceki kod: işaretsiz bölüm X (sil) */
-export const prevCode = (c: Cell): Code => (c === 'D' || c === 'İ' || c === 'R' || c === 'H' || c === 'T' || c === 'K' ? c : 'X');
+/** Geri al için önceki kod: işaretsiz bölüm "-" (sil) */
+export const prevCode = (c: Cell): Code => (c === 'X' || c === 'D' || c === 'İ' || c === 'R' || c === 'H' || c === 'T' || c === 'K' ? c : '-');
 
 /** Kod renkleri (panel çizelgesiyle aynı) */
-export const TONE: Record<string, { bg: string; fg: string; border?: string }> = {
+export const TONE: Record<string, { bg: string; fg: string; border?: string; dashed?: boolean }> = {
   X: { bg: '#ffffff', fg: '#334155', border: '#94a3b8' },
   D: { bg: '#ef4444', fg: '#ffffff' },
   İ: { bg: '#99f6e4', fg: '#134e4a' },
@@ -38,12 +40,14 @@ export const TONE: Record<string, { bg: string; fg: string; border?: string }> =
   K: { bg: '#fde68a', fg: '#713f12' },
   O: { bg: '#bbf7d0', fg: '#14532d' },
   W: { bg: '#ece8e1', fg: '#a8a29e' },
+  '?': { bg: '#ffffff', fg: '#a8a29e', border: '#d6d3d1', dashed: true },
   '': { bg: '#ffffff', fg: '#a8a29e', border: '#e7e3dc' },
 };
 
 /** "Devamsızlığın gösterileceği semboller" bandı (e-Okul sırası) */
 export const LEGEND_BAND: [string, string][] = [
   ['X', 'İşletmede'],
+  ['?', 'Kontrol edilmedi'],
   ['D', 'Özürsüz Devamsız'],
   ['İ', 'İzinli'],
   ['R', 'Raporlu'],
@@ -83,8 +87,8 @@ export interface MarkBody {
 }
 
 /**
- * Anında kayıt: her işaret dokununca kaydedilir; son kayıt "Geri al" ile önceki kodlara döner. Devamsızlık birkaç dakika
- * sonra müdür yardımcısına bildirilir (bu sürede düzeltilen işaret bildirilmez).
+ * Anında kayıt: her işaret dokununca kaydedilir; son kayıt "Geri al" ile önceki kodlara döner. Devamsızlık hemen
+ * bildirilmez; koordinatör "Gönder" deyince müdür yardımcısına gider.
  */
 export function useMarks() {
   const { school } = useAuth();
@@ -210,6 +214,213 @@ export function ReportSheet({ student, from, onClose, onSaved }: { student: { id
       <View style={{ marginTop: 14 }}>
         <Button loading={busy} onPress={() => void save()}>
           Kaydet
+        </Button>
+      </View>
+    </Sheet>
+  );
+}
+
+/** Gönderilmemiş devamsızlık (müdür yardımcısına henüz gitmedi) */
+export interface PendingMark {
+  id: string;
+  studentId: string;
+  fullName: string;
+  className: string | null;
+  businessName: string | null;
+  date: string;
+  half: Half;
+  code: 'D' | 'İ' | 'R' | 'H';
+  userName: string;
+}
+
+const days = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1).replace('.', ','));
+const PENDING_TEXT: Record<PendingMark['code'], string> = { D: 'özürsüz', İ: 'izinli', R: 'raporlu', H: 'hasta sevkli' };
+
+/** Altta: "N devamsızlık gönderilmedi · Gönder…" */
+export function PendingStrip({ rows, onPress }: { rows: PendingMark[]; onPress: () => void }) {
+  const students = new Set(rows.map((r) => r.studentId)).size;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#fcd34d', borderRadius: 16, paddingVertical: 10, paddingHorizontal: 12 }}>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#92400e' }}>{days(rows.length / 2)} günlük devamsızlık gönderilmedi</Text>
+        <Text style={{ fontSize: 11.5, color: '#92400e' }}>{students} öğrenci · müdür yardımcısına henüz gitmedi</Text>
+      </View>
+      <Button size="sm" onPress={onPress}>
+        Gönder…
+      </Button>
+    </View>
+  );
+}
+
+/** Gönderilmemiş devamsızlıklar: öğrenci ve koda göre gruplanır, seçilenler müdür yardımcısına gönderilir */
+export function SendSheet({ rows, onClose, onSent }: { rows: PendingMark[]; onClose: () => void; onSent: (msg: string) => void }) {
+  const path = useSchoolPath('internship/send');
+  const groups = (() => {
+    const m = new Map<string, PendingMark[]>();
+    for (const r of rows) m.set(`${r.studentId}|${r.code}`, [...(m.get(`${r.studentId}|${r.code}`) ?? []), r]);
+    return [...m.entries()].map(([key, list]) => ({ key, list }));
+  })();
+  const [off, setOff] = useState<Set<string>>(new Set());
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const ids = groups.filter((g) => !off.has(g.key)).flatMap((g) => g.list.map((r) => r.id));
+  const when = (list: PendingMark[]) => {
+    const ds = [...new Set(list.map((r) => r.date))].sort();
+    if (ds.length === 1) return `${shortDate(ds[0]!)} · ${list.length === 2 ? 'tam gün' : list[0]!.half === 'am' ? 'sabah' : 'öğle'}`;
+    return `${shortDate(ds[0]!)} – ${shortDate(ds[ds.length - 1]!)} · ${days(list.length / 2)} gün`;
+  };
+  const send = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api<{ sent: number }>(path, { method: 'POST', body: { ids, note: note.trim() || undefined } });
+      onSent(`${days(r.sent / 2)} günlük devamsızlık müdür yardımcısına gönderildi.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Gönderilemedi');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Sheet open onClose={onClose}>
+      <Text style={{ fontSize: 17, fontWeight: '800', color: colors.ink }}>Müdür yardımcısına gönder</Text>
+      <T size={12.5} color={colors.faint} style={{ marginTop: 4 }}>
+        Kontrol edip göndermek istediklerinizi seçin; seçmedikleriniz sonra gönderilmek üzere bekler.
+      </T>
+      <ScrollView style={{ maxHeight: 300, marginTop: 10 }}>
+        {groups.map((g) => {
+          const r = g.list[0]!;
+          const on = !off.has(g.key);
+          const t = TONE[r.code]!;
+          return (
+            <Pressable
+              key={g.key}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: on }}
+              onPress={() =>
+                setOff((s) => {
+                  const n = new Set(s);
+                  if (on) n.add(g.key);
+                  else n.delete(g.key);
+                  return n;
+                })
+              }
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, borderTopWidth: 1, borderTopColor: colors.divider }}
+            >
+              <View style={{ width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: on ? colors.ink : colors.subtle, backgroundColor: on ? colors.ink : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                {on && <Text style={{ color: colors.bg, fontSize: 12, fontWeight: '900' }}>✓</Text>}
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={{ fontSize: 13.5, fontWeight: '800', color: colors.ink }} numberOfLines={1}>
+                  {r.fullName}
+                  {r.businessName ? ` · ${r.businessName}` : ''}
+                </Text>
+                <Text style={{ fontSize: 11.5, color: colors.faint }}>{when(g.list)}</Text>
+              </View>
+              <View style={{ paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999, backgroundColor: t.bg }}>
+                <Text style={{ fontSize: 11.5, fontWeight: '800', color: t.fg }}>
+                  {r.code} · {PENDING_TEXT[r.code]}
+                </Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+      <View style={{ marginTop: 10 }}>
+        <Field label="Not (isteğe bağlı)" value={note} onChangeText={setNote} multiline maxLength={500} placeholder="ör. Veli ile görüşüldü" />
+      </View>
+      {error && (
+        <T size={13} color={colors.danger} style={{ marginTop: 8 }}>
+          {error}
+        </T>
+      )}
+      <View style={{ marginTop: 12 }}>
+        <Button loading={busy} disabled={!ids.length} icon="send" onPress={() => void send()}>
+          {ids.length ? `${days(ids.length / 2)} günü gönder` : 'Seçim yok'}
+        </Button>
+      </View>
+    </Sheet>
+  );
+}
+
+/** Toplu "İşletmede": seçilen dönemde yalnızca "?" (kontrol edilmedi) bölümler X olur; konan işaretlere dokunulmaz */
+export function FillSheet({
+  today,
+  businesses,
+  businessId,
+  onClose,
+  onDone,
+}: {
+  today: string;
+  businesses: { id: string; name: string }[];
+  businessId: string;
+  onClose: () => void;
+  onDone: (msg: string) => void;
+}) {
+  const path = useSchoolPath('internship/marks/fill');
+  const weekday = ((new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
+  const RANGES = [
+    { key: 'today', label: `Yalnız bugün (${shortDate(today)})`, from: today },
+    { key: 'week', label: `Bu hafta, bugüne kadar (${shortDate(addDays(today, 1 - weekday))} – ${shortDate(today)})`, from: addDays(today, 1 - weekday) },
+    { key: 'two', label: `Son iki hafta (${shortDate(addDays(today, -6 - weekday))} – ${shortDate(today)})`, from: addDays(today, -6 - weekday) },
+    { key: 'month', label: `Bu ay, bugüne kadar (${shortDate(`${today.slice(0, 7)}-01`)} – ${shortDate(today)})`, from: `${today.slice(0, 7)}-01` },
+  ];
+  const [range, setRange] = useState('week');
+  const [biz, setBiz] = useState(businessId);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const opt = (on: boolean) => ({ paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12, borderWidth: on ? 2 : 1, borderColor: on ? colors.ink : colors.border, backgroundColor: colors.card });
+  const run = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api<{ changed: number }>(path, { method: 'POST', body: { from: RANGES.find((x) => x.key === range)!.from, until: today, businessId: biz || null } });
+      onDone(r.changed ? `${days(r.changed / 2)} gün “İşletmede” işaretlendi.` : 'İşaretsiz gün yoktu.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Kaydedilemedi');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Sheet open onClose={onClose}>
+      <Text style={{ fontSize: 17, fontWeight: '800', color: colors.ink }}>İşaretsizleri “İşletmede” yap</Text>
+      <T size={12.5} color={colors.faint} style={{ marginTop: 4 }}>
+        Önce devamsızlıkları (D, İ, R, H) işaretleyin. Bu işlem yalnızca “?” olan bölümleri X yapar; konan işaretlere dokunmaz.
+      </T>
+      <T size={11.5} weight="800" color={colors.faint} style={{ marginTop: 12, marginBottom: 6 }}>
+        HANGİ GÜNLER
+      </T>
+      <View style={{ gap: 6 }}>
+        {RANGES.map((x) => (
+          <Pressable key={x.key} accessibilityRole="radio" accessibilityState={{ selected: range === x.key }} onPress={() => setRange(x.key)} style={opt(range === x.key)}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.ink }}>{x.label}</Text>
+          </Pressable>
+        ))}
+      </View>
+      {businesses.length > 1 && (
+        <>
+          <T size={11.5} weight="800" color={colors.faint} style={{ marginTop: 12, marginBottom: 6 }}>
+            HANGİ ÖĞRENCİLER
+          </T>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+            {[{ id: '', name: 'Bütün işletmelerim' }, ...businesses].map((b) => (
+              <Pressable key={b.id || 'all'} accessibilityRole="radio" accessibilityState={{ selected: biz === b.id }} onPress={() => setBiz(b.id)} style={[opt(biz === b.id), { paddingVertical: 7 }]}>
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.ink }}>{b.name}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </>
+      )}
+      {error && (
+        <T size={13} color={colors.danger} style={{ marginTop: 8 }}>
+          {error}
+        </T>
+      )}
+      <View style={{ marginTop: 14 }}>
+        <Button loading={busy} icon="checkmark-done" onPress={() => void run()}>
+          İşletmede işaretle
         </Button>
       </View>
     </Sheet>

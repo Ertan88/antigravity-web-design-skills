@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { gradeOf } from './grade.ts';
-import { formatDays, internCells, internKey, internMonthDays, internshipClassIds, internTotals, isInternshipSubject, schoolHalvesFromTimetable, vocationalLessonShare, type InternMark } from './internship.ts';
+import { formatDays, internCells, internKey, internMonthDays, internshipClassIds, internTotals, isInternshipSubject, schoolHalvesFromTimetable, vocationalLessonShare, type InternStored } from './internship.ts';
 
 describe('işletmede devam çizelgesi', () => {
   // Ekim 2026: 1 Ekim Perşembe; 28 Ekim arife (öğleden sonra tatil), 29 Ekim Cumhuriyet Bayramı
   const days = internMonthDays('2026-10', [{ date: '2026-10-29', name: 'Cumhuriyet Bayramı' }], [{ date: '2026-10-28', name: 'Cumhuriyet Bayramı Arifesi' }]);
-  const marks = new Map<string, InternMark>([
+  const marks = new Map<string, InternStored>([
     [internKey('2026-10-08', 'am'), 'D'],
     [internKey('2026-10-08', 'pm'), 'D'],
     [internKey('2026-10-14', 'pm'), 'R'],
     [internKey('2026-10-16', 'am'), 'K'],
+    // İşletmede: koordinatörün koyduğu işaret
+    [internKey('2026-10-02', 'am'), 'X'],
+    [internKey('2026-10-02', 'pm'), 'X'],
     // Okul gününe düşen işaret yok sayılır (okulda devamı e-Okul tutar)
     [internKey('2026-10-05', 'am'), 'D'],
   ]);
@@ -20,26 +23,27 @@ describe('işletmede devam çizelgesi', () => {
   const cells = internCells(days, { school, marks, today: '2026-10-31' });
   const at = (d: number) => cells[d - 1];
 
-  it('okul günleri O, hafta sonu W, işletme günleri X', () => {
+  it('okul günleri O, hafta sonu W, işaretsiz işletme günleri ? (kontrol edilmedi)', () => {
     expect(days).toHaveLength(31);
-    expect(at(1)).toEqual(['X', 'X']);
+    expect(at(1)).toEqual(['?', '?']);
     expect(at(3)).toEqual(['W', 'W']);
     expect(at(5)).toEqual(['O', 'O']);
     expect(at(6)).toEqual(['O', 'O']);
   });
   it('tatil ve arife: arifede yalnızca öğleden sonra', () => {
     expect(at(29)).toEqual(['TA', 'TA']);
-    expect(at(28)).toEqual(['X', 'TA']);
+    expect(at(28)).toEqual(['?', 'TA']);
   });
   it('öğretmen işaretleri yarım gün olarak', () => {
     expect(at(8)).toEqual(['D', 'D']);
-    expect(at(14)).toEqual(['X', 'R']);
-    expect(at(16)).toEqual(['K', 'X']);
+    expect(at(14)).toEqual(['?', 'R']);
+    expect(at(16)).toEqual(['K', '?']);
+    expect(at(2)).toEqual(['X', 'X']);
   });
   it('henüz gelmemiş günler boş', () => {
     const early = internCells(days, { school, marks, today: '2026-10-21' });
     expect(early[21]).toEqual(['', '']);
-    expect(early[20]).toEqual(['X', 'X']);
+    expect(early[20]).toEqual(['?', '?']);
   });
   it('toplamlar: R özürlü, D özürsüz, yarım gün 0,5', () => {
     const t = internTotals(cells);
@@ -48,6 +52,8 @@ describe('işletmede devam çizelgesi', () => {
     expect(t.closed).toBe(0.5);
     expect(t.holiday).toBe(1.5);
     expect(formatDays(t.unexcused + t.excused)).toBe('1,5');
+    expect(t.business).toBe(1);
+    expect(t.unchecked).toBeGreaterThan(0);
   });
 
   it('okul günleri ders programından: işletme dersi okul günü sayılmaz, karışık günde bölümler ayrılır', () => {

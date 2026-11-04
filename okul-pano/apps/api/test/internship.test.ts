@@ -1,6 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { sentPushes } from '../src/lib/push.ts';
-import { runInternshipNotices } from '../src/routes/internship.ts';
 import { client, createTestApp, expectStatus, login, SUPER, type TestCtx } from './helpers.ts';
 
 /* İşletmelerde mesleki eğitim: işletmeler, aylık devam çizelgesi, koordinatör müdür yardımcısına bildirim */
@@ -17,8 +16,12 @@ let classId: string;
 const ids: Record<string, string> = {};
 const biz: Record<string, string> = {};
 const VP_TOKEN = 'ExponentPushToken[mudur-yardimcisi]';
-/** Bekleyen devamsızlık bildirimlerini gönder (bekleme süresi geçmiş gibi) */
-const flushNotices = () => runInternshipNotices(t.app.deps, new Date(Date.now() + 3 * 60_000));
+/** Koordinatörün gönderilmemiş devamsızlıklarını müdür yardımcısına gönder; gönderilen sayı */
+const sendAll = async (c = coord, note?: string) => {
+  const pending = (await c.get(`${base}/internship/pending`)).json() as { id: string }[];
+  if (pending.length) expectStatus(await c.post(`${base}/internship/send`, { ids: pending.map((x) => x.id), note }), 200);
+  return pending.length;
+};
 
 beforeAll(async () => {
   t = await createTestApp({ PUSH_URL: 'memory' });
@@ -89,16 +92,18 @@ describe('işletmelerde mesleki eğitim', () => {
     expect((await other.get(`${base}/internship/sheet`)).statusCode).toBe(403);
   });
 
-  it('çizelge: okul günleri O, hafta sonu, arife ve bayram T, işletme günleri X', async () => {
+  it('çizelge: okul günleri O, hafta sonu, arife ve bayram T, işaretsiz işletme günleri ? (kontrol edilmedi)', async () => {
     const sheet = (await owner.get(`${base}/internship/sheet?month=2026-10`)).json();
     expect(sheet.days).toHaveLength(31);
     expect(sheet.students.map((s: { fullName: string }) => s.fullName)).toEqual(['Arda Kaya', 'Elif Demir', 'Burak Şahin']);
     const arda = sheet.students[0];
-    expect(arda.cells[0]).toEqual(['X', 'X']); // 1 Ekim Perşembe
+    expect(arda.cells[0]).toEqual(['?', '?']); // 1 Ekim Perşembe: kendiliğinden işletmede sayılmaz
     expect(arda.cells[2]).toEqual(['W', 'W']);
     expect(arda.cells[4]).toEqual(['O', 'O']); // 5 Ekim Pazartesi
-    expect(arda.cells[6]).toEqual(['X', 'X']); // 7 Ekim Çarşamba: programda yalnızca işletme dersi
-    expect(arda.cells[27]).toEqual(['X', 'TA']); // 28 Ekim arife
+    expect(arda.cells[6]).toEqual(['?', '?']); // 7 Ekim Çarşamba: programda yalnızca işletme dersi
+    expect(arda.cells[27]).toEqual(['?', 'TA']); // 28 Ekim arife
+    expect(arda.totals).toMatchObject({ business: 0 });
+    expect(arda.totals.unchecked).toBeGreaterThan(0);
     expect(arda.cells[28]).toEqual(['TA', 'TA']); // 29 Ekim
     // Koordinatör yalnızca kendi işletmesindeki öğrencileri görür
     // 30 günlük ay
@@ -108,24 +113,32 @@ describe('işletmelerde mesleki eğitim', () => {
     expect(mine.students.map((s: { fullName: string }) => s.fullName)).toEqual(['Arda Kaya', 'Elif Demir']);
   });
 
-  it('D ve R kaydedilir, toplamlara özürsüz / özürlü geçer; birkaç dakika sonra müdür yardımcısına bildirilir', async () => {
+  it('D ve R kaydedilir, toplamlara özürsüz / özürlü geçer; koordinatör "Gönder" deyince müdür yardımcısına bildirilir', async () => {
     const r = await coord.post(`${base}/internship/marks`, {
       date: '2026-10-08',
       items: [
         { studentId: ids['Arda Kaya'], half: 'am', code: 'D' },
         { studentId: ids['Arda Kaya'], half: 'pm', code: 'D' },
         { studentId: ids['Elif Demir'], half: 'pm', code: 'R' },
-        // Yanlışlıkla girilip hemen düzeltilen işaret bildirilmez
+        // Yanlışlıkla girilip silinen işaret gönderilmez
         { studentId: ids['Elif Demir'], half: 'am', code: 'H' },
       ],
     });
     expectStatus(r, 200);
     expect(r.json()).toMatchObject({ changed: 4, pending: 4 });
-    expectStatus(await coord.post(`${base}/internship/marks`, { date: '2026-10-08', items: [{ studentId: ids['Elif Demir'], half: 'am', code: 'X' }] }), 200);
-    // Bekleme süresi dolmadan gönderilmez
-    expect(await runInternshipNotices(t.app.deps)).toBe(0);
-    expect(await flushNotices()).toBe(1);
-    expect(await flushNotices()).toBe(0);
+    expectStatus(await coord.post(`${base}/internship/marks`, { date: '2026-10-08', items: [{ studentId: ids['Elif Demir'], half: 'am', code: '-' }] }), 200);
+    // Gönder denmeden müdür yardımcısına hiçbir şey gitmez; çizelgede gönderilmemiş olarak görünür
+    await new Promise((res) => setTimeout(res, 50));
+    expect(sentPushes.filter((p) => p.to.includes(VP_TOKEN))).toHaveLength(0);
+    const before = (await coord.get(`${base}/internship/sheet?month=2026-10`)).json();
+    expect(before.students[0].unsent).toEqual(['2026-10-08|am', '2026-10-08|pm']);
+    const pending = (await coord.get(`${base}/internship/pending`)).json();
+    expect(pending).toHaveLength(3);
+    // Başka koordinatör bu öğrencileri gönderemez
+    expect((await other.post(`${base}/internship/send`, { ids: pending.map((x: { id: string }) => x.id) })).statusCode).toBe(403);
+    expect(await sendAll(coord, 'Veli ile görüşüldü')).toBe(3);
+    expect(await sendAll()).toBe(0);
+    expect((await coord.get(`${base}/internship/sheet?month=2026-10`)).json().students[0].unsent).toEqual([]);
     await vi.waitFor(() => expect(sentPushes.filter((p) => p.to.includes(VP_TOKEN))).toHaveLength(1));
     const push = sentPushes.find((p) => p.to.includes(VP_TOKEN))!.message;
     expect(push.title).toBe('İşletmede devamsızlık ve rapor/izin');
@@ -135,6 +148,7 @@ describe('işletmelerde mesleki eğitim', () => {
     expect(inbox).not.toContain('hasta sevkli');
     expect(inbox).toContain('Arda Kaya (12-A): 8 Ekim tam gün devamsız (özürsüz)');
     expect(inbox).toContain('Elif Demir (12-A): 8 Ekim öğleden sonra raporlu (özürlü)');
+    expect(inbox).toContain('Not: Veli ile görüşüldü');
 
     const sheet = (await owner.get(`${base}/internship/sheet?month=2026-10`)).json();
     expect(sheet.students[0].cells[7]).toEqual(['D', 'D']);
@@ -154,17 +168,38 @@ describe('işletmelerde mesleki eğitim', () => {
   it('K işletmedeki bütün öğrencilere, T bütün öğrencilere uygulanır ve aynı kapsamdan kalkar', async () => {
     expectStatus(await coord.post(`${base}/internship/marks`, { date: '2026-10-16', items: [{ studentId: ids['Arda Kaya'], half: 'am', code: 'K' }] }), 200);
     let s = (await owner.get(`${base}/internship/sheet?month=2026-10`)).json().students;
-    expect(s.map((x: { cells: string[][] }) => x.cells[15]![0])).toEqual(['K', 'K', 'X']);
+    expect(s.map((x: { cells: string[][] }) => x.cells[15]![0])).toEqual(['K', 'K', '?']);
 
     expectStatus(await coord.post(`${base}/internship/marks`, { date: '2026-10-22', items: [{ studentId: ids['Elif Demir'], half: 'pm', code: 'T' }] }), 200);
     s = (await owner.get(`${base}/internship/sheet?month=2026-10`)).json().students;
     expect(s.map((x: { cells: string[][] }) => x.cells[21]![1])).toEqual(['T', 'T', 'T']);
 
-    expectStatus(await owner.post(`${base}/internship/marks`, { date: '2026-10-22', items: [{ studentId: ids['Burak Şahin'], half: 'pm', code: 'X' }] }), 200);
-    expectStatus(await coord.post(`${base}/internship/marks`, { date: '2026-10-16', items: [{ studentId: ids['Elif Demir'], half: 'am', code: 'X' }] }), 200);
+    expectStatus(await owner.post(`${base}/internship/marks`, { date: '2026-10-22', items: [{ studentId: ids['Burak Şahin'], half: 'pm', code: '-' }] }), 200);
+    expectStatus(await coord.post(`${base}/internship/marks`, { date: '2026-10-16', items: [{ studentId: ids['Elif Demir'], half: 'am', code: '-' }] }), 200);
     s = (await owner.get(`${base}/internship/sheet?month=2026-10`)).json().students;
-    expect(s.map((x: { cells: string[][] }) => x.cells[21]![1])).toEqual(['X', 'X', 'X']);
-    expect(s.map((x: { cells: string[][] }) => x.cells[15]![0])).toEqual(['X', 'X', 'X']);
+    expect(s.map((x: { cells: string[][] }) => x.cells[21]![1])).toEqual(['?', '?', '?']);
+    expect(s.map((x: { cells: string[][] }) => x.cells[15]![0])).toEqual(['?', '?', '?']);
+  });
+
+  it('İşletmede (X) elle konur ve silinir; toplu doldurma yalnızca işaretsiz günleri X yapar', async () => {
+    expectStatus(await coord.post(`${base}/internship/marks`, { date: '2026-10-09', items: [{ studentId: ids['Arda Kaya'], half: 'am', code: 'X' }] }), 200);
+    let arda = (await coord.get(`${base}/internship/sheet?month=2026-10`)).json().students[0];
+    expect(arda.cells[8]).toEqual(['X', '?']);
+    expectStatus(await coord.post(`${base}/internship/marks`, { date: '2026-10-09', items: [{ studentId: ids['Arda Kaya'], half: 'am', code: '-' }] }), 200);
+    arda = (await coord.get(`${base}/internship/sheet?month=2026-10`)).json().students[0];
+    expect(arda.cells[8]).toEqual(['?', '?']);
+    // 7–9 Ekim, yalnız koordinatörün işletmesi: D (8 Ekim) olduğu gibi kalır
+    const r = await coord.post(`${base}/internship/marks/fill`, { from: '2026-10-07', until: '2026-10-09', businessId: biz.usta });
+    expectStatus(r, 200);
+    const s = (await coord.get(`${base}/internship/sheet?month=2026-10`)).json().students;
+    expect(s[0].cells.slice(6, 9)).toEqual([['X', 'X'], ['D', 'D'], ['X', 'X']]);
+    expect(s[1].cells[7]).toEqual(['X', 'R']); // silinen sabah işaretsizdi, R olduğu gibi kaldı
+    expect(s[0].totals.business).toBe(2);
+    // Başka işletmenin öğrencisine dokunulmaz
+    const burak = (await owner.get(`${base}/internship/sheet?month=2026-10`)).json().students[2];
+    expect(burak.cells[6]).toEqual(['?', '?']);
+    // İleri tarihe X konmaz
+    expect((await coord.post(`${base}/internship/marks`, { date: '2030-01-07', items: [{ studentId: ids['Arda Kaya'], half: 'am', code: 'X' }] })).statusCode).toBe(400);
   });
 
   it('ziyaret günü (mobil): kendi işletmeleri önce, iki bölüm ayrı', async () => {
@@ -191,7 +226,7 @@ describe('işletmelerde mesleki eğitim', () => {
     const elif = sheet.students.find((x: { fullName: string }) => x.fullName === 'Elif Demir');
     expect(elif.cells.slice(4, 11)).toEqual([['R', 'R'], ['R', 'R'], ['R', 'R'], ['W', 'W'], ['W', 'W'], ['O', 'O'], ['O', 'O']]);
     expect(elif.totals.excused).toBe(3);
-    await flushNotices();
+    expect(await sendAll()).toBe(6);
     const inbox = JSON.stringify((await vp.get(`${base}/inbox`)).json());
     expect(inbox).toContain('Elif Demir (12-A): 5 Mayıs – 7 Mayıs, 3 gün raporlu (özürlü)');
     expect((await coord.post(`${base}/internship/marks`, { date: '2027-05-12', items: [{ studentId: ids['Elif Demir'], half: 'am', code: 'D' }] })).statusCode).toBe(400);
@@ -220,7 +255,7 @@ describe('işletmelerde mesleki eğitim', () => {
     const arda = (await owner.get(`${base}/internship/sheet?month=2026-10`)).json().students[0];
     expect(arda.cells[14]).toEqual(['İ', 'H']);
     expect(arda.totals).toMatchObject({ permitted: 0.5, referred: 0.5 });
-    await flushNotices();
+    await sendAll();
   });
 
   it('alanlar branştan: MEB alan adları tanınır, okul açıp kapatabilir; koordinatör adayları branşa göre', async () => {

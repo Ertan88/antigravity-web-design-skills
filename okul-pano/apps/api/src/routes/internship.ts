@@ -19,6 +19,9 @@ import {
   type InternDay,
   type InternHalf,
   type InternMark,
+  type InternStored,
+  internFillSchema,
+  internSendSchema,
   INTERN_ABSENCES,
   INTERN_MARK_TEXT,
   areaVocationalSchema,
@@ -45,8 +48,9 @@ import { addToInbox } from './notifications.ts';
  * İşletmelerde mesleki eğitim: işletmeler, öğrencilerin işletmeleri ve aylık devam çizelgesi. İşletmeleri ve bütün
  * çizelgeyi idare yönetir (internship.manage); koordinatör öğretmen kendi işletmelerindeki öğrencileri işaretler.
  * Öğretmen kendi eklediği ya da koordinatörü olduğu işletmeleri görür (KVKK); idare ve koordinatör müdür yardımcısı hepsini.
- * Devamsızlıklar (D, İ, R, H) birkaç dakika bekletilip koordinatör müdür yardımcısına (okul ayarlarında seçilen kullanıcı)
- * bildirilir: yanlışlıkla girilip hemen düzeltilen işaret bildirilmez. KVKK: destek erişimi öğrenci devam kayıtlarını
+ * "İşletmede" (X) da koordinatörün koyduğu işarettir; işaretsiz geçmiş gün "kontrol edilmedi" (?) görünür. Devamsızlıklar
+ * (D, İ, R, H) hemen bildirilmez: koordinatör kontrol edip "Gönder" deyince koordinatör müdür yardımcısına (okul ayarlarında
+ * seçilen kullanıcı) gider. KVKK: destek erişimi öğrenci devam kayıtlarını
  * göremez; panoya hiçbir şey gitmez.
  */
 
@@ -191,17 +195,22 @@ const NO_SCHOOL: SchoolHalves = new Map();
 
 async function marksInRange(deps: AppDeps, schoolId: string, from: string, to: string) {
   const rows = await deps.db
-    .select({ studentId: internshipMarks.studentId, date: internshipMarks.date, half: internshipMarks.half, code: internshipMarks.code })
+    .select({ studentId: internshipMarks.studentId, date: internshipMarks.date, half: internshipMarks.half, code: internshipMarks.code, notifiedAt: internshipMarks.notifiedAt })
     .from(internshipMarks)
     .where(and(eq(internshipMarks.schoolId, schoolId), gte(internshipMarks.date, from), lte(internshipMarks.date, to)));
-  const out = new Map<string, Map<string, InternMark>>();
+  const out = new Map<string, Map<string, InternStored>>() as Map<string, Map<string, InternStored>> & { unsent: Map<string, string[]> };
+  out.unsent = new Map();
   for (const r of rows) {
-    const m = out.get(r.studentId) ?? new Map<string, InternMark>();
+    const m = out.get(r.studentId) ?? new Map<string, InternStored>();
     m.set(internKey(r.date, r.half), r.code);
     out.set(r.studentId, m);
+    // Gönderilmemiş devamsızlık (koordinatör henüz müdür yardımcısına göndermedi)
+    if (!r.notifiedAt && isAbsence(r.code)) out.unsent.set(r.studentId, [...(out.unsent.get(r.studentId) ?? []), internKey(r.date, r.half)]);
   }
   return out;
 }
+
+const isAbsence = (code: string) => (INTERN_ABSENCES as readonly string[]).includes(code);
 
 /** Ayın son günü (YYYY-AA-GG) */
 const monthLast = (month: string) => {
@@ -607,6 +616,7 @@ export async function internshipRoutes(app: FastifyInstance) {
           areaId: st.areaId,
           editable: s.canEdit(st.businessId),
           cells,
+          unsent: marks.unsent.get(st.id) ?? [],
           totals: internTotals(cells),
         };
       }),
@@ -653,7 +663,7 @@ export async function internshipRoutes(app: FastifyInstance) {
         info: info.get(st.businessId!) ?? null,
         students: [],
       };
-      g.students.push({ id: st.id, fullName: st.fullName, schoolNo: st.schoolNo, className: st.className, am: cell![0], pm: cell![1], editable: s.canEdit(st.businessId) });
+      g.students.push({ id: st.id, fullName: st.fullName, schoolNo: st.schoolNo, className: st.className, am: cell![0], pm: cell![1], unsent: marks.unsent.get(st.id) ?? [], editable: s.canEdit(st.businessId) });
       groups.set(g.id, g);
     }
     return {
@@ -667,7 +677,7 @@ export async function internshipRoutes(app: FastifyInstance) {
   });
 
   /**
-   * İşaretleri kaydet. 'X' işareti kaldırır. 'T' işletmeye giden bütün öğrencilere, 'K' öğrencinin işletmesindeki bütün
+   * İşaretleri kaydet. 'X' işletmede, '-' işareti kaldırır. 'T' işletmeye giden bütün öğrencilere, 'K' öğrencinin işletmesindeki bütün
    * öğrencilere uygulanır (kaldırınca da aynı kapsamdan kalkar). D ve R koordinatör müdür yardımcısına bildirilir.
    */
   app.post(`${base}/marks`, member, async (req) => {
@@ -679,6 +689,7 @@ export async function internshipRoutes(app: FastifyInstance) {
     if (dates.length > 31) throw badRequest('En çok 31 günlük aralık girilebilir.');
     const now = today(req);
     if (last > now && items.some((i) => i.code === 'D')) throw badRequest('İleri tarihe özürsüz devamsızlık (D) girilemez; izin (İ), rapor (R), sevk (H), tatil (T) ya da işletme kapalı (K) girilebilir.');
+    if (last > now && items.some((i) => i.code === 'X')) throw badRequest('İleri tarih "İşletmede" işaretlenemez; gün gelince kontrol edip işaretleyin.');
     const single = dates.length === 1;
     const list = await internStudents(deps, req.ctx.schoolId);
     const byId = new Map(list.map((x) => [x.id, x]));
@@ -696,7 +707,7 @@ export async function internshipRoutes(app: FastifyInstance) {
     const dayOf = new Map(monthList.flat().map((d) => [d.date, d]));
 
     // Değişiklikler: öğrenci, gün, bölüm, yeni kod (null: kaldır)
-    const changed: { studentId: string; date: string; half: InternHalf; code: InternMark | null }[] = [];
+    const changed: { studentId: string; date: string; half: InternHalf; code: InternStored | null }[] = [];
     for (const dt of dates) {
       const day = dayOf.get(dt)!;
       const prev = (studentId: string, half: InternHalf) => before.get(studentId)?.get(internKey(dt, half)) ?? null;
@@ -704,10 +715,10 @@ export async function internshipRoutes(app: FastifyInstance) {
       const workHalf = (studentId: string, half: InternHalf) => {
         const st = byId.get(studentId)!;
         const [c] = internCells([day], { school: weekdays.get(st.classId ?? '') ?? NO_SCHOOL, marks: new Map(), today: '9999-12-31' });
-        return c![half === 'am' ? 0 : 1] === 'X';
+        return c![half === 'am' ? 0 : 1] === '?';
       };
-      const next = new Map<string, InternMark | null>();
-      const set = (studentId: string, half: InternHalf, code: InternMark | null) => {
+      const next = new Map<string, InternStored | null>();
+      const set = (studentId: string, half: InternHalf, code: InternStored | null) => {
         if (workHalf(studentId, half)) next.set(`${studentId}|${half}`, code);
       };
       for (const it of items) {
@@ -722,12 +733,12 @@ export async function internshipRoutes(app: FastifyInstance) {
           for (const x of list) set(x.id, it.half, 'T');
         } else if (it.code === 'K') {
           for (const x of list) if (x.businessId === st.businessId) set(x.id, it.half, 'K');
-        } else if (it.code === 'X' && old === 'T') {
+        } else if (it.code === '-' && old === 'T') {
           for (const x of list) if (prev(x.id, it.half) === 'T') set(x.id, it.half, null);
-        } else if (it.code === 'X' && old === 'K') {
+        } else if (it.code === '-' && old === 'K') {
           for (const x of list) if (x.businessId === st.businessId && prev(x.id, it.half) === 'K') set(x.id, it.half, null);
         } else {
-          set(st.id, it.half, it.code === 'X' ? null : it.code);
+          set(st.id, it.half, it.code === '-' ? null : it.code);
         }
       }
       // Öğrencinin kendi satırındaki seçim, toplu (T, K) uygulamadan sonra gelir
@@ -752,104 +763,147 @@ export async function internshipRoutes(app: FastifyInstance) {
     });
 
     await audit(req, 'update', 'İşletmede devam', null, `${dateText(date)}${single ? '' : ` – ${dateText(last)}`}: ${changed.length} işaret`);
-    // Devamsızlıklar birkaç dakika sonra bildirilir (runInternshipNotices); bu sürede düzeltilen işaret bildirilmez
-    const pending = changed.filter((c) => c.code && INTERN_ABSENCES.includes(c.code)).length;
+    // Devamsızlıklar hemen bildirilmez: koordinatör "Gönder" deyince gider (bkz. /send)
+    const pending = changed.filter((c) => c.code && isAbsence(c.code)).length;
     return { changed: changed.length, pending };
+  });
+
+  /** Toplu "İşletmede": aralıktaki işaretsiz (?) işletme günleri X olur; var olan işaretlere dokunulmaz */
+  app.post(`${base}/marks/fill`, member, async (req) => {
+    const s = await scope(deps, req);
+    const { from, until, businessId } = parse(internFillSchema, req.body);
+    const now = today(req);
+    const last = until < now ? until : now;
+    if (from > last) throw badRequest('İleri tarih "İşletmede" işaretlenemez.');
+    const dates: string[] = [];
+    for (let d = from; d <= last; d = addIsoDays(d, 1)) dates.push(d);
+    if (dates.length > 62) throw badRequest('En çok iki aylık aralık seçilebilir.');
+    const list = (await internStudents(deps, req.ctx.schoolId)).filter((st) => s.canEdit(st.businessId) && (!businessId || st.businessId === businessId));
+    if (!list.length) throw badRequest('İşaretlenecek öğrenci yok.');
+    const months = [...new Set(dates.map((d) => d.slice(0, 7)))];
+    const [monthList, weekdays, before] = await Promise.all([
+      Promise.all(months.map((m) => monthDays(deps, req.ctx.schoolId, m))),
+      schoolWeekdays(deps, req.ctx.schoolId, [...new Set(list.map((x) => x.classId).filter((x): x is string => Boolean(x)))]),
+      marksInRange(deps, req.ctx.schoolId, from, last),
+    ]);
+    const days = monthList.flat().filter((d) => d.date >= from && d.date <= last);
+    const rows: (typeof internshipMarks.$inferInsert)[] = [];
+    const name = await userName(deps, req.ctx.userId);
+    for (const st of list) {
+      const cells = internCells(days, { school: weekdays.get(st.classId ?? '') ?? NO_SCHOOL, marks: before.get(st.id) ?? new Map(), today: now });
+      days.forEach((d, i) =>
+        INTERN_HALVES_LIST.forEach((half, hi) => {
+          if (cells[i]![hi] === '?') rows.push({ schoolId: req.ctx.schoolId, studentId: st.id, date: d.date, half, code: 'X', userId: req.ctx.userId, userName: name });
+        }),
+      );
+    }
+    if (rows.length) {
+      await db.transaction(async (tx) => {
+        for (let i = 0; i < rows.length; i += 500) await tx.insert(internshipMarks).values(rows.slice(i, i + 500)).onConflictDoNothing();
+      });
+      await audit(req, 'update', 'İşletmede devam', null, `${dateText(from)} – ${dateText(last)}: ${rows.length} bölüm işletmede işaretlendi`);
+    }
+    return { changed: rows.length };
+  });
+
+  /** Gönderilmemiş devamsızlıklar (koordinatörün düzenleyebildiği öğrencilerde) */
+  app.get(`${base}/pending`, member, async (req) => {
+    const s = await scope(deps, req);
+    const rows = await pendingRows(deps, req.ctx.schoolId);
+    return rows
+      .filter((r) => s.canEdit(r.businessId))
+      .map((r) => ({ id: r.id, studentId: r.studentId, fullName: r.fullName, className: r.className, businessName: r.businessName, date: r.date, half: r.half, code: r.code, userName: r.userName }));
+  });
+
+  /** Seçilen devamsızlıkları koordinatör müdür yardımcısına gönder (bildirim kutusu ve anlık bildirim) */
+  app.post(`${base}/send`, member, async (req) => {
+    const s = await scope(deps, req);
+    const { ids, note } = parse(internSendSchema, req.body);
+    const rows = (await pendingRows(deps, req.ctx.schoolId)).filter((r) => ids.includes(r.id));
+    if (!rows.length) throw badRequest('Gönderilecek devamsızlık yok (daha önce gönderilmiş olabilir).');
+    for (const r of rows) if (!s.canEdit(r.businessId)) throw forbidden(`${r.fullName} sizin koordinatör olduğunuz bir işletmede değil.`);
+    const vp = settingsOf(req).internshipManagerUserId;
+    if (!vp) throw badRequest('Okul ayarlarında işletmelerden sorumlu müdür yardımcısı seçilmemiş; idareye bildirin.');
+    const [m] = await db.select({ id: memberships.id }).from(memberships).where(and(eq(memberships.schoolId, req.ctx.schoolId), eq(memberships.userId, vp)));
+    if (!m) throw badRequest('Seçilen müdür yardımcısı artık okulda değil; okul ayarlarından yeniden seçilmeli.');
+    const sender = await userName(deps, req.ctx.userId);
+    if (vp !== req.ctx.userId) await sendInternshipNotice(deps, { schoolId: req.ctx.schoolId, vp, sender, note: note || null, rows });
+    await db
+      .update(internshipMarks)
+      .set({ notifiedAt: new Date() })
+      .where(inArray(internshipMarks.id, rows.map((r) => r.id)));
+    await audit(req, 'update', 'İşletmede devam', null, `${rows.length} devamsızlık müdür yardımcısına gönderildi`);
+    return { sent: rows.length };
   });
 }
 
-/** Devamsızlık bildirimi bekleme süresi (bu sürede düzeltilen işaret bildirilmez) ve en eski bildirilecek işaret */
-const NOTICE_DELAY_MS = 2 * 60_000;
-const NOTICE_MAX_AGE_MS = 3 * 86400_000;
+const INTERN_HALVES_LIST: InternHalf[] = ['am', 'pm'];
 
-const shortDate = (iso: string) => new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));
-
-/**
- * Bekleyen devamsızlıkları (D, İ, R, H) koordinatör müdür yardımcısına bildirir: okul ve bildiren kişiye göre tek bildirim.
- * Ayrıntı (öğrenci adı, rapor) yalnızca uygulamanın bildirim kutusunda; kilit ekranına düşen bildirimde ad ve sağlık
- * bilgisi yazmaz (KVKK). Müdür yardımcısı seçilmemişse ya da işaret çok eskiyse gönderilmeden kapatılır.
- */
-export async function runInternshipNotices(deps: AppDeps, now = new Date()) {
-  const { db } = deps;
-  const rows = await db
+/** Okulun gönderilmemiş devamsızlıkları (D, İ, R, H; müdür yardımcısına henüz gitmedi) */
+async function pendingRows(deps: AppDeps, schoolId: string) {
+  const rows = await deps.db
     .select({
       id: internshipMarks.id,
-      schoolId: internshipMarks.schoolId,
-      userId: internshipMarks.userId,
-      userName: internshipMarks.userName,
       studentId: internshipMarks.studentId,
       date: internshipMarks.date,
       half: internshipMarks.half,
       code: internshipMarks.code,
-      createdAt: internshipMarks.createdAt,
+      userName: internshipMarks.userName,
       fullName: students.fullName,
       className: classGroups.name,
+      businessId: students.businessId,
       businessName: businesses.name,
-      settings: schools.settings,
     })
     .from(internshipMarks)
     .innerJoin(students, eq(students.id, internshipMarks.studentId))
     .leftJoin(classGroups, eq(classGroups.id, students.classGroupId))
     .leftJoin(businesses, eq(businesses.id, students.businessId))
-    .innerJoin(schools, eq(schools.id, internshipMarks.schoolId))
-    .where(
-      and(
-        isNull(internshipMarks.notifiedAt),
-        inArray(internshipMarks.code, [...INTERN_ABSENCES]),
-        lte(internshipMarks.createdAt, new Date(now.getTime() - NOTICE_DELAY_MS)),
-      ),
-    );
-  if (!rows.length) return 0;
-  const groups = new Map<string, typeof rows>();
-  for (const r of rows) groups.set(`${r.schoolId}|${r.userId ?? ''}`, [...(groups.get(`${r.schoolId}|${r.userId ?? ''}`) ?? []), r]);
-  let sent = 0;
-  for (const list of groups.values()) {
-    const first = list[0]!;
-    const vp = schoolSettingsSchema.parse(first.settings ?? {}).internshipManagerUserId;
-    const fresh = list.filter((r) => now.getTime() - r.createdAt.getTime() <= NOTICE_MAX_AGE_MS);
-    let member = false;
-    if (vp && vp !== first.userId && fresh.length) {
-      const [m] = await db
-        .select({ id: memberships.id })
-        .from(memberships)
-        .where(and(eq(memberships.schoolId, first.schoolId), eq(memberships.userId, vp)));
-      member = Boolean(m);
-    }
-    if (member && vp) {
-      // Öğrenci ve koda göre günler ve bölümler birleşir
-      const byKey = new Map<string, typeof fresh>();
-      for (const r of fresh) byKey.set(`${r.studentId}|${r.code}`, [...(byKey.get(`${r.studentId}|${r.code}`) ?? []), r]);
-      const lines = [...byKey.values()].map((parts) => {
-        const p = parts[0]!;
-        const days = [...new Set(parts.map((x) => x.date))].sort();
-        const when =
-          days.length === 1
-            ? `${shortDate(days[0]!)} ${internHalfText(parts.map((x) => x.half))}`
-            : `${shortDate(days[0]!)} – ${shortDate(days[days.length - 1]!)}, ${formatDays(parts.length / 2)} gün`;
-        return `${p.fullName}${p.className ? ` (${p.className})` : ''}: ${when} ${INTERN_MARK_TEXT[p.code]}${p.businessName ? ` · ${p.businessName}` : ''}`;
-      });
-      const codes = new Set(fresh.map((r) => r.code));
-      const absent = codes.has('D');
-      const excused = [...codes].some((c) => c !== 'D');
-      const title = absent && excused ? 'İşletmede devamsızlık ve rapor/izin' : absent ? 'İşletmede devamsızlık' : 'İşletmede rapor / izin bildirimi';
-      const what = absent && excused ? 'devamsızlık ve rapor/izin' : absent ? 'devamsızlık' : 'rapor / izin';
-      const studentCount = new Set(fresh.map((r) => r.studentId)).size;
-      const firstDate = [...fresh.map((r) => r.date)].sort()[0]!;
-      await addToInbox(db, [vp], {
-        key: `internship:${randomUUID()}`,
-        kind: 'internship',
-        title,
-        body: `Bildiren: ${first.userName}\n${lines.join('\n')}`,
-        to: `/isletme-devam?ay=${firstDate.slice(0, 7)}&gun=${firstDate}`,
-        schoolId: first.schoolId,
-      });
-      notifyUsers(deps, [vp], { title, body: `${studentCount === 1 ? 'Bir öğrenci' : `${studentCount} öğrenci`} için ${what} bildirildi. Ayrıntı uygulamada.`, url: '/bildirimler' });
-      sent++;
-    }
-    await db
-      .update(internshipMarks)
-      .set({ notifiedAt: now })
-      .where(inArray(internshipMarks.id, list.map((r) => r.id)));
-  }
-  return sent;
+    .where(and(eq(internshipMarks.schoolId, schoolId), isNull(internshipMarks.notifiedAt), inArray(internshipMarks.code, [...INTERN_ABSENCES])));
+  return rows.sort((a, b) => trCompare(a.businessName ?? '', b.businessName ?? '') || trCompare(a.fullName, b.fullName) || a.date.localeCompare(b.date) || a.half.localeCompare(b.half));
+}
+
+const shortDate = (iso: string) => new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));
+
+/**
+ * Devamsızlıkları koordinatör müdür yardımcısına bildirir: tek bildirim, öğrenci ve koda göre günler birleşir. Ayrıntı
+ * (öğrenci adı, rapor) yalnızca uygulamanın bildirim kutusunda; kilit ekranına düşen bildirimde ad ve sağlık bilgisi
+ * yazmaz (KVKK).
+ */
+async function sendInternshipNotice(
+  deps: AppDeps,
+  o: {
+    schoolId: string;
+    vp: string;
+    sender: string;
+    note: string | null;
+    rows: { studentId: string; date: string; half: InternHalf; code: InternStored; fullName: string; className: string | null; businessName: string | null }[];
+  },
+) {
+  const byKey = new Map<string, typeof o.rows>();
+  for (const r of o.rows) byKey.set(`${r.studentId}|${r.code}`, [...(byKey.get(`${r.studentId}|${r.code}`) ?? []), r]);
+  const lines = [...byKey.values()].map((parts) => {
+    const p = parts[0]!;
+    const days = [...new Set(parts.map((x) => x.date))].sort();
+    const when =
+      days.length === 1
+        ? `${shortDate(days[0]!)} ${internHalfText(parts.map((x) => x.half))}`
+        : `${shortDate(days[0]!)} – ${shortDate(days[days.length - 1]!)}, ${formatDays(parts.length / 2)} gün`;
+    return `${p.fullName}${p.className ? ` (${p.className})` : ''}: ${when} ${INTERN_MARK_TEXT[p.code]}${p.businessName ? ` · ${p.businessName}` : ''}`;
+  });
+  const codes = new Set(o.rows.map((r) => r.code));
+  const absent = codes.has('D');
+  const excused = [...codes].some((c) => c !== 'D');
+  const title = absent && excused ? 'İşletmede devamsızlık ve rapor/izin' : absent ? 'İşletmede devamsızlık' : 'İşletmede rapor / izin bildirimi';
+  const what = absent && excused ? 'devamsızlık ve rapor/izin' : absent ? 'devamsızlık' : 'rapor / izin';
+  const studentCount = new Set(o.rows.map((r) => r.studentId)).size;
+  const firstDate = [...o.rows.map((r) => r.date)].sort()[0]!;
+  await addToInbox(deps.db, [o.vp], {
+    key: `internship:${randomUUID()}`,
+    kind: 'internship',
+    title,
+    body: `Bildiren: ${o.sender}\n${lines.join('\n')}${o.note ? `\nNot: ${o.note}` : ''}`,
+    to: `/isletme-devam?ay=${firstDate.slice(0, 7)}&gun=${firstDate}`,
+    schoolId: o.schoolId,
+  });
+  notifyUsers(deps, [o.vp], { title, body: `${studentCount === 1 ? 'Bir öğrenci' : `${studentCount} öğrenci`} için ${what} bildirildi. Ayrıntı uygulamada.`, url: '/bildirimler' });
 }
