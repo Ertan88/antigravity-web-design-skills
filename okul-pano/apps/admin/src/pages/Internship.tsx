@@ -28,7 +28,7 @@ import {
   Undo2,
   Users,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useToast } from "../components/Toast.tsx";
 import {
@@ -606,24 +606,22 @@ function SheetTable({
         </thead>
         <tbody>
           {rows.map((s, i) => (
-            <tr key={s.id}>
-              <td className="border-b border-slate-100 px-1.5 text-center font-bold text-slate-400">
+            // İki satır: üstte No · Sınıf · Ad, altta bütün öğrenci bilgilerinin altında işletme adı; günler iki satırı kaplar
+            <Fragment key={s.id}>
+            <tr>
+              <td rowSpan={2} className="border-b border-slate-100 px-1.5 text-center font-bold text-slate-400">
                 {i + 1}
               </td>
-              {/* No, sınıf ve ad ayrı sütunlarda: uzun sınıf adında (ör. AMP 12-B) işletme adı yine öğrenci adının altında */}
-              <td className="border-b border-slate-100 px-2 text-[13px] font-bold whitespace-nowrap text-slate-500 tabular-nums">
+              <td className="px-2 pt-1.5 align-bottom text-[13px] font-bold whitespace-nowrap text-slate-500 tabular-nums">
                 {s.schoolNo}
               </td>
-              <td className="border-b border-slate-100 px-2 text-[13px] font-bold whitespace-nowrap text-slate-600">
+              <td className="px-2 pt-1.5 align-bottom text-[13px] font-bold whitespace-nowrap text-slate-600">
                 {s.className ?? "–"}
               </td>
-              <td className="border-b border-slate-100 px-2 py-1 whitespace-nowrap">
-                <div className="text-[13px] font-extrabold">{s.fullName}</div>
-                <div className="text-[11px] font-medium text-slate-400">
-                  {s.businessName}
-                </div>
+              <td className="px-2 pt-1.5 align-bottom text-[13px] font-extrabold whitespace-nowrap">
+                {s.fullName}
               </td>
-              <td className="border-b border-slate-100 pr-1 text-right text-[9px] leading-[21px] font-bold text-slate-400">
+              <td rowSpan={2} className="border-b border-slate-100 pr-1 text-right text-[9px] leading-[21px] font-bold text-slate-400">
                 {INTERN_HALF_SHORT.am}
                 <br />
                 {INTERN_HALF_SHORT.pm}
@@ -631,6 +629,7 @@ function SheetTable({
               {days.map((d, di) => (
                 <td
                   key={d.date}
+                  rowSpan={2}
                   className="border-b border-slate-100 px-px py-1"
                 >
                   {s.cells[di]!.map((c, hi) => {
@@ -679,15 +678,22 @@ function SheetTable({
                 </td>
               ))}
               <td
+                rowSpan={2}
                 className="border-b border-slate-100 px-2 text-center text-[13px] font-extrabold text-violet-700 dark:text-violet-300"
                 title={`İzinli ${formatDays(s.totals.permitted)} · Raporlu ${formatDays(s.totals.report)} · Sevkli ${formatDays(s.totals.referred)}`}
               >
                 {s.totals.excused ? formatDays(s.totals.excused) : "–"}
               </td>
-              <td className="border-b border-slate-100 px-2 text-center text-[13px] font-extrabold text-red-600">
+              <td rowSpan={2} className="border-b border-slate-100 px-2 text-center text-[13px] font-extrabold text-red-600">
                 {s.totals.unexcused ? formatDays(s.totals.unexcused) : "–"}
               </td>
             </tr>
+            <tr>
+              <td colSpan={3} className="border-b border-slate-100 px-2 pb-1.5 align-top text-[11px] font-medium whitespace-nowrap text-slate-400">
+                {s.businessName}
+              </td>
+            </tr>
+            </Fragment>
           ))}
         </tbody>
       </table>
