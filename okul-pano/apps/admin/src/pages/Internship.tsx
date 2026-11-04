@@ -169,19 +169,23 @@ const thisMonth = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 };
 
+/*
+ * Koyu temada panelin renk ölçeği dönüştürülür (açık tonlar saydamlaşır); hücreler bu yüzden koyu temada sabit, yüksek
+ * kontrastlı renklerle çizilir: koyu zemin, açık harf.
+ */
 export const CELL_CLASS: Record<InternCell, string> = {
-  O: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-200 dark:border-emerald-800",
-  X: "bg-white text-slate-700 border-slate-400 dark:bg-transparent dark:text-slate-200 dark:border-slate-500",
-  D: "bg-red-500 text-white border-red-500",
-  İ: "bg-teal-200 text-teal-900 border-teal-300 dark:bg-teal-900/60 dark:text-teal-100 dark:border-teal-700",
-  R: "bg-violet-200 text-violet-900 border-violet-300 dark:bg-violet-900/60 dark:text-violet-100 dark:border-violet-700",
-  H: "bg-orange-200 text-orange-900 border-orange-300 dark:bg-orange-900/60 dark:text-orange-100 dark:border-orange-700",
-  TA: "bg-sky-200 text-sky-900 border-sky-200 dark:bg-sky-900/60 dark:text-sky-100 dark:border-sky-800",
-  T: "bg-sky-200 text-sky-900 border-sky-700 border-2 dark:bg-sky-900/60 dark:text-sky-100 dark:border-sky-400",
-  K: "bg-amber-200 text-amber-900 border-amber-300 dark:bg-amber-900/60 dark:text-amber-100 dark:border-amber-700",
-  "?": "bg-white text-slate-400 border-dashed border-slate-300 dark:bg-transparent dark:text-slate-500 dark:border-slate-600",
+  O: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-[#123d2c] dark:text-[#a7f3d0] dark:border-[#1f6b4d]",
+  X: "bg-white text-slate-700 border-slate-400 dark:bg-[#26231f] dark:text-[#f5f3ef] dark:border-[#a8a29e]",
+  D: "bg-red-500 text-white border-red-500 dark:bg-[#dc2626] dark:text-white dark:border-[#dc2626]",
+  İ: "bg-teal-200 text-teal-900 border-teal-300 dark:bg-[#134e4a] dark:text-[#99f6e4] dark:border-[#0f766e]",
+  R: "bg-violet-200 text-violet-900 border-violet-300 dark:bg-[#3b2a6b] dark:text-[#ddd6fe] dark:border-[#7c3aed]",
+  H: "bg-orange-200 text-orange-900 border-orange-300 dark:bg-[#5a2a10] dark:text-[#fed7aa] dark:border-[#c2410c]",
+  TA: "bg-sky-200 text-sky-900 border-sky-200 dark:bg-[#0c3a5a] dark:text-[#bae6fd] dark:border-[#0c3a5a]",
+  T: "bg-sky-200 text-sky-900 border-sky-700 border-2 dark:bg-[#0c3a5a] dark:text-[#bae6fd] dark:border-[#38bdf8]",
+  K: "bg-amber-200 text-amber-900 border-amber-300 dark:bg-[#5a430c] dark:text-[#fde68a] dark:border-[#b45309]",
+  "?": "bg-white text-slate-400 border-dashed border-slate-300 dark:bg-transparent dark:text-[#d6d1c8] dark:border-[#8a837b]",
   W: "border-transparent bg-[repeating-linear-gradient(135deg,var(--color-slate-100)_0_4px,var(--color-slate-200)_4px_8px)]",
-  "": "bg-white border-slate-200 dark:bg-transparent dark:border-slate-700",
+  "": "bg-white border-slate-200 dark:bg-transparent dark:border-[#4d4740]",
 };
 
 /** Kodların açıklaması (çizelgenin altında) */
@@ -340,7 +344,7 @@ export function InternshipSheet() {
         }
       />
       {Boolean(pending.data?.length) && (
-        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100">
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 dark:border-[#b45309] dark:bg-[#2e2208] dark:text-[#fde68a]">
           <span className="size-2.5 rounded-full bg-amber-500" />
           <div className="mr-auto">
             <div className="font-extrabold">
