@@ -1,0 +1,8 @@
+{$DOMAIN} {
+	encode zstd gzip
+
+	reverse_proxy app:3000 {
+		# Ekranlara canlı yayın (SSE) bekletilmeden iletilsin
+		flush_interval -1
+	}
+}

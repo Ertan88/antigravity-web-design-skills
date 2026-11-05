@@ -1,0 +1,277 @@
+import { compareClassNames, normalizeClassName, normalizeName, studentImportSchema, studentSchema, trCompare, schoolFullName } from '@okulpano/shared';
+import { asc, eq } from 'drizzle-orm';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { z } from 'zod';
+import { audit, schoolGuard } from '../context.ts';
+import type { DB } from '../db/client.ts';
+import { classGroups, students, teachers } from '../db/schema.ts';
+import { applyAdvisor } from '../lib/advisor.ts';
+import { parse } from '../lib/errors.ts';
+import { exportFileName, sendXlsx } from '../lib/excel.ts';
+import { badRequest } from '../lib/errors.ts';
+import { parseClassListPdf } from '../lib/sheets/eokulStudents.ts';
+import { buildStudentsWorkbook, parseStudentsWorkbook } from '../lib/sheets/students.ts';
+import { registerResource } from './crud.ts';
+
+type Tx = Parameters<Parameters<DB['transaction']>[0]>[0];
+
+/** Aynı öğrenci: okul numarası (büyük/küçük harf duyarsız). Aynı isimli iki öğrenci karışmaz. */
+const studentKey = (schoolNo: string) => schoolNo.trim().toLocaleUpperCase('tr-TR');
+const classKey = (name: string) => normalizeName(normalizeClassName(name));
+
+async function loadClasses(db: DB | Tx, schoolId: string) {
+  const rows = await db
+    .select({ id: classGroups.id, name: classGroups.name, sortOrder: classGroups.sortOrder })
+    .from(classGroups)
+    .where(eq(classGroups.schoolId, schoolId))
+    .orderBy(asc(classGroups.sortOrder), asc(classGroups.name));
+  rows.sort((a, b) => compareClassNames(a.name, b.name));
+  return { rows, byKey: new Map(rows.map((c) => [classKey(c.name), c])), byId: new Map(rows.map((c) => [c.id, c])) };
+}
+
+type Compared = { fullName: string; birthDate: string; classGroupId: string | null; listNo?: number | null };
+
+/** Kayıttaki ad, doğum tarihi, sınıf ya da sıra no dosyadakinden farklı mı (ad karşılaştırması Türkçe büyük/küçük harf duyarsız) */
+function differs(a: Compared, b: Compared) {
+  return (
+    normalizeName(a.fullName) !== normalizeName(b.fullName) ||
+    a.birthDate !== b.birthDate ||
+    (b.classGroupId !== null && a.classGroupId !== b.classGroupId) ||
+    (b.listNo != null && a.listNo !== b.listNo)
+  );
+}
+
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+
+/** Öğrenci listesi dosyası: Excel (.xlsx) ya da e-Okul sınıf listesi PDF'i */
+async function readStudentUpload(req: FastifyRequest) {
+  const file = await req.file({ limits: { fileSize: MAX_UPLOAD_BYTES } });
+  if (!file) throw badRequest('Dosya bulunamadı.');
+  const pdf = /\.pdf$/i.test(file.filename);
+  if (!pdf && !/\.xlsx$/i.test(file.filename)) {
+    throw badRequest(
+      /\.xls$/i.test(file.filename)
+        ? 'Eski .xls biçimi desteklenmiyor. Excel\'de "Farklı Kaydet → Excel Çalışma Kitabı (.xlsx)" seçin.'
+        : "Lütfen .xlsx uzantılı Excel dosyası ya da e-Okul sınıf listesi PDF'i yükleyin.",
+    );
+  }
+  const data = await file.toBuffer();
+  if (file.file.truncated) throw badRequest('Dosya 10 MB sınırını aşıyor.');
+  return pdf ? parseClassListPdf(new Uint8Array(data)) : parseStudentsWorkbook(data);
+}
+
+export async function studentRoutes(app: FastifyInstance) {
+  const { db, bus } = app.deps;
+  const base = '/api/schools/:schoolId/students';
+  const read = { preHandler: [app.authenticate, schoolGuard()] };
+  const write = { preHandler: [app.authenticate, schoolGuard('students.manage')] };
+
+  registerResource(app, {
+    path: 'students',
+    entity: 'Öğrenci',
+    table: students,
+    permission: 'students.manage',
+    schema: studentSchema,
+    orderBy: [asc(students.fullName)],
+    refs: { classGroupId: classGroups },
+    toRow: (i) => ({ ...i, classGroupId: i.classGroupId ?? null }),
+  });
+
+  /** Öğrenci listesini tamamen siler (sınıflar kalır; ders programında kullanılırlar) */
+  app.post(`${base}/delete-all`, write, async (req) => {
+    parse(z.object({ confirm: z.literal('delete-all', { error: 'Silme onayı eksik' }) }), req.body);
+    const removed = await db.delete(students).where(eq(students.schoolId, req.ctx.schoolId)).returning({ id: students.id });
+    await audit(req, 'delete', 'Öğrenci', null, `Öğrenci listesi temizlendi (${removed.length} öğrenci)`);
+    bus.contentChanged(req.ctx.schoolId);
+    return { deleted: removed.length };
+  });
+
+  /**
+   * Toplu içe aktarma (Excel önizlemesinden ya da yapıştırılan listeden). Eksik sınıflar oluşturulur;
+   * aynı okul numaralı öğrenci varsa yeni kayıt açılmaz, adı, sınıfı ve doğum tarihi güncellenir.
+   */
+  app.post(`${base}/import`, write, async (req) => {
+    const { rows, updateExisting, advisors } = parse(studentImportSchema, req.body);
+    const schoolId = req.ctx.schoolId;
+
+    const result = await db.transaction(async (tx) => {
+      const classes = await loadClasses(tx, schoolId);
+      const missing = new Map<string, string>();
+      for (const r of rows) {
+        if (!r.className) continue;
+        const name = normalizeClassName(r.className);
+        if (!classes.byKey.has(classKey(name))) missing.set(classKey(name), name);
+      }
+      if (missing.size) {
+        const created = await tx
+          .insert(classGroups)
+          .values([...missing.values()].map((name, i) => ({ schoolId, name, sortOrder: classes.rows.length + i })))
+          .returning({ id: classGroups.id, name: classGroups.name, sortOrder: classGroups.sortOrder });
+        for (const c of created) classes.byKey.set(classKey(c.name), c);
+      }
+
+      const current = await tx
+        .select({ id: students.id, schoolNo: students.schoolNo, fullName: students.fullName, birthDate: students.birthDate, classGroupId: students.classGroupId, listNo: students.listNo })
+        .from(students)
+        .where(eq(students.schoolId, schoolId));
+      const byKey = new Map(current.map((s) => [studentKey(s.schoolNo), s]));
+
+      const inserts: (typeof students.$inferInsert)[] = [];
+      let updated = 0;
+      let unchanged = 0;
+      const handled = new Set<string>();
+      for (const r of rows) {
+        const key = studentKey(r.schoolNo);
+        if (handled.has(key)) continue;
+        handled.add(key);
+        const classGroupId = r.className ? (classes.byKey.get(classKey(r.className))?.id ?? null) : null;
+        const fullName = r.fullName.trim().replace(/\s+/g, ' ');
+        const existing = byKey.get(key);
+        const listNo = r.listNo ?? null;
+        if (!existing) {
+          inserts.push({ schoolId, schoolNo: r.schoolNo, fullName, birthDate: r.birthDate, classGroupId, listNo });
+        } else if (updateExisting && differs(existing, { fullName, birthDate: r.birthDate, classGroupId, listNo })) {
+          await tx
+            .update(students)
+            .set({ fullName, birthDate: r.birthDate, classGroupId: classGroupId ?? existing.classGroupId, listNo: listNo ?? existing.listNo })
+            .where(eq(students.id, existing.id));
+          updated++;
+        } else {
+          unchanged++;
+        }
+      }
+      for (let i = 0; i < inserts.length; i += 500) await tx.insert(students).values(inserts.slice(i, i + 500));
+
+      // Sınıf rehber öğretmenleri (e-Okul'daki "Sınıf Öğretmeni"): kadrodaki adla eşleşenler yazılır
+      let advisorsSet = 0;
+      if (advisors?.length) {
+        const staff = await tx.select({ id: teachers.id, fullName: teachers.fullName }).from(teachers).where(eq(teachers.schoolId, schoolId));
+        const teacherByKey = new Map(staff.map((t) => [normalizeName(t.fullName), t.id]));
+        const current = await tx.select({ id: classGroups.id, advisor: classGroups.advisorTeacherId }).from(classGroups).where(eq(classGroups.schoolId, schoolId));
+        const advisorOf = new Map(current.map((c) => [c.id, c.advisor]));
+        for (const a of advisors) {
+          const cls = classes.byKey.get(classKey(a.className));
+          const teacherId = teacherByKey.get(normalizeName(a.teacherName));
+          if (!cls || !teacherId) continue;
+          const previous = advisorOf.get(cls.id) ?? null;
+          if (previous !== teacherId) {
+            await tx.update(classGroups).set({ advisorTeacherId: teacherId }).where(eq(classGroups.id, cls.id));
+            advisorsSet++;
+          }
+          await applyAdvisor(tx, schoolId, cls.id, teacherId, previous);
+        }
+      }
+      return { created: inserts.length, updated, unchanged, classesCreated: missing.size, ...(advisors?.length ? { advisorsSet } : {}) };
+    });
+
+    await audit(req, 'create', 'Öğrenci', null, `${result.created} öğrenci eklendi, ${result.updated} güncellendi (toplu)`);
+    bus.contentChanged(schoolId);
+    return result;
+  });
+
+  /** Excel önizlemesi: hiçbir şey kaydetmeden yeni / güncellenecek / atlanacak satırları gösterir. */
+  app.post(`${base}/import/preview`, { ...write, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req) => {
+    const parsed = await readStudentUpload(req);
+    const schoolId = req.ctx.schoolId;
+    const [classes, current] = await Promise.all([
+      loadClasses(db, schoolId),
+      db
+        .select({ schoolNo: students.schoolNo, fullName: students.fullName, birthDate: students.birthDate, classGroupId: students.classGroupId, listNo: students.listNo })
+        .from(students)
+        .where(eq(students.schoolId, schoolId)),
+    ]);
+    const byKey = new Map(current.map((s) => [studentKey(s.schoolNo), s]));
+    const newClasses = new Map<string, string>();
+    const seen = new Map<string, number>();
+    const issues = [...parsed.issues];
+
+    const rows = parsed.rows.flatMap((r) => {
+      const key = studentKey(r.schoolNo);
+      const first = seen.get(key);
+      if (first !== undefined) {
+        issues.push({ row: r.row, message: `${r.schoolNo} numarası dosyada iki kez var (ilk: ${first}. satır); bu satır atlanacak` });
+        return [];
+      }
+      seen.set(key, r.row);
+      const cls = r.className ? classes.byKey.get(classKey(r.className)) : undefined;
+      if (r.className && !cls) newClasses.set(classKey(r.className), r.className);
+      const existing = byKey.get(key);
+      const status: 'new' | 'update' | 'unchanged' = !existing
+        ? 'new'
+        : (r.className && (!cls || cls.id !== existing.classGroupId)) || differs(existing, { fullName: r.fullName, birthDate: r.birthDate, classGroupId: existing.classGroupId, listNo: 'listNo' in r ? (r.listNo as number | null) : null })
+          ? 'update'
+          : 'unchanged';
+      return [{ ...r, status }];
+    });
+
+    issues.sort((a, b) => a.row - b.row);
+    let advisors: { className: string; teacherName: string; match: { id: string; fullName: string } | null; current: string | null }[] = [];
+    const parsedAdvisors = 'advisors' in parsed ? (parsed.advisors as { className: string; teacherName: string }[]) : [];
+    if (parsedAdvisors.length) {
+      const [staff, classRows] = await Promise.all([
+        db.select({ id: teachers.id, fullName: teachers.fullName }).from(teachers).where(eq(teachers.schoolId, schoolId)),
+        db.select({ id: classGroups.id, name: classGroups.name, advisor: classGroups.advisorTeacherId }).from(classGroups).where(eq(classGroups.schoolId, schoolId)),
+      ]);
+      const teacherByKey = new Map(staff.map((t) => [normalizeName(t.fullName), t]));
+      const nameOf = new Map(staff.map((t) => [t.id, t.fullName]));
+      const advisorByClass = new Map(classRows.map((c) => [classKey(c.name), c.advisor]));
+      advisors = parsedAdvisors.map((a) => {
+        const t = teacherByKey.get(normalizeName(a.teacherName));
+        const cur = advisorByClass.get(classKey(a.className));
+        return { ...a, match: t ? { id: t.id, fullName: t.fullName } : null, current: cur ? (nameOf.get(cur) ?? null) : null };
+      });
+    }
+    return {
+      advisors,
+      sheetName: parsed.sheetName,
+      rows,
+      issues,
+      additions: newClasses.size ? [{ label: 'Oluşturulacak sınıflar', values: [...newClasses.values()].sort(trCompare) }] : [],
+      totals: {
+        new: rows.filter((r) => r.status === 'new').length,
+        update: rows.filter((r) => r.status === 'update').length,
+        unchanged: rows.filter((r) => r.status === 'unchanged').length,
+        skipped: issues.length,
+      },
+    };
+  });
+
+  app.get(`${base}/template`, read, async (req, reply) => {
+    const classes = await loadClasses(db, req.ctx.schoolId);
+    const buf = await buildStudentsWorkbook({ classes: classes.rows.map((c) => c.name), schoolName: schoolFullName(req.ctx.school.name, req.ctx.school.settings?.schoolType) });
+    return sendXlsx(reply, buf, 'ogrenci-sablonu.xlsx');
+  });
+
+  /** Sınıf sırasına, sonra ada göre sıralı liste */
+  app.get(`${base}/export`, read, async (req, reply) => {
+    const schoolId = req.ctx.schoolId;
+    const [classes, rows] = await Promise.all([
+      loadClasses(db, schoolId),
+      db
+        .select({ schoolNo: students.schoolNo, fullName: students.fullName, birthDate: students.birthDate, classGroupId: students.classGroupId })
+        .from(students)
+        .where(eq(students.schoolId, schoolId)),
+    ]);
+    const order = (id: string | null) => {
+      const c = id ? classes.byId.get(id) : undefined;
+      return c ? c.sortOrder : Number.MAX_SAFE_INTEGER;
+    };
+    rows.sort(
+      (a, b) =>
+        order(a.classGroupId) - order(b.classGroupId) ||
+        trCompare(classes.byId.get(a.classGroupId ?? '')?.name ?? '', classes.byId.get(b.classGroupId ?? '')?.name ?? '') ||
+        trCompare(a.fullName, b.fullName),
+    );
+    const buf = await buildStudentsWorkbook({
+      classes: classes.rows.map((c) => c.name),
+      schoolName: schoolFullName(req.ctx.school.name, req.ctx.school.settings?.schoolType),
+      rows: rows.map((r) => ({
+        schoolNo: r.schoolNo,
+        fullName: r.fullName,
+        birthDate: r.birthDate,
+        className: r.classGroupId ? (classes.byId.get(r.classGroupId)?.name ?? null) : null,
+      })),
+    });
+    return sendXlsx(reply, buf, exportFileName('ogrenciler', req.ctx.school.name));
+  });
+}

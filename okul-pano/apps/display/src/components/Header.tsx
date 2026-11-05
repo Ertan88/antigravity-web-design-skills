@@ -1,0 +1,133 @@
+import { splitSchoolName, weatherInfo, type WeatherNow } from '@okulpano/shared/client';
+import type { Connection } from '../hooks.ts';
+import { AlertIcon, MoonIcon, PinIcon, SchoolIcon, SunIcon, WEATHER_ICONS, WifiOffIcon } from './Icons.tsx';
+import { SpecialMark } from './SpecialMark.tsx';
+
+const timeFmt = new Map<string, Intl.DateTimeFormat>();
+function fmt(tz: string, opts: Intl.DateTimeFormatOptions, key: string) {
+  const k = `${tz}|${key}`;
+  let f = timeFmt.get(k);
+  if (!f) {
+    f = new Intl.DateTimeFormat('tr-TR', { timeZone: tz, ...opts });
+    timeFmt.set(k, f);
+  }
+  return f;
+}
+
+const capitalize = (t: string) => t.charAt(0).toLocaleUpperCase('tr-TR') + t.slice(1);
+
+interface Props {
+  schoolName: string;
+  /** Ayarlardaki okul türü; boşsa addan otomatik ayrılır */
+  schoolType?: string;
+  logoUrl: string | null;
+  timezone: string;
+  now: Date;
+  weather: WeatherNow | null;
+  city: string | null;
+  connection: Connection;
+  lastUpdated: number | null;
+  /** O günün özel teması (millî bayram, 10 Kasım…): üst barın ortasında filigran */
+  specialId?: string;
+  /** Bugün için hava durumu uyarısı (yoğun kar, aşırı sıcak…) */
+  showWeatherAlert?: boolean;
+}
+
+export function Header({
+  schoolName,
+  schoolType,
+  logoUrl,
+  timezone,
+  now,
+  weather,
+  city,
+  connection,
+  lastUpdated,
+  specialId,
+  showWeatherAlert = true,
+}: Props) {
+  const todayAlert = weather?.alerts?.find((a) => a.day === 'today') ?? null;
+  const hm = fmt(timezone, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }, 'hm').format(now);
+  const sec = fmt(timezone, { second: '2-digit' }, 's').format(now).padStart(2, '0');
+  const date = fmt(timezone, { day: 'numeric', month: 'long', year: 'numeric' }, 'date').format(now);
+  const weekday = fmt(timezone, { weekday: 'long' }, 'wd').format(now);
+  const info = weather ? weatherInfo(weather.weatherCode, weather.isDay) : null;
+  const WeatherGlyph = info ? WEATHER_ICONS[info.icon] : null;
+  const title = splitSchoolName(schoolName, schoolType);
+
+  return (
+    <header className="header">
+      {specialId && <SpecialMark id={specialId} className="special-mark-header" />}
+      <div className="header-school">
+        <div className="school-badge">
+          {logoUrl ? <img src={logoUrl} alt="" className="school-logo" /> : <SchoolIcon size={50} className="school-logo-icon" />}
+        </div>
+        <h1 className="school-title">
+          <span className="school-name">{title.name}</span>
+          {title.type && <span className="school-type">{title.type}</span>}
+        </h1>
+      </div>
+
+      <div className="header-right">
+        <div className="header-weather">
+          {/* Konum üstte belirgin; altında sıcaklık ve bugünün durumu (yarının tahmini burada yok) */}
+          {(weather?.city ?? city) && (
+            <div className="weather-city">
+              <PinIcon size={17} />
+              {weather?.city ?? city}
+            </div>
+          )}
+          {weather && WeatherGlyph && info ? (
+            <div className="weather-now">
+              {/* Simge: güneş / ay ya da bulutlu, yağmurlu… üzerinde gece-gündüz rozeti */}
+              <span className={`weather-glyph ${weather.isDay ? 'is-day' : 'is-night'}`}>
+                <WeatherGlyph size={54} className="weather-icon" />
+                {!['sun', 'moon', 'cloud-sun', 'cloud-moon'].includes(info.icon) && (
+                  <span className="weather-daynight">{weather.isDay ? <SunIcon size={18} /> : <MoonIcon size={18} />}</span>
+                )}
+              </span>
+              {/* Derece üstte, o anki durum hemen altında */}
+              <div className="weather-stack">
+                <div className="weather-temp">
+                  {weather.temperature}°<span className="weather-unit">C</span>
+                </div>
+                <div className="weather-cond">{info.label}</div>
+                {showWeatherAlert && todayAlert && (
+                  <div className="weather-alert">
+                    <AlertIcon size={14} /> {capitalize(todayAlert.text.replace(/^Bugün /, ''))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="weather-cond muted">Hava durumu bekleniyor</div>
+          )}
+        </div>
+
+        <div className="header-clock">
+          <div className="clock">
+            <span className="clock-hm">{hm}</span>
+            <span className="clock-s">{sec}</span>
+          </div>
+          <div className="date">
+            <span className="date-day">{date}</span>
+            <span className="date-weekday">{weekday}</span>
+          </div>
+          <div className="header-chips">
+            {connection === 'offline' && (
+              <div className="offline-chip" title="Sunucuya ulaşılamıyor; son kayıtlı veri gösteriliyor">
+                <WifiOffIcon size={18} />
+                Çevrimdışı
+                {lastUpdated && (
+                  <span>
+                    · {fmt(timezone, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }, 'hm').format(new Date(lastUpdated))}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
