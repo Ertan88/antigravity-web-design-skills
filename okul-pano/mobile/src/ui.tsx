@@ -4,6 +4,7 @@ import { ActivityIndicator, Animated, Easing, Keyboard, KeyboardAvoidingView, Pl
 import { Text, TextInput } from './text.tsx';
 import { ICONS, type IconName } from './icons.tsx';
 import { openConfirm, type ConfirmOptions } from './confirm.tsx';
+import { SpecialDayStrip } from './specialDay.tsx';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { scrollMemory, scrollRestore } from './scroll.ts';
 import { colors, dark, radius, space, tiles, type TileTone } from './theme.ts';
@@ -620,6 +621,7 @@ export function HomeHeader({ name, school, schoolType, role, children }: { name?
   const first = name?.trim().split(/\s+/)[0];
   return (
     <View style={{ gap: 14, paddingTop: 8 }}>
+      <SpecialDayStrip />
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <Avatar name={name} />
         <View style={{ flex: 1, minWidth: 0 }}>

@@ -19,7 +19,7 @@ export interface SchoolInfo {
   logoUrl: string | null;
   timezone: string;
   supportAccessUntil?: string | null;
-  settings: { requireApproval?: boolean; schoolType?: string; lunchThresholdMin?: number };
+  settings: { requireApproval?: boolean; schoolType?: string; lunchThresholdMin?: number; specialDays?: unknown };
 }
 
 export interface MeToday {

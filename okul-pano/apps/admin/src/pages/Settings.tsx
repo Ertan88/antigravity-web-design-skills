@@ -1,4 +1,4 @@
-import { SCHOOL_TYPES, splitSchoolName, updateSchoolSchema, type SchoolSettings } from '@okulpano/shared';
+import { SCHOOL_TYPES, SPECIAL_DAYS, specialDayFor, splitSchoolName, updateSchoolSchema, type SchoolSettings } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Download, ExternalLink, FileText, MapPin, Search } from '../components/icons.tsx';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -7,7 +7,7 @@ import { SampleDataCard } from '../components/Onboarding.tsx';
 import { SupportAccessCard } from '../components/SupportAccess.tsx';
 import { SaveBar } from '../components/SaveBar.tsx';
 import { useToast } from '../components/Toast.tsx';
-import { Alert, Button, Card, Field, Input, PageHeader, Select, Spinner, Textarea, Toggle } from '../components/ui.tsx';
+import { Alert, Badge, Button, Card, Field, Input, PageHeader, Select, Spinner, Textarea, Toggle } from '../components/ui.tsx';
 import { confirm } from '../components/confirm.tsx';
 import { downloadJson } from '../lib/download.ts';
 import { Link } from 'react-router-dom';
@@ -375,6 +375,7 @@ export function Settings() {
             sayfasında.
           </p>
         </Section>
+        <SpecialDaysSection value={s.specialDays} schoolName={v.name} onChange={(x) => setting('specialDays', x)} />
         <PrivacySection value={s.privacyNotice ?? ''} onChange={(x) => setting('privacyNotice', x)} slug={school.data!.slug} />
         {/* Pano düzenindeki gibi: yalnızca değişiklik varsa altta yapışık Kaydet / İptal */}
         <SaveBar
@@ -387,5 +388,93 @@ export function Settings() {
       <SampleDataCard />
       <SupportAccessCard />
     </div>
+  );
+}
+
+/** Bir özel günün örnek tarihi (önizlemede {yil} doldurmak için): bu yıl ya da gelecek yıl */
+function sampleDate(id: string): string | null {
+  const y = new Date().getFullYear();
+  for (const year of [y, y + 1]) {
+    for (let d = new Date(Date.UTC(year, 0, 1)); d.getUTCFullYear() === year; d.setUTCDate(d.getUTCDate() + 1)) {
+      const iso = d.toISOString().slice(0, 10);
+      if (specialDayFor(iso)?.def.id === id) return iso;
+    }
+  }
+  return null;
+}
+
+type SpecialDaysValue = SchoolSettings['specialDays'];
+
+/**
+ * Mobil uygulamadaki özel gün şeridi ve mesaj penceresi: tamamen kapatılabilir, her gün ayrı açılıp kapatılır,
+ * başlık / mesaj / görsel değiştirilebilir. Anma günleri sade (konfetisiz, gri) gösterilir.
+ */
+function SpecialDaysSection({ value, schoolName, onChange }: { value: SpecialDaysValue | undefined; schoolName: string; onChange: (v: SpecialDaysValue) => void }) {
+  const cur: SpecialDaysValue = value ?? { enabled: true, signature: '', days: {} };
+  const [open, setOpen] = useState<string | null>(null);
+  const setDay = (id: string, patch: NonNullable<SpecialDaysValue['days']>[string]) =>
+    onChange({ ...cur, days: { ...cur.days, [id]: { ...cur.days?.[id], ...patch } } });
+  return (
+    <Section
+      title="Özel gün mesajları"
+      description="Mobil uygulamada bayram ve anma günlerinde ana sayfanın üstünde ince bir şerit görünür; mesaj penceresi her kullanıcıya bir kez açılır. Anma günlerinde (10 Kasım, 18 Mart, 15 Temmuz…) sade ve gri tonlu gösterilir."
+    >
+      <Toggle checked={cur.enabled !== false} onChange={(x) => onChange({ ...cur, enabled: x })} label="Özel gün şeridi ve mesajları açık" />
+      {cur.enabled !== false && (
+        <>
+          <Field label="İmza" help="Pencerenin altında yazar. Boş bırakılırsa okul adı ve “Okul Müdürlüğü” yazar.">
+            {(id) => <Input id={id} value={cur.signature ?? ''} maxLength={80} placeholder={`${schoolName || 'Okul adı'} · Okul Müdürlüğü`} onChange={(e) => onChange({ ...cur, signature: e.target.value })} />}
+          </Field>
+          <div className="divide-y divide-slate-100 rounded-2xl ring-1 ring-slate-200">
+            {SPECIAL_DAYS.map((d) => {
+              const own = cur.days?.[d.id] ?? {};
+              const on = own.enabled !== false;
+              const sample = sampleDate(d.id);
+              const preview = sample ? specialDayFor(sample, { enabled: true, days: { [d.id]: own } }) : null;
+              return (
+                <div key={d.id} className="px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-ink">
+                        {d.name}
+                        <Badge tone={d.kind === 'celebration' ? 'green' : 'slate'}>{d.kind === 'celebration' ? 'Kutlama' : 'Anma'}</Badge>
+                        {(own.title || own.message || own.imageUrl) && <Badge tone="blue">Okulun metni</Badge>}
+                      </div>
+                      <div className="text-xs text-slate-500">{d.when}</div>
+                    </div>
+                    {on && (
+                      <Button size="sm" variant="ghost" onClick={() => setOpen(open === d.id ? null : d.id)}>
+                        {open === d.id ? 'Kapat' : 'Düzenle'}
+                      </Button>
+                    )}
+                    <Toggle checked={on} onChange={(x) => setDay(d.id, { enabled: x })} label="" />
+                  </div>
+                  {on && open === d.id && (
+                    <div className="mt-3 space-y-3 rounded-xl bg-slate-50 p-3">
+                      <Field label="Başlık" help="Boş bırakılırsa varsayılan metin kullanılır. {yil} kaçıncı yıl olduğunu yazar.">
+                        {(id) => <Input id={id} value={own.title ?? ''} maxLength={80} placeholder={d.title} onChange={(e) => setDay(d.id, { title: e.target.value })} />}
+                      </Field>
+                      <Field label="Mesaj">
+                        {(id) => <Textarea id={id} rows={3} value={own.message ?? ''} maxLength={400} placeholder={d.message} onChange={(e) => setDay(d.id, { message: e.target.value })} />}
+                      </Field>
+                      <Field label="Görsel (isteğe bağlı)" help="Yüklemezseniz hazır çizim (bayrak, kurdele…) kullanılır. Telif hakkı size ait ya da serbest bir görsel yükleyin.">
+                        {() => <ImageUpload value={own.imageUrl ?? null} onChange={(url) => setDay(d.id, { imageUrl: url })} aspect="aspect-[2/1]" hint="PNG, JPG veya WEBP · yatay (2:1) görsel" />}
+                      </Field>
+                      {preview && (
+                        <div className="rounded-xl bg-surface p-3 text-sm ring-1 ring-slate-200">
+                          <div className="text-xs font-bold tracking-wide text-slate-400 uppercase">Önizleme · {sample}</div>
+                          <div className="mt-1 font-bold text-ink">{preview.title}</div>
+                          <div className="text-slate-600">{preview.message}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </Section>
   );
 }

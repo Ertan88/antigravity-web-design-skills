@@ -145,6 +145,24 @@ export const schoolSettingsSchema = z.object({
   labels: z.partialRecord(z.enum(LABEL_KEYS as [LabelKeyT, ...LabelKeyT[]]), z.string().trim().max(60)).default({}),
   /** Okulun varsayılan pano düzeni; yoksa eski göster/gizle ayarlarından türetilir */
   layout: boardLayoutSchema.nullable().default(null),
+  /** Mobil uygulamada özel gün şeridi ve mesaj penceresi (kutlama ve anma günleri) */
+  specialDays: z
+    .object({
+      enabled: z.boolean().default(true),
+      signature: z.string().trim().max(80).default(''),
+      days: z
+        .record(
+          z.string().max(30),
+          z.object({
+            enabled: z.boolean().optional(),
+            title: z.string().trim().max(80).optional(),
+            message: z.string().trim().max(400).optional(),
+            imageUrl: z.string().max(500).nullable().optional(),
+          }),
+        )
+        .default({}),
+    })
+    .default({ enabled: true, signature: '', days: {} }),
   /** KVKK aydınlatma metni: okulun kendi metni, herkese açık /aydinlatma/<okul> adresinde yayınlanır */
   privacyNotice: z.string().max(20000).default(''),
 });
