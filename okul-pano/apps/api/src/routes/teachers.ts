@@ -10,7 +10,7 @@ import {
   schoolFullName,
 } from '@okulpano/shared';
 import { and, count, eq, sql } from 'drizzle-orm';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { audit, schoolGuard } from '../context.ts';
 import type { DB } from '../db/client.ts';
@@ -23,8 +23,11 @@ import { registerResource } from './crud.ts';
 type OptionTable = typeof teacherBranches | typeof teacherTitles;
 type Tx = Parameters<Parameters<DB['transaction']>[0]>[0];
 
+/** E-posta ve telefon (KVKK): yalnızca kadro ya da kullanıcı yönetimi yetkisi olan görür */
+export const canSeeContact = (req: FastifyRequest) => req.ctx.permissions.includes('directory.manage') || req.ctx.permissions.includes('users.manage');
+
 /** Okulun öğretmenlerini branş ve ünvan adlarıyla birlikte, Türkçe alfabeye göre sıralı döndürür. */
-export async function listTeachers(db: DB, schoolId: string) {
+export async function listTeachers(db: DB, schoolId: string, withContact = false) {
   const rows = await db
     .select({
       id: teachers.id,
@@ -35,6 +38,8 @@ export async function listTeachers(db: DB, schoolId: string) {
       branch: teacherBranches.name,
       title: teacherTitles.name,
       isActive: teachers.isActive,
+      email: teachers.email,
+      phone: teachers.phone,
       createdAt: teachers.createdAt,
       updatedAt: teachers.updatedAt,
     })
@@ -42,7 +47,8 @@ export async function listTeachers(db: DB, schoolId: string) {
     .leftJoin(teacherBranches, eq(teacherBranches.id, teachers.branchId))
     .leftJoin(teacherTitles, eq(teacherTitles.id, teachers.titleId))
     .where(eq(teachers.schoolId, schoolId));
-  return rows.sort((a, b) => trCompare(a.fullName, b.fullName));
+  const out = withContact ? rows : rows.map(({ email: _e, phone: _p, ...r }) => ({ ...r, email: null, phone: null }));
+  return out.sort((a, b) => trCompare(a.fullName, b.fullName));
 }
 
 /** Eksik branş/ünvanları oluşturur (büyük/küçük harf duyarsız) ve ad -> kimlik eşlemesini döndürür. */
@@ -133,7 +139,7 @@ export async function teacherRoutes(app: FastifyInstance) {
     schema: teacherSchema,
     refs: { branchId: teacherBranches, titleId: teacherTitles },
     toRow: (i) => ({ ...i, fullName: tidyName(i.fullName), branchId: i.branchId ?? null, titleId: i.titleId ?? null }),
-    list: (req) => listTeachers(db, req.ctx.schoolId),
+    list: (req) => listTeachers(db, req.ctx.schoolId, canSeeContact(req)),
   });
 
   app.get(`${base}/teachers/usage`, read, async (req) => usage(req.ctx.schoolId));
@@ -173,15 +179,17 @@ export async function teacherRoutes(app: FastifyInstance) {
   });
 
   app.get(`${base}/teachers/export`, read, async (req, reply) => {
+    const withContact = canSeeContact(req);
     const [rows, branches, titles] = await Promise.all([
-      listTeachers(db, req.ctx.schoolId),
+      listTeachers(db, req.ctx.schoolId, withContact),
       optionNames(db, teacherBranches, req.ctx.schoolId),
       optionNames(db, teacherTitles, req.ctx.schoolId),
     ]);
     const buf = await buildTeachersWorkbook({
       branches,
       titles,
-      rows: rows.map((r) => ({ fullName: r.fullName, branch: r.branch, title: r.title, isActive: r.isActive })),
+      rows: rows.map((r) => ({ fullName: r.fullName, branch: r.branch, title: r.title, email: r.email, phone: r.phone, isActive: r.isActive })),
+      withContact,
       schoolName: schoolFullName(req.ctx.school.name, req.ctx.school.settings?.schoolType),
     });
     return sendXlsx(reply, buf, exportFileName('ogretmenler', req.ctx.school.name));
@@ -199,7 +207,7 @@ export async function teacherRoutes(app: FastifyInstance) {
 
       const schoolId = req.ctx.schoolId;
       const [existing, branchRows, titleRows] = await Promise.all([
-        listTeachers(db, schoolId),
+        listTeachers(db, schoolId, true),
         db.select({ name: teacherBranches.name }).from(teacherBranches).where(eq(teacherBranches.schoolId, schoolId)),
         db.select({ name: teacherTitles.name }).from(teacherTitles).where(eq(teacherTitles.schoolId, schoolId)),
       ]);
@@ -226,6 +234,8 @@ export async function teacherRoutes(app: FastifyInstance) {
         let status: 'new' | 'update' | 'unchanged' = 'new';
         if (current) {
           const changed =
+            (r.email && r.email !== current.email) ||
+            (r.phone && r.phone !== current.phone) ||
             (r.branch && normalizeName(r.branch) !== normalizeName(current.branch ?? '')) ||
             (r.title && normalizeName(r.title) !== normalizeName(current.title ?? '')) ||
             (r.isActive !== undefined && r.isActive !== current.isActive);
@@ -260,7 +270,7 @@ export async function teacherRoutes(app: FastifyInstance) {
       const branches = await ensureOptions(tx, teacherBranches, schoolId, body.rows.map((r) => r.branch));
       const titles = await ensureOptions(tx, teacherTitles, schoolId, body.rows.map((r) => r.title));
       const current = await tx
-        .select({ id: teachers.id, fullName: teachers.fullName, branchId: teachers.branchId, titleId: teachers.titleId, isActive: teachers.isActive })
+        .select({ id: teachers.id, fullName: teachers.fullName, branchId: teachers.branchId, titleId: teachers.titleId, email: teachers.email, phone: teachers.phone, isActive: teachers.isActive })
         .from(teachers)
         .where(eq(teachers.schoolId, schoolId));
       const byName = new Map(current.map((t) => [normalizeName(t.fullName), t]));
@@ -279,15 +289,19 @@ export async function teacherRoutes(app: FastifyInstance) {
         const existing = byName.get(key);
 
         if (!existing) {
-          inserts.push({ schoolId, fullName: tidyName(r.fullName), branchId, titleId, isActive: r.isActive ?? true });
+          inserts.push({ schoolId, fullName: tidyName(r.fullName), branchId, titleId, email: r.email ?? null, phone: r.phone ?? null, isActive: r.isActive ?? true });
           continue;
         }
         const patch = {
           branchId: branchId ?? existing.branchId,
           titleId: titleId ?? existing.titleId,
           isActive: r.isActive ?? existing.isActive,
+          // Boş hücre mevcut iletişim bilgisini silmez
+          email: r.email ?? existing.email,
+          phone: r.phone ?? existing.phone,
         };
-        const changed = patch.branchId !== existing.branchId || patch.titleId !== existing.titleId || patch.isActive !== existing.isActive;
+        const changed =
+          patch.branchId !== existing.branchId || patch.titleId !== existing.titleId || patch.isActive !== existing.isActive || patch.email !== existing.email || patch.phone !== existing.phone;
         if (!changed || !body.updateExisting) {
           unchanged++;
           continue;

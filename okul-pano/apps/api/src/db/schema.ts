@@ -149,6 +149,9 @@ export const teachers = pgTable(
     fullName: text('full_name').notNull(),
     branchId: uuid('branch_id').references(() => teacherBranches.id, { onDelete: 'set null' }),
     titleId: uuid('title_id').references(() => teacherTitles.id, { onDelete: 'set null' }),
+    /** İletişim (isteğe bağlı, KVKK): yalnızca idare ve kadro yetkilisi görür; hesap açılınca öğretmenin doğruladığı e-posta yazılır */
+    email: text('email'),
+    phone: text('phone'),
     isActive: isActive(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -917,4 +920,54 @@ export const userInvites = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index('user_invites_user_idx').on(t.userId)],
+);
+
+/**
+ * Öğretmen hesabı açma (katılım). İki yol:
+ * - code: yetkili öğretmene tek kullanımlık giriş kodu verir (15 dk); öğretmen kodla başlar, hesap hemen açılır.
+ * - meeting: toplantıda okulun QR'ı okutulur, öğretmen kadrodan adını seçer; hesap yetkili onaylayınca açılır.
+ * Her iki yolda da öğretmen e-postasını (doğrulama koduyla) ve şifresini kendisi girer.
+ */
+export const enrollments = pgTable(
+  'enrollments',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    teacherId: uuid('teacher_id').references(() => teachers.id, { onDelete: 'cascade' }),
+    kind: text('kind').$type<'code' | 'meeting'>().notNull(),
+    role: text('role').$type<'admin' | 'editor'>().notNull().default('editor'),
+    permissions: jsonb('permissions').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    /** Tek kullanımlık giriş kodunun özeti (yalnızca code) */
+    codeHash: text('code_hash'),
+    codeExpiresAt: timestamp('code_expires_at', { withTimezone: true }),
+    /** Kod girildikten sonra adımları sürdüren geçici anahtarın özeti */
+    stepHash: text('step_hash'),
+    stepExpiresAt: timestamp('step_expires_at', { withTimezone: true }),
+    email: text('email'),
+    emailCodeHash: text('email_code_hash'),
+    emailCodeExpiresAt: timestamp('email_code_expires_at', { withTimezone: true }),
+    emailCodeTries: integer('email_code_tries').notNull().default(0),
+    passwordHash: text('password_hash'),
+    /** Hesap zaten varsa (başka okuldan) bu kullanıcıya üyelik eklenir */
+    existingUserId: uuid('existing_user_id').references(() => users.id, { onDelete: 'cascade' }),
+    status: text('status').$type<'waiting' | 'pending' | 'done' | 'cancelled'>().notNull().default('waiting'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index('enrollments_school_idx').on(t.schoolId, t.status), index('enrollments_code_idx').on(t.codeHash), index('enrollments_step_idx').on(t.stepHash)],
+);
+
+/** Toplantı QR'ı: okulun öğretmenlerinin kendi hesabını açmak için okuttuğu süreli bağlantı */
+export const joinLinks = pgTable(
+  'join_links',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    tokenHash: text('token_hash').notNull().unique(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+  },
+  (t) => [index('join_links_school_idx').on(t.schoolId)],
 );

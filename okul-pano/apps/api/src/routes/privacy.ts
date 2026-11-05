@@ -74,6 +74,8 @@ export function privacyTemplate(schoolName: string, dataRegion: string): string 
 
 # Hangi veriler işlenir
 - Öğretmen ve personel: ad soyad, branş ve unvan, nöbet yeri ve günleri, ders programı, izin tarihleri, panel kullanıcılarının e-posta adresi ve işlem kayıtları
+- Öğretmen iletişim bilgisi: e-posta adresi ve telefon numarası (isteğe bağlı). Yalnızca hesap açma, giriş doğrulaması, şifre yenileme ve okul içi bildirimler için kullanılır; okul idaresi dışında kimse görmez, panoda gösterilmez
+- Okul sorunları: sorunu bildiren öğretmenin adı, sorunun yeri, açıklaması ve isteğe bağlı fotoğrafı (fotoğraflar sorun çözüldükten 90 gün sonra silinir)
 - Öğrenci: okul numarası, ad soyad (panoda kısaltılmış biçimde, ör. "Ayşe Y."), sınıf, doğum günü (yalnızca gün ve ay)
 - Öğrenci gözlemleri: öğretmenlerin derste ve okulda gözlemlediği davranışlara göre verdiği artı / eksi kayıtları ve kısa notlar (yalnızca öğretmenler, rehber öğretmenler ve okul idaresi görür; panoda gösterilmez, velilerle paylaşılmaz). Kayıtları kimin girdiğini yalnızca rehber öğretmen ve okul idaresi görür. Dönem sonu göstergesi bu kayıtlardan hesaplanır ve not önerisi değildir.
 - Rehberlik uyarıları: kısa sürede belirli sayıda eksi alan öğrenci için rehber öğretmene giden uyarı ve rehber öğretmenin görüşme notu (yalnızca rehber öğretmen ve okul idaresi görür)
@@ -84,6 +86,8 @@ export function privacyTemplate(schoolName: string, dataRegion: string): string 
 - Öğrenci başarılarının ve doğum günlerinin okul içinde kutlanması
 - Öğrencinin gelişiminin izlenmesi, rehberlik hizmeti ve ayın öğrencisi seçimi; öğretmenin dönem sonu değerlendirmesine yardımcı gösterge (not sistem tarafından verilmez, öğretmen karar verir)
 - Acil durumlarda (deprem, yangın, tahliye) okuldaki herkesin hızla uyarılması
+- Öğretmenlerin panel ve mobil uygulama hesaplarının açılması, e-posta adresinin doğrulanması ve okul içi bildirimlerin iletilmesi
+- Okuldaki arıza ve sorunların idareye bildirilmesi ve takibi
 
 # Hukuki sebepler
 Veriler KVKK'nın 5. maddesindeki kanunlarda açıkça öngörülme, veri sorumlusunun hukuki yükümlülüğü ve meşru menfaati sebeplerine dayanılarak; öğrenci fotoğrafı ve başarı paylaşımı ise velinin açık rızasıyla işlenir. Açık rıza her zaman geri alınabilir.
@@ -92,7 +96,7 @@ Veriler KVKK'nın 5. maddesindeki kanunlarda açıkça öngörülme, veri soruml
 Veriler ${dataRegion} sunucularında saklanır ve okul dışındaki kişilerle paylaşılmaz. Panolar okul binası içinde gösterilir. Hizmet sağlayıcı (Okulyayın) verileri yalnızca okul adına, veri işleyen olarak işler. İçerikler yayın süresi bitince panodan kalkar; öğrenci gözlem kayıtları ve rehberlik uyarıları öğretim yılı sonunda silinir (okul daha kısa ya da uzun bir süre belirleyebilir); okulun aboneliği sona erdiğinde veriler silinir.
 
 # Toplama yöntemi
-Veriler okul idaresince yönetim paneline elektronik ortamda girilerek ya da Excel dosyasıyla aktarılarak toplanır.
+Veriler okul idaresince yönetim paneline elektronik ortamda girilerek ya da Excel dosyasıyla aktarılarak toplanır. Öğretmenin e-posta adresi ve şifresi, hesabını açarken kendisi tarafından girilir.
 
 # Haklarınız
 KVKK'nın 11. maddesi uyarınca kişisel verilerinizin işlenip işlenmediğini öğrenme, bilgi isteme, düzeltilmesini ya da silinmesini isteme ve itiraz etme haklarına sahipsiniz. Başvurularınızı [okul adresi] adresine yazılı olarak ya da [okul e-posta adresi] adresine iletebilirsiniz.

@@ -30,6 +30,7 @@ import { displayRoutes } from './routes/display.ts';
 import { emergencyRoutes } from './routes/emergency.ts';
 import { notificationRoutes } from './routes/notifications.ts';
 import { memberRoutes } from './routes/members.ts';
+import { enrollRoutes } from './routes/enroll.ts';
 import { controlRoutes } from './routes/control.ts';
 import { meRoutes } from './routes/me.ts';
 import { bellOverrideRoutes } from './routes/bellOverrides.ts';
@@ -105,6 +106,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   await app.register(authRoutes);
   await app.register(schoolRoutes);
   await app.register(memberRoutes);
+  await app.register(enrollRoutes);
   await app.register(contentRoutes);
   await app.register(teacherRoutes);
   await app.register(studentRoutes);

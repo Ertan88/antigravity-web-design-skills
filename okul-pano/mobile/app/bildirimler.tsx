@@ -21,6 +21,7 @@ const ROUTES: Record<string, string> = {
   'support-expired': '/okullar',
   'meb-calendar': '/takvim',
   internship: '/isletme-devam',
+  enroll: '/kullanicilar',
 };
 const ICONS: Record<string, { icon: IconName; tone: 'primary' | 'warning' | 'danger' | 'gold' | 'muted' }> = {
   approval: { icon: 'checkmark-done-outline', tone: 'primary' },
@@ -39,6 +40,7 @@ const ICONS: Record<string, { icon: IconName; tone: 'primary' | 'warning' | 'dan
   issue: { icon: 'alert-triangle', tone: 'warning' },
   'support-reply': { icon: 'lifebuoy', tone: 'primary' },
   'support-ticket': { icon: 'lifebuoy', tone: 'gold' },
+  enroll: { icon: 'people-outline', tone: 'primary' },
   'screen-security': { icon: 'shield-outline', tone: 'warning' },
 };
 const FALLBACK = { icon: 'notifications-outline' as IconName, tone: 'muted' as const };

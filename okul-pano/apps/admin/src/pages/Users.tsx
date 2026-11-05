@@ -3,6 +3,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { KeyRound, Pencil, Plus, Send, UserCog } from '../components/icons.tsx';
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { RosterTab } from './users/Roster.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Select, Spinner, Table, Td } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
@@ -132,6 +134,8 @@ export function Users() {
     },
     onError: (e) => toast.error(e.message),
   });
+  const [params, setParams] = useSearchParams();
+  const tab = params.get('sekme') === 'kadro' ? 'kadro' : 'hesaplar';
   const [mode, setMode] = useState<'add' | Member | null>(null);
   const [created, setCreated] = useState<Credentials | null>(null);
   const [invited, setInvited] = useState<InviteResult | null>(null);
@@ -213,6 +217,19 @@ export function Users() {
           </Button>
         }
       />
+      <div className="mb-4">
+        <Segmented
+          value={tab}
+          onChange={(v) => setParams(v === 'kadro' ? { sekme: 'kadro' } : {}, { replace: true })}
+          options={[
+            { value: 'hesaplar', label: `Hesaplar (${list.data?.length ?? 0})` },
+            { value: 'kadro', label: 'Kadro' },
+          ]}
+        />
+      </div>
+      {tab === 'kadro' ? (
+        <RosterTab members={list.data ?? []} />
+      ) : (
       <Card>
         {list.isLoading ? (
           <Spinner />
@@ -282,6 +299,7 @@ export function Users() {
           </Table>
         )}
       </Card>
+      )}
 
       <Modal
         open={mode !== null}

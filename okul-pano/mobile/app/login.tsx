@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Image, Linking, Pressable, View } from 'react-native';
 import { Text } from '../src/text.tsx';
-import { DEFAULT_SERVER, normalizeServer } from '../src/api.ts';
+import { router } from 'expo-router';
+import { DEFAULT_SERVER, normalizeServer, session } from '../src/api.ts';
 import { useAuth } from '../src/auth.tsx';
 // Marka kutusu temadan bağımsızdır (koyu turkuaz); üzerindeki etiketler her iki temada açık pastel renklerle
 import { colors, LIGHT_TILES, type TileTone } from '../src/theme.ts';
@@ -129,6 +130,17 @@ export default function Login() {
           )}
           <Button size="lg" loading={busy} onPress={() => void submit()}>
             Giriş yap
+          </Button>
+          {/* İlk giriş: okul idaresinin verdiği tek kullanımlık kodla hesap açılır (kullanıcı adı ya da yazılı şifre yok) */}
+          <Button
+            variant="secondary"
+            icon="key-outline"
+            onPress={() => {
+              if (server.trim()) void session.setServer(server);
+              router.push('/katil');
+            }}
+          >
+            Giriş kodum var
           </Button>
         </Card>
 

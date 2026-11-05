@@ -4,7 +4,8 @@ import { z } from 'zod';
  * İki ayrı yazışma kanalı:
  * 1. Okul sorunları: okul içindeki her üye (öğretmen) idareye (müdür ve yöneticiler) sorun bildirir.
  *    Yeni → İşlemde → Çözüldü; her adımda bildirimi gönderen haberdar olur. Kategori sorumlusu okul
- *    ayarlarından seçilir (issueOwners); seçilmediyse bildirim bütün idarecilere gider.
+ *    ayarlarından seçilir (issueOwners); seçilmediyse bildirim bütün idarecilere gider. Kategoriye ek sorumlu
+ *    (ör. meslek ya da bilişim öğretmeni) eklenebilir (issueHelpers): bildirimi alır ve durumu değiştirebilir.
  * 2. Destek talepleri: yalnızca okul müdürü ve yöneticiler platform yöneticisine sorun / öneri / soru yazar.
  */
 
@@ -91,6 +92,8 @@ export interface SchoolIssue {
   createdAt: string;
   updatedAt: string;
   resolvedAt: string | null;
+  /** Bu kullanıcı durumu değiştirebilir mi (idareci, kategorinin ek sorumlusu ya da atanan kişi) */
+  canUpdate?: boolean;
   lastMessage: string | null;
   messages?: IssueMessage[];
 }

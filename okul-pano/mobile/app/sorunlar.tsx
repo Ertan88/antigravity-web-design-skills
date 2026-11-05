@@ -26,13 +26,15 @@ export default function Sorunlar() {
     if (id) router.push(`/sorun/${id}`);
   }, [id]);
   const all = q.data ?? [];
+  // Kategorinin ek sorumlusu: kendi bildirimleri yanında sorumlu olduğu bildirimler de gelir
+  const helper = !manager && all.some((r) => !r.mine && r.canUpdate);
   const rows = manager ? all.filter((r) => r.status === tab) : all;
   const count = (s: string) => all.filter((r) => r.status === s).length;
   return (
     <Screen
       back
-      title={manager ? 'Okul sorunları' : 'Bildirimlerim'}
-      subtitle={manager ? 'Öğretmenlerin bildirdiği sorunlar' : 'Gönderdiğiniz sorunlar'}
+      title={manager ? 'Okul sorunları' : helper ? 'Sorunlar' : 'Bildirimlerim'}
+      subtitle={manager ? 'Öğretmenlerin bildirdiği sorunlar' : helper ? 'Sorumlu olduğunuz ve gönderdiğiniz sorunlar' : 'Gönderdiğiniz sorunlar'}
       refreshing={q.isRefetching}
       onRefresh={() => void q.refetch()}
       footer={

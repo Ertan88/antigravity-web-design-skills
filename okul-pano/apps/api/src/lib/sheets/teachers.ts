@@ -1,4 +1,4 @@
-import { tidyName } from '@okulpano/shared';
+import { optionalEmail, optionalPhone, tidyName } from '@okulpano/shared';
 import type ExcelJS from 'exceljs';
 import { badRequest } from '../errors.ts';
 import {
@@ -23,6 +23,8 @@ export interface TeacherSheetRow {
   fullName: string;
   branch: string | null;
   title: string | null;
+  email?: string | null;
+  phone?: string | null;
   isActive?: boolean;
 }
 
@@ -44,6 +46,8 @@ const ALIASES = {
   branch: ['brans', 'bransi', 'alan', 'alani', 'ders', 'brans alan', 'alan brans'],
   title: ['unvan', 'unvani', 'kadro', 'kadro unvani', 'gorev', 'gorevi', 'unvan gorev', 'gorev unvan'],
   status: ['durum', 'durumu', 'aktif'],
+  email: ['e posta', 'eposta', 'e posta adresi', 'mail', 'email', 'e mail', 'mail adresi', 'elektronik posta'],
+  phone: ['telefon', 'tel', 'telefon no', 'telefon numarasi', 'cep', 'cep telefonu', 'cep tel', 'gsm'],
 } as const;
 type Key = keyof typeof ALIASES;
 
@@ -80,13 +84,19 @@ export async function parseTeachersWorkbook(data: Buffer): Promise<{ sheetName: 
     const fullName = readName(row, cols);
     const branch = tidyName(get(row, 'branch')) || null;
     const title = tidyName(get(row, 'title')) || null;
+    const rawEmail = get(row, 'email').replace(/^mailto:/i, '');
+    const rawPhone = get(row, 'phone');
     if (!fullName && !branch && !title) continue;
+    const email = optionalEmail.safeParse(rawEmail);
+    const phone = optionalPhone.safeParse(rawPhone);
 
     if (fullName.length < 2) issues.push({ row: r, message: 'Ad soyad boş' });
     else if (fullName.length > 80) issues.push({ row: r, message: 'Ad soyad 80 karakterden uzun' });
     else if (branch && branch.length > 60) issues.push({ row: r, message: 'Branş 60 karakterden uzun' });
     else if (title && title.length > 60) issues.push({ row: r, message: 'Ünvan 60 karakterden uzun' });
-    else rows.push({ row: r, fullName, branch, title, isActive: parseStatus(get(row, 'status')) });
+    else if (!email.success) issues.push({ row: r, message: `E-posta geçersiz: ${rawEmail}` });
+    else if (!phone.success) issues.push({ row: r, message: `Telefon geçersiz: ${rawPhone}` });
+    else rows.push({ row: r, fullName, branch, title, email: email.data ?? null, phone: phone.data ?? null, isActive: parseStatus(get(row, 'status')) });
 
     if (rows.length > MAX_IMPORT_ROWS) throw badRequest(`Tek seferde en fazla ${MAX_IMPORT_ROWS} öğretmen aktarılabilir.`);
   }
@@ -102,27 +112,32 @@ export async function buildTeachersWorkbook(opts: {
   titles: string[];
   rows?: TeacherSheetRow[];
   schoolName: string;
+  /** E-posta ve telefon sütunları (şablonda hep var; dışa aktarmada yalnızca idare ve kadro yetkilisi için dolu) */
+  withContact?: boolean;
 }): Promise<Buffer> {
   const wb = newWorkbook();
   const withStatus = Boolean(opts.rows);
+  const withContact = opts.withContact ?? !opts.rows;
   const ws = wb.addWorksheet('Öğretmenler', { views: [{ state: 'frozen', ySplit: 1 }] });
   ws.columns = [
     { header: 'Ad Soyad', key: 'fullName', width: 34 },
     { header: 'Branş', key: 'branch', width: 34 },
     { header: 'Ünvan', key: 'title', width: 26 },
+    ...(withContact ? [{ header: 'E-posta', key: 'email', width: 30 }, { header: 'Telefon', key: 'phone', width: 18 }] : []),
     ...(withStatus ? [{ header: 'Durum', key: 'status', width: 12 }] : []),
   ];
   styleHeader(ws);
   for (const r of opts.rows ?? []) {
-    ws.addRow({ fullName: r.fullName, branch: r.branch ?? '', title: r.title ?? '', status: r.isActive === false ? 'Pasif' : 'Aktif' });
+    ws.addRow({ fullName: r.fullName, branch: r.branch ?? '', title: r.title ?? '', email: r.email ?? '', phone: r.phone ?? '', status: r.isActive === false ? 'Pasif' : 'Aktif' });
   }
-  if (withStatus) ws.autoFilter = { from: 'A1', to: 'D1' };
+  const statusCol = withContact ? 'F' : 'D';
+  if (withStatus) ws.autoFilter = { from: 'A1', to: `${statusCol}1` };
 
   const [branchRange, titleRange] = addListsSheet(wb, [opts.branches, opts.titles]);
   const lastRow = Math.max(TEMPLATE_ROWS, (opts.rows?.length ?? 0) + 200);
   validations(ws).add(`B2:B${lastRow}`, listRule(branchRange!, 'Branş', { allowNew: true }));
   validations(ws).add(`C2:C${lastRow}`, listRule(titleRange!, 'Ünvan', { allowNew: true }));
-  if (withStatus) validations(ws).add(`D2:D${lastRow}`, { type: 'list', allowBlank: true, formulae: ['"Aktif,Pasif"'] });
+  if (withStatus) validations(ws).add(`${statusCol}2:${statusCol}${lastRow}`, { type: 'list', allowBlank: true, formulae: ['"Aktif,Pasif"'] });
 
   addHelpSheet(
     wb,
@@ -133,9 +148,10 @@ export async function buildTeachersWorkbook(opts: {
       '3. Adı ve soyadı ayrı sütunlarda olan listeler (ör. MEBBİS çıktısı) da kabul edilir: başlıkları "Adı" ve "Soyadı" olmalı.',
       '4. Sistemde aynı ad soyadla kayıtlı öğretmen varsa yeni kayıt açılmaz, branşı ve ünvanı güncellenir.',
       '5. Durum sütununa "Pasif" yazılan öğretmenler nöbet ve ders programı seçimlerinde gizlenir.',
-      '6. Dosyayı .xlsx olarak kaydedip yönetim panelinde Öğretmen Kadrosu → Excel\'den yükle ile yükleyin.',
+      '6. E-posta ve Telefon isteğe bağlıdır. E-postası yazılan öğretmene hesap açma daveti gönderilebilir; boş bırakılırsa öğretmen hesabını açarken e-postasını kendisi girer. Bu bilgiler yalnızca okul idaresince görülür (KVKK).',
+      '7. Dosyayı .xlsx olarak kaydedip yönetim panelinde Öğretmen Kadrosu → Excel\'den yükle ile yükleyin.',
     ],
-    { header: ['Ad Soyad', 'Branş', 'Ünvan'], row: ['Ayşe Demir', 'Matematik', 'Uzman Öğretmen'] },
+    { header: ['Ad Soyad', 'Branş', 'Ünvan', 'E-posta', 'Telefon'], row: ['Ayşe Demir', 'Matematik', 'Uzman Öğretmen', 'ayse.demir@ornek.k12.tr', '0555 000 00 00'] },
   );
   return toBuffer(wb);
 }

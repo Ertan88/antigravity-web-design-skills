@@ -36,19 +36,24 @@ function initials(name: string): string {
 export function TeacherCard({
   teacher,
   editable,
+  onOpen,
   onEdit,
   onDelete,
 }: {
   teacher: Teacher;
   editable: boolean;
+  /** Karta tıklayınca bütün bilgiler (iletişim dahil) pencerede açılır */
+  onOpen?: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   return (
     <article
+      onClick={onOpen}
       className={clsx(
         'group relative flex min-w-0 gap-3 rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-slate-200/70 transition-shadow hover:shadow-md',
         !teacher.isActive && 'bg-slate-50',
+        onOpen && 'cursor-pointer',
       )}
     >
       <div
@@ -90,7 +95,10 @@ export function TeacherCard({
         >
           <button
             type="button"
-            onClick={onEdit}
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
             aria-label={`${teacher.fullName} düzenle`}
             title="Düzenle"
             className="inline-flex size-9 items-center justify-center rounded-lg bg-surface text-slate-500 ring-1 ring-slate-200 hover:bg-brand-50 hover:text-brand-700 hover:ring-brand-200"
@@ -99,7 +107,10 @@ export function TeacherCard({
           </button>
           <button
             type="button"
-            onClick={onDelete}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
             aria-label={`${teacher.fullName} sil`}
             title="Sil"
             className="inline-flex size-9 items-center justify-center rounded-lg bg-surface text-slate-500 ring-1 ring-slate-200 hover:bg-red-50 hover:text-red-600 hover:ring-red-200"

@@ -23,6 +23,26 @@ const isoDateTime = z.iso.datetime({ offset: true, error: 'Geçerli bir tarih ve
 const weekday = z.number().int().min(1).max(7);
 const id = z.uuid({ error: 'Geçersiz kimlik' });
 const optionalText = (max: number) => z.string().trim().max(max).nullable().optional();
+/** İsteğe bağlı e-posta: boş bırakılabilir, küçük harfe çevrilir */
+export const optionalEmail = z
+  .string()
+  .trim()
+  .max(160)
+  .transform((v) => v.toLowerCase())
+  .pipe(z.union([z.literal(''), z.email('Geçerli bir e-posta girin')]))
+  .transform((v) => v || null)
+  .nullable()
+  .optional();
+/** İsteğe bağlı telefon: yalnızca rakam ve +; 10–13 hane (0 ile ya da +90 ile) */
+export const optionalPhone = z
+  .string()
+  .trim()
+  .max(30)
+  .transform((v) => v.replace(/[^\d+]/g, ''))
+  .pipe(z.union([z.literal(''), z.string().regex(/^\+?\d{10,13}$/, 'Geçerli bir telefon numarası girin')]))
+  .transform((v) => v || null)
+  .nullable()
+  .optional();
 const required = (label: string, max: number, min = 1) =>
   z
     .string({ error: `${label} gerekli` })
@@ -165,6 +185,10 @@ export const schoolSettingsSchema = z.object({
     .default({ enabled: true, signature: '', days: {} }),
   /** Okul sorunları: kategori → sorumlu idareci (kullanıcı). Seçilmeyen kategoride bütün idarecilere gider */
   issueOwners: z.record(z.string().max(20), z.uuid()).default({}),
+  /** Okul sorunları: kategori → ek sorumlular (ör. meslek ya da bilişim öğretmeni); bildirim alır, durumu değiştirebilir */
+  issueHelpers: z.record(z.string().max(20), z.array(z.uuid()).max(10)).default({}),
+  /** Kadrodaki ünvan → hesap açılırken önerilen rol (okul belirler; ör. "Müdür Yardımcısı" → Yönetici) */
+  titleRoles: z.record(z.uuid(), z.enum(['admin', 'teacher', 'counselor'])).default({}),
   /** KVKK aydınlatma metni: okulun kendi metni, herkese açık /aydinlatma/<okul> adresinde yayınlanır */
   privacyNotice: z.string().max(20000).default(''),
 });
@@ -417,6 +441,9 @@ export const teacherSchema = z.object({
   fullName: required('Ad soyad', 80, 2),
   branchId: id.nullable().optional(),
   titleId: id.nullable().optional(),
+  /** İletişim (isteğe bağlı): yalnızca idare ve kadro yetkilisi görür */
+  email: optionalEmail,
+  phone: optionalPhone,
   isActive: z.boolean().default(true),
 });
 
@@ -436,6 +463,8 @@ export const teacherImportSchema = z.object({
         fullName: required('Ad soyad', 80, 2),
         branch: optionalText(60),
         title: optionalText(60),
+        email: optionalEmail,
+        phone: optionalPhone,
         isActive: z.boolean().optional(),
       }),
     )
@@ -760,3 +789,28 @@ export const conductAwardSchema = z.object({
   description: optionalText(200),
   photoUrl: optionalText(500),
 });
+
+/* ---------- Öğretmen hesabı açma (katılım) ---------- */
+
+/** Önerilen / seçilen hesap rolü: Yönetici, Öğretmen (yalnızca kendi bilgileri), Rehber öğretmen */
+export const ENROLL_ROLES = { teacher: 'Öğretmen', counselor: 'Rehber öğretmen', admin: 'Yönetici' } as const;
+export type EnrollRole = keyof typeof ENROLL_ROLES;
+
+export const enrollCodeCreateSchema = z.object({
+  teacherId: id,
+  role: z.enum(['admin', 'teacher', 'counselor']).default('teacher'),
+});
+export const enrollStartCodeSchema = z.object({ code: z.string().trim().min(6).max(12) });
+export const enrollMeetingSchema = z.object({ link: z.string().min(10).max(200) });
+export const enrollMeetingStartSchema = z.object({ link: z.string().min(10).max(200), teacherId: id });
+export const enrollEmailSchema = z.object({ token: z.string().min(10).max(200), email: z.email('Geçerli bir e-posta girin').max(160) });
+export const enrollFinishSchema = z.object({
+  token: z.string().min(10).max(200),
+  /** E-postaya giden 6 haneli kod (e-posta gönderimi ayarlıysa) */
+  emailCode: z.string().trim().max(10).optional(),
+  /** Yeni hesap için şifre */
+  password: z.string().min(8, 'Şifre en az 8 karakter olmalı').max(200).optional(),
+  /** E-posta başka okuldan kayıtlıysa o hesabın şifresi */
+  existingPassword: z.string().max(200).optional(),
+});
+export const enrollApproveSchema = z.object({ role: z.enum(['admin', 'teacher', 'counselor']).optional() });

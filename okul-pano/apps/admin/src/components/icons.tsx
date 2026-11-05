@@ -112,6 +112,7 @@ export const Scale = wrap(T.IconScale, 'Scale');
 export const ScanEye = wrap(T.IconScanEye, 'ScanEye');
 export const School = wrap(T.IconBuildingCommunity, 'School');
 export const Scissors = wrap(T.IconScissors, 'Scissors');
+export const QrCodeIcon = wrap(T.IconQrcode, 'QrCodeIcon');
 export const Search = wrap(T.IconSearch, 'Search');
 export const SearchX = wrap(T.IconSearchOff, 'SearchX');
 export const Send = wrap(T.IconSend, 'Send');

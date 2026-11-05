@@ -109,3 +109,35 @@ describe('destek talepleri', () => {
     expect((await owner.get('/api/platform/support')).statusCode).toBe(403);
   });
 });
+
+describe('kategori ek sorumlusu', () => {
+  it('bildirim idareciyle birlikte ek sorumluya da gider; ek sorumlu durumu değiştirir ama sorumlu atayamaz', async () => {
+    const teacherId = (await teacher.get('/api/me')).json().user.id;
+    expectStatus(await owner.patch(base, { settings: { issueOwners: { electric: vpId }, issueHelpers: { electric: [teacherId] } } }), 200);
+    sentPushes.length = 0;
+    const res = await owner.post(`${base}/issues`, { category: 'electric', location: 'Atölye', description: 'Priz kıvılcım çıkarıyor' });
+    expectStatus(res, 201);
+    expect(to(TOK.vp)).toHaveLength(1);
+    expect(to(TOK.teacher)).toHaveLength(1);
+    const id = res.json().id;
+    // Ek sorumlu kendi listesinde görür ve durumu değiştirebilir
+    const list = (await teacher.get(`${base}/issues`)).json() as { id: string; canUpdate: boolean }[];
+    expect(list.find((x) => x.id === id)?.canUpdate).toBe(true);
+    sentPushes.length = 0;
+    const upd = await teacher.patch(`${base}/issues/${id}`, { status: 'in_progress' });
+    expectStatus(upd, 200);
+    expect(upd.json().status).toBe('in_progress');
+    expect(to(TOK.vp)).toHaveLength(1);
+    expectStatus(await teacher.patch(`${base}/issues/${id}`, { assigneeUserId: vpId }), 403);
+    // İdareci ek sorumluyu sorumlu atayabilir
+    const managersList = (await owner.get(`${base}/issues/managers?category=electric`)).json() as { id: string; helper: boolean }[];
+    expect(managersList.find((m) => m.id === teacherId)?.helper).toBe(true);
+    expectStatus(await owner.patch(`${base}/issues/${id}`, { assigneeUserId: teacherId }), 200);
+  });
+
+  it('başka kategorideki bildirimi göremez', async () => {
+    const other = await owner.post(`${base}/issues`, { category: 'water', location: 'Spor salonu', description: 'Musluk akıtıyor' });
+    expectStatus(await teacher.get(`${base}/issues/${other.json().id}`), 404);
+    expectStatus(await teacher.patch(`${base}/issues/${other.json().id}`, { status: 'resolved' }), 404);
+  });
+});

@@ -139,6 +139,13 @@ services:
       SEED_SUPERADMIN_PASSWORD: ${SEED_SUPERADMIN_PASSWORD:-}
       SEED_DEMO: ${SEED_DEMO:-false}
       PUSH_ACCESS_TOKEN: ${PUSH_ACCESS_TOKEN:-}
+      # E-posta (davet, doğrulama kodu, şifre yenileme): .env'de BREVO_API_KEY ya da SMTP_* ve SMTP_FROM
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-Okulyayın <bildirim@okulyayin.local>}
     depends_on:
       db:
         condition: service_healthy
@@ -223,6 +230,10 @@ SH
 set -euo pipefail
 cd /opt/okul-pano
 ./yedekle.sh
+# Eski kurulumlarda e-posta ayarları uygulamaya aktarılmıyordu: eksikse docker-compose.yml'e eklenir
+if ! grep -q 'BREVO_API_KEY' docker-compose.yml; then
+  sed -i '/PUSH_ACCESS_TOKEN:/a\      BREVO_API_KEY: ${BREVO_API_KEY:-}\n      SMTP_HOST: ${SMTP_HOST:-}\n      SMTP_PORT: ${SMTP_PORT:-587}\n      SMTP_USER: ${SMTP_USER:-}\n      SMTP_PASS: ${SMTP_PASS:-}\n      SMTP_FROM: ${SMTP_FROM:-Okulyayın <bildirim@okulyayin.local>}' docker-compose.yml
+fi
 image=$(grep '^OKULPANO_IMAGE=' .env | cut -d= -f2-)
 if [ "$image" = okul-pano:yerel ]; then
   branch=$(grep '^OKULPANO_BRANCH=' .env | cut -d= -f2-)

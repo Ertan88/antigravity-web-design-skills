@@ -1,4 +1,4 @@
-import { ISSUE_CATEGORIES, ISSUE_CATEGORY_KEYS, ISSUE_STATUSES, type IssueCategory, type IssueMessage, type IssueStatus, type SchoolIssue } from '@okulpano/shared';
+import { isVocationalBranchName, ISSUE_CATEGORIES, ISSUE_CATEGORY_KEYS, ISSUE_STATUSES, trCompare, type IssueCategory, type IssueMessage, type IssueStatus, type SchoolIssue } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { useEffect, useRef, useState } from 'react';
@@ -26,7 +26,7 @@ import { useToast } from '../components/Toast.tsx';
 import { Alert, Badge, Button, EmptyState, Field, Input, Modal, PageHeader, Select, Spinner, Textarea } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
-import { useSchool, useSchoolPath } from '../lib/data.ts';
+import { useList, useSchool, useSchoolPath, type Teacher } from '../lib/data.ts';
 
 /*
  * Okul Sorunları: öğretmenler idareye arıza, temizlik, ısınma… bildirir. İdare (müdür ve yöneticiler) pano
@@ -221,7 +221,12 @@ function IssueDetail({ id, manager, onClose }: { id: string; manager: boolean; o
   const qc = useQueryClient();
   const toast = useToast();
   const q = useQuery({ queryKey: [school?.id, 'issues', 'detail', id], queryFn: () => api<SchoolIssue>(`${path}/${id}`) });
-  const mgrs = useQuery({ queryKey: [school?.id, 'issues', 'managers'], queryFn: () => api<{ id: string; fullName: string }[]>(`${path}/managers`), enabled: manager });
+  const r0 = q.data;
+  const mgrs = useQuery({
+    queryKey: [school?.id, 'issues', 'managers', r0?.category],
+    queryFn: () => api<{ id: string; fullName: string; helper: boolean }[]>(`${path}/managers?category=${r0!.category}`),
+    enabled: manager && Boolean(r0),
+  });
   const [reply, setReply] = useState('');
   const [busy, setBusy] = useState(false);
   const refresh = (data: SchoolIssue) => {
@@ -254,7 +259,7 @@ function IssueDetail({ id, manager, onClose }: { id: string; manager: boolean; o
           </div>
           <p className="text-sm whitespace-pre-wrap text-ink">{r.description}</p>
           {r.photoUrl && <img src={r.photoUrl} alt="Sorunun fotoğrafı" className="max-h-72 rounded-2xl object-contain ring-1 ring-slate-200" />}
-          {manager && (
+          {(manager || r.canUpdate) && (
             <div className="flex flex-wrap items-end gap-2 rounded-2xl bg-slate-50 p-3 dark:bg-white/5">
               <div className="flex gap-1.5">
                 {(Object.keys(ISSUE_STATUSES) as IssueStatus[]).map((s) => (
@@ -263,16 +268,21 @@ function IssueDetail({ id, manager, onClose }: { id: string; manager: boolean; o
                   </Button>
                 ))}
               </div>
-              <div className="min-w-48 flex-1">
-                <Select value={r.assigneeUserId ?? ''} onChange={(e) => void call({ assigneeUserId: e.target.value || null })}>
-                  <option value="">Sorumlu seçilmedi</option>
-                  {(mgrs.data ?? []).map((m) => (
-                    <option key={m.id} value={m.id}>
-                      Sorumlu: {m.fullName}
-                    </option>
-                  ))}
-                </Select>
-              </div>
+              {manager ? (
+                <div className="min-w-48 flex-1">
+                  <Select value={r.assigneeUserId ?? ''} onChange={(e) => void call({ assigneeUserId: e.target.value || null })}>
+                    <option value="">Sorumlu seçilmedi</option>
+                    {(mgrs.data ?? []).map((m) => (
+                      <option key={m.id} value={m.id}>
+                        Sorumlu: {m.fullName}
+                        {m.helper ? ' (ek sorumlu)' : ''}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              ) : (
+                r.assigneeName && <span className="text-sm text-slate-500">Sorumlu: {r.assigneeName}</span>
+              )}
             </div>
           )}
           <Thread messages={r.messages ?? []} />
@@ -398,7 +408,10 @@ export function IssueForm({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** Kategori sorumluları: okul ayarı (issueOwners); seçilmeyen kategoride bildirim bütün idarecilere gider */
+/**
+ * Kategori sorumluları (okul ayarı): her kategoride bir idareci (issueOwners; seçilmezse bütün idareciler) ve isteğe bağlı
+ * ek sorumlular (issueHelpers; ör. meslek ya da bilişim öğretmeni). Bildirim ikisine birden gider; ek sorumlu durumu değiştirebilir.
+ */
 function OwnersDialog({ onClose }: { onClose: () => void }) {
   const { school: access } = useAuth();
   const school = useSchool();
@@ -407,16 +420,33 @@ function OwnersDialog({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient();
   const toast = useToast();
   const mgrs = useQuery({ queryKey: [access?.id, 'issues', 'managers'], queryFn: () => api<{ id: string; fullName: string }[]>(`${path}/managers`) });
+  const members = useList<{ userId: string; fullName: string; role: string; teacherId: string | null }>('members');
+  const teachers = useList<Teacher>('teachers');
   const [owners, setOwners] = useState<Record<string, string>>({});
+  const [helpers, setHelpers] = useState<Record<string, string[]>>({});
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    if (school.data) setOwners(school.data.settings.issueOwners ?? {});
+    if (school.data) {
+      setOwners(school.data.settings.issueOwners ?? {});
+      setHelpers(school.data.settings.issueHelpers ?? {});
+    }
   }, [school.data]);
+  // Ek sorumlu adayları: hesabı olan herkes; meslek alanı öğretmenleri üstte
+  const branchOf = new Map((teachers.data ?? []).map((t) => [t.id, t.branch]));
+  const candidates = (members.data ?? [])
+    .filter((m) => m.role !== 'owner' && m.role !== 'admin')
+    .map((m) => {
+      const branch = m.teacherId ? (branchOf.get(m.teacherId) ?? null) : null;
+      return { id: m.userId, fullName: m.fullName, branch, vocational: Boolean(branch && isVocationalBranchName(branch)) };
+    })
+    .sort((a, b) => Number(b.vocational) - Number(a.vocational) || trCompare(a.fullName, b.fullName));
+  const nameOf = new Map(candidates.map((c) => [c.id, c]));
   const save = async () => {
     setBusy(true);
     try {
       const clean = Object.fromEntries(Object.entries(owners).filter(([, v]) => v));
-      const data = await api(schoolPath, { method: 'PATCH', body: { settings: { issueOwners: clean } } });
+      const cleanHelpers = Object.fromEntries(Object.entries(helpers).filter(([, v]) => v.length));
+      const data = await api(schoolPath, { method: 'PATCH', body: { settings: { issueOwners: clean, issueHelpers: cleanHelpers } } });
       qc.setQueryData([access?.id, 'school'], data);
       toast.success('Sorumlular kaydedildi');
       onClose();
@@ -430,8 +460,9 @@ function OwnersDialog({ onClose }: { onClose: () => void }) {
     <Modal
       open
       onClose={onClose}
+      size="lg"
       title="Kategori sorumluları"
-      description="Seçilen idareciye yalnızca kendi kategorisindeki bildirimler gider. Boş bırakılan kategoride bütün idarecilere gider."
+      description="İdareci seçilmeyen kategoride bildirim bütün idarecilere gider. Ek sorumlu (ör. meslek ya da bilişim öğretmeni) bildirimi alır ve durumu “İşlemde” ya da “Çözüldü” yapabilir."
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -443,25 +474,55 @@ function OwnersDialog({ onClose }: { onClose: () => void }) {
         </>
       }
     >
-      <div className="space-y-2">
-        {ISSUE_CATEGORY_KEYS.map((k) => (
-          <div key={k} className="flex items-center gap-3">
-            <div className="w-44">
-              <CategoryPill category={k} />
+      <div className="divide-y divide-slate-100">
+        {ISSUE_CATEGORY_KEYS.map((k) => {
+          const list = helpers[k] ?? [];
+          return (
+            <div key={k} className="grid gap-2 py-3 sm:grid-cols-[11rem_1fr]">
+              <div className="pt-1.5">
+                <CategoryPill category={k} />
+              </div>
+              <div className="space-y-2">
+                <Select value={owners[k] ?? ''} onChange={(e) => setOwners({ ...owners, [k]: e.target.value })} aria-label={`${ISSUE_CATEGORIES[k]} idarecisi`}>
+                  <option value="">Bütün idareciler</option>
+                  {(mgrs.data ?? []).map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.fullName}
+                    </option>
+                  ))}
+                </Select>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {list.map((id) => (
+                    <span key={id} className="inline-flex items-center gap-1 rounded-full bg-amber-50 py-1 pr-1 pl-3 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
+                      {nameOf.get(id)?.fullName ?? 'Silinmiş kullanıcı'}
+                      {nameOf.get(id)?.branch ? <span className="font-normal text-amber-700/80">· {nameOf.get(id)!.branch}</span> : null}
+                      <button type="button" aria-label="Kaldır" onClick={() => setHelpers({ ...helpers, [k]: list.filter((x) => x !== id) })} className="rounded-full p-0.5 hover:bg-amber-100">
+                        <X className="size-3.5" />
+                      </button>
+                    </span>
+                  ))}
+                  {list.length < 10 && (
+                    <div className="w-56">
+                      <Select value="" onChange={(e) => e.target.value && setHelpers({ ...helpers, [k]: [...list, e.target.value] })} aria-label={`${ISSUE_CATEGORIES[k]} ek sorumlu ekle`}>
+                        <option value="">+ Ek sorumlu ekle</option>
+                        {candidates
+                          .filter((c) => !list.includes(c.id))
+                          .map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.fullName}
+                              {c.branch ? ` · ${c.branch}` : ''}
+                            </option>
+                          ))}
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="flex-1">
-              <Select value={owners[k] ?? ''} onChange={(e) => setOwners({ ...owners, [k]: e.target.value })}>
-                <option value="">Bütün idareciler</option>
-                {(mgrs.data ?? []).map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.fullName}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
+      {!candidates.length && <p className="mt-2 text-xs text-slate-500">Ek sorumlu seçebilmek için öğretmenin hesabı olmalı (Kullanıcılar → Kadro).</p>}
     </Modal>
   );
 }

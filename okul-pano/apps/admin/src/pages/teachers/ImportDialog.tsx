@@ -6,6 +6,8 @@ interface Row {
   fullName: string;
   branch: string | null;
   title: string | null;
+  email?: string | null;
+  phone?: string | null;
   isActive?: boolean;
 }
 
@@ -34,6 +36,8 @@ export function ImportDialog({ file, onClose }: { file: File | null; onClose: ()
         { header: 'Ad soyad', cell: (r) => <span className="font-medium whitespace-nowrap text-ink">{r.fullName}</span> },
         { header: 'Branş', cell: (r) => r.branch ?? '—' },
         { header: 'Ünvan', cell: (r) => r.title ?? '—' },
+        { header: 'E-posta', cell: (r) => r.email ?? '—' },
+        { header: 'Telefon', cell: (r) => r.phone ?? '—' },
       ]}
       stats={(p) => [
         { label: 'Yeni öğretmen', value: p.totals.new, tone: 'green' },
@@ -50,7 +54,7 @@ export function ImportDialog({ file, onClose }: { file: File | null; onClose: ()
           <Toggle
             checked={o.updateExisting}
             onChange={(v) => set({ updateExisting: v })}
-            label="Sistemde kayıtlı öğretmenlerin branş ve ünvanını güncelle"
+            label="Sistemde kayıtlı öğretmenlerin branş, ünvan ve iletişim bilgisini güncelle"
             description="Kapalıysa yalnızca yeni öğretmenler eklenir. Dosyadaki boş hücreler mevcut bilgiyi silmez."
           />
         )
@@ -60,7 +64,7 @@ export function ImportDialog({ file, onClose }: { file: File | null; onClose: ()
       commitLabel={(n) => `${n} öğretmeni kaydet`}
       commitBody={(p, o) => ({
         updateExisting: o.updateExisting,
-        rows: p.rows.map(({ fullName, branch, title, isActive }) => ({ fullName, branch, title, isActive })),
+        rows: p.rows.map(({ fullName, branch, title, email, phone, isActive }) => ({ fullName, branch, title, email, phone, isActive })),
       })}
       successMessage={(res: Result) => {
         const parts = [`${res.created} öğretmen eklendi`];

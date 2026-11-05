@@ -89,6 +89,8 @@ function Gate({ fontsReady }: { fontsReady: boolean }) {
   const nav = useNavigationContainerRef();
   const segments = useSegments();
   const onLogin = segments[0] === 'login';
+  // Hesap açma (giriş kodu ya da toplantı QR'ı) oturum açmadan kullanılır
+  const onEnroll = segments[0] === 'katil';
   // Açılış ekranı en az SPLASH_MIN_MS görünür; arkada ilk ekranın verisi yüklenir (sonra yuvarlak simge görünmesin)
   const fetching = useIsFetching();
   const [minDone, setMinDone] = useState(false);
@@ -110,9 +112,9 @@ function Gate({ fontsReady }: { fontsReady: boolean }) {
   const hideSplash = useRef(() => setSplashHidden(true)).current;
 
   useEffect(() => {
-    if (status === 'signedOut' && !onLogin) router.replace('/login');
+    if (status === 'signedOut' && !onLogin && !onEnroll) router.replace('/login');
     if (status === 'signedIn' && onLogin) router.replace('/');
-  }, [status, onLogin]);
+  }, [status, onLogin, onEnroll]);
 
   useEffect(() => {
     if (status === 'signedIn') void registerForPush().catch(() => undefined);

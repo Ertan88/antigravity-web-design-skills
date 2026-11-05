@@ -16,9 +16,9 @@ import { OptionsManager } from './teachers/OptionsManager.tsx';
 import { TeacherCard } from './teachers/TeacherCard.tsx';
 
 type Sort = 'name-asc' | 'name-desc' | 'surname-asc';
-type Form = { fullName: string; branchId: string; titleId: string; isActive: boolean };
+type Form = { fullName: string; branchId: string; titleId: string; email: string; phone: string; isActive: boolean };
 const NO_BRANCH = '__none__';
-const emptyForm = (): Form => ({ fullName: '', branchId: '', titleId: '', isActive: true });
+const emptyForm = (): Form => ({ fullName: '', branchId: '', titleId: '', email: '', phone: '', isActive: true });
 
 /* ---------- Sayfa ---------- */
 
@@ -84,7 +84,7 @@ export function Teachers() {
     setEditing('new');
   };
   const openEdit = (t: Teacher) => {
-    form.reset({ fullName: t.fullName, branchId: t.branchId ?? '', titleId: t.titleId ?? '', isActive: t.isActive });
+    form.reset({ fullName: t.fullName, branchId: t.branchId ?? '', titleId: t.titleId ?? '', email: t.email ?? '', phone: t.phone ?? '', isActive: t.isActive });
     setEditing(t);
   };
 
@@ -93,6 +93,8 @@ export function Teachers() {
       fullName: form.values.fullName,
       branchId: form.values.branchId || null,
       titleId: form.values.titleId || null,
+      email: form.values.email,
+      phone: form.values.phone,
       isActive: form.values.isActive,
     });
     if (!payload) return;
@@ -256,7 +258,7 @@ export function Teachers() {
           ) : (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] gap-3">
               {visible.map((t) => (
-                <TeacherCard key={t.id} teacher={t} editable={editable} onEdit={() => openEdit(t)} onDelete={() => setDeleting(t)} />
+                <TeacherCard key={t.id} teacher={t} editable={editable} onOpen={editable ? () => openEdit(t) : undefined} onEdit={() => openEdit(t)} onDelete={() => setDeleting(t)} />
               ))}
             </div>
           )}
@@ -267,7 +269,7 @@ export function Teachers() {
       <Modal
         open={editing !== null}
         onClose={() => setEditing(null)}
-        title={editing === 'new' ? 'Öğretmen ekle' : 'Öğretmeni düzenle'}
+        title={editing === 'new' ? 'Öğretmen ekle' : (editing?.fullName ?? 'Öğretmen')}
         footer={
           <>
             <Button variant="secondary" onClick={() => setEditing(null)}>
@@ -311,6 +313,21 @@ export function Teachers() {
           <Field label="Ünvan" error={form.errors.titleId}>
             {(id) => <OptionSelect id={id} kind="teacher-titles" options={sortedTitles} value={form.values.titleId} onChange={(v) => form.set('titleId', v)} />}
           </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="E-posta (isteğe bağlı)" error={form.errors.email}>
+              {(id) => (
+                <Input id={id} type="email" value={form.values.email} maxLength={160} onChange={(e) => form.set('email', e.target.value)} placeholder="ör. ayse.demir@ornek.k12.tr" invalid={Boolean(form.errors.email)} />
+              )}
+            </Field>
+            <Field label="Telefon (isteğe bağlı)" error={form.errors.phone}>
+              {(id) => (
+                <Input id={id} type="tel" inputMode="tel" value={form.values.phone} maxLength={30} onChange={(e) => form.set('phone', e.target.value)} placeholder="ör. 0555 000 00 00" invalid={Boolean(form.errors.phone)} />
+              )}
+            </Field>
+          </div>
+          <p className="-mt-2 text-xs text-slate-500">
+            Yalnızca okul idaresi ve kadro yetkilisi görür; panoda ve listelerde gösterilmez. Öğretmen hesabını açarken doğruladığı e-posta buraya kendiliğinden yazılır.
+          </p>
           {editing !== 'new' && (
             <Toggle
               checked={form.values.isActive}

@@ -60,6 +60,9 @@ export interface Teacher extends Base {
   /** Listeden gelen adlar (salt okunur) */
   branch: string | null;
   title: string | null;
+  /** İletişim (yalnızca kadro ya da kullanıcı yönetimi yetkisi olana dolu gelir) */
+  email: string | null;
+  phone: string | null;
   isActive: boolean;
 }
 /** Branş ya da ünvan listesinin bir öğesi */

@@ -28,6 +28,13 @@ services:
       PUBLIC_URL: https://${DOMAIN:?DOMAIN gerekli}
       SEED_SUPERADMIN_EMAIL: ${SEED_SUPERADMIN_EMAIL:-}
       SEED_SUPERADMIN_PASSWORD: ${SEED_SUPERADMIN_PASSWORD:-}
+      # E-posta (davet, doğrulama kodu, şifre yenileme): .env'de BREVO_API_KEY ya da SMTP_* ve SMTP_FROM
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-Okulyayın <bildirim@okulyayin.local>}
     volumes:
       - uploads:/app/apps/api/uploads
     depends_on:

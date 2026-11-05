@@ -15,7 +15,7 @@ import {
   type SchoolIssue,
   type SupportTicket,
 } from '@okulpano/shared';
-import { and, asc, desc, eq, inArray, isNotNull, lt } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, lt, or } from 'drizzle-orm';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { AppDeps } from '../context.ts';
@@ -34,7 +34,7 @@ import { addToInbox } from './notifications.ts';
 
 const isManager = (role: string) => role === 'owner' || role === 'admin';
 
-async function tell(deps: AppDeps, userIds: (string | null | undefined)[], n: { kind: string; title: string; body: string; to: string; schoolId?: string | null }) {
+export async function tell(deps: AppDeps, userIds: (string | null | undefined)[], n: { kind: string; title: string; body: string; to: string; schoolId?: string | null }) {
   const ids = [...new Set(userIds.filter((x): x is string => Boolean(x)))];
   if (!ids.length) return;
   await addToInbox(deps.db, ids, { key: `${n.kind}:${randomUUID()}`, kind: n.kind, title: n.title, body: n.body, to: n.to, schoolId: n.schoolId ?? null });
@@ -53,13 +53,43 @@ export async function issueRoutes(app: FastifyInstance) {
     return rows.filter((r) => isManager(r.role)).map((r) => r.userId);
   }
 
-  /** Kategorinin sorumlusu (okul ayarı) ya da bütün idareciler */
-  async function recipients(schoolId: string, category: string): Promise<string[]> {
+  async function issueSettings(schoolId: string) {
     const [school] = await db.select({ settings: schools.settings }).from(schools).where(eq(schools.id, schoolId));
-    const owners = schoolSettingsSchema.parse(school?.settings ?? {}).issueOwners;
+    const s = schoolSettingsSchema.parse(school?.settings ?? {});
+    return { owners: s.issueOwners, helpers: s.issueHelpers };
+  }
+
+  /** Kategorinin ek sorumluları (okulda hâlâ üye olanlar) */
+  async function helpersOf(schoolId: string, category: string): Promise<string[]> {
+    const ids = (await issueSettings(schoolId)).helpers[category] ?? [];
+    if (!ids.length) return [];
+    const rows = await db
+      .select({ userId: memberships.userId })
+      .from(memberships)
+      .where(and(eq(memberships.schoolId, schoolId), inArray(memberships.userId, ids)));
+    return rows.map((r) => r.userId);
+  }
+
+  /** Kategorinin sorumlu idarecisi (okul ayarı) ya da bütün idareciler; ayrıca ek sorumlular (ör. meslek öğretmeni) */
+  async function recipients(schoolId: string, category: string): Promise<string[]> {
+    const { owners } = await issueSettings(schoolId);
     const all = await managers(schoolId);
     const owner = owners[category];
-    return owner && all.includes(owner) ? [owner] : all;
+    return [...new Set([...(owner && all.includes(owner) ? [owner] : all), ...(await helpersOf(schoolId, category))])];
+  }
+
+  /** Kullanıcının ek sorumlu olduğu kategoriler */
+  async function myCategories(schoolId: string, userId: string): Promise<string[]> {
+    const { helpers } = await issueSettings(schoolId);
+    return Object.entries(helpers)
+      .filter(([, ids]) => ids.includes(userId))
+      .map(([c]) => c);
+  }
+
+  /** Durumu değiştirebilir: idareci, kategorinin ek sorumlusu ya da sorunun atandığı kişi */
+  async function canHandle(req: FastifyRequest, row: typeof schoolIssues.$inferSelect) {
+    if (isManager(req.ctx.role) || row.assigneeUserId === req.ctx.userId) return true;
+    return (await myCategories(req.ctx.schoolId, req.ctx.userId)).includes(row.category);
   }
 
   async function nameMap(ids: (string | null)[]) {
@@ -72,11 +102,12 @@ export async function issueRoutes(app: FastifyInstance) {
   async function load(req: FastifyRequest, id: string) {
     const [row] = await db.select().from(schoolIssues).where(and(eq(schoolIssues.id, id), eq(schoolIssues.schoolId, req.ctx.schoolId)));
     if (!row) throw notFound('Bildirim bulunamadı.');
-    if (!isManager(req.ctx.role) && row.reporterUserId !== req.ctx.userId) throw notFound('Bildirim bulunamadı.');
+    if (row.reporterUserId !== req.ctx.userId && !(await canHandle(req, row))) throw notFound('Bildirim bulunamadı.');
     return row;
   }
 
-  async function present(rows: (typeof schoolIssues.$inferSelect)[], me: string, withMessages = false): Promise<SchoolIssue[]> {
+  async function present(rows: (typeof schoolIssues.$inferSelect)[], me: string, withMessages = false, req?: FastifyRequest): Promise<SchoolIssue[]> {
+    const handled = req ? (isManager(req.ctx.role) ? null : new Set(await myCategories(req.ctx.schoolId, me))) : new Set<string>();
     const ids = rows.map((r) => r.id);
     const msgs = ids.length ? await db.select().from(schoolIssueMessages).where(inArray(schoolIssueMessages.issueId, ids)).orderBy(asc(schoolIssueMessages.createdAt)) : [];
     const names = await nameMap([...rows.flatMap((r) => [r.reporterUserId, r.assigneeUserId]), ...msgs.map((m) => m.userId)]);
@@ -98,6 +129,7 @@ export async function issueRoutes(app: FastifyInstance) {
         createdAt: r.createdAt.toISOString(),
         updatedAt: r.updatedAt.toISOString(),
         resolvedAt: r.resolvedAt?.toISOString() ?? null,
+        canUpdate: handled === null || handled.has(r.category) || r.assigneeUserId === me,
         lastMessage: last ? `${names.get(last.userId ?? '') ?? ''}: ${short(last.body)}` : null,
         ...(withMessages
           ? { messages: mine.map((m) => ({ id: m.id, userName: names.get(m.userId ?? '') ?? '', mine: m.userId === me, system: m.system, body: m.body, at: m.createdAt.toISOString() })) }
@@ -106,30 +138,43 @@ export async function issueRoutes(app: FastifyInstance) {
     });
   }
 
-  /** Liste: idare için bütün okul (scope=all), herkes için kendi bildirimleri (scope=mine) */
+  /**
+   * Liste: idare için bütün okul (scope=all). Herkes için (scope=mine) kendi bildirimleri; ek sorumluya ayrıca
+   * sorumlu olduğu kategorilerdeki ve kendisine atanan bildirimler.
+   */
   app.get(base, member, async (req) => {
     const { scope } = parse(z.object({ scope: z.enum(['mine', 'all']).default('mine') }), req.query);
     const all = scope === 'all';
     if (all && !isManager(req.ctx.role)) throw forbidden('Okulun bütün bildirimlerini yalnızca idareciler görür.');
+    const cats = all ? [] : await myCategories(req.ctx.schoolId, req.ctx.userId);
+    const mine = or(
+      eq(schoolIssues.reporterUserId, req.ctx.userId),
+      eq(schoolIssues.assigneeUserId, req.ctx.userId),
+      ...(cats.length ? [inArray(schoolIssues.category, cats)] : []),
+    );
     const rows = await db
       .select()
       .from(schoolIssues)
-      .where(and(eq(schoolIssues.schoolId, req.ctx.schoolId), ...(all ? [] : [eq(schoolIssues.reporterUserId, req.ctx.userId)])))
+      .where(and(eq(schoolIssues.schoolId, req.ctx.schoolId), ...(all ? [] : [mine!])))
       .orderBy(desc(schoolIssues.createdAt))
       .limit(300);
-    return present(rows, req.ctx.userId);
+    return present(rows, req.ctx.userId, false, req);
   });
 
-  /** İdareciler (sorumlu seçimi için) */
+  /** Sorumlu seçimi: idareciler ve (kategori verilirse) o kategorinin ek sorumluları */
   app.get(`${base}/managers`, member, async (req) => {
+    const { category } = parse(z.object({ category: z.string().max(20).optional() }), req.query);
     const ids = await managers(req.ctx.schoolId);
-    const names = await nameMap(ids);
-    return ids.map((id) => ({ id, fullName: names.get(id) ?? '' })).sort((a, b) => a.fullName.localeCompare(b.fullName, 'tr'));
+    const helpers = category ? (await helpersOf(req.ctx.schoolId, category)).filter((h) => !ids.includes(h)) : [];
+    const names = await nameMap([...ids, ...helpers]);
+    return [...ids.map((id) => ({ id, fullName: names.get(id) ?? '', helper: false })), ...helpers.map((id) => ({ id, fullName: names.get(id) ?? '', helper: true }))].sort(
+      (a, b) => Number(a.helper) - Number(b.helper) || a.fullName.localeCompare(b.fullName, 'tr'),
+    );
   });
 
   app.get(`${base}/:id`, member, async (req) => {
     const row = await load(req, (req.params as { id: string }).id);
-    return (await present([row], req.ctx.userId, true))[0];
+    return (await present([row], req.ctx.userId, true, req))[0];
   });
 
   /** Fotoğraf: her üye yükleyebilir (yalnızca sorun bildirimi için) */
@@ -159,13 +204,14 @@ export async function issueRoutes(app: FastifyInstance) {
     return reply.status(201).send((await present([row!], req.ctx.userId, true))[0]);
   });
 
-  /** İdare: durum ve sorumlu */
+  /** Durum: idare ve kategorinin ek sorumlusu (ya da atanan kişi) değiştirir. Sorumlu atamayı yalnızca idare yapar. */
   app.patch(`${base}/:id`, member, async (req) => {
-    if (!isManager(req.ctx.role)) throw forbidden('Durumu yalnızca idareciler değiştirir.');
     const row = await load(req, (req.params as { id: string }).id);
+    if (!(await canHandle(req, row))) throw forbidden('Durumu idareciler ve kategorinin sorumluları değiştirir.');
     const body = parse(issueUpdateSchema, req.body);
-    const all = await managers(req.ctx.schoolId);
-    if (body.assigneeUserId && !all.includes(body.assigneeUserId)) throw badRequest('Sorumlu bir idareci olmalı.');
+    if (body.assigneeUserId !== undefined && !isManager(req.ctx.role)) throw forbidden('Sorumlu atamayı idareciler yapar.');
+    const all = [...(await managers(req.ctx.schoolId)), ...(await helpersOf(req.ctx.schoolId, row.category))];
+    if (body.assigneeUserId && !all.includes(body.assigneeUserId)) throw badRequest('Sorumlu bir idareci ya da kategorinin ek sorumlusu olmalı.');
     const statusChanged = body.status && body.status !== row.status;
     const assigneeChanged = body.assigneeUserId !== undefined && body.assigneeUserId !== row.assigneeUserId;
     const [updated] = await db
@@ -193,10 +239,15 @@ export async function issueRoutes(app: FastifyInstance) {
         schoolId: req.ctx.schoolId,
       });
     }
+    // Ek sorumlu durumu değiştirdiyse kategorinin idarecisi de haberdar olur
+    if (statusChanged && !isManager(req.ctx.role)) {
+      const owners = (await recipients(req.ctx.schoolId, row.category)).filter((u) => u !== req.ctx.userId && u !== row.reporterUserId);
+      await tell(app.deps, owners, { kind: 'issue', title: `${actor}: ${ISSUE_STATUSES[body.status!]}`, body: title, to: `/sorunlar?id=${row.id}`, schoolId: req.ctx.schoolId });
+    }
     if (assigneeChanged && body.assigneeUserId && body.assigneeUserId !== req.ctx.userId) {
       await tell(app.deps, [body.assigneeUserId], { kind: 'issue', title: 'Size bir sorun atandı', body: `${title}: ${short(row.description)}`, to: `/sorunlar?id=${row.id}`, schoolId: req.ctx.schoolId });
     }
-    return (await present([updated!], req.ctx.userId, true))[0];
+    return (await present([updated!], req.ctx.userId, true, req))[0];
   });
 
   /** Yazışma: bildiren ve idare yanıt yazar; karşı taraf haberdar olur */
@@ -219,7 +270,7 @@ export async function issueRoutes(app: FastifyInstance) {
         schoolId: req.ctx.schoolId,
       },
     );
-    return reply.status(201).send((await present([row], req.ctx.userId, true))[0]);
+    return reply.status(201).send((await present([row], req.ctx.userId, true, req))[0]);
   });
 
   /* ---------- Destek talepleri (okul müdürü / yöneticiler → platform) ---------- */

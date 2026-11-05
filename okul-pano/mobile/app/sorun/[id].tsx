@@ -20,7 +20,11 @@ export default function SorunDetay() {
   const qc = useQueryClient();
   const key = [school?.id, 'issue', id];
   const q = useQuery({ queryKey: key, queryFn: () => api<SchoolIssue>(path), enabled: Boolean(school && id), refetchInterval: 30_000 });
-  const managers = useQuery({ queryKey: [school?.id, 'issue-managers'], queryFn: () => api<{ id: string; fullName: string }[]>(managersPath), enabled: Boolean(school) && manager });
+  const managers = useQuery({
+    queryKey: [school?.id, 'issue-managers', q.data?.category],
+    queryFn: () => api<{ id: string; fullName: string; helper: boolean }[]>(`${managersPath}?category=${q.data!.category}`),
+    enabled: Boolean(school && q.data) && manager,
+  });
   const [text, setText] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -95,14 +99,14 @@ export default function SorunDetay() {
           {r.description}
         </T>
         {r.photoUrl ? <Image source={{ uri: absoluteUrl(r.photoUrl)! }} style={{ width: '100%', height: 200, borderRadius: 14, marginTop: 10 }} resizeMode="cover" accessibilityLabel="Sorunun fotoğrafı" /> : null}
-        {!manager && r.assigneeName ? (
+        {!manager && r.assigneeName && !r.canUpdate ? (
           <T size={12.5} color={colors.muted} style={{ marginTop: 8 }}>
             Sorumlu: {r.assigneeName}
           </T>
         ) : null}
       </Card>
 
-      {manager && (
+      {(manager || r.canUpdate) && (
         <Card>
           <T size={12} weight="800" color={colors.muted}>
             DURUM
@@ -123,15 +127,23 @@ export default function SorunDetay() {
               </Button>
             )}
           </View>
-          <T size={12} weight="800" color={colors.muted} style={{ marginTop: 14 }}>
-            SORUMLU
-          </T>
-          <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-            <Chip label="Atanmadı" selected={!r.assigneeUserId} onPress={() => void patch('assignee', { assigneeUserId: null })} />
-            {(managers.data ?? []).map((m) => (
-              <Chip key={m.id} label={m.fullName} selected={r.assigneeUserId === m.id} onPress={() => void patch('assignee', { assigneeUserId: m.id })} />
-            ))}
-          </View>
+          {manager ? (
+            <>
+              <T size={12} weight="800" color={colors.muted} style={{ marginTop: 14 }}>
+                SORUMLU
+              </T>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                <Chip label="Atanmadı" selected={!r.assigneeUserId} onPress={() => void patch('assignee', { assigneeUserId: null })} />
+                {(managers.data ?? []).map((m) => (
+                  <Chip key={m.id} label={m.helper ? `${m.fullName} (ek)` : m.fullName} selected={r.assigneeUserId === m.id} onPress={() => void patch('assignee', { assigneeUserId: m.id })} />
+                ))}
+              </View>
+            </>
+          ) : r.assigneeName ? (
+            <T size={12.5} color={colors.muted} style={{ marginTop: 10 }}>
+              Sorumlu: {r.assigneeName}
+            </T>
+          ) : null}
         </Card>
       )}
 

@@ -111,7 +111,7 @@ describe('Excel', () => {
     const wb = await readWorkbook(res.rawPayload);
     expect(wb.worksheets.map((w) => w.name)).toEqual(['Öğretmenler', 'Listeler', 'Açıklama']);
     const sheet = wb.getWorksheet('Öğretmenler')!;
-    expect(sheet.getRow(1).values).toEqual([undefined, 'Ad Soyad', 'Branş', 'Ünvan']);
+    expect(sheet.getRow(1).values).toEqual([undefined, 'Ad Soyad', 'Branş', 'Ünvan', 'E-posta', 'Telefon']);
     expect(sheet.getCell('B2').dataValidation).toMatchObject({ type: 'list' });
     const lists = wb.getWorksheet('Listeler')!;
     expect(lists.state).toBe('veryHidden');
@@ -184,8 +184,9 @@ describe('Excel', () => {
     const sheet = wb.getWorksheet('Öğretmenler')!;
     const names = sheet.getColumn(1).values.slice(2) as string[];
     expect(names).toEqual(['Cem Yıldırım', 'Deniz Ak', 'Kemal Tunç', 'Zehra Çınar']);
-    expect(sheet.getRow(1).values).toEqual([undefined, 'Ad Soyad', 'Branş', 'Ünvan', 'Durum']);
-    expect(sheet.getCell('D2').value).toBe('Aktif');
+    // İletişim sütunları yalnızca kadro ya da kullanıcı yönetimi yetkisi olana dolu gelir
+    expect(sheet.getRow(1).values).toEqual([undefined, 'Ad Soyad', 'Branş', 'Ünvan', 'E-posta', 'Telefon', 'Durum']);
+    expect(sheet.getCell('F2').value).toBe('Aktif');
 
     const roundtrip = await upload(res.rawPayload);
     expect(roundtrip.json().totals).toEqual({ new: 0, update: 0, unchanged: 4, skipped: 0 });
