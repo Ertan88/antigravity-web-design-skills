@@ -1,5 +1,5 @@
 import { mkdirSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { join, resolve } from 'node:path';
 import { and, eq } from 'drizzle-orm';
@@ -13,6 +13,14 @@ import { badRequest } from './errors.ts';
  */
 export interface FileStorage {
   saveImage(schoolId: string, data: Buffer): Promise<string>;
+  /** Yüklenmiş görseli siler (adres: /uploads/<okul>/<ad>); yoksa sessizce geçer */
+  deleteImage?(url: string): Promise<void>;
+}
+
+/** "/uploads/<okul>/<ad>" → { schoolId, name } (geçersizse null) */
+export function parseUploadUrl(url: string): { schoolId: string; name: string } | null {
+  const m = /^\/uploads\/([0-9a-f-]{36})\/([0-9a-f-]{36}\.(?:png|jpg|gif|webp))$/.exec(url);
+  return m ? { schoolId: m[1]!, name: m[2]! } : null;
 }
 
 export const IMAGE_TYPES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp' };
@@ -50,6 +58,11 @@ export class LocalStorage implements FileStorage {
     await writeFile(join(dir, name), data);
     return `${this.publicPrefix}/${schoolId}/${name}`;
   }
+
+  async deleteImage(url: string): Promise<void> {
+    const p = parseUploadUrl(url.replace(this.publicPrefix, '/uploads'));
+    if (p) await rm(join(this.root, p.schoolId, p.name), { force: true });
+  }
 }
 
 /** Görselleri veritabanında saklar; adresler yerel diskle aynıdır (/uploads/<okul>/<ad>) */
@@ -62,6 +75,11 @@ export class DbStorage implements FileStorage {
     const name = `${randomUUID()}.${ext}`;
     await this.db.insert(storedFiles).values({ schoolId, name, contentType: IMAGE_TYPES[ext]!, data });
     return `/uploads/${schoolId}/${name}`;
+  }
+
+  async deleteImage(url: string): Promise<void> {
+    const p = parseUploadUrl(url);
+    if (p) await this.db.delete(storedFiles).where(and(eq(storedFiles.schoolId, p.schoolId), eq(storedFiles.name, p.name)));
   }
 
   async read(schoolId: string, name: string): Promise<{ contentType: string; data: Buffer } | null> {

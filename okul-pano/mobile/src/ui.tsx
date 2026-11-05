@@ -669,8 +669,26 @@ export function HeaderButton({ icon, label, onPress, badge }: { icon: IconName; 
     >
       <Icon name={icon} size={21} />
       {badge ? (
-        <View style={{ position: 'absolute', top: -3, right: -3, minWidth: 19, height: 19, borderRadius: 10, backgroundColor: colors.danger, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, borderWidth: 2, borderColor: colors.bg }}>
-          <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>{badge > 9 ? '9+' : badge}</Text>
+        <View
+          style={{
+            position: 'absolute',
+            top: -5,
+            right: -5,
+            minWidth: 22,
+            height: 22,
+            borderRadius: 11,
+            backgroundColor: colors.danger,
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingHorizontal: 4,
+            borderWidth: 2,
+            borderColor: colors.bg,
+          }}
+        >
+          {/* Yazı tipinin üst / alt boşluğu sayıyı aşağı itmesin: satır yüksekliği sabit, dikey ortalama */}
+          <Text style={{ color: '#fff', fontSize: 12, lineHeight: 14, fontWeight: '800', textAlign: 'center', includeFontPadding: false, textAlignVertical: 'center' }}>
+            {badge > 9 ? '9+' : badge}
+          </Text>
         </View>
       ) : null}
     </Pressable>

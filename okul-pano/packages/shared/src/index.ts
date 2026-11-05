@@ -28,3 +28,4 @@ export * from './internship.ts';
 export * from './vocationalAreas.ts';
 export * from './examSchedule.ts';
 export * from './specialDays.ts';
+export * from './issues.ts';

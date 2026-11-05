@@ -438,8 +438,13 @@ function ExamDialog({ exam, options, onClose }: { exam: Partial<ScheduledExam>; 
       footer={
         <>
           {exam.id && (
-            <Button variant="ghost" className="mr-auto text-rose-600!" icon={<Trash2 className="size-4" />} onClick={() => void remove()}>
-              Sil
+            <Button
+              variant="secondary"
+              className="mr-auto text-rose-600! ring-rose-300! hover:bg-rose-50! dark:text-[#fb7185]! dark:ring-[#5c1d31]! dark:hover:bg-[#3e1422]!"
+              icon={<Trash2 className="size-4" />}
+              onClick={() => void remove()}
+            >
+              Sınavı sil
             </Button>
           )}
           <Button variant="secondary" onClick={onClose}>
@@ -492,11 +497,24 @@ function ExamDialog({ exam, options, onClose }: { exam: Partial<ScheduledExam>; 
         </Field>
         <Field label="Tür">
           {() => (
-            <Segmented
-              value={v.kind}
-              onChange={(kind) => setV({ ...v, kind })}
-              options={(Object.keys(EXAM_KINDS) as ExamKind[]).map((k) => ({ value: k, label: EXAM_KINDS[k] }))}
-            />
+            // Dar sütunda alt satıra kaymasın: üç eşit parça, tam genişlik
+            <div role="radiogroup" aria-label="Sınav türü" className="grid h-10 grid-cols-3 gap-1 rounded-full bg-slate-200/70 p-1">
+              {(Object.keys(EXAM_KINDS) as ExamKind[]).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  role="radio"
+                  aria-checked={v.kind === k}
+                  onClick={() => setV({ ...v, kind: k })}
+                  className={clsx(
+                    'truncate rounded-full px-2 text-sm font-bold transition-colors',
+                    v.kind === k ? 'bg-surface text-ink shadow-[0_1px_2px_rgba(28,25,23,0.12)]' : 'text-slate-500 hover:text-ink',
+                  )}
+                >
+                  {EXAM_KINDS[k]}
+                </button>
+              ))}
+            </div>
           )}
         </Field>
         <Field label="Gözetmen" help="Boş bırakılırsa o saatte o sınıfta dersi olan öğretmen gözetmen olur.">

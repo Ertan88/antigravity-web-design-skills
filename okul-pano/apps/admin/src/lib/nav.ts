@@ -1,5 +1,7 @@
 import type { Permission, SchoolSettings } from '@okulpano/shared';
 import {
+  AlertTriangle,
+  Lifebuoy2,
   BellRing,
   Cake,
   CalendarClock,
@@ -65,6 +67,8 @@ export const NAV: NavGroup[] = [
       { to: '/basarilar', label: 'Başarılar', icon: Trophy, permission: 'highlights.manage' },
       { to: '/etkinlikler', label: 'Etkinlik Takvimi', icon: CalendarDays, permission: 'highlights.manage' },
       { to: '/haftanin-kitabi', label: 'Haftanın Kitabı', icon: Library, permission: 'highlights.manage' },
+      // Herkes bildirir; idare pano görünümünde yönetir
+      { to: '/sorunlar', label: 'Okul Sorunları', icon: AlertTriangle },
     ],
   },
   {
@@ -113,6 +117,8 @@ export const NAV: NavGroup[] = [
       { to: '/ayarlar', label: 'Genel Ayarlar', icon: Settings, permission: 'settings.manage' },
       { to: '/basliklar', label: 'Başlıklar', icon: Type, permission: 'labels.manage' },
       { to: '/gecmis', label: 'Etkinlik Geçmişi', icon: History, permission: 'users.manage' },
+      // Okul müdürü ve yöneticiler (kullanıcı yönetimi yetkisi yalnız onlarda) platforma yazar
+      { to: '/platforma-yaz', label: 'Platforma Yaz', icon: Lifebuoy2, permission: 'users.manage' },
     ],
   },
 ];

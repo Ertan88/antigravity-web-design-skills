@@ -163,6 +163,8 @@ export const schoolSettingsSchema = z.object({
         .default({}),
     })
     .default({ enabled: true, signature: '', days: {} }),
+  /** Okul sorunları: kategori → sorumlu idareci (kullanıcı). Seçilmeyen kategoride bütün idarecilere gider */
+  issueOwners: z.record(z.string().max(20), z.uuid()).default({}),
   /** KVKK aydınlatma metni: okulun kendi metni, herkese açık /aydinlatma/<okul> adresinde yayınlanır */
   privacyNotice: z.string().max(20000).default(''),
 });

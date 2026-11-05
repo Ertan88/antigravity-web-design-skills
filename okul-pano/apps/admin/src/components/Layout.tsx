@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { Building2, ChevronRight, ChevronsUpDown, LogOut, Menu, Moon, School, Sun, X } from './icons.tsx';
+import { Building2, Lifebuoy2, ChevronRight, ChevronsUpDown, LogOut, Menu, Moon, School, Sun, X } from './icons.tsx';
 import { Suspense, useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth.tsx';
@@ -121,6 +121,9 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             <div className="px-3.5 pb-1.5 text-xs font-bold text-slate-400">Platform</div>
             <NavLink to="/platform" end onClick={onNavigate} className={navLinkClass}>
               <Building2 className="size-[18px]" /> Okullar ve Abonelikler
+            </NavLink>
+            <NavLink to="/platform/destek" onClick={onNavigate} className={navLinkClass}>
+              <Lifebuoy2 className="size-[18px]" /> Destek talepleri
             </NavLink>
           </div>
         )}

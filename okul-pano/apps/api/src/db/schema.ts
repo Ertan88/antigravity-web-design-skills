@@ -508,6 +508,76 @@ export const examSchedule = pgTable(
   (t) => [uniqueIndex('exam_schedule_slot_uq').on(t.schoolId, t.date, t.periodNo, t.classGroupId), index('exam_schedule_date_idx').on(t.schoolId, t.date)],
 );
 
+/** Okul sorunları: öğretmenin idareye bildirdiği sorun (arıza, temizlik, ısınma…) */
+export const schoolIssues = pgTable(
+  'school_issues',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    reporterUserId: uuid('reporter_user_id').references(() => users.id, { onDelete: 'set null' }),
+    category: text('category').notNull(),
+    location: text('location').notNull(),
+    description: text('description').notNull(),
+    urgent: boolean('urgent').notNull().default(false),
+    photoUrl: text('photo_url'),
+    status: text('status').$type<'new' | 'in_progress' | 'resolved'>().notNull().default('new'),
+    assigneeUserId: uuid('assignee_user_id').references(() => users.id, { onDelete: 'set null' }),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index('school_issues_school_idx').on(t.schoolId, t.status)],
+);
+
+export const schoolIssueMessages = pgTable(
+  'school_issue_messages',
+  {
+    id: pk(),
+    issueId: uuid('issue_id')
+      .notNull()
+      .references(() => schoolIssues.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    body: text('body').notNull(),
+    system: boolean('system').notNull().default(false),
+    createdAt: createdAt(),
+  },
+  (t) => [index('school_issue_messages_issue_idx').on(t.issueId)],
+);
+
+/** Destek talepleri: okul müdürü / yöneticilerinden platform yöneticisine sorun, öneri, soru */
+export const supportTickets = pgTable(
+  'support_tickets',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    kind: text('kind').notNull(),
+    area: text('area').notNull(),
+    subject: text('subject').notNull(),
+    status: text('status').$type<'new' | 'answered' | 'resolved'>().notNull().default('new'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index('support_tickets_status_idx').on(t.status)],
+);
+
+export const supportMessages = pgTable(
+  'support_messages',
+  {
+    id: pk(),
+    ticketId: uuid('ticket_id')
+      .notNull()
+      .references(() => supportTickets.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    fromPlatform: boolean('from_platform').notNull().default(false),
+    body: text('body').notNull(),
+    attachmentUrl: text('attachment_url'),
+    system: boolean('system').notNull().default(false),
+    createdAt: createdAt(),
+  },
+  (t) => [index('support_messages_ticket_idx').on(t.ticketId)],
+);
+
 /** Başarılar ve ayın öğrencisi */
 export const achievements = pgTable(
   'achievements',

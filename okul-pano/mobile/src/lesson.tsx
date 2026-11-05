@@ -1,7 +1,7 @@
 import type { Period, Shift } from '@okulpano/shared/bell';
 import { router } from 'expo-router';
-import type { ReactNode } from 'react';
-import { Pressable, View } from 'react-native';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { Animated, Easing, Pressable, View } from 'react-native';
 import { useNow, type MeToday } from './data.ts';
 import { classDayPeriods, classLabel, dateOfWeekday, dayBellPeriods, greeting, teacherDay } from './day.ts';
 import { Text } from './text.tsx';
@@ -56,6 +56,22 @@ export function daySlots(data: MeToday, weekday: number, endsAt?: string | null,
 
 type Slot = { period: Period; lesson: Lesson };
 
+/** Canlı göstergesi: beyaz nokta yavaşça yanıp söner */
+function PulseDot() {
+  const v = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(v, { toValue: 0.2, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(v, { toValue: 1, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [v]);
+  return <Animated.View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#fff', opacity: v }} />;
+}
+
 /** Şu anki ders (art arda aynı dersin kaçıncı saati) ve sıradaki ders */
 export function liveLesson(data: MeToday, now: Date) {
   const today = teacherDay(data, now);
@@ -97,7 +113,7 @@ export function LiveLesson({ data, link }: { data: MeToday; link?: boolean }) {
       <BigCard
         tone={toneOf(lesson.className)}
         kicker={`ŞU AN · ${period.no}. DERS`}
-        badge="derste"
+        badge="Derste"
         title={lesson.subject}
         subtitle={`${classLabel(lesson.className)}${live.run!.total > 1 ? ` · ${live.run!.total} saatlik dersin ${live.run!.index}. saati` : ''}`}
         left={toMin(period.end) - nowMin}
@@ -191,7 +207,7 @@ function BigCard(p: {
         <Text style={{ fontSize: 12.5, fontWeight: '800', color: t.sub, letterSpacing: 0.4 }}>{p.kicker}</Text>
         {p.badge && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.danger, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 }}>
-            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' }} />
+            <PulseDot />
             <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#fff' }}>{p.badge}</Text>
           </View>
         )}

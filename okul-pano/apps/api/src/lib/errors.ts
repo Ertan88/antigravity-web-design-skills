@@ -49,6 +49,13 @@ export function errorHandler(err: FastifyError | Error, req: FastifyRequest, rep
   if (code === '23503') return reply.status(409).send({ error: 'conflict', message: 'İlişkili kayıt bulunamadı ya da kullanımda.' });
 
   const status = (err as FastifyError).statusCode;
+  const fcode = (err as FastifyError).code;
+  if (fcode === 'FST_REQ_FILE_TOO_LARGE' || status === 413) {
+    return reply.status(413).send({ error: 'too_large', message: 'Dosya çok büyük (en fazla 10 MB). Daha küçük bir fotoğraf seçin.' });
+  }
+  if (fcode === 'FST_INVALID_MULTIPART_CONTENT_TYPE' || fcode === 'FST_NO_FORM_DATA' || fcode === 'FST_FILES_LIMIT') {
+    return reply.status(400).send({ error: 'bad_upload', message: 'Dosya okunamadı. Lütfen tekrar seçip yükleyin.' });
+  }
   if (status && status < 500) {
     const message = status === 429 ? 'Çok fazla deneme yaptınız, lütfen biraz bekleyin.' : err.message;
     return reply.status(status).send({ error: (err as FastifyError).code ?? 'error', message });

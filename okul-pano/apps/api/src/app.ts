@@ -19,6 +19,7 @@ import { academicCalendarRoutes } from './routes/academicCalendar.ts';
 import { conductRoutes, runConductRetention } from './routes/conduct.ts';
 import { internshipRoutes } from './routes/internship.ts';
 import { examScheduleRoutes } from './routes/examSchedule.ts';
+import { issueRoutes, runIssuePhotoRetention } from './routes/issues.ts';
 import { runScreenKeyExpiry } from './lib/screenSecurity.ts';
 import { authRoutes } from './routes/auth.ts';
 import { contentRoutes } from './routes/content.ts';
@@ -125,6 +126,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   await app.register(conductRoutes);
   await app.register(internshipRoutes);
   await app.register(examScheduleRoutes);
+  await app.register(issueRoutes);
 
   // Deneme süresi hatırlatmaları: açılıştan kısa süre sonra ve saatte bir (testlerde elle çağrılır)
   if (env.NODE_ENV !== 'test') {
@@ -133,6 +135,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
       void runConductRetention(deps).catch((err) => app.log.error(err, 'gözlem saklama süresi'));
       // Uzun süre bağlanmayan panoların anahtarı iptal edilir
       void runScreenKeyExpiry(deps).catch((err) => app.log.error(err, 'pano anahtarı süresi'));
+      void runIssuePhotoRetention(deps).catch((err) => app.log.error(err, 'sorun fotoğrafı saklama süresi'));
       // MEB çalışma takvimi: haziran ortasından itibaren yayımlanır; her yıl için günde bir deneme
       if (deps.env.MEB_INDEX_URLS) void runMebCalendarJob(deps).catch((err) => app.log.error(err, 'MEB çalışma takvimi'));
     };

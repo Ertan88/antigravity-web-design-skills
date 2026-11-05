@@ -209,6 +209,7 @@ export default function Menu() {
         { title: 'Abonelikler', subtitle: 'Paketler, pano sayısı, deneme süreleri', icon: 'business-outline', to: '/okullar' },
         { title: 'Kayıt onayları', subtitle: 'E-postası doğrulanmamış başvurular', icon: 'checkmark-done-outline', to: '/kayit-onaylari' },
         { title: 'MEB çalışma takvimi', subtitle: 'Tara · onayla', icon: 'calendar-outline', to: '/takvim' },
+        { title: 'Destek talepleri', subtitle: 'Okul müdürü ve yöneticilerinden gelen sorun, öneri, soru', icon: 'lifebuoy', to: '/platform/destek' },
       ],
     });
   }
@@ -253,6 +254,8 @@ export default function Menu() {
           : []),
         { title: 'Tatil takvimi', subtitle: 'MEB takvimi, bayramlar, köprü günleri', icon: 'sunny-outline', to: '/tatiller' },
         { title: 'Sınav takvimi', subtitle: 'Sınıfların yazılı ve ortak sınavları', icon: 'clipboard-check', to: '/sinav-takvimi' },
+        { title: 'Okul sorunları', subtitle: 'Öğretmenlerin bildirdiği arıza, temizlik, ısınma…', icon: 'alert-triangle', to: '/sorunlar' },
+        { title: 'Platforma yaz', subtitle: 'Okul Yayın ekibine sorun, öneri ya da soru', icon: 'lifebuoy', to: '/platforma-yaz' },
         { title: 'Etkinlik geçmişi', subtitle: 'Kim ne zaman neyi değiştirdi', icon: 'time-outline', tone: 'muted', to: '/gecmis' },
       ],
     });
@@ -320,6 +323,7 @@ export default function Menu() {
         ...(role === 'editor' && !isTeacher && (can('conduct.counsel') || can('conduct.manage'))
           ? [{ title: 'Gözlem', subtitle: 'Öğrencilere artı / eksi, öğrenci kartları', icon: 'clipboard-outline' as IconName, to: '/gozlem' }, { title: 'Rehberlik uyarıları', subtitle: 'Kısa sürede çok eksi alan öğrenciler', icon: 'heart-outline' as IconName, to: '/rehberlik' }]
           : []),
+        { title: 'Sorun bildir', subtitle: 'Arıza, temizlik, ısınma… idareye iletin', icon: 'alert-triangle', to: '/sorunlar' },
         { title: 'Tatil takvimi', subtitle: 'Ara tatil, yarıyıl, bayramlar', icon: 'sunny-outline', to: '/tatiller' },
         { title: 'Sınavlar ve etkinlikler', subtitle: 'Yaklaşan sınav ve etkinlikler', icon: 'school-outline', to: '/yaklasanlar' },
         { title: 'Bugün doğum günü olanlar', subtitle: 'Öğrencilerimiz', icon: 'gift-outline', to: '/dogum-gunleri' },

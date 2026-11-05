@@ -5,6 +5,17 @@
  */
 import type { ComponentType } from 'react';
 import type { SvgProps } from 'react-native-svg';
+import IconBolt from '@tabler/icons-react-native/IconBolt';
+import IconBug from '@tabler/icons-react-native/IconBug';
+import IconBulb from '@tabler/icons-react-native/IconBulb';
+import IconDesk from '@tabler/icons-react-native/IconDesk';
+import IconDroplet from '@tabler/icons-react-native/IconDroplet';
+import IconLifebuoy from '@tabler/icons-react-native/IconLifebuoy';
+import IconPaperclip from '@tabler/icons-react-native/IconPaperclip';
+import IconSpray from '@tabler/icons-react-native/IconSpray';
+import IconTemperature from '@tabler/icons-react-native/IconTemperature';
+import IconTool from '@tabler/icons-react-native/IconTool';
+import IconWifi from '@tabler/icons-react-native/IconWifi';
 import IconMinus from '@tabler/icons-react-native/IconMinus';
 import IconPointFilled from '@tabler/icons-react-native/IconPointFilled';
 import IconAlarm from '@tabler/icons-react-native/IconAlarm';
@@ -275,6 +286,18 @@ export const ICONS = {
   'signature': IconSignature,
   'calendar-due': IconCalendarDue,
   'calendar-event': IconCalendarEvent,
+  'tool': IconTool,
+  'spray': IconSpray,
+  'temperature': IconTemperature,
+  'bolt': IconBolt,
+  'wifi': IconWifi,
+  'droplet': IconDroplet,
+  'desk': IconDesk,
+  'bug': IconBug,
+  'bulb': IconBulb,
+  'lifebuoy': IconLifebuoy,
+  'paperclip': IconPaperclip,
+  'alert-triangle': IconAlertTriangle,
   point: IconPointFilled,
   remove: IconMinus,
 } satisfies Record<string, TablerIcon>;

@@ -6,6 +6,30 @@ import { useAuth } from '../lib/auth.tsx';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
+const MAX_SIDE = 1920;
+
+/**
+ * Büyük fotoğraflar yüklenmeden önce tarayıcıda küçültülür (en uzun kenar 1920 px, JPEG): telefon ve fotoğraf
+ * makinesi görüntüleri 10 MB sınırını aşabiliyor. GIF ve zaten küçük PNG'ler (saydam logo) olduğu gibi gider.
+ */
+export async function shrinkImage(file: File): Promise<File> {
+  if (file.type === 'image/gif' || (file.type === 'image/png' && file.size < 1_500_000)) return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+    if (scale === 1 && file.size < 1_500_000) return file;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/jpeg', 0.85));
+    if (!blob) return file;
+    return new File([blob], file.name.replace(/\.[a-z0-9]+$/i, '') + '.jpg', { type: 'image/jpeg' });
+  } catch {
+    return file;
+  }
+}
+
 export function ImageUpload({
   value,
   onChange,
@@ -29,10 +53,11 @@ export function ImageUpload({
     if (!file) return;
     setError(null);
     if (!file.type.startsWith('image/')) return setError('Lütfen bir görsel dosyası seçin.');
-    if (file.size > MAX_BYTES) return setError('Dosya 10 MB sınırını aşıyor.');
     setBusy(true);
     try {
-      onChange(await uploadImage(schoolId, file));
+      const ready = await shrinkImage(file);
+      if (ready.size > MAX_BYTES) return setError('Dosya 10 MB sınırını aşıyor.');
+      onChange(await uploadImage(schoolId, ready));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Yükleme başarısız.');
     } finally {

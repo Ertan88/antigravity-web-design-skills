@@ -1,3 +1,4 @@
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Platform } from 'react-native';
 import { storage } from './storage.ts';
 
@@ -145,9 +146,31 @@ export async function logout() {
 }
 
 /** Fotoğraf yükleme (duyuru / başarı): telefonda dosya adresi, web önizlemesinde dosyanın kendisi */
-export async function uploadImage(schoolId: string, asset: { uri: string; mimeType?: string | null; fileName?: string | null; file?: File }) {
+/** Yüklemeden önce en uzun kenar bu boyuta indirilir (pano 1920 piksel gösterir; telefon fotoğrafları 10 MB'ı aşabiliyor) */
+const UPLOAD_MAX_SIDE = 1920;
+
+export async function uploadImage(schoolId: string, asset: { uri: string; mimeType?: string | null; fileName?: string | null; file?: File; width?: number; height?: number }, endpoint = 'uploads') {
   const form = new FormData();
   if (asset.file) form.append('file', asset.file);
-  else form.append('file', { uri: asset.uri, name: asset.fileName ?? 'foto.jpg', type: asset.mimeType ?? 'image/jpeg' } as unknown as Blob);
-  return api<{ url: string }>(`/api/schools/${schoolId}/uploads`, { method: 'POST', form });
+  else {
+    // Kamera fotoğrafları büyük olur: küçültülüp JPEG olarak sıkıştırılır (yükleme hızlı, sunucu sınırına takılmaz)
+    let uri = asset.uri;
+    let type = asset.mimeType ?? 'image/jpeg';
+    let name = asset.fileName ?? 'foto.jpg';
+    if (type !== 'image/gif') {
+      try {
+        const w = asset.width ?? 0;
+        const h = asset.height ?? 0;
+        const resize = Math.max(w, h) > UPLOAD_MAX_SIDE ? [{ resize: w >= h ? { width: UPLOAD_MAX_SIDE } : { height: UPLOAD_MAX_SIDE } }] : [];
+        const out = await manipulateAsync(uri, resize, { compress: 0.82, format: SaveFormat.JPEG });
+        uri = out.uri;
+        type = 'image/jpeg';
+        name = name.replace(/\.[a-z0-9]+$/i, '') + '.jpg';
+      } catch {
+        // Küçültülemezse özgün dosya gönderilir
+      }
+    }
+    form.append('file', { uri, name, type } as unknown as Blob);
+  }
+  return api<{ url: string }>(`/api/schools/${schoolId}/${endpoint}`, { method: 'POST', form });
 }
