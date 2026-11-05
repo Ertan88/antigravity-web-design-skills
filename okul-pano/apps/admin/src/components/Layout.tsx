@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { Building2, Lifebuoy2, ChevronRight, ChevronsUpDown, LogOut, Menu, Moon, School, Sun, X } from './icons.tsx';
+import { Building2, Lifebuoy2, ChevronDown, ChevronRight, ChevronsUpDown, LogOut, Menu, Moon, School, Sun, X } from './icons.tsx';
 import { Suspense, useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth.tsx';
@@ -76,11 +76,32 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     isActive ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-200/60 hover:text-ink',
   );
 
+/** Kenar menüde katlanan grupların adları (tarayıcıda saklanır) */
+const COLLAPSE_KEY = 'okulpano.navCollapsed';
+
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { me, can, logout, school: access } = useAuth();
   const who = { userId: me?.user.id ?? null, teacherId: access?.teacherId ?? null, vocational: Boolean(access?.vocational), can };
   const school = useSchool();
   const settings = school.data?.settings;
+  const current = findNav(useLocation().pathname)?.item.to;
+  const [collapsed, setCollapsed] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(COLLAPSE_KEY) ?? '[]') as string[];
+    } catch {
+      return [];
+    }
+  });
+  const toggleGroup = (title: string) =>
+    setCollapsed((c) => {
+      const next = c.includes(title) ? c.filter((t) => t !== title) : [...c, title];
+      try {
+        localStorage.setItem(COLLAPSE_KEY, JSON.stringify(next));
+      } catch {
+        /* tarayıcı depolaması kapalıysa yalnızca bu oturumda geçerli */
+      }
+      return next;
+    });
   return (
     <div className="relative flex h-full flex-col overflow-hidden border-r border-slate-200 bg-slate-50 text-slate-600 dark:bg-[#161412]">
 
@@ -94,25 +115,43 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       <div className="relative px-3 pb-4">
         <SchoolSwitcher />
       </div>
-      <nav className="relative flex-1 space-y-5 overflow-y-auto px-3 pb-4 [scrollbar-width:thin]">
+      <nav className="relative flex-1 space-y-3 overflow-y-auto px-3 pb-4 [scrollbar-width:thin]">
         {NAV.map((group) => {
           const items = group.items.filter((i) => (!i.permission || can(i.permission)) && (!i.when || i.when(settings, who)));
           if (!items.length) return null;
+          const links = (
+            <div id={`nav-${group.title}`} className="space-y-0.5">
+              {items.map((item) => (
+                <NavLink key={item.to} to={item.to} end={item.to === '/'} onClick={onNavigate} className={navLinkClass}>
+                  {({ isActive }) => (
+                    <>
+                      <item.icon className={clsx('size-[18px] shrink-0 transition-colors', isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-600')} />
+                      <span className="truncate">{item.label}</span>
+                    </>
+                  )}
+                </NavLink>
+              ))}
+            </div>
+          );
+          if (!group.title) return <div key="root">{links}</div>;
+          // Açık sayfanın grubu her zaman açık kalır; diğerleri kullanıcının seçimine göre katlanır
+          const active = items.some((i) => i.to === current);
+          const open = active || !collapsed.includes(group.title);
           return (
-            <div key={group.title || 'root'}>
-              {group.title && <div className="px-3.5 pb-1.5 text-xs font-bold text-slate-400">{group.title}</div>}
-              <div className="space-y-0.5">
-                {items.map((item) => (
-                  <NavLink key={item.to} to={item.to} end={item.to === '/'} onClick={onNavigate} className={navLinkClass}>
-                    {({ isActive }) => (
-                      <>
-                        <item.icon className={clsx('size-[18px] shrink-0 transition-colors', isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-600')} />
-                        <span className="truncate">{item.label}</span>
-                      </>
-                    )}
-                  </NavLink>
-                ))}
-              </div>
+            <div key={group.title}>
+              <button
+                type="button"
+                aria-expanded={open}
+                aria-controls={`nav-${group.title}`}
+                disabled={active}
+                onClick={() => toggleGroup(group.title)}
+                className="flex w-full items-center gap-1.5 rounded-full px-3.5 pb-1.5 text-left text-xs font-bold text-slate-400 transition hover:text-slate-600 disabled:cursor-default disabled:hover:text-slate-400"
+              >
+                <span className="flex-1">{group.title}</span>
+                {!open && <span className="rounded-full bg-slate-200/70 px-1.5 text-[10.5px] font-bold text-slate-500">{items.length}</span>}
+                <ChevronDown className={clsx('size-3.5 transition-transform', !open && '-rotate-90', active && 'opacity-0')} />
+              </button>
+              {open && links}
             </div>
           );
         })}

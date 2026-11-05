@@ -46,34 +46,47 @@ export interface NavGroup {
   items: NavItem[];
 }
 
+/**
+ * Gruplar konuya göre (web ve mobilde aynı ad ve sıra): Pano · Takvim ve Ders · Personel · Öğrenciler ·
+ * Mesleki Eğitim · İletişim · Yönetim. Yetkisi olmayan kişide boş kalan grup görünmez.
+ */
 export const NAV: NavGroup[] = [
   { title: '', items: [{ to: '/', label: 'Genel Bakış', icon: LayoutDashboard }] },
   {
-    title: 'Pano İçeriği',
+    title: 'Pano',
     items: [
       { to: '/duyurular', label: 'Duyurular', icon: Megaphone, permission: 'announcements.manage' },
       { to: '/kayan-yazi', label: 'Kayan Yazı', icon: TextCursorInput, permission: 'ticker.manage' },
       { to: '/sinavlar', label: 'Sınav Sayacı', icon: GraduationCap, permission: 'exams.manage' },
-      { to: '/sinav-takvimi', label: 'Sınav Takvimi', icon: ClipboardCheck },
+      { to: '/basarilar', label: 'Başarılar', icon: Trophy, permission: 'highlights.manage' },
+      { to: '/etkinlikler', label: 'Etkinlik Takvimi', icon: CalendarDays, permission: 'highlights.manage' },
+      { to: '/haftanin-kitabi', label: 'Haftanın Kitabı', icon: Library, permission: 'highlights.manage' },
+      { to: '/basliklar', label: 'Başlıklar', icon: Type, permission: 'labels.manage' },
+      { to: '/ekranlar', label: 'Panolar', icon: MonitorSmartphone, permission: 'screens.manage' },
     ],
   },
   {
-    title: 'Okul Hayatı',
+    title: 'Takvim ve Ders',
+    items: [
+      { to: '/ders-programi', label: 'Ders Programı ve Sınıflar', icon: CalendarClock, permission: 'schedule.manage' },
+      { to: '/zil-saatleri', label: 'Zil Saatleri', icon: BellRing, permission: 'schedule.manage' },
+      { to: '/sinav-takvimi', label: 'Sınav Takvimi', icon: ClipboardCheck },
+      // Herkes görür; tatil ekleme Nöbet yetkisiyle, MEB takvimini düzeltme yalnızca platform yöneticisinde
+      { to: '/tatil-takvimi', label: 'Tatil Takvimi', icon: CalendarRange },
+    ],
+  },
+  {
+    title: 'Personel',
     items: [
       { to: '/ogretmenler', label: 'Öğretmen Kadrosu', icon: Users, permission: 'directory.manage' },
       { to: '/nobet', label: 'Nöbet Çizelgesi', icon: ShieldCheck, permission: 'duties.manage' },
       { to: '/izinler', label: 'İzinli Öğretmenler', icon: UserMinus, permission: 'leaves.manage' },
-      { to: '/ogrenciler', label: 'Öğrenciler', icon: Cake, permission: 'students.manage' },
-      { to: '/basarilar', label: 'Başarılar', icon: Trophy, permission: 'highlights.manage' },
-      { to: '/etkinlikler', label: 'Etkinlik Takvimi', icon: CalendarDays, permission: 'highlights.manage' },
-      { to: '/haftanin-kitabi', label: 'Haftanın Kitabı', icon: Library, permission: 'highlights.manage' },
-      // Herkes bildirir; idare pano görünümünde yönetir
-      { to: '/sorunlar', label: 'Okul Sorunları', icon: AlertTriangle },
     ],
   },
   {
-    title: 'Gözlem',
+    title: 'Öğrenciler',
     items: [
+      { to: '/ogrenciler', label: 'Öğrenciler', icon: Cake, permission: 'students.manage' },
       { to: '/gozlem', label: 'Öğrenci Gözlemleri', icon: ClipboardCheck, permission: 'conduct.counsel' },
       { to: '/ayin-ogrencisi', label: 'Ayın Öğrencisi', icon: Star, permission: 'conduct.counsel' },
       { to: '/donem-gostergesi', label: 'Dönem Göstergesi', icon: Gauge, permission: 'conduct.counsel' },
@@ -101,24 +114,20 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
-    title: 'Ders Düzeni',
+    title: 'İletişim',
     items: [
-      { to: '/zil-saatleri', label: 'Zil Saatleri', icon: BellRing, permission: 'schedule.manage' },
-      // Herkes görür; tatil ekleme Nöbet yetkisiyle, MEB takvimini düzeltme yalnızca platform yöneticisinde
-      { to: '/tatil-takvimi', label: 'Tatil Takvimi', icon: CalendarRange },
-      { to: '/ders-programi', label: 'Ders Programı ve Sınıflar', icon: CalendarClock, permission: 'schedule.manage' },
+      // Herkes bildirir; idare pano görünümünde yönetir
+      { to: '/sorunlar', label: 'Okul Sorunları', icon: AlertTriangle },
+      // Okul müdürü ve yöneticiler (kullanıcı yönetimi yetkisi yalnız onlarda) platforma yazar
+      { to: '/platforma-yaz', label: 'Platforma Yaz', icon: Lifebuoy2, permission: 'users.manage' },
     ],
   },
   {
     title: 'Yönetim',
     items: [
-      { to: '/ekranlar', label: 'Panolar', icon: MonitorSmartphone, permission: 'screens.manage' },
       { to: '/kullanicilar', label: 'Kullanıcılar ve Yetkiler', icon: UserCog, permission: 'users.manage' },
       { to: '/ayarlar', label: 'Genel Ayarlar', icon: Settings, permission: 'settings.manage' },
-      { to: '/basliklar', label: 'Başlıklar', icon: Type, permission: 'labels.manage' },
       { to: '/gecmis', label: 'Etkinlik Geçmişi', icon: History, permission: 'users.manage' },
-      // Okul müdürü ve yöneticiler (kullanıcı yönetimi yetkisi yalnız onlarda) platforma yazar
-      { to: '/platforma-yaz', label: 'Platforma Yaz', icon: Lifebuoy2, permission: 'users.manage' },
     ],
   },
 ];

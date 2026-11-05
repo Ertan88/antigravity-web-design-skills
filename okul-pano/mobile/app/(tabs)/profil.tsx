@@ -228,107 +228,75 @@ export default function Menu() {
     });
   }
 
-  if (managerial) {
-    sections.push({
-      title: 'Okul yönetimi',
-      items: [
-        {
-          title: 'Kullanıcılar ve yetkiler',
-          subtitle: role === 'owner' ? 'Davet · yönetici ve editör ata · yetki ver' : 'Davet · editör ekle ve yetki ver',
-          icon: 'people-outline',
-          to: '/kullanicilar',
-        },
-        // Öğretmen kaydı olan yöneticide Gözlem "Öğretmen araçlarım"da
-        ...(!isTeacher ? [{ title: 'Gözlem', subtitle: 'Öğrencilere artı / eksi, öğrenci kartları', icon: 'clipboard-outline' as IconName, to: '/gozlem' }] : []),
-        { title: 'Rehberlik uyarıları', subtitle: 'Kısa sürede çok eksi alan öğrenciler', icon: 'heart-outline' as IconName, to: '/rehberlik' },
-        ...(role === 'owner' && !school?.support && !me?.user.isSuperAdmin
-          ? [
-              {
-                title: 'Destek erişimi',
-                subtitle: 'Platform desteğine 24 saat ya da 7 gün onay ver, kapat',
-                icon: 'key-outline' as IconName,
-                tone: 'gold' as const,
-                to: '/destek',
-              },
-            ]
-          : []),
-        { title: 'Tatil takvimi', subtitle: 'MEB takvimi, bayramlar, köprü günleri', icon: 'sunny-outline', to: '/tatiller' },
-        { title: 'Sınav takvimi', subtitle: 'Sınıfların yazılı ve ortak sınavları', icon: 'clipboard-check', to: '/sinav-takvimi' },
-        { title: 'Okul sorunları', subtitle: 'Öğretmenlerin bildirdiği arıza, temizlik, ısınma…', icon: 'alert-triangle', to: '/sorunlar' },
-        { title: 'Platforma yaz', subtitle: 'Okul Yayın ekibine sorun, öneri ya da soru', icon: 'lifebuoy', to: '/platforma-yaz' },
-        { title: 'Etkinlik geçmişi', subtitle: 'Kim ne zaman neyi değiştirdi', icon: 'time-outline', tone: 'muted', to: '/gecmis' },
-      ],
-    });
-  }
-
-  if (role !== 'platform' && internship.data?.enabled && (internship.data.all || internship.data.coordinator || internship.data.teacher)) {
-    sections.push({
-      title: 'Mesleki eğitim',
-      items: [
-        {
-          title: 'İşletmede devam',
-          subtitle: 'Aylık çizelge: X, D, İ, R, H, K, T · özürlü / özürsüz',
-          icon: 'grid-outline',
-          to: '/isletme-devam',
-        },
-        {
-          title: 'İşletmelerim',
-          subtitle: 'İşletme bilgileri, ekle, düzenle',
-          icon: 'business-outline',
-          to: '/isletme',
-        },
-      ],
-    });
-  }
-
+  // Gruplar web paneliyle aynı ad ve sırada: Pano · Takvim ve Ders · Personel · Öğrenciler · Mesleki eğitim ·
+  // İletişim · Yönetim. Boş kalan grup görünmez.
   if (role !== 'platform') {
-    const content = CONTENT.filter((c) => can(c.permission)).map((c): Item => ({ title: c.title, subtitle: c.subtitle, icon: c.icon, to: `/icerik/${c.tur}` }));
-    if (can('announcements.manage'))
-      content.unshift({ title: 'Duyurular ve yayın akışı', subtitle: 'Yeni duyuru, yayındakiler', icon: 'megaphone-outline', to: '/yayin-akisi' });
-    if (content.length && role !== 'teacher') {
-      if (can('students.manage') || managerial)
-        content.push({ title: 'Doğum günleri', subtitle: 'Bugün doğum günü olanlar', icon: 'gift-outline', to: '/dogum-gunleri' });
-      sections.push({ title: role === 'editor' ? 'İçerik (yetkileriniz)' : 'İçerik', items: content });
+    const add = (title: string, items: (Item | false | undefined)[]) => {
+      const list = items.filter((i): i is Item => Boolean(i));
+      if (list.length) sections.push({ title, items: list });
+    };
+    const counsel = can('conduct.counsel') || can('conduct.manage');
+    const content = role === 'teacher' ? [] : CONTENT.filter((c) => can(c.permission)).map((c): Item => ({ title: c.title, subtitle: c.subtitle, icon: c.icon, to: `/icerik/${c.tur}` }));
+    add('Pano', [
+      role !== 'teacher' && can('announcements.manage') && { title: 'Duyurular ve yayın akışı', subtitle: 'Yeni duyuru, yayındakiler', icon: 'megaphone-outline', to: '/yayin-akisi' },
+      ...content,
+    ]);
+    add('Takvim ve Ders', [
+      isTeacher && { title: 'Ders programım', subtitle: 'Haftalık ders programı', icon: 'time-outline', to: '/programim' },
+      (managerial || isTeacher) && {
+        title: 'Sınav takvimi',
+        subtitle: isTeacher && !managerial ? 'Gözetmen olduğunuz ve dersinizin sınavları' : 'Sınıfların yazılı ve ortak sınavları',
+        icon: 'clipboard-check',
+        to: '/sinav-takvimi',
+      },
+      !managerial && { title: 'Sınavlar ve etkinlikler', subtitle: 'Yaklaşan sınav ve etkinlikler', icon: 'school-outline', to: '/yaklasanlar' },
+      { title: 'Tatil takvimi', subtitle: 'MEB takvimi, ara tatil, bayramlar', icon: 'sunny-outline', to: '/tatiller' },
+      isTeacher && { title: 'Telefon takvimine ekle', subtitle: 'Nöbetler ve sınavlar takviminize', icon: 'calendar-outline', to: '/takvime-ekle' },
+    ]);
+    add('Personel', [
+      role === 'editor' && isTeacher && { title: 'Nöbetlerim', subtitle: 'Bu hafta ve yerine görevlendirmeler', icon: 'shield-checkmark-outline', to: '/nobet' },
+      isTeacher && { title: 'Nöbet hatırlatmaları', subtitle: reminderSummary(reminders), icon: 'notifications-outline', to: '/hatirlatmalar' },
+      isTeacher && {
+        title: role === 'teacher' ? 'İzinlerim' : 'İzin bildir',
+        subtitle: pendingLeaves ? `${pendingLeaves} bildirim onay bekliyor` : 'Onay durumu',
+        icon: 'calendar-clear-outline',
+        to: role === 'teacher' ? '/izinlerim' : '/izin',
+      },
+    ]);
+    add('Öğrenciler', [
+      // Öğretmen görünümünde Gözlem alt menüde
+      role !== 'teacher' && (managerial || isTeacher || counsel) && { title: 'Gözlem', subtitle: 'Öğrencilere artı / eksi, öğrenci kartları', icon: 'clipboard-outline', to: '/gozlem' },
+      (managerial || (role === 'editor' && counsel)) && { title: 'Rehberlik uyarıları', subtitle: 'Kısa sürede çok eksi alan öğrenciler', icon: 'heart-outline', to: '/rehberlik' },
+      { title: 'Doğum günleri', subtitle: 'Bugün doğum günü olan öğrenciler', icon: 'gift-outline', to: '/dogum-gunleri' },
+    ]);
+    if (internship.data?.enabled && (internship.data.all || internship.data.coordinator || internship.data.teacher)) {
+      add('Mesleki eğitim', [
+        { title: 'İşletmede devam', subtitle: 'Aylık çizelge: X, D, İ, R, H, K, T · özürlü / özürsüz', icon: 'grid-outline', to: '/isletme-devam' },
+        { title: 'İşletmelerim', subtitle: 'İşletme bilgileri, ekle, düzenle', icon: 'business-outline', to: '/isletme' },
+      ]);
     }
-  }
-
-  if (isTeacher && role !== 'platform') {
-    sections.push({
-      title: 'Öğretmen araçlarım',
-      items: [
-        { title: 'Ders programım', subtitle: 'Haftalık ders programı', icon: 'time-outline', to: '/programim' },
-        { title: 'Sınav takvimi', subtitle: 'Gözetmen olduğunuz ve dersinizin sınavları', icon: 'clipboard-check', to: '/sinav-takvimi' },
-        { title: 'Nöbet hatırlatmaları', subtitle: reminderSummary(reminders), icon: 'notifications-outline', to: '/hatirlatmalar' },
-        // Öğretmen görünümünde Gözlem alt menüde; duyurular ana sayfadaki kısayoldan okunur
-        ...(role === 'teacher' ? [] : [{ title: 'Gözlem', subtitle: 'Öğrencilere artı / eksi, öğrenci kartları', icon: 'clipboard-outline' as IconName, to: '/gozlem' }]),
-        ...(role === 'editor'
-          ? [{ title: 'Nöbetlerim', subtitle: 'Bu hafta ve yerine görevlendirmeler', icon: 'shield-checkmark-outline' as IconName, to: '/nobet' }]
-          : []),
-        {
-          title: role === 'teacher' ? 'İzinlerim' : 'İzin bildir',
-          subtitle: pendingLeaves ? `${pendingLeaves} bildirim onay bekliyor` : 'Onay durumu',
-          icon: 'calendar-clear-outline',
-          to: role === 'teacher' ? '/izinlerim' : '/izin',
-        },
-        { title: 'Telefon takvimine ekle', subtitle: 'Nöbetler ve sınavlar takviminize', icon: 'calendar-outline', to: '/takvime-ekle' },
-      ],
-    });
-  }
-
-  if (role === 'editor' || role === 'teacher') {
-    sections.push({
-      title: 'Okul',
-      items: [
-        // Rehber öğretmen (öğretmen kaydı olmayan): Gözlem
-        ...(role === 'editor' && !isTeacher && (can('conduct.counsel') || can('conduct.manage'))
-          ? [{ title: 'Gözlem', subtitle: 'Öğrencilere artı / eksi, öğrenci kartları', icon: 'clipboard-outline' as IconName, to: '/gozlem' }, { title: 'Rehberlik uyarıları', subtitle: 'Kısa sürede çok eksi alan öğrenciler', icon: 'heart-outline' as IconName, to: '/rehberlik' }]
-          : []),
-        { title: 'Sorun bildir', subtitle: 'Arıza, temizlik, ısınma… idareye iletin', icon: 'alert-triangle', to: '/sorunlar' },
-        { title: 'Tatil takvimi', subtitle: 'Ara tatil, yarıyıl, bayramlar', icon: 'sunny-outline', to: '/tatiller' },
-        { title: 'Sınavlar ve etkinlikler', subtitle: 'Yaklaşan sınav ve etkinlikler', icon: 'school-outline', to: '/yaklasanlar' },
-        { title: 'Bugün doğum günü olanlar', subtitle: 'Öğrencilerimiz', icon: 'gift-outline', to: '/dogum-gunleri' },
-      ],
-    });
+    add('İletişim', [
+      managerial
+        ? { title: 'Okul sorunları', subtitle: 'Öğretmenlerin bildirdiği arıza, temizlik, ısınma…', icon: 'alert-triangle', to: '/sorunlar' }
+        : { title: 'Sorun bildir', subtitle: 'Arıza, temizlik, ısınma… idareye iletin', icon: 'alert-triangle', to: '/sorunlar' },
+      managerial && { title: 'Platforma yaz', subtitle: 'Okul Yayın ekibine sorun, öneri ya da soru', icon: 'lifebuoy', to: '/platforma-yaz' },
+    ]);
+    add('Yönetim', [
+      managerial && {
+        title: 'Kullanıcılar ve yetkiler',
+        subtitle: role === 'owner' ? 'Davet · yönetici ve editör ata · yetki ver' : 'Davet · editör ekle ve yetki ver',
+        icon: 'people-outline',
+        to: '/kullanicilar',
+      },
+      role === 'owner' && !school?.support && !me?.user.isSuperAdmin && {
+        title: 'Destek erişimi',
+        subtitle: 'Platform desteğine 24 saat ya da 7 gün onay ver, kapat',
+        icon: 'key-outline',
+        tone: 'gold',
+        to: '/destek',
+      },
+      managerial && { title: 'Etkinlik geçmişi', subtitle: 'Kim ne zaman neyi değiştirdi', icon: 'time-outline', tone: 'muted', to: '/gecmis' },
+    ]);
   }
 
   sections.push({
