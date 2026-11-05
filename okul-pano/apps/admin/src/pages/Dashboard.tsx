@@ -1,7 +1,7 @@
 import { resolveScreenDisplay } from '@okulpano/shared';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { ArrowUpRight, Cake, GraduationCap, Megaphone, MonitorSmartphone, Plus, ShieldCheck, TextCursorInput, UserMinus, Users } from '../components/icons.tsx';
+import { ArrowRight, ArrowUpRight, Cake, GraduationCap, Megaphone, MonitorSmartphone, Plus, ShieldCheck, TextCursorInput, UserMinus, Users } from '../components/icons.tsx';
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { BoardPreview } from '../components/BoardPreview.tsx';
@@ -94,7 +94,9 @@ function PendingApprovals() {
         <Megaphone className="size-5" />
       </span>
       <span className="text-[15px] font-extrabold">{n} duyuru onayınızı bekliyor</span>
-      <span className="ml-auto shrink-0 rounded-full bg-white/60 px-3.5 py-1.5 text-sm font-bold whitespace-nowrap dark:bg-white/10">İncele →</span>
+      <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-white/60 px-3.5 py-1.5 text-sm font-bold whitespace-nowrap dark:bg-white/10">
+        İncele <ArrowRight className="size-4" />
+      </span>
     </Link>
   );
 }

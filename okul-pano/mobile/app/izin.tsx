@@ -7,7 +7,7 @@ import { useMeToday, useMyLeaves, type Leave } from '../src/data.ts';
 import { addDays, dayTitle } from '../src/day.ts';
 import { Text } from '../src/text.tsx';
 import { colors, tiles, type TileTone } from '../src/theme.ts';
-import { Badge, Button, Card, Choice, confirm, Empty, Field, Icon, Screen, T } from '../src/ui.tsx';
+import { Badge, Button, Card, Choice, confirm, Empty, Field, Icon, Screen, T, type IconName } from '../src/ui.tsx';
 
 type Preset = 'today' | 'tomorrow' | 'custom';
 type Tab = 'new' | 'list';
@@ -15,15 +15,15 @@ const ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 /** İzin nedeni (yalnızca yöneticiler görür): kayıtta notun başına yazılır, ör. "Mazeret izni · düğün" */
 const KINDS = [
-  { value: 'Mazeret izni', emoji: '🙋', tone: 'peach' },
-  { value: 'Görevlendirme', emoji: '🧳', tone: 'sky' },
-  { value: 'Rapor', emoji: '🩺', tone: 'rose' },
-  { value: 'Refakat izni', emoji: '🤝', tone: 'mint' },
-  { value: 'Doğum / babalık izni', emoji: '👶', tone: 'sun' },
-  { value: 'Evlilik izni', emoji: '💍', tone: 'lilac' },
-  { value: 'Vefat izni', emoji: '🕊️', tone: 'paper' },
-  { value: 'Diğer', emoji: '✳️', tone: 'paper' },
-] as const satisfies readonly { value: string; emoji: string; tone: TileTone }[];
+  { value: 'Mazeret izni', icon: 'hand-stop', tone: 'peach' },
+  { value: 'Görevlendirme', icon: 'briefcase', tone: 'sky' },
+  { value: 'Rapor', icon: 'stethoscope', tone: 'rose' },
+  { value: 'Refakat izni', icon: 'heart-handshake', tone: 'mint' },
+  { value: 'Doğum / babalık izni', icon: 'baby-carriage', tone: 'sun' },
+  { value: 'Evlilik izni', icon: 'rings', tone: 'lilac' },
+  { value: 'Vefat izni', icon: 'feather', tone: 'paper' },
+  { value: 'Diğer', icon: 'dots', tone: 'paper' },
+] as const satisfies readonly { value: string; icon: IconName; tone: TileTone }[];
 type Kind = (typeof KINDS)[number]['value'] | '';
 const composeNote = (kind: Kind, detail: string) => [kind, detail.trim()].filter(Boolean).join(' · ') || null;
 /** Kayıtlı notun başındaki nedenin simgesi (eski ya da serbest notlarda "Diğer") */
@@ -126,10 +126,12 @@ export default function Izin() {
 
   const leaves = mine.data ?? [];
   const msg = message && (
-    <T size={13} color={message.ok ? colors.success : colors.danger} weight="600" style={{ textAlign: 'center' }}>
-      {message.ok ? '✓ ' : ''}
-      {message.text}
-    </T>
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+      {message.ok ? <Icon name="checkmark" size={15} strokeWidth={2.6} color={colors.success} /> : null}
+      <T size={13} color={message.ok ? colors.success : colors.danger} weight="600" style={{ textAlign: 'center', flexShrink: 1 }}>
+        {message.text}
+      </T>
+    </View>
   );
 
   return (
@@ -175,7 +177,7 @@ export default function Izin() {
       {tab === 'new' ? (
         <>
           <View style={{ flexDirection: 'row', gap: 10, padding: 12, borderRadius: 16, borderWidth: 1, borderColor: tiles.sky.bg, backgroundColor: colors.infoSoft }}>
-            <Text style={{ fontSize: 14 }}>🔒</Text>
+            <Icon name="lock-closed-outline" size={16} color={colors.info} />
             <Text style={{ flex: 1, fontSize: 12.5, lineHeight: 18, fontWeight: '500', color: colors.info }}>
               İzin nedenini yalnızca yöneticiler görür, panoda gösterilmez. Bitmemiş izinlerinizi İzinlerim sekmesinden silebilirsiniz.
             </Text>
@@ -203,10 +205,13 @@ export default function Izin() {
               </View>
             )}
             {valid && (
-              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.ink }}>
-                📅 {rangeText(valid[0], valid[1])}
-                {valid[0] !== valid[1] ? ` · ${dayCount(valid[0], valid[1])} gün` : ''}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Icon name="calendar-event" size={17} color={colors.ink} />
+                <Text style={{ fontSize: 14, fontWeight: '700', color: colors.ink }}>
+                  {rangeText(valid[0], valid[1])}
+                  {valid[0] !== valid[1] ? ` · ${dayCount(valid[0], valid[1])} gün` : ''}
+                </Text>
+              </View>
             )}
           </Step>
 
@@ -235,7 +240,7 @@ export default function Izin() {
                     }}
                   >
                     <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: tiles[k.tone].bg, alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ fontSize: 16 }}>{k.emoji}</Text>
+                      <Icon name={k.icon} size={17} color={tiles[k.tone].fg} />
                     </View>
                     <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.ink }}>{k.value}</Text>
                   </Pressable>
@@ -251,7 +256,7 @@ export default function Izin() {
               onChangeText={setNote}
               maxLength={90}
               placeholder="ör. il millî eğitim toplantısı"
-              help="⚠️ Hastalık, tanı ya da rapor içeriği gibi sağlık bilgisi yazmayın."
+              help="Hastalık, tanı ya da rapor içeriği gibi sağlık bilgisi yazmayın."
             />
           </Step>
         </>
@@ -352,7 +357,7 @@ function LeaveList({
       {upcoming.length > 0 && <Group title="Yaklaşan" items={upcoming} removable={removable} onRemove={onRemove} />}
       {past.length > 0 && <Group title="Geçmiş" items={past} removable={removable} onRemove={onRemove} faded />}
       <T size={12} color={colors.faint} style={{ textAlign: 'center' }}>
-        Bitmemiş izinler 🗑️ ile silinebilir; onaylı izin silinirse yöneticiye bildirilir.
+        Bitmemiş izinler çöp kutusu düğmesiyle silinebilir; onaylı izin silinirse yöneticiye bildirilir.
       </T>
     </>
   );
@@ -372,7 +377,7 @@ function Group({ title, items, removable, onRemove, faded }: { title: string; it
           return (
             <View key={l.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 12, paddingHorizontal: 14, borderTopWidth: i ? 1 : 0, borderTopColor: colors.divider }}>
               <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: tiles[k.tone].bg, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontSize: 17 }}>{k.emoji}</Text>
+                <Icon name={k.icon} size={18} color={tiles[k.tone].fg} />
               </View>
               <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                 <Text style={{ fontSize: 14.5, fontWeight: '700', color: colors.ink }}>

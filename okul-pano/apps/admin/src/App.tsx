@@ -1,5 +1,5 @@
 import type { Permission } from '@okulpano/shared';
-import { Loader2, Lock, SearchX } from './components/icons.tsx';
+import { ArrowRight, Loader2, Lock, SearchX } from './components/icons.tsx';
 import { lazy, type ComponentType, type ReactNode } from 'react';
 import { Link, Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout.tsx';
@@ -89,8 +89,8 @@ export function App() {
         description={me.user.isSuperAdmin ? 'Platform bölümünden ilk okulu oluşturun.' : 'Okul yöneticinizden sizi eklemesini isteyin.'}
         action={
           me.user.isSuperAdmin && (
-            <Link to="/platform" className="text-sm font-semibold text-brand-600">
-              Okul oluştur →
+            <Link to="/platform" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600">
+              Okul oluştur <ArrowRight className="size-4" />
             </Link>
           )
         }

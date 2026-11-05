@@ -214,11 +214,11 @@ function SchoolSheet({ s, onClose }: { s: PlatformSchool; onClose: () => void })
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 12, overflow: 'hidden' }}>
             <Pressable accessibilityRole="button" accessibilityLabel="Pano sınırını azalt" disabled={maxScreens <= Math.max(1, s.screenCount)} onPress={() => setMaxScreens((n) => n - 1)} style={{ paddingHorizontal: 15, paddingVertical: 9, backgroundColor: colors.primarySoft, opacity: maxScreens <= Math.max(1, s.screenCount) ? 0.4 : 1 }}>
-              <Text style={{ fontSize: 17, fontWeight: '800', color: colors.ink }}>−</Text>
+              <Icon name="remove" size={18} strokeWidth={2.4} color={colors.ink} />
             </Pressable>
             <Text style={{ minWidth: 48, textAlign: 'center', fontSize: 17, fontWeight: '800', color: colors.ink }}>{maxScreens}</Text>
             <Pressable accessibilityRole="button" accessibilityLabel="Pano sınırını artır" disabled={maxScreens >= 500} onPress={() => setMaxScreens((n) => n + 1)} style={{ paddingHorizontal: 15, paddingVertical: 9, backgroundColor: colors.primarySoft }}>
-              <Text style={{ fontSize: 17, fontWeight: '800', color: colors.ink }}>+</Text>
+              <Icon name="add" size={18} strokeWidth={2.4} color={colors.ink} />
             </Pressable>
           </View>
         </View>

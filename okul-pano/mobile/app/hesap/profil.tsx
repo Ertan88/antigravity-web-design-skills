@@ -74,7 +74,7 @@ export default function Profil() {
         />
       )}
       <Card style={{ paddingVertical: 4, gap: 0, marginTop: 8 }}>
-        <ListRow emoji={{ char: '🔒', tone: 'lilac' }} title="Şifre değiştir" subtitle="Diğer cihazlardaki oturumlar kapanır" onPress={() => router.push('/hesap/sifre')} last />
+        <ListRow tile={{ icon: 'lock-closed-outline', tone: 'lilac' }} title="Şifre değiştir" subtitle="Diğer cihazlardaki oturumlar kapanır" onPress={() => router.push('/hesap/sifre')} last />
       </Card>
     </Screen>
   );

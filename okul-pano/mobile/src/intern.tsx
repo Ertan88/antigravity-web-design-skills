@@ -213,18 +213,14 @@ export function ReportSheet({ student, from, onClose, onSaved }: { student: { id
         })}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 16, alignSelf: 'center' }}>
-        <Button variant="secondary" onPress={() => setDays((n) => Math.max(1, n - 1))} disabled={days <= 1}>
-          −
-        </Button>
+        <Button variant="secondary" icon="remove" accessibilityLabel="Bir gün azalt" onPress={() => setDays((n) => Math.max(1, n - 1))} disabled={days <= 1} style={{ width: 56 }} />
         <View style={{ alignItems: 'center', minWidth: 110 }}>
           <Text style={{ fontSize: 28, fontWeight: '800', color: colors.ink }}>{days}</Text>
           <T size={12} color={colors.faint}>
             takvim günü
           </T>
         </View>
-        <Button variant="secondary" onPress={() => setDays((n) => Math.min(31, n + 1))} disabled={days >= 31}>
-          +
-        </Button>
+        <Button variant="secondary" icon="add" accessibilityLabel="Bir gün artır" onPress={() => setDays((n) => Math.min(31, n + 1))} disabled={days >= 31} style={{ width: 56 }} />
       </View>
       <T size={14} weight="700" style={{ textAlign: 'center', marginTop: 10 }}>
         {days === 1 ? shortDate(from) : `${shortDate(from)} – ${shortDate(until)}`}

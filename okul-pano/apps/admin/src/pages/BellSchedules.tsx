@@ -23,7 +23,7 @@ import {
 } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { BellRing, Check, ChevronDown, Coffee, CopyPlus, Minus, Pencil, Plus, Trash2, Utensils, Wand2 } from '../components/icons.tsx';
+import { BellRing, Check, ChevronDown, ChevronLeft, ChevronRight, Coffee, CopyPlus, Minus, Pencil, Plus, Trash2, Utensils, Wand2 } from '../components/icons.tsx';
 import { useMemo, useState } from 'react';
 import { Alert, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Spinner } from '../components/ui.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -226,11 +226,11 @@ function Editor({ form, classes, lunchThresholdMin }: { form: ReturnType<typeof 
                     <span className="w-20">{lunch ? 'Öğle arası' : 'Teneffüs'}</span>
                     <span className="inline-flex items-center rounded-lg bg-surface/80 ring-1 ring-black/5">
                       <button type="button" disabled={gap < 5} onClick={() => shiftFrom(i + 1, -5)} className="px-2 py-0.5 text-sm font-bold disabled:opacity-40" aria-label="Arayı 5 dakika kısalt">
-                        −
+                        <Minus className="size-3.5" strokeWidth={2.5} />
                       </button>
                       <span className="min-w-14 text-center font-bold tabular-nums">{gap} dk</span>
                       <button type="button" onClick={() => shiftFrom(i + 1, 5)} className="px-2 py-0.5 text-sm font-bold" aria-label="Arayı 5 dakika uzat">
-                        +
+                        <Plus className="size-3.5" strokeWidth={2.5} />
                       </button>
                     </span>
                     <button
@@ -629,14 +629,14 @@ export function BellSchedules() {
                 <p className="text-sm text-slate-500">Her günün altında o gün çalan ziller. Bir güne tıklayınca akışı aşağıda açılır; oradan o güne elle müdahale edebilirsiniz.</p>
               </div>
               <div className="flex items-center gap-1">
-                <Button size="sm" variant="secondary" disabled={weekOffset <= 0} onClick={() => setWeekOffset((w) => w - 1)}>
-                  ‹
+                <Button size="sm" variant="secondary" aria-label="Önceki hafta" disabled={weekOffset <= 0} onClick={() => setWeekOffset((w) => w - 1)}>
+                  <ChevronLeft className="size-4" />
                 </Button>
                 <span className="px-2 text-sm font-semibold text-slate-600">
                   {shortDate(monday)} haftası
                 </span>
-                <Button size="sm" variant="secondary" disabled={weekOffset >= 8} onClick={() => setWeekOffset((w) => w + 1)}>
-                  ›
+                <Button size="sm" variant="secondary" aria-label="Sonraki hafta" disabled={weekOffset >= 8} onClick={() => setWeekOffset((w) => w + 1)}>
+                  <ChevronRight className="size-4" />
                 </Button>
               </div>
             </div>

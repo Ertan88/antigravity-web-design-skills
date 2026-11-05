@@ -1,6 +1,6 @@
 import { SCHOOL_TYPES } from '@okulpano/shared';
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircle2, MailCheck } from '../components/icons.tsx';
+import { ArrowRight, CheckCircle2, MailCheck } from '../components/icons.tsx';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { BrandMark, BrandName } from '../components/Brand.tsx';
@@ -246,8 +246,8 @@ export function VerifySignup() {
           ) : (
             <p>{state.schoolName} için deneme süreniz başladı. Kayıtta belirlediğiniz e-posta ve şifreyle giriş yapın.</p>
           )}
-          <Link to="/" className="inline-block font-semibold text-brand-600">
-            Giriş yap →
+          <Link to="/" className="inline-flex items-center gap-1 font-semibold text-brand-600">
+            Giriş yap <ArrowRight className="size-4" />
           </Link>
         </Done>
       ) : (

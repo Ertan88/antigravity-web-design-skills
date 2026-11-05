@@ -3,7 +3,7 @@ import { EMERGENCY_INFO, EMERGENCY_TYPES, type EmergencyType } from '@okulpano/s
 import { startWailSiren } from '@okulpano/shared/siren';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { CloudLightning, Flame, Lock, LogOut, OctagonAlert, Siren, TriangleAlert, type LucideIcon } from './icons.tsx';
+import { CloudLightning, Flame, Lock, LogOut, OctagonAlert, PlayCircle, Siren, TriangleAlert, type LucideIcon } from './icons.tsx';
 import { useState } from 'react';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
@@ -157,8 +157,8 @@ export function EmergencyButton() {
             label="Sesli uyarı (siren)"
             description="Panoya bağlı hoparlörden siren çalar. Kiosk komutuyla açılan panolarda doğrudan çalar; normal tarayıcı sekmesinde ekrana bir kez dokunmak gerekebilir. Paneldeki küçük önizleme sessizdir."
           />
-          <button type="button" onClick={playSirenSample} className="text-sm font-semibold text-red-700 hover:text-red-800">
-            ▶ Sireni dinle (5 sn)
+          <button type="button" onClick={playSirenSample} className="inline-flex items-center gap-1.5 text-sm font-semibold text-red-700 hover:text-red-800">
+            <PlayCircle className="size-4" /> Sireni dinle (5 sn)
           </button>
         </div>
       </Modal>

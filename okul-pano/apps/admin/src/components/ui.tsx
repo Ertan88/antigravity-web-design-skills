@@ -579,7 +579,7 @@ export function Modal({
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setNudge((n) => n + 1)} />
       {nudge > 0 && (
         <div key={nudge} role="status" className="animate-toast pointer-events-none absolute top-4 left-1/2 z-10 -translate-x-1/2 rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-lg">
-          Kapatmak için Vazgeç ya da ✕ düğmesini kullanın
+          Kapatmak için Vazgeç ya da Kapat düğmesini kullanın
         </div>
       )}
       <div

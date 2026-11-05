@@ -16,7 +16,7 @@ interface Item {
   title: string;
   subtitle?: string;
   icon: IconName;
-  emoji?: { char: string; tone: TileTone };
+  tile?: { icon: IconName; tone: TileTone };
   tone?: 'primary' | 'warning' | 'danger' | 'gold' | 'muted';
   to?: string;
   onPress?: () => void;
@@ -48,51 +48,51 @@ const CONTENT: { tur: string; title: string; subtitle: string; icon: IconName; p
 
 const TILE_CYCLE: TileTone[] = ['sky', 'peach', 'mint', 'lilac', 'sun', 'rose'];
 
-type Emoji = { char: string; tone: TileTone };
-/** Menü simgeleri renkli emoji: önce başlığa, yoksa simge adına göre (her rolün menüsü kendi maddelerini gösterir) */
-const EMOJI_BY_TITLE: Record<string, Emoji> = {
-  'Ders programım': { char: '🕘', tone: 'sky' },
-  'Nöbet hatırlatmaları': { char: '⏰', tone: 'peach' },
-  'Nöbetlerim': { char: '🛡️', tone: 'peach' },
-  'İzinlerim': { char: '🗓️', tone: 'mint' },
-  'İzin bildir': { char: '🗓️', tone: 'mint' },
-  'Telefon takvimine ekle': { char: '📲', tone: 'sky' },
-  'İşletmede devam': { char: '📋', tone: 'sky' },
-  'İşletmelerim': { char: '🏭', tone: 'peach' },
-  'Etkinlik geçmişi': { char: '📜', tone: 'paper' },
-  'Tatil takvimi': { char: '🏖️', tone: 'sun' },
-  'MEB çalışma takvimi': { char: '📅', tone: 'sky' },
-  'Destek erişimi': { char: '🔐', tone: 'sun' },
-  'Destek erişimi olan okullar': { char: '🔑', tone: 'sun' },
-  'Platform görünümüne dön': { char: '🧭', tone: 'lilac' },
-  Abonelikler: { char: '🏫', tone: 'sky' },
-  'Kayıt onayları': { char: '✅', tone: 'mint' },
-  'Sınavlar ve etkinlikler': { char: '🎓', tone: 'lilac' },
+type Tile = { icon: IconName; tone: TileTone };
+/** Menü simgeleri renkli kutuda: önce başlığa, yoksa simge adına göre (her rolün menüsü kendi maddelerini gösterir) */
+const TILE_BY_TITLE: Record<string, Tile> = {
+  'Ders programım': { icon: 'time-outline', tone: 'sky' },
+  'Nöbet hatırlatmaları': { icon: 'alarm', tone: 'peach' },
+  'Nöbetlerim': { icon: 'shield-checkmark-outline', tone: 'peach' },
+  'İzinlerim': { icon: 'calendar-user', tone: 'mint' },
+  'İzin bildir': { icon: 'calendar-plus', tone: 'mint' },
+  'Telefon takvimine ekle': { icon: 'calendar-share', tone: 'sky' },
+  'İşletmede devam': { icon: 'clipboard-check', tone: 'sky' },
+  'İşletmelerim': { icon: 'factory', tone: 'peach' },
+  'Etkinlik geçmişi': { icon: 'history', tone: 'paper' },
+  'Tatil takvimi': { icon: 'beach', tone: 'sun' },
+  'MEB çalışma takvimi': { icon: 'calendar-number-outline', tone: 'sky' },
+  'Destek erişimi': { icon: 'lock-access', tone: 'sun' },
+  'Destek erişimi olan okullar': { icon: 'key-outline', tone: 'sun' },
+  'Platform görünümüne dön': { icon: 'compass', tone: 'lilac' },
+  Abonelikler: { icon: 'building-community', tone: 'sky' },
+  'Kayıt onayları': { icon: 'checkmark-circle-outline', tone: 'mint' },
+  'Sınavlar ve etkinlikler': { icon: 'school-outline', tone: 'lilac' },
 };
-const EMOJI_BY_ICON: Partial<Record<IconName, Emoji>> = {
-  'swap-horizontal-outline': { char: '🔁', tone: 'sky' },
-  'people-outline': { char: '👥', tone: 'sky' },
-  'clipboard-outline': { char: '📝', tone: 'mint' },
-  'heart-outline': { char: '💗', tone: 'rose' },
-  'megaphone-outline': { char: '📣', tone: 'peach' },
-  'reorder-three-outline': { char: '💬', tone: 'sky' },
-  'trophy-outline': { char: '🏆', tone: 'sun' },
-  'calendar-number-outline': { char: '🗓️', tone: 'lilac' },
-  'school-outline': { char: '⏳', tone: 'lilac' },
-  'book-outline': { char: '📚', tone: 'mint' },
-  'gift-outline': { char: '🎂', tone: 'rose' },
-  'notifications-outline': { char: '🔔', tone: 'sun' },
-  'person-outline': { char: '👤', tone: 'paper' },
-  'phone-portrait-outline': { char: '📱', tone: 'paper' },
-  'business-outline': { char: '🏫', tone: 'sky' },
-  'calendar-outline': { char: '📅', tone: 'sky' },
-  'grid-outline': { char: '🧭', tone: 'lilac' },
-  'key-outline': { char: '🔑', tone: 'sun' },
-  'sunny-outline': { char: '🏖️', tone: 'sun' },
-  'shield-checkmark-outline': { char: '🛡️', tone: 'peach' },
-  'time-outline': { char: '🕘', tone: 'sky' },
+const TILE_BY_ICON: Partial<Record<IconName, Tile>> = {
+  'swap-horizontal-outline': { icon: 'swap-horizontal-outline', tone: 'sky' },
+  'people-outline': { icon: 'people-outline', tone: 'sky' },
+  'clipboard-outline': { icon: 'clipboard-text', tone: 'mint' },
+  'heart-outline': { icon: 'heart-outline', tone: 'rose' },
+  'megaphone-outline': { icon: 'megaphone-outline', tone: 'peach' },
+  'reorder-three-outline': { icon: 'message', tone: 'sky' },
+  'trophy-outline': { icon: 'trophy-outline', tone: 'sun' },
+  'calendar-number-outline': { icon: 'calendar-number-outline', tone: 'lilac' },
+  'school-outline': { icon: 'hourglass-outline', tone: 'lilac' },
+  'book-outline': { icon: 'book-outline', tone: 'mint' },
+  'gift-outline': { icon: 'cake', tone: 'rose' },
+  'notifications-outline': { icon: 'notifications-outline', tone: 'sun' },
+  'person-outline': { icon: 'person-outline', tone: 'paper' },
+  'phone-portrait-outline': { icon: 'phone-portrait-outline', tone: 'paper' },
+  'business-outline': { icon: 'building-community', tone: 'sky' },
+  'calendar-outline': { icon: 'calendar-outline', tone: 'sky' },
+  'grid-outline': { icon: 'compass', tone: 'lilac' },
+  'key-outline': { icon: 'key-outline', tone: 'sun' },
+  'sunny-outline': { icon: 'beach', tone: 'sun' },
+  'shield-checkmark-outline': { icon: 'shield-checkmark-outline', tone: 'peach' },
+  'time-outline': { icon: 'time-outline', tone: 'sky' },
 };
-const emojiFor = (it: Item): Emoji | undefined => it.emoji ?? EMOJI_BY_TITLE[it.title] ?? EMOJI_BY_ICON[it.icon];
+const tileFor = (it: Item): Tile | undefined => it.tile ?? TILE_BY_TITLE[it.title] ?? TILE_BY_ICON[it.icon];
 
 /** Koyu profil kutusu: renkli baş harf rozeti, ad, e-posta, rol hapları ve okul; dokununca profil bilgileri */
 function ProfileTile({ name, email, school, badges }: { name: string; email: string; school?: string | null; badges: string[] }) {
@@ -146,7 +146,7 @@ function MenuTile({ item, tone }: { item: Item; tone: TileTone }) {
       style={({ pressed }) => ({ flex: 1, backgroundColor: t.bg, borderRadius: radius.lg, padding: 14, minHeight: 124, gap: 12, opacity: pressed ? 0.88 : 1, transform: [{ scale: pressed ? 0.985 : 1 }] })}
     >
       <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: t.chip, alignItems: 'center', justifyContent: 'center' }}>
-        {emojiFor(item) ? <Text style={{ fontSize: 21 }}>{emojiFor(item)!.char}</Text> : <Icon name={item.icon} size={20} color={t.fg} />}
+        <Icon name={tileFor(item)?.icon ?? item.icon} size={21} color={t.fg} />
       </View>
       <View style={{ gap: 3 }}>
         <Text style={{ fontSize: 15, lineHeight: 19, fontWeight: '800', letterSpacing: -0.3, color: t.fg }} numberOfLines={2}>
@@ -402,7 +402,7 @@ export default function Menu() {
               <ListRow
                 key={it.title}
                 icon={it.icon}
-                emoji={emojiFor(it)}
+                tile={tileFor(it)}
                 iconTone={it.tone ?? 'primary'}
                 title={it.title}
                 subtitle={it.subtitle}

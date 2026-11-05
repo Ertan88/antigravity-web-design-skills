@@ -214,8 +214,11 @@ export function Button({
   disabled,
   size = 'md',
   style,
+  accessibilityLabel,
 }: {
-  children: ReactNode;
+  /** Yazısız (yalnız simgeli) düğmede boş bırakılır; o zaman accessibilityLabel verilmelidir */
+  children?: ReactNode;
+  accessibilityLabel?: string;
   onPress?: () => void;
   variant?: ButtonVariant;
   icon?: IconName;
@@ -229,6 +232,7 @@ export function Button({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: Boolean(disabled || loading), busy: Boolean(loading) }}
       disabled={disabled || loading}
       onPress={onPress}
@@ -239,7 +243,7 @@ export function Button({
       ]}
     >
       {loading ? <ActivityIndicator color={v.fg} /> : icon ? <Icon name={icon} size={size === 'sm' ? 17 : 20} color={v.fg} /> : null}
-      <Text style={{ color: v.fg, fontSize: size === 'sm' ? 14 : 15.5, fontWeight: '700' }}>{children}</Text>
+      {children != null && children !== '' ? <Text style={{ color: v.fg, fontSize: size === 'sm' ? 14 : 15.5, fontWeight: '700' }}>{children}</Text> : null}
     </Pressable>
   );
 }
@@ -363,7 +367,7 @@ export function ListRow({
   title,
   subtitle,
   icon,
-  emoji,
+  tile,
   iconTone = 'primary',
   right,
   onPress,
@@ -372,8 +376,8 @@ export function ListRow({
   title: string;
   subtitle?: string | null;
   icon?: IconName;
-  /** Simge yerine renkli emoji (zemini bento kutusu tonunda) */
-  emoji?: { char: string; tone: TileTone };
+  /** Renkli simge kutusu (zemini bento kutusu tonunda) */
+  tile?: { icon: IconName; tone: TileTone };
   iconTone?: 'primary' | 'warning' | 'danger' | 'gold' | 'muted';
   right?: ReactNode;
   onPress?: () => void;
@@ -382,9 +386,9 @@ export function ListRow({
   const tone = ICON_TONES[iconTone];
   const content = (
     <View style={[styles.listRow, !last && styles.listRowBorder]}>
-      {emoji ? (
-        <View style={[styles.iconBox, { backgroundColor: tiles[emoji.tone].bg }]}>
-          <Text style={{ fontSize: 21 }}>{emoji.char}</Text>
+      {tile ? (
+        <View style={[styles.iconBox, { backgroundColor: tiles[tile.tone].bg }]}>
+          <Icon name={tile.icon} size={21} color={tiles[tile.tone].fg} />
         </View>
       ) : icon ? (
         <View style={[styles.iconBox, { backgroundColor: tone.bg }]}>

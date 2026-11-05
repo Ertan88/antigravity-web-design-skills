@@ -1891,7 +1891,7 @@ function AreasDialog({
                       aria-label={`${t.fullName} branş seç`}
                       title="Var olan branştan seç"
                     >
-                      <option value="">▾</option>
+                      <option value=""></option>
                       {branches.map((b) => (
                         <option key={b.id} value={b.id}>
                           {b.name}

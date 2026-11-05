@@ -72,9 +72,12 @@ export default function PanoKumanda() {
       back
       title={s.name}
       subtitle={
-        <T size={12} weight="600" color={s.online ? colors.success : colors.warning}>
-          {s.online ? '● Canlı' : `● Çevrimdışı · ${s.lastSeenAt ? `son görülme ${timeAgo(s.lastSeenAt)}` : 'hiç bağlanmadı'}`}
-        </T>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+          <Icon name="point" size={16} color={s.online ? colors.success : colors.warning} />
+          <T size={12} weight="600" color={s.online ? colors.success : colors.warning}>
+            {s.online ? 'Canlı' : `Çevrimdışı · ${s.lastSeenAt ? `son görülme ${timeAgo(s.lastSeenAt)}` : 'hiç bağlanmadı'}`}
+          </T>
+        </View>
       }
     >
       {previewUrl ? <BoardPreview url={previewUrl} portrait={s.display.orientation === 'portrait'} /> : <Loading />}

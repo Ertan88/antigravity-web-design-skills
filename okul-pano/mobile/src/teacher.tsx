@@ -75,12 +75,12 @@ export function TeacherHome() {
   const now = useNow(60_000);
   const day = today.data ? teacherDay(today.data, now) : null;
   const linked = Boolean(today.data?.teacher);
-  const quick: { label: string; emoji: string; tone: TileTone; to: string }[] = [
-    { label: 'Gözlem', emoji: '📝', tone: 'mint', to: '/gozlem' },
-    { label: 'İzin bildir', emoji: '🗓️', tone: 'peach', to: '/izin' },
+  const quick: { label: string; icon: IconName; tone: TileTone; to: string }[] = [
+    { label: 'Gözlem', icon: 'clipboard-text', tone: 'mint', to: '/gozlem' },
+    { label: 'İzin bildir', icon: 'calendar-plus', tone: 'peach', to: '/izin' },
     // Öğretmen görünümünde duyurular yalnızca okunur (yayındakiler)
-    { label: 'Duyurular', emoji: '📣', tone: 'sky', to: '/duyurular' },
-    ...(linked ? [{ label: 'Hatırlatma', emoji: '⏰', tone: 'sun' as TileTone, to: '/hatirlatmalar' }] : []),
+    { label: 'Duyurular', icon: 'megaphone-outline', tone: 'sky', to: '/duyurular' },
+    ...(linked ? [{ label: 'Hatırlatma', icon: 'alarm' as IconName, tone: 'sun' as TileTone, to: '/hatirlatmalar' }] : []),
   ];
   return (
     <Screen refreshing={today.isRefetching} onRefresh={() => void today.refetch()}>
@@ -134,7 +134,9 @@ function ObserveCard({ className }: { className?: string }) {
         opacity: pressed ? 0.85 : 1,
       })}
     >
-      <Text style={{ fontSize: 24 }}>📝</Text>
+      <View style={{ width: 40, height: 40, borderRadius: 13, backgroundColor: tiles.mint.bg, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name="clipboard-text" size={21} color={tiles.mint.fg} />
+      </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={{ fontSize: 15, fontWeight: '800', color: colors.ink }}>{dative(name)} gözlem ekle</Text>
         <Text style={{ fontSize: 12.5, color: colors.muted, marginTop: 1 }}>Şu anki dersiniz · artı / eksi tek dokunuş</Text>
@@ -144,8 +146,8 @@ function ObserveCard({ className }: { className?: string }) {
   );
 }
 
-/** Dört eşit kutu: emoji ve kısa ad */
-function QuickGrid({ items }: { items: { label: string; emoji: string; tone: TileTone; to: string }[] }) {
+/** Dört eşit kutu: simge ve kısa ad */
+function QuickGrid({ items }: { items: { label: string; icon: IconName; tone: TileTone; to: string }[] }) {
   return (
     <View style={{ flexDirection: 'row', gap: 8 }}>
       {items.map((q) => (
@@ -168,7 +170,7 @@ function QuickGrid({ items }: { items: { label: string; emoji: string; tone: Til
           })}
         >
           <View style={{ width: 40, height: 40, borderRadius: 13, backgroundColor: tiles[q.tone].bg, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ fontSize: 19 }}>{q.emoji}</Text>
+            <Icon name={q.icon} size={20} color={tiles[q.tone].fg} />
           </View>
           <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '700', color: colors.ink }}>
             {q.label}
@@ -192,15 +194,15 @@ function UpcomingCard() {
   const today = localIso(now);
   const until = new Date(isoMs(today) + 30 * DAY).toISOString().slice(0, 10);
 
-  const rows: { key: string; date: string; emoji: string; tone: TileTone; title: string; when: string }[] = [];
+  const rows: { key: string; date: string; icon: IconName; tone: TileTone; title: string; when: string }[] = [];
   for (const e of exams.data ?? []) {
     const d = localIso(new Date(e.examAt));
     if (e.isActive && Date.parse(e.examAt) >= now.getTime() && d <= until)
-      rows.push({ key: `x${e.id}`, date: d, emoji: '⏳', tone: 'lilac', title: e.title, when: `${dayTitle(d)} · ${clock(e.examAt)}` });
+      rows.push({ key: `x${e.id}`, date: d, icon: 'hourglass-outline', tone: 'lilac', title: e.title, when: `${dayTitle(d)} · ${clock(e.examAt)}` });
   }
   for (const e of events.data ?? []) {
     if (e.isActive && e.date >= today && e.date <= until)
-      rows.push({ key: `e${e.id}`, date: e.date, emoji: '📅', tone: 'sky', title: e.title, when: [dayTitle(e.date), e.time, e.place].filter(Boolean).join(' · ') });
+      rows.push({ key: `e${e.id}`, date: e.date, icon: 'calendar-event', tone: 'sky', title: e.title, when: [dayTitle(e.date), e.time, e.place].filter(Boolean).join(' · ') });
   }
   // Ardışık (hafta sonu arada olsa da) aynı adlı tatil günleri tek satır: "16 – 20 Kasım"
   const hs = [...(holidays.data?.holidays ?? [])].filter((h) => h.date >= today && h.date <= until).sort((a, b) => a.date.localeCompare(b.date));
@@ -213,7 +215,7 @@ function UpcomingCard() {
   for (const g of groups) {
     const sameMonth = g.from.slice(0, 7) === g.to.slice(0, 7);
     const when = g.from === g.to ? dayTitle(g.from) : sameMonth ? `${Number(g.from.slice(8))} – ${shortDay(g.to)}` : `${shortDay(g.from)} – ${shortDay(g.to)}`;
-    rows.push({ key: `h${g.from}`, date: g.from, emoji: '🏖️', tone: 'sun', title: g.name, when });
+    rows.push({ key: `h${g.from}`, date: g.from, icon: 'beach', tone: 'sun', title: g.name, when });
   }
   const list = rows.sort((a, b) => a.date.localeCompare(b.date)).slice(0, 3);
   if (!list.length) return null;
@@ -223,9 +225,12 @@ function UpcomingCard() {
       <SectionTitle
         right={
           <Pressable accessibilityRole="link" onPress={() => router.push('/yaklasanlar')} hitSlop={8}>
-            <T size={13} weight="700" color={colors.faint}>
-              Tümü ›
-            </T>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+              <T size={13} weight="700" color={colors.faint}>
+                Tümü
+              </T>
+              <Icon name="chevron-forward" size={14} color={colors.faint} />
+            </View>
           </Pressable>
         }
       >
@@ -237,7 +242,7 @@ function UpcomingCard() {
           return (
             <View key={r.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14, borderTopWidth: i ? 1 : 0, borderTopColor: colors.divider }}>
               <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: tiles[r.tone].bg, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontSize: 18 }}>{r.emoji}</Text>
+                <Icon name={r.icon} size={19} color={tiles[r.tone].fg} />
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text numberOfLines={1} style={{ fontSize: 14.5, fontWeight: '700', color: colors.ink }}>

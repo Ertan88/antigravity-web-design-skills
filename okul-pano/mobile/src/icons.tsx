@@ -5,6 +5,32 @@
  */
 import type { ComponentType } from 'react';
 import type { SvgProps } from 'react-native-svg';
+import IconMinus from '@tabler/icons-react-native/IconMinus';
+import IconPointFilled from '@tabler/icons-react-native/IconPointFilled';
+import IconAlarm from '@tabler/icons-react-native/IconAlarm';
+import IconBabyCarriage from '@tabler/icons-react-native/IconBabyCarriage';
+import IconBeach from '@tabler/icons-react-native/IconBeach';
+import IconBriefcase from '@tabler/icons-react-native/IconBriefcase';
+import IconBuildingCommunity from '@tabler/icons-react-native/IconBuildingCommunity';
+import IconBuildingFactory2 from '@tabler/icons-react-native/IconBuildingFactory2';
+import IconCake from '@tabler/icons-react-native/IconCake';
+import IconCalendarDue from '@tabler/icons-react-native/IconCalendarDue';
+import IconCalendarPlus from '@tabler/icons-react-native/IconCalendarPlus';
+import IconCalendarShare from '@tabler/icons-react-native/IconCalendarShare';
+import IconCalendarUser from '@tabler/icons-react-native/IconCalendarUser';
+import IconClipboardCheck from '@tabler/icons-react-native/IconClipboardCheck';
+import IconClipboardText from '@tabler/icons-react-native/IconClipboardText';
+import IconCompass from '@tabler/icons-react-native/IconCompass';
+import IconDots from '@tabler/icons-react-native/IconDots';
+import IconFeather from '@tabler/icons-react-native/IconFeather';
+import IconHandStop from '@tabler/icons-react-native/IconHandStop';
+import IconHeartHandshake from '@tabler/icons-react-native/IconHeartHandshake';
+import IconHistory from '@tabler/icons-react-native/IconHistory';
+import IconLockAccess from '@tabler/icons-react-native/IconLockAccess';
+import IconMessage from '@tabler/icons-react-native/IconMessage';
+import IconRings from '@tabler/icons-react-native/IconRings';
+import IconSignature from '@tabler/icons-react-native/IconSignature';
+import IconStethoscope from '@tabler/icons-react-native/IconStethoscope';
 import IconAlertCircle from '@tabler/icons-react-native/IconAlertCircle';
 import IconAlertTriangle from '@tabler/icons-react-native/IconAlertTriangle';
 import IconAlertTriangleFilled from '@tabler/icons-react-native/IconAlertTriangleFilled';
@@ -224,6 +250,33 @@ export const ICONS = {
   'tv-outline': IconDeviceTv,
   'warning': IconAlertTriangleFilled,
   'warning-outline': IconAlertTriangle,
+  'alarm': IconAlarm,
+  'calendar-user': IconCalendarUser,
+  'calendar-plus': IconCalendarPlus,
+  'calendar-share': IconCalendarShare,
+  'clipboard-check': IconClipboardCheck,
+  'factory': IconBuildingFactory2,
+  'history': IconHistory,
+  'beach': IconBeach,
+  'lock-access': IconLockAccess,
+  'compass': IconCompass,
+  'building-community': IconBuildingCommunity,
+  'clipboard-text': IconClipboardText,
+  'message': IconMessage,
+  'cake': IconCake,
+  'hand-stop': IconHandStop,
+  'briefcase': IconBriefcase,
+  'stethoscope': IconStethoscope,
+  'heart-handshake': IconHeartHandshake,
+  'baby-carriage': IconBabyCarriage,
+  'rings': IconRings,
+  'feather': IconFeather,
+  'dots': IconDots,
+  'signature': IconSignature,
+  'calendar-due': IconCalendarDue,
+  'calendar-event': IconCalendarEvent,
+  point: IconPointFilled,
+  remove: IconMinus,
 } satisfies Record<string, TablerIcon>;
 
 export type IconName = keyof typeof ICONS;

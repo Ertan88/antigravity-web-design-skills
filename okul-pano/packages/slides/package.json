@@ -12,7 +12,8 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@okulpano/shared": "*"
+    "@okulpano/shared": "*",
+    "@tabler/icons-react": "^3.50.0"
   },
   "peerDependencies": {
     "react": "*"

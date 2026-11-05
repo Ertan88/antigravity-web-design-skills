@@ -98,8 +98,8 @@ export function InboxScreen({ back }: { back?: boolean }) {
                 <ListRow
                   icon={style.icon}
                   iconTone={style.tone}
-                  title={isNew ? `● ${n.title}` : n.title}
-                  subtitle={`${n.body} · ${timeAgo(n.at)}`}
+                  title={n.title}
+                  subtitle={`${isNew ? 'Yeni · ' : ''}${n.body} · ${timeAgo(n.at)}`}
                   onPress={() => open(n)}
                   last={i === list.length - 1}
                   right={

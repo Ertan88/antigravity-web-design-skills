@@ -7,7 +7,7 @@ import { useInternshipAccess, useSchoolQuery } from '../src/data.ts';
 import { Sheet } from '../src/sheet.tsx';
 import { Text } from '../src/text.tsx';
 import { colors } from '../src/theme.ts';
-import { Button, Card, confirm, Empty, ErrorNote, Field, Loading, Screen, T } from '../src/ui.tsx';
+import { Icon, Button, Card, confirm, Empty, ErrorNote, Field, Loading, Screen, T } from '../src/ui.tsx';
 
 /*
  * İşletmelerim: öğretmenin eklediği ya da koordinatörü olduğu işletmeler (idarede bütün işletmeler). İşletmeye dokununca
@@ -105,7 +105,7 @@ export default function Isletmelerim() {
                     {b.students} öğrenci · {b.coordinatorName ? `Koordinatör: ${b.coordinatorName}` : 'Koordinatör seçilmedi'}
                   </T>
                 </View>
-                <Text style={{ fontSize: 20, color: colors.faint }}>{expanded ? '−' : '+'}</Text>
+                <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={20} color={colors.faint} />
               </Pressable>
               {expanded && (
                 <>

@@ -4,7 +4,7 @@ import { sendTestNotification } from '../src/push.ts';
 import { useReminderSettings, type ReminderSettings } from '../src/reminders.ts';
 import { Text } from '../src/text.tsx';
 import { colors, tiles, type TileTone } from '../src/theme.ts';
-import { Button, Card, Loading, Screen, switchColors, T } from '../src/ui.tsx';
+import { Button, Card, Icon, Loading, Screen, switchColors, T, type IconName } from '../src/ui.tsx';
 
 /*
  * Nöbet hatırlatmaları: her biri ayrı açılır, saatleri seçilir. Bildirimleri uygulama telefonun kendisinde kurar
@@ -14,7 +14,7 @@ import { Button, Card, Loading, Screen, switchColors, T } from '../src/ui.tsx';
 type Key = keyof ReminderSettings;
 interface Row {
   key: Key;
-  emoji: string;
+  icon: IconName;
   tone: TileTone;
   title: string;
   text: string;
@@ -25,7 +25,7 @@ interface Row {
 const ROWS: Row[] = [
   {
     key: 'evening',
-    emoji: '🌙',
+    icon: 'moon-outline',
     tone: 'sun',
     title: 'Akşamdan haber ver',
     text: '"Yarın nöbetçisiniz · 2. Kat"',
@@ -38,7 +38,7 @@ const ROWS: Row[] = [
   },
   {
     key: 'morning',
-    emoji: '☀️',
+    icon: 'sunny-outline',
     tone: 'peach',
     title: 'Nöbet sabahı',
     text: 'İlk dersten önce; nöbet yeri ve birlikte nöbetçiler',
@@ -49,9 +49,9 @@ const ROWS: Row[] = [
       { label: 'Ders başında', value: 0 },
     ],
   },
-  { key: 'breaks', emoji: '🔔', tone: 'mint', title: 'Teneffüs başında', text: 'Nöbet günü her teneffüste kısa bir bildirim' },
-  { key: 'transport', emoji: '🍽️', tone: 'lilac', title: 'Öğle ve taşımalı nöbeti', text: 'Taşımalı görev günü öğle arasından ve servis saatinden 10 dk önce' },
-  { key: 'logbook', emoji: '✍️', tone: 'rose', title: 'Gün sonu: nöbet defteri', text: 'Son dersten sonra "Nöbet defterini imzalamayı unutmayın"' },
+  { key: 'breaks', icon: 'notifications-outline', tone: 'mint', title: 'Teneffüs başında', text: 'Nöbet günü her teneffüste kısa bir bildirim' },
+  { key: 'transport', icon: 'restaurant-outline', tone: 'lilac', title: 'Öğle ve taşımalı nöbeti', text: 'Taşımalı görev günü öğle arasından ve servis saatinden 10 dk önce' },
+  { key: 'logbook', icon: 'signature', tone: 'rose', title: 'Gün sonu: nöbet defteri', text: 'Son dersten sonra "Nöbet defterini imzalamayı unutmayın"' },
 ];
 
 export default function Hatirlatmalar() {
@@ -76,7 +76,7 @@ export default function Hatirlatmalar() {
             <View key={r.key} style={{ borderTopWidth: i ? 1 : 0, borderTopColor: colors.divider, paddingVertical: 13, paddingHorizontal: 14, gap: 10 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                 <View style={{ width: 42, height: 42, borderRadius: 14, backgroundColor: tiles[r.tone].bg, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ fontSize: 21 }}>{r.emoji}</Text>
+                  <Icon name={r.icon} size={21} color={tiles[r.tone].fg} />
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={{ fontSize: 15, fontWeight: '700', color: colors.ink }}>{r.title}</Text>
