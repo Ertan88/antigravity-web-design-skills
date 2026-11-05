@@ -52,6 +52,7 @@ export const NAV: NavGroup[] = [
       { to: '/duyurular', label: 'Duyurular', icon: Megaphone, permission: 'announcements.manage' },
       { to: '/kayan-yazi', label: 'Kayan Yazı', icon: TextCursorInput, permission: 'ticker.manage' },
       { to: '/sinavlar', label: 'Sınav Sayacı', icon: GraduationCap, permission: 'exams.manage' },
+      { to: '/sinav-takvimi', label: 'Sınav Takvimi', icon: ClipboardCheck },
     ],
   },
   {

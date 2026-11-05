@@ -3200,3 +3200,30 @@ p {
   opacity: 0.75;
   font-weight: 600;
 }
+
+/* ---------- Sınav takvimi: Bugünkü sınavlar kartı ve "Şu an derste" kartındaki SINAV etiketi ---------- */
+.today-exams-card { --hue: #e11d48; --hue-2: #e11d48; }
+.style-bento.theme-dark .today-exams-card { --tile: #3e1422; --text: #ffe4e6; --muted: rgba(254, 205, 211, 0.74); --hue: #fb7185; --hue-2: #fb7185; }
+.style-bento.theme-light .today-exams-card { --tile: #fecdd3; --text: #881337; --muted: rgba(136, 19, 55, 0.74); --hue: #e11d48; --hue-2: #e11d48; }
+.style-vivid .today-exams-card { --tile: #be123c; --text: #fff; --muted: rgba(255, 255, 255, 0.8); --hue: #fff; --hue-2: #fff; }
+
+.exam-badge {
+  margin-left: auto;
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: #fbbf24;
+  color: #3b2f0c;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lesson-row.exam-now {
+  margin: -6px -8px;
+  padding: 6px 8px;
+  border-radius: 14px;
+  outline: 2px solid #fbbf24;
+  background: color-mix(in srgb, #fbbf24 16%, transparent);
+}

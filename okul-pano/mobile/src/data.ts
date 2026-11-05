@@ -1,3 +1,4 @@
+import type { ScheduledExam } from '@okulpano/shared/examCore';
 import { academicYearOf, type AcademicCalendarData } from '@okulpano/shared/academicCalendar';
 import type { BellScheduleLike } from '@okulpano/shared/bell';
 import type { BellClass, BellOverrideLike } from '@okulpano/shared/schoolDay';
@@ -188,6 +189,8 @@ export function useSchoolQuery<T>(resource: string, opts: { refetchInterval?: nu
 }
 
 export const useSchoolInfo = () => useSchoolQuery<SchoolInfo>('');
+/** Sınav takvimi: bugünden 60 gün (saat, gözetmen ve hatırlatma anı sunucuda hesaplanmış) */
+export const useExamSchedule = () => useSchoolQuery<{ today: string; exams: ScheduledExam[] }>('exam-schedule', { refetchInterval: 10 * 60_000 });
 export const useMeToday = () => useSchoolQuery<MeToday>('me/today', { refetchInterval: 5 * 60_000 });
 export const useControlCenter = (enabled = true) => useSchoolQuery<ControlCenter>('control-center', { refetchInterval: 30_000, enabled });
 export const useScreens = (fast = false) => useSchoolQuery<Screen[]>('screens', { refetchInterval: fast ? 3000 : 30_000 });

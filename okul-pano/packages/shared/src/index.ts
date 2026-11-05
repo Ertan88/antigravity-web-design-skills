@@ -26,3 +26,4 @@ export * from './labels.ts';
 export * from './conduct.ts';
 export * from './internship.ts';
 export * from './vocationalAreas.ts';
+export * from './examSchedule.ts';

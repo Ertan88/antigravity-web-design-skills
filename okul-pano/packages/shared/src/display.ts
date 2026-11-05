@@ -34,6 +34,8 @@ export interface DisplayState {
   /** Etkin acil durum: bütün panolarda tam ekran uyarı */
   emergency?: DisplayEmergency | null;
   exams: { id: string; title: string; examAt: string }[];
+  /** Sınav takvimi: bugünün (ve yarının) sınavları; saatler o sınıfın zilinden hesaplanmış */
+  scheduledExams?: { id: string; date: string; periodNo: number; classId: string; className: string; subject: string; kind: 'written' | 'practical' | 'common'; start: string | null; end: string | null }[];
   duties: { id: string; weekday: number; area: string; teacherName: string }[];
   /** Tarihe bağlı nöbetçi müdür yardımcıları (bugünden itibaren bir hafta) */
   dutySupervisors: { date: string; name: string }[];

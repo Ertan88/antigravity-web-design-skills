@@ -18,6 +18,7 @@ import { UUID_RE } from './context.ts';
 import { academicCalendarRoutes } from './routes/academicCalendar.ts';
 import { conductRoutes, runConductRetention } from './routes/conduct.ts';
 import { internshipRoutes } from './routes/internship.ts';
+import { examScheduleRoutes } from './routes/examSchedule.ts';
 import { runScreenKeyExpiry } from './lib/screenSecurity.ts';
 import { authRoutes } from './routes/auth.ts';
 import { contentRoutes } from './routes/content.ts';
@@ -123,6 +124,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   await app.register(academicCalendarRoutes);
   await app.register(conductRoutes);
   await app.register(internshipRoutes);
+  await app.register(examScheduleRoutes);
 
   // Deneme süresi hatırlatmaları: açılıştan kısa süre sonra ve saatte bir (testlerde elle çağrılır)
   if (env.NODE_ENV !== 'test') {

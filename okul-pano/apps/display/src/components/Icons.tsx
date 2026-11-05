@@ -60,3 +60,4 @@ export const CalendarIcon = make(T.IconCalendar);
 export const LibraryIcon = make(T.IconBooks);
 export const AlertIcon = make(T.IconAlertTriangle);
 export const PinIcon = make(T.IconMapPin);
+export const ClipboardIcon = make(T.IconClipboardCheck);

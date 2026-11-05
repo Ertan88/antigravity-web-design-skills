@@ -3,6 +3,7 @@ import {
   announcementOnAir,
   addIsoDays,
   compareClassNames,
+  formatClock,
   nextSchoolDay,
   boardBell,
   shortClassLabeler,
@@ -46,7 +47,7 @@ import { SpecialMark } from './components/SpecialMark.tsx';
 import { BookIcon, CakeIcon, CalendarIcon, CapIcon, LibraryIcon, MonitorIcon, ShieldIcon, TrophyIcon, UserMinusIcon, WifiOffIcon } from './components/Icons.tsx';
 import { AchievementsCard, BookCard, EventsCard } from './components/LifeCards.tsx';
 import { BirthdayCard, DutyCard, EmptyCard, ExamCard, LeaveCard } from './components/LeftColumn.tsx';
-import { BellCard, LessonsCard } from './components/RightColumn.tsx';
+import { BellCard, LessonsCard, TodayExamsCard } from './components/RightColumn.tsx';
 import { Screensaver } from './components/Screensaver.tsx';
 import { Slideshow } from './components/Slideshow.tsx';
 import { Stage, STAGE_H, STAGE_W } from './components/Stage.tsx';
@@ -242,6 +243,15 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
     ...(state.rss ?? []).map((r) => ({ kind: 'rss' as const, tag: r.source, text: r.title })),
   ];
 
+  // Sınav takvimi: bugünün bitmemiş sınavları (bu panonun sınıfları) ve "Şu an derste" kartındaki SINAV etiketi
+  const nowClock = formatClock(today.secondsOfDay);
+  const todayExams = day.holiday
+    ? []
+    : (state.scheduledExams ?? [])
+        .filter((e) => e.date === today.isoDate && (!screenClasses.size || screenClasses.has(e.classId)) && !(e.end && e.end <= nowClock))
+        .sort((a, b) => a.periodNo - b.periodNo || compareClassNames(a.className, b.className));
+  const examSlots = new Set(todayExams.map((e) => `${e.classId}|${e.periodNo}`));
+
   // Kartlar panonun düzenine göre (panoya özel ya da okulun) sol / sağ sütuna yerleşir
   const layout = state.layout ?? resolveLayout(s);
   // Düzende olup o gün içeriği olmayan kartlar kısa bir notla görünür (ayar kapalıysa hiç görünmez)
@@ -292,6 +302,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
           <LessonsCard
             key={m}
             entries={lessons}
+            examSlots={examSlots}
             heading={bell.kind === 'lesson' || !lessonPeriod ? 'Şu An Derste' : 'Sıradaki Ders'}
             periodTitle={
               !lessonPeriod ? 'Ek ders saati' : bell.kind === 'lesson' ? periodLabel(lessonPeriod) : `${periodLabel(lessonPeriod)} · ${lessonPeriod.start}`
@@ -303,6 +314,8 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         ) : (
           empty(m, <BookIcon size={22} />, 'Şu An Derste', 'Şu an ders yok', 'lessons-card')
         );
+      case 'todayExams':
+        return todayExams.length ? <TodayExamsCard key={m} exams={todayExams} nowClock={nowClock} /> : null;
       case 'achievements':
         return achievementsNow.length ? (
           <AchievementsCard key={m} items={achievementsNow} />
@@ -347,6 +360,8 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         return true;
       case 'lessons':
         return Boolean(lessonPeriod) || lessons.length > 0 || nextLessons.length > 0;
+      case 'todayExams':
+        return todayExams.length > 0;
       case 'achievements':
         return achievementsNow.length > 0;
       case 'events':

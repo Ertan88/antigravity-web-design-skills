@@ -77,19 +77,22 @@ export async function unregisterPush() {
   await storage.set(TOKEN_KEY, null);
 }
 
-/** Nöbet hatırlatmaları telefonda yerel olarak kurulur (sunucu gerekmez); her kurulumda öncekiler silinir */
-export async function scheduleReminders(items: { at: Date; title: string; body: string; url: string }[]) {
+/**
+ * Hatırlatmalar telefonda yerel olarak kurulur (sunucu ve internet gerekmez); her kurulumda aynı türdeki
+ * öncekiler silinir. Tür: "duty" (nöbet) ya da "exam" (sınav takvimi).
+ */
+export async function scheduleReminders(items: { at: Date; title: string; body: string; url: string }[], kind: 'duty' | 'exam' = 'duty') {
   if (Platform.OS === 'web') return;
   const perm = await Notifications.getPermissionsAsync();
   if (!perm.granted) return;
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   await Promise.all(
-    scheduled.filter((n) => (n.content.data as { kind?: string } | undefined)?.kind === 'duty').map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
+    scheduled.filter((n) => (n.content.data as { kind?: string } | undefined)?.kind === kind).map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
   );
   for (const item of items) {
     if (item.at.getTime() <= Date.now()) continue;
     await Notifications.scheduleNotificationAsync({
-      content: { title: item.title, body: item.body, data: { kind: 'duty', url: item.url } },
+      content: { title: item.title, body: item.body, data: { kind, url: item.url } },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: item.at },
     });
   }

@@ -20,6 +20,7 @@ const Audit = page(() => import('./pages/Audit.tsx'), 'Audit');
 const BellSchedules = page(() => import('./pages/BellSchedules.tsx'), 'BellSchedules');
 const Duties = page(() => import('./pages/Duties.tsx'), 'Duties');
 const Exams = page(() => import('./pages/Exams.tsx'), 'Exams');
+const ExamSchedule = page(() => import('./pages/ExamSchedule.tsx'), 'ExamSchedule');
 const Achievements = page(() => import('./pages/SchoolLife.tsx'), 'Achievements');
 const Events = page(() => import('./pages/SchoolLife.tsx'), 'Events');
 const Books = page(() => import('./pages/SchoolLife.tsx'), 'Books');
@@ -104,6 +105,7 @@ export function App() {
         <Route path="duyurular" element={needsSchool(<Guard permission="announcements.manage"><Announcements /></Guard>)} />
         <Route path="kayan-yazi" element={needsSchool(<Guard permission="ticker.manage"><Ticker /></Guard>)} />
         <Route path="sinavlar" element={needsSchool(<Guard permission="exams.manage"><Exams /></Guard>)} />
+        <Route path="sinav-takvimi" element={needsSchool(<ExamSchedule />)} />
         <Route path="basarilar" element={needsSchool(<Guard permission="highlights.manage"><Achievements /></Guard>)} />
         <Route path="etkinlikler" element={needsSchool(<Guard permission="highlights.manage"><Events /></Guard>)} />
         <Route path="haftanin-kitabi" element={needsSchool(<Guard permission="highlights.manage"><Books /></Guard>)} />

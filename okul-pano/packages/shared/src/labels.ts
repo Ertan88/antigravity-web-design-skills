@@ -9,6 +9,7 @@ export const LABELS = {
   supervisor: { default: 'Nöbetçi Müdür Yardımcısı', where: 'Panel: Nöbet Çizelgesi sekmesi · Pano: nöbet kartı' },
   transport: { default: 'Taşıma ve Öğle Yemeği Nöbetçileri', where: 'Panel: Nöbet Çizelgesi sekmesi · Pano: nöbet kartı' },
   exams: { default: 'Sınav Sayacı', where: 'Pano: sınav kartı' },
+  todayExams: { default: 'Bugünkü Sınavlar', where: 'Pano: bugünkü sınavlar kartı (Sınav Takvimi)' },
   leaves: { default: 'İzinli Öğretmenler', where: 'Pano: izinliler kartı' },
   birthdays: { default: 'İyi ki doğdun!', where: 'Pano: doğum günü kartı' },
   bell: { default: 'Zil Vakti', where: 'Pano: zil kartı' },

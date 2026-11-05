@@ -1,6 +1,7 @@
 import { lunchIndex, type Period } from '@okulpano/shared/bell';
 import { useEffect, useState } from 'react';
-import { useMeToday, useMyDuties } from './data.ts';
+import { examReminderText, examRoles } from '@okulpano/shared/examCore';
+import { useExamSchedule, useMeToday, useMyDuties } from './data.ts';
 import { scheduleReminders } from './push.ts';
 import type { MeToday, MyDuties } from './data.ts';
 import { dayBellPeriods } from './day.ts';
@@ -159,4 +160,30 @@ export function useDutyReminders(enabled: boolean) {
     if (!enabled || !me.data?.teacher || !duties.data || !settings) return;
     void scheduleReminders(buildReminders(me.data, duties.data, settings)).catch(() => undefined);
   }, [enabled, me.data, duties.data, settings]);
+}
+
+/**
+ * Sınav hatırlatmaları: öğretmenin gözetmen ya da dersin öğretmeni olduğu sınavlar için, sınavdan önceki
+ * teneffüsün başında (1. derste ilk zilden 15 dk önce). Zaman sunucuda o sınıfın zilinden hesaplanır;
+ * takvim ya da zil değişince uygulama açıldığında yeniden kurulur.
+ */
+export function useExamReminders(enabled: boolean) {
+  const me = useMeToday();
+  const exams = useExamSchedule();
+  useEffect(() => {
+    const teacherId = me.data?.teacher?.id;
+    if (!enabled || !teacherId || !exams.data) return;
+    const now = Date.now();
+    const items = exams.data.exams
+      .flatMap((e) => {
+        const roles = examRoles(e, teacherId);
+        if (!e.notifyAt || (!roles.proctor && !roles.subject)) return [];
+        const at = new Date(e.notifyAt);
+        if (at.getTime() <= now || at.getTime() > now + 21 * 86400_000) return [];
+        return [{ at, ...examReminderText(e, roles), url: '/sinav-takvimi' }];
+      })
+      .sort((a, b) => a.at.getTime() - b.at.getTime())
+      .slice(0, 30);
+    void scheduleReminders(items, 'exam').catch(() => undefined);
+  }, [enabled, me.data, exams.data]);
 }

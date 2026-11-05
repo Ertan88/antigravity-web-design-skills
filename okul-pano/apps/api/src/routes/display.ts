@@ -44,6 +44,7 @@ import { getWeather } from '../lib/weather.ts';
 import { addDays, holidaysAndHalfDays } from '../lib/dayinfo.ts';
 import { DEVICE_TOKEN_PREFIX } from './screens.ts';
 import { noteScreenSeen, noticeScreenPaired } from '../lib/screenSecurity.ts';
+import { listExams } from '../lib/examSchedule.ts';
 
 const PAIRING_TTL_MS = 10 * 60 * 1000;
 /** Sunucu her başlatıldığında (güncelleme yayınlanınca) değişir; panolar bunu görünce kendini yeniler */
@@ -257,6 +258,9 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
   // Arife günleri yarım gündür (sabah ders var): tatil sayılmaz, ayrı listede gider
   const holidays = new Map(holidayRows.holidays.map((h) => [h.date, h.name] as const));
 
+  // Sınav takvimi: bugün ve yarın (pano gece yarısından sonra da doğru günü gösterir)
+  const scheduled = await listExams(db, school, today, addDays(today, 1));
+
   return {
     serverTime: now.toISOString(),
     appVersion: APP_VERSION,
@@ -274,6 +278,7 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
     display: resolveScreenDisplay(auth.screen?.display),
     emergency: school.emergency ? { type: school.emergency.type, message: school.emergency.message, sound: school.emergency.sound, startedAt: school.emergency.startedAt } : null,
     exams: examRows.map((e) => ({ ...e, examAt: e.examAt.toISOString() })),
+    scheduledExams: scheduled.map((e) => ({ id: e.id, date: e.date, periodNo: e.periodNo, classId: e.classGroupId, className: e.className, subject: e.subject, kind: e.kind, start: e.start, end: e.end })),
     duties: dutyRows,
     dutySupervisors: supervisorRows,
     holidays: holidayRows.holidays,

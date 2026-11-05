@@ -52,6 +52,7 @@ type Tile = { icon: IconName; tone: TileTone };
 /** Menü simgeleri renkli kutuda: önce başlığa, yoksa simge adına göre (her rolün menüsü kendi maddelerini gösterir) */
 const TILE_BY_TITLE: Record<string, Tile> = {
   'Ders programım': { icon: 'time-outline', tone: 'sky' },
+  'Sınav takvimi': { icon: 'clipboard-check', tone: 'rose' },
   'Nöbet hatırlatmaları': { icon: 'alarm', tone: 'peach' },
   'Nöbetlerim': { icon: 'shield-checkmark-outline', tone: 'peach' },
   'İzinlerim': { icon: 'calendar-user', tone: 'mint' },
@@ -251,6 +252,7 @@ export default function Menu() {
             ]
           : []),
         { title: 'Tatil takvimi', subtitle: 'MEB takvimi, bayramlar, köprü günleri', icon: 'sunny-outline', to: '/tatiller' },
+        { title: 'Sınav takvimi', subtitle: 'Sınıfların yazılı ve ortak sınavları', icon: 'clipboard-check', to: '/sinav-takvimi' },
         { title: 'Etkinlik geçmişi', subtitle: 'Kim ne zaman neyi değiştirdi', icon: 'time-outline', tone: 'muted', to: '/gecmis' },
       ],
     });
@@ -292,6 +294,7 @@ export default function Menu() {
       title: 'Öğretmen araçlarım',
       items: [
         { title: 'Ders programım', subtitle: 'Haftalık ders programı', icon: 'time-outline', to: '/programim' },
+        { title: 'Sınav takvimi', subtitle: 'Gözetmen olduğunuz ve dersinizin sınavları', icon: 'clipboard-check', to: '/sinav-takvimi' },
         { title: 'Nöbet hatırlatmaları', subtitle: reminderSummary(reminders), icon: 'notifications-outline', to: '/hatirlatmalar' },
         // Öğretmen görünümünde Gözlem alt menüde; duyurular ana sayfadaki kısayoldan okunur
         ...(role === 'teacher' ? [] : [{ title: 'Gözlem', subtitle: 'Öğrencilere artı / eksi, öğrenci kartları', icon: 'clipboard-outline' as IconName, to: '/gozlem' }]),

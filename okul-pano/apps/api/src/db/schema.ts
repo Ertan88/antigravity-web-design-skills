@@ -483,6 +483,31 @@ export const exams = pgTable(
   (t) => [index('exams_school_idx').on(t.schoolId)],
 );
 
+/**
+ * Sınav takvimi: sınıfın o gün o ders saatindeki yazılı / uygulama / ortak sınavı. Saat tutulmaz; o günkü
+ * zilden hesaplanır. Gözetmen boşsa ders programından (o saatte o sınıfta dersi olan) bulunur.
+ */
+export const examSchedule = pgTable(
+  'exam_schedule',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    date: date('date', { mode: 'string' }).notNull(),
+    periodNo: integer('period_no').notNull(),
+    classGroupId: uuid('class_group_id')
+      .notNull()
+      .references(() => classGroups.id, { onDelete: 'cascade' }),
+    subject: text('subject').notNull(),
+    kind: text('kind').$type<'written' | 'practical' | 'common'>().notNull().default('written'),
+    proctorTeacherId: uuid('proctor_teacher_id').references(() => teachers.id, { onDelete: 'set null' }),
+    note: text('note'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex('exam_schedule_slot_uq').on(t.schoolId, t.date, t.periodNo, t.classGroupId), index('exam_schedule_date_idx').on(t.schoolId, t.date)],
+);
+
 /** Başarılar ve ayın öğrencisi */
 export const achievements = pgTable(
   'achievements',

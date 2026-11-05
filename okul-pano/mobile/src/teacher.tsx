@@ -2,7 +2,8 @@ import { router } from 'expo-router';
 import { Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Text } from './text.tsx';
 import { membershipLabel, useAuth } from './auth.tsx';
-import { useEvents, useExams, useInbox, useMeToday, useNow, useUpcomingHolidays, type MeToday } from './data.ts';
+import { useEvents, useExamSchedule, useExams, useInbox, useMeToday, useNow, useUpcomingHolidays, type MeToday } from './data.ts';
+import { examRoles } from '@okulpano/shared/examCore';
 import { classLabel, clock, dative, dayTitle, localIso, teacherDay } from './day.ts';
 import { colors, tiles, type TileTone } from './theme.ts';
 import { LiveLesson } from './lesson.tsx';
@@ -102,6 +103,7 @@ export function TeacherHome() {
           ) : !day.holiday ? (
             <DutyTile data={today.data} />
           ) : null}
+          {!day.holiday && <ExamTodayCard teacherId={today.data.teacher?.id ?? null} />}
           {!day.holiday && <ObserveCard className={day.lessons.find((l) => l.state === 'now')?.className} />}
           <SectionTitle>Hızlı işlemler</SectionTitle>
           <QuickGrid items={quick} />
@@ -109,6 +111,41 @@ export function TeacherHome() {
         </>
       )}
     </Screen>
+  );
+}
+
+/** Sınav günü: öğretmenin gözetmen olduğu ya da dersinin bugünkü sınavları (bitmemiş olanlar) */
+function ExamTodayCard({ teacherId }: { teacherId: string | null }) {
+  const q = useExamSchedule();
+  const now = useNow(30_000);
+  if (!teacherId || !q.data) return null;
+  const clockNow = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const mine = q.data.exams.filter((e) => {
+    const r = examRoles(e, teacherId);
+    return e.date === q.data.today && (r.proctor || r.subject) && !(e.end && e.end <= clockNow);
+  });
+  if (!mine.length) return null;
+  const first = mine[0]!;
+  const r = examRoles(first, teacherId);
+  const role = r.proctor ? 'gözetmen sizsiniz' : 'dersinizin sınavı';
+  const t = tiles.sun;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => router.push('/sinav-takvimi')}
+      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 22, backgroundColor: t.bg, opacity: pressed ? 0.85 : 1 })}
+    >
+      <View style={{ width: 40, height: 40, borderRadius: 13, backgroundColor: t.chip, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name="clipboard-check" size={21} color={t.fg} />
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={{ fontSize: 15, fontWeight: '800', color: t.fg }}>{mine.length === 1 ? 'Bugün sınavınız var' : `Bugün ${mine.length} sınavınız var`}</Text>
+        <Text style={{ fontSize: 12.5, color: t.sub, marginTop: 1 }} numberOfLines={2}>
+          {first.className} {first.subject} · {first.periodNo}. ders{first.start ? ` · ${first.start}` : ''} · {role}
+        </Text>
+      </View>
+      <Icon name="chevron-forward" size={18} color={t.fg} />
+    </Pressable>
   );
 }
 

@@ -36,7 +36,7 @@ describe('pano düzeni', () => {
     const { screen, token } = created.json() as { screen: { id: string }; token: string };
 
     // Varsayılan
-    expect((await state(token)).layout).toEqual({ left: ['exams', 'duties', 'leaves', 'birthdays'], right: ['bell', 'lessons'] });
+    expect((await state(token)).layout).toEqual({ left: ['exams', 'duties', 'leaves', 'birthdays'], right: ['bell', 'lessons', 'todayExams'] });
 
     // Eski ayar: doğum günleri gizli -> düzende yok
     expectStatus(await owner.patch(`/api/schools/${schoolId}`, { settings: { showBirthdays: false } }), 200);

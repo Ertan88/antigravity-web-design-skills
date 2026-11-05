@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { useDutyReminders } from '../../src/reminders.ts';
+import { useDutyReminders, useExamReminders } from '../../src/reminders.ts';
 import { fontFor, Text } from '../../src/text.tsx';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth, type AppRole } from '../../src/auth.tsx';
@@ -53,6 +53,7 @@ export default function TabsLayout() {
   const { role, can, isManager, isTeacher } = useAuth();
   // Nöbet hatırlatmaları: öğretmen kaydı olan herkesin telefonunda kurulur
   useDutyReminders(isTeacher);
+  useExamReminders(isTeacher);
   // Telefonun alt sistem çubuğu (üç düğmeli gezinme) menünün üstüne binmesin
   const insets = useSafeAreaInsets();
   const center = useControlCenter(isManager && role !== 'platform');

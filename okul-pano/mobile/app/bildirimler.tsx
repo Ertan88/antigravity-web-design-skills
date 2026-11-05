@@ -35,6 +35,8 @@ const ICONS: Record<string, { icon: IconName; tone: 'primary' | 'warning' | 'dan
   'support-expired': { icon: 'lock-closed-outline', tone: 'muted' },
   'meb-calendar': { icon: 'calendar-outline', tone: 'primary' },
   internship: { icon: 'business-outline', tone: 'warning' },
+  exam: { icon: 'clipboard-check', tone: 'primary' },
+  'screen-security': { icon: 'shield-outline', tone: 'warning' },
 };
 const FALLBACK = { icon: 'notifications-outline' as IconName, tone: 'muted' as const };
 

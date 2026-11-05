@@ -10,7 +10,7 @@ export const PERMISSIONS = {
   'board.control': 'Panoları uzaktan yönetme',
   'highlights.manage': 'Başarılar, etkinlikler, haftanın kitabı',
   'ticker.manage': 'Kayan yazı',
-  'exams.manage': 'Sınav sayacı',
+  'exams.manage': 'Sınav sayacı ve sınav takvimi',
   'duties.manage': 'Nöbet çizelgesi',
   'leaves.manage': 'İzinli öğretmenler',
   'students.manage': 'Öğrenciler ve doğum günleri',

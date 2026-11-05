@@ -2,7 +2,7 @@
  * Pano düzeni: orta alan (duyurular) sabittir; sol ve sağ sütundaki kartların yeri ve sırası
  * okul genelinde ya da her pano için ayrı ayarlanır. Listede olmayan kart panoda gösterilmez.
  */
-export const BOARD_MODULES = ['exams', 'duties', 'leaves', 'birthdays', 'bell', 'lessons', 'achievements', 'events', 'book'] as const;
+export const BOARD_MODULES = ['exams', 'duties', 'leaves', 'birthdays', 'bell', 'lessons', 'todayExams', 'achievements', 'events', 'book'] as const;
 export type BoardModule = (typeof BOARD_MODULES)[number];
 
 /**
@@ -28,12 +28,13 @@ export const MODULE_LABELS: Record<BoardModule, string> = {
   birthdays: 'Doğum günleri',
   bell: 'Zil vakti',
   lessons: 'Şu an derste',
+  todayExams: 'Bugünkü sınavlar',
   achievements: 'Başarılar / ayın öğrencisi',
   events: 'Etkinlik takvimi',
   book: 'Haftanın kitabı',
 };
 
-export const DEFAULT_LAYOUT: BoardLayout = { left: ['exams', 'duties', 'leaves', 'birthdays'], right: ['bell', 'lessons'] };
+export const DEFAULT_LAYOUT: BoardLayout = { left: ['exams', 'duties', 'leaves', 'birthdays'], right: ['bell', 'lessons', 'todayExams'] };
 
 /** Tekrarlananları ve bilinmeyenleri ayıklar; tek kartı kalan birleşik kart düz karta döner */
 export function cleanLayout(layout: BoardLayout): BoardLayout {

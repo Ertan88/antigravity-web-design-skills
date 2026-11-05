@@ -2,7 +2,7 @@ import { formatDuration, gradeHue, periodLabel, type BellStatus, type DisplaySta
 import type { CSSProperties } from 'react';
 import { AutoPager } from './AutoPager.tsx';
 import { useLabel } from './Labels.tsx';
-import { BellIcon, BellWatermarkIcon, BookIcon, CoffeeIcon, UtensilsIcon } from './Icons.tsx';
+import { BellIcon, BellWatermarkIcon, BookIcon, ClipboardIcon, CoffeeIcon, UtensilsIcon } from './Icons.tsx';
 
 /** Zil kartının gün bilgisi: tatil, arife (yarım gün) ve sonraki ders günü */
 export interface BellDayContext {
@@ -128,10 +128,13 @@ export function LessonsCard({
   entries,
   heading,
   periodTitle,
+  examSlots,
 }: {
   entries: DisplayState['timetable'];
   heading: string;
   periodTitle: string;
+  /** Sınavı olan sınıf + ders saatleri ("<sınıf id>|<ders no>"): satırda SINAV etiketi */
+  examSlots?: ReadonlySet<string>;
 }) {
   return (
     <section className="card list-card lessons-card">
@@ -153,8 +156,46 @@ export function LessonsCard({
               <span className="lesson-subject">{e.subject}</span>
               {e.teacherName && <span className="lesson-teacher">{e.teacherName}</span>}
             </span>
+            {e.classId && examSlots?.has(`${e.classId}|${e.periodNo}`) && <span className="exam-badge">Sınav</span>}
           </div>
         )}
+      />
+    </section>
+  );
+}
+
+type ScheduledExam = NonNullable<DisplayState['scheduledExams']>[number];
+const EXAM_KIND_LABEL: Record<ScheduledExam['kind'], string> = { written: 'Yazılı', practical: 'Uygulama', common: 'Ortak' };
+
+/** Bugünkü sınavlar: bitmemiş olanlar ders saati sırasıyla; saati gelen sınav vurgulanır (ŞİMDİ) */
+export function TodayExamsCard({ exams, nowClock }: { exams: ScheduledExam[]; nowClock: string }) {
+  return (
+    <section className="card list-card today-exams-card">
+      <div className="card-label">
+        <ClipboardIcon size={22} /> {useLabel('todayExams')}
+        <span className="card-label-aside">{exams.length} sınav</span>
+      </div>
+      <AutoPager
+        items={exams}
+        rowHeight={88}
+        intervalMs={8000}
+        keyOf={(e) => e.id}
+        empty="Bugün sınav yok"
+        render={(e) => {
+          const now = Boolean(e.start && e.end && e.start <= nowClock && nowClock < e.end);
+          return (
+            <div className={`lesson-row${now ? ' exam-now' : ''}`}>
+              <ClassBadge name={e.className} />
+              <span className="lesson-info">
+                <span className="lesson-subject">{e.subject}</span>
+                <span className="lesson-teacher">
+                  {e.periodNo}. ders{e.start ? ` · ${e.start}` : ''} · {EXAM_KIND_LABEL[e.kind]}
+                </span>
+              </span>
+              {now && <span className="exam-badge">Şimdi</span>}
+            </div>
+          );
+        }}
       />
     </section>
   );
