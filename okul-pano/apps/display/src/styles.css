@@ -3227,3 +3227,51 @@ p {
   outline: 2px solid #fbbf24;
   background: color-mix(in srgb, #fbbf24 16%, transparent);
 }
+
+/* ---------- 10 Kasım: üst barda yas kurdelesi ve yazı (zemindeki bayrak değişmez) ---------- */
+.special-mark-header.special-mark-ataturk {
+  width: auto;
+  height: auto;
+  transform: translate(-50%, -50%);
+  opacity: 1;
+  filter: none;
+}
+
+.mourning-mark {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.mourning-ribbon {
+  width: 56px !important;
+  height: 78px !important;
+  flex: none;
+  /* Koyu zeminde siluetin yalnızca dış hattı aydınlanır (iç kesişimlerde çizgi olmaz) */
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 1px rgba(255, 255, 255, 0.6)) drop-shadow(0 0 10px rgba(255, 255, 255, 0.25));
+}
+
+.theme-light .mourning-ribbon {
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.25));
+}
+
+.mourning-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--text, #e2e8f0);
+}
+
+.mourning-text strong {
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.mourning-text span {
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0.72;
+}

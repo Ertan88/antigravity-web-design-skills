@@ -2,6 +2,7 @@ import { IconFlower, IconSchool, IconSnowflake } from '@tabler/icons-react';
 /**
  * Özel gün filigranları: millî bayramlarda ve 10 Kasım'da Türk bayrağı, dini bayramlarda hilal ve
  * yıldızlar, Öğretmenler Günü'nde kep, yeni yılda kar tanesi. Üst barın ortasında ve zeminde silik durur.
+ * 10 Kasım'da üst barda bayrak yerine siyah yas kurdelesi ve "10 Kasım · Saygıyla anıyoruz" yazısı; zeminde bayrak kalır.
  */
 
 /** Türk bayrağı: TS 2001 / 2893 sayılı kanundaki oranlar (en 1,5 × boy) */
@@ -51,8 +52,48 @@ const MARKS: Record<string, () => React.JSX.Element> = {
   newyear: Snowflake,
 };
 
+/**
+ * 10 Kasım yas kurdelesi: tek parça siluet (kenar çizgisi yok; kesişen kollarda iç çizgi oluşmaz). Koyu temada
+ * görünür olsun diye dış hattına CSS ile ince açık bir ışık verilir.
+ */
+function MourningRibbon() {
+  return (
+    <svg className="mourning-ribbon" viewBox="0 0 100 140" aria-hidden="true">
+      <defs>
+        <linearGradient id="mourning-ribbon-fill" x1="0" x2="1" y1="0" y2="0">
+          <stop offset="0" stopColor="#2b2b2b" />
+          <stop offset="0.5" stopColor="#050505" />
+          <stop offset="1" stopColor="#1f1f1f" />
+        </linearGradient>
+      </defs>
+      <path
+        fill="url(#mourning-ribbon-fill)"
+        d="M50 6C29 6 20 27 29 49L57 132L72 120L45 53C39 37 43 24 50 24C57 24 61 37 55 53L28 120L43 132L71 49C80 27 71 6 50 6Z"
+      />
+    </svg>
+  );
+}
+
+/** Üst barda 10 Kasım: kurdele ve yanında "10 Kasım · Saygıyla anıyoruz" */
+function AtaturkHeader() {
+  return (
+    <div className="mourning-mark">
+      <MourningRibbon />
+      <div className="mourning-text">
+        <strong>10 Kasım</strong>
+        <span>Saygıyla anıyoruz</span>
+      </div>
+    </div>
+  );
+}
+
+/** Üst bardaki işaret zemindekinden farklı olabilir (10 Kasım: üstte kurdele, zeminde bayrak) */
+const HEADER_MARKS: Record<string, () => React.JSX.Element> = {
+  ataturk: AtaturkHeader,
+};
+
 export function SpecialMark({ id, className }: { id: string; className: string }) {
-  const Mark = MARKS[id];
+  const Mark = (className.includes('header') ? HEADER_MARKS[id] : undefined) ?? MARKS[id];
   if (!Mark) return null;
   return (
     <div className={`special-mark special-mark-${id} ${className}`}>
