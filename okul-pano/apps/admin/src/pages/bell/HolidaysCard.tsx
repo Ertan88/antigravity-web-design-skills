@@ -1,7 +1,7 @@
 import { academicYearOf, semesterBreak, type AcademicCalendarData } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { CalendarDays, CalendarPlus, GraduationCap, Plus, Sunset, Trash2 } from 'lucide-react';
+import { CalendarDays, CalendarPlus, GraduationCap, Plus, Sunset, Trash2 } from '../../components/icons.tsx';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useToast } from '../../components/Toast.tsx';

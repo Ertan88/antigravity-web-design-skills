@@ -1,7 +1,7 @@
 import { isHalfDayHoliday } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Scale } from 'lucide-react';
+import { Scale } from '../../components/icons.tsx';
 import { useEffect, useState } from 'react';
 import { useToast } from '../../components/Toast.tsx';
 import { Alert, Badge, Button, Card, Modal, Select } from '../../components/ui.tsx';

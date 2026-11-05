@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Clock, ExternalLink, RotateCcw } from 'lucide-react';
+import { Clock, ExternalLink, RotateCcw } from './icons.tsx';
 import clsx from 'clsx';
 import { useState } from 'react';
 import { api } from '../lib/api.ts';

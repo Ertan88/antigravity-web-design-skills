@@ -23,7 +23,7 @@ import {
 } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { BellRing, Check, ChevronDown, Coffee, CopyPlus, Minus, Pencil, Plus, Trash2, Utensils, Wand2 } from 'lucide-react';
+import { BellRing, Check, ChevronDown, Coffee, CopyPlus, Minus, Pencil, Plus, Trash2, Utensils, Wand2 } from '../components/icons.tsx';
 import { useMemo, useState } from 'react';
 import { Alert, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Spinner } from '../components/ui.tsx';
 import { useToast } from '../components/Toast.tsx';

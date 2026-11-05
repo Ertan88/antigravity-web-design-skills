@@ -1,6 +1,6 @@
 import { SCHOOL_TYPES } from '@okulpano/shared';
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircle2, MailCheck } from 'lucide-react';
+import { CheckCircle2, MailCheck } from '../components/icons.tsx';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { BrandMark, BrandName } from '../components/Brand.tsx';

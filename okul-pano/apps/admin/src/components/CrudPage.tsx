@@ -1,6 +1,6 @@
 import type { Permission } from '@okulpano/shared';
 import clsx from 'clsx';
-import { ArrowDown, ArrowUp, Pencil, Plus, Search } from 'lucide-react';
+import { ArrowDown, ArrowUp, Pencil, Plus, Search } from './icons.tsx';
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { ZodType } from 'zod';

@@ -1,5 +1,5 @@
 import { countdown, examSchema } from '@okulpano/shared';
-import { GraduationCap } from 'lucide-react';
+import { GraduationCap } from '../components/icons.tsx';
 import { CrudPage } from '../components/CrudPage.tsx';
 import { Badge, Field, Input, Toggle } from '../components/ui.tsx';
 import type { Exam } from '../lib/data.ts';

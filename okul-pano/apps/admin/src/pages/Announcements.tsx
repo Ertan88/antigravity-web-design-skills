@@ -1,5 +1,5 @@
 import { announcementSchema, designTemplate, designTitle, parseYouTubeUrl, youTubeThumbnail, type AnnouncementDesign } from '@okulpano/shared';
-import { Image as ImageIcon, LayoutTemplate, Megaphone, PlayCircle, ScanEye, Type } from 'lucide-react';
+import { Image as ImageIcon, LayoutTemplate, Megaphone, PlayCircle, ScanEye, Type } from '../components/icons.tsx';
 import { useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
 import { CrudPage } from '../components/CrudPage.tsx';

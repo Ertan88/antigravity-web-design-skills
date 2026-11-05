@@ -25,7 +25,7 @@ import {
   Trash2,
   Undo2,
   Users,
-} from "lucide-react";
+} from '../components/icons.tsx';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useToast } from "../components/Toast.tsx";

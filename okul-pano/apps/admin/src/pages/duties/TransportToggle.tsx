@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bus } from 'lucide-react';
+import { Bus } from '../../components/icons.tsx';
 import { useToast } from '../../components/Toast.tsx';
 import { Button, Toggle } from '../../components/ui.tsx';
 import { api } from '../../lib/api.ts';

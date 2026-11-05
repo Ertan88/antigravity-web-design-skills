@@ -1,7 +1,7 @@
 import { ADMIN_ONLY_PERMISSIONS, createMemberSchema, normalizeName, PERMISSION_KEYS, PERMISSIONS, updateMemberSchema, type Permission, type Role } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { KeyRound, Pencil, Plus, Send, UserCog } from 'lucide-react';
+import { KeyRound, Pencil, Plus, Send, UserCog } from '../components/icons.tsx';
 import { useState } from 'react';
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Select, Spinner, Table, Td } from '../components/ui.tsx';

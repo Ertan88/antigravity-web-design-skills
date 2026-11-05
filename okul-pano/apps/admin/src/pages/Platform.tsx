@@ -1,9 +1,10 @@
 import { createSchoolSchema, PLANS, trialStatus, type Plan } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Building2, Check, Download, Inbox, Lock, Plus, Trash2 } from 'lucide-react';
+import { Building2, Check, Download, Inbox, Lock, Plus, Trash2 } from '../components/icons.tsx';
 import { useState } from 'react';
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Badge, Button, Card, EmptyState, Field, IconButton, Input, Modal, PageHeader, Select, Spinner, Table, Td, Toggle } from '../components/ui.tsx';
+import { closeSubscription, confirm } from '../components/confirm.tsx';
 import { downloadJson } from '../lib/download.ts';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
@@ -237,10 +238,10 @@ export function Platform() {
                   {/* Abonelik: kapatmak onay ister (yanlışlıkla tıklanmasın); veriler silinmez */}
                   <Toggle
                     checked={s.isActive}
-                    onChange={(x) =>
-                      (x || window.confirm(`${s.name} aboneliği kapatılsın mı?\n\nPanolar ve panel girişi durur. Veriler silinmez; abonelik yeniden başlatılınca kaldığı yerden devam eder.`)) &&
-                      patch.mutate({ id: s.id, body: { isActive: x } })
-                    }
+                    onChange={async (x) => {
+                      if (!x && !(await confirm(closeSubscription(s.name)))) return;
+                      patch.mutate({ id: s.id, body: { isActive: x } });
+                    }}
                   />
                 </Td>
                 <Td className="w-px">

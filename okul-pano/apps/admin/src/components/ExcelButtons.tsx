@@ -1,4 +1,4 @@
-import { FileDown, FileSpreadsheet, Upload } from 'lucide-react';
+import { FileDown, FileSpreadsheet, Upload } from './icons.tsx';
 import { useRef, useState, type ReactNode } from 'react';
 import { downloadFile, excelFileName } from '../lib/api.ts';
 import { useSchool } from '../lib/data.ts';

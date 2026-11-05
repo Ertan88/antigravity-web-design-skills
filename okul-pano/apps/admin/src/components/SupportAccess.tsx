@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { LifeBuoy, ShieldCheck } from 'lucide-react';
+import { LifeBuoy, ShieldCheck } from './icons.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useSchool, useSchoolPath, type School } from '../lib/data.ts';

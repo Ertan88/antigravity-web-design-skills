@@ -22,7 +22,7 @@ import {
   Trophy,
   UserMinus,
   type LucideIcon,
-} from 'lucide-react';
+} from './icons.tsx';
 import { useState, type ReactNode } from 'react';
 
 const ICONS: Record<BoardModule, LucideIcon> = {

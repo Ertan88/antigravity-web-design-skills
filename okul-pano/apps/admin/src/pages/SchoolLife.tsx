@@ -1,5 +1,5 @@
 import { achievementDesign, achievementSchema, bookSchema, schoolEventSchema } from '@okulpano/shared';
-import { CalendarDays, Library, Trophy } from 'lucide-react';
+import { CalendarDays, Library, Trophy } from '../components/icons.tsx';
 import { CrudPage } from '../components/CrudPage.tsx';
 import { ImageUpload } from '../components/ImageUpload.tsx';
 import { Badge, Field, Input, MonthPicker, Segmented, Textarea, Toggle } from '../components/ui.tsx';

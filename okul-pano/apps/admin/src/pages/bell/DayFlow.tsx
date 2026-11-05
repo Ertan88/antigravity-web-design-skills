@@ -16,7 +16,7 @@ import {
   type Period,
 } from '@okulpano/shared';
 import clsx from 'clsx';
-import { BellRing, CalendarOff, Coffee, FastForward, Flag, Hand, Scissors, Sunrise, Sunset, Undo2, Utensils, Zap } from 'lucide-react';
+import { BellRing, CalendarOff, Coffee, FastForward, Flag, Hand, Scissors, Sunrise, Sunset, Undo2, Utensils, Zap } from '../../components/icons.tsx';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Input, Select, Toggle } from '../../components/ui.tsx';

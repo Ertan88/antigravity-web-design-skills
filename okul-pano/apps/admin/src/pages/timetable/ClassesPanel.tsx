@@ -1,7 +1,7 @@
 import { compareClassNames, gradeHue, gradeOf, normalizeClassName } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Check, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Check, Pencil, Plus, Trash2, X } from '../../components/icons.tsx';
 import { useState, type CSSProperties } from 'react';
 import { useToast } from '../../components/Toast.tsx';
 import { Card } from '../../components/ui.tsx';

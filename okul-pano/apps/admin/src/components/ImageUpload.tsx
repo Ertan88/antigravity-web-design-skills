@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { ImagePlus, Loader2, X } from 'lucide-react';
+import { ImagePlus, Loader2, X } from './icons.tsx';
 import { useRef, useState } from 'react';
 import { uploadImage } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';

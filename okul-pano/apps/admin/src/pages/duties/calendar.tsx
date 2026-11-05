@@ -1,7 +1,7 @@
 import { holidayFullName, isHalfDayHoliday, WEEKDAY_NAMES, WEEKDAY_SHORT } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Check, Eraser, Loader2 } from 'lucide-react';
+import { Check, Eraser, Loader2 } from '../../components/icons.tsx';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useToast } from '../../components/Toast.tsx';
 import { MonthPicker } from '../../components/ui.tsx';

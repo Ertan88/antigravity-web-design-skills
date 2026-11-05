@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { AlertTriangle, FileSpreadsheet, Loader2, UserPlus } from 'lucide-react';
+import { AlertTriangle, FileSpreadsheet, Loader2, UserPlus } from './icons.tsx';
 import { useEffect, useState, type ReactNode } from 'react';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';

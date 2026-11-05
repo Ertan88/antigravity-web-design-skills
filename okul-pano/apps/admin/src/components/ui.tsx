@@ -1,6 +1,6 @@
 import { WEEKDAY_SHORT } from '@okulpano/shared';
 import clsx from 'clsx';
-import { AlertTriangle, Check, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, Loader2, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, Loader2, Trash2, X } from './icons.tsx';
 import {
   Children,
   Fragment,
@@ -23,6 +23,7 @@ import {
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 import { findNav } from '../lib/nav.ts';
+import { confirm } from './confirm.tsx';
 
 /* ---------- Düğmeler ---------- */
 
@@ -610,103 +611,51 @@ export function Modal({
   );
 }
 
-/** Tek tıkla silmeyi önleyen iki aşamalı sil düğmesi */
 /**
- * Silme: çöp kutusuna basınca hemen yanında küçük bir onay kutusu açılır ("Silinsin mi?" · Vazgeç · Sil).
- * Kendiliğinden kapanmaz; Vazgeç, Esc ya da dışarı tıklamak kapatır. Kutu sayfanın üstünde açılır,
- * tablo kenarlarında kesilmez.
+ * Silme düğmesi: çöp kutusuna basınca ortak onay penceresi açılır ("… silinsin mi?" · Vazgeç · Sil).
+ * `hold` verilirse silmek için onay düğmesine basılı tutmak gerekir.
  */
 export function DeleteButton({
   onConfirm,
   label = 'Sil',
   disabled,
   what,
+  message,
+  hold,
   className,
 }: {
   onConfirm: () => void;
   label?: string;
   disabled?: boolean;
   className?: string;
-  /** Onay kutusunda ne silineceği (ör. "Bu duyuru") */
+  /** Onay penceresinde ne silineceği (ör. "Bu duyuru") */
   what?: string;
+  /** Silmenin sonucu (varsayılan: "Bu işlem geri alınamaz.") */
+  message?: ReactNode;
+  hold?: boolean;
 }) {
-  const [pos, setPos] = useState<{ top: number; right: number; above: boolean } | null>(null);
-  const button = useRef<HTMLButtonElement>(null);
-  const box = useRef<HTMLDivElement>(null);
-  const cancel = useRef<HTMLButtonElement>(null);
-  const open = () => {
-    const r = button.current?.getBoundingClientRect();
-    if (!r) return;
-    const above = r.bottom + 120 > window.innerHeight;
-    setPos({ top: above ? r.top - 8 : r.bottom + 8, right: Math.max(8, window.innerWidth - r.right), above });
-  };
-  useEffect(() => {
-    if (!pos) return;
-    cancel.current?.focus();
-    const close = (e: Event) => {
-      if (e.type === 'keydown' && (e as KeyboardEvent).key !== 'Escape') return;
-      if (e.type === 'pointerdown' && (box.current?.contains(e.target as Node) || button.current?.contains(e.target as Node))) return;
-      setPos(null);
-    };
-    const reset = () => setPos(null);
-    window.addEventListener('pointerdown', close, true);
-    window.addEventListener('keydown', close);
-    window.addEventListener('scroll', reset, true);
-    window.addEventListener('resize', reset);
-    return () => {
-      window.removeEventListener('pointerdown', close, true);
-      window.removeEventListener('keydown', close);
-      window.removeEventListener('scroll', reset, true);
-      window.removeEventListener('resize', reset);
-    };
-  }, [pos]);
+  const [open, setOpen] = useState(false);
   return (
-    <>
-      <IconButton
-        ref={button}
-        label={label}
-        disabled={disabled}
-        aria-expanded={Boolean(pos)}
-        className={clsx('hover:bg-red-50 hover:text-red-600', pos && 'bg-red-50 text-red-600', className)}
-        onClick={() => (pos ? setPos(null) : open())}
-      >
-        <Trash2 className="size-4" />
-      </IconButton>
-      {pos &&
-        createPortal(
-          <div
-            ref={box}
-            role="dialog"
-            aria-label="Silme onayı"
-            className="animate-toast fixed z-[60] w-60 rounded-2xl bg-surface p-3 text-left shadow-[0_12px_40px_-8px_rgba(15,23,42,0.35)] ring-1 ring-slate-200"
-            style={{ top: pos.top, right: pos.right, transform: pos.above ? 'translateY(-100%)' : undefined }}
-          >
-            <div className="text-sm font-semibold text-ink">{what ? `${what} silinsin mi?` : 'Silinsin mi?'}</div>
-            <div className="mt-0.5 text-xs text-slate-500">Bu işlem geri alınamaz.</div>
-            <div className="mt-3 flex justify-end gap-2">
-              <button
-                ref={cancel}
-                type="button"
-                onClick={() => setPos(null)}
-                className="rounded-full px-3 py-1.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
-              >
-                Vazgeç
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setPos(null);
-                  onConfirm();
-                }}
-                className="inline-flex items-center gap-1 rounded-full bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-500"
-              >
-                <Trash2 className="size-3.5" /> Sil
-              </button>
-            </div>
-          </div>,
-          document.body,
-        )}
-    </>
+    <IconButton
+      label={label}
+      disabled={disabled}
+      className={clsx('hover:bg-red-50 hover:text-red-600', open && 'bg-red-50 text-red-600', className)}
+      onClick={async () => {
+        setOpen(true);
+        const ok = await confirm({
+          title: what ? `${what} silinsin mi?` : 'Silinsin mi?',
+          message: message ?? 'Bu işlem geri alınamaz.',
+          tone: 'danger',
+          confirmLabel: 'Sil',
+          hold,
+          holdLabel: 'Silmek için basılı tutun',
+        });
+        setOpen(false);
+        if (ok) onConfirm();
+      }}
+    >
+      <Trash2 className="size-4" />
+    </IconButton>
   );
 }
 

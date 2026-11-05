@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { App } from './App.tsx';
 import { ToastProvider } from './components/Toast.tsx';
+import { ConfirmHost } from './components/confirm.tsx';
 import { ApiError } from './lib/api.ts';
 import { AuthProvider } from './lib/auth.tsx';
 import { applyTheme, currentTheme } from './lib/theme.ts';
@@ -30,6 +31,7 @@ createRoot(document.getElementById('root')!).render(
         <AuthProvider>
           <BrowserRouter basename="/admin">
             <App />
+            <ConfirmHost />
           </BrowserRouter>
         </AuthProvider>
       </ToastProvider>

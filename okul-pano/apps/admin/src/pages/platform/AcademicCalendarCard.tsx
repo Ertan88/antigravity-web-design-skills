@@ -1,6 +1,6 @@
 import { semesterBreak, summerBreak, type AcademicCalendarData } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarRange, Check, ExternalLink, Pencil, Plus, RefreshCw, Trash2, X } from 'lucide-react';
+import { CalendarRange, Check, ExternalLink, Pencil, Plus, RefreshCw, Trash2, X } from '../../components/icons.tsx';
 import { useState } from 'react';
 import { useToast } from '../../components/Toast.tsx';
 import { Alert, Badge, Button, Card, Field, IconButton, Input, Modal } from '../../components/ui.tsx';

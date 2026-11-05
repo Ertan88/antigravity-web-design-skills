@@ -3,7 +3,7 @@ import { EMERGENCY_INFO, EMERGENCY_TYPES, type EmergencyType } from '@okulpano/s
 import { startWailSiren } from '@okulpano/shared/siren';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { CloudLightning, Flame, Lock, LogOut, OctagonAlert, Siren, TriangleAlert, type LucideIcon } from 'lucide-react';
+import { CloudLightning, Flame, Lock, LogOut, OctagonAlert, Siren, TriangleAlert, type LucideIcon } from './icons.tsx';
 import { useState } from 'react';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';

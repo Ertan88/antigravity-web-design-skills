@@ -1,7 +1,7 @@
 import { compareClassNames, resolveScreenDisplay, type ScreenDisplay } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Clock, Images, LayoutDashboard, RectangleHorizontal, RectangleVertical, type LucideIcon } from 'lucide-react';
+import { Clock, Images, LayoutDashboard, RectangleHorizontal, RectangleVertical, type LucideIcon } from '../../components/icons.tsx';
 import { useEffect, useState } from 'react';
 import { BoardPreview } from '../../components/BoardPreview.tsx';
 import { useToast } from '../../components/Toast.tsx';

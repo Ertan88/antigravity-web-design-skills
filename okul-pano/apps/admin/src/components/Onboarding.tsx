@@ -1,11 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Eraser, FilePlus2, Sparkles } from 'lucide-react';
+import { Eraser, FilePlus2, Sparkles } from './icons.tsx';
 import { useState } from 'react';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useSchool, useSchoolPath, type School } from '../lib/data.ts';
 import { useToast } from './Toast.tsx';
+import { confirm } from './confirm.tsx';
 import { Button, Card, Modal } from './ui.tsx';
 
 /** Okul verisini değiştiren işlemlerden sonra bütün okul sorgularını tazeler */
@@ -99,12 +100,10 @@ export function SampleDataCard() {
   const path = useSchoolPath('sample-data/clear');
   const toast = useToast();
   const apply = useApplySchool();
-  const [confirm, setConfirm] = useState(false);
   const clear = useMutation({
     mutationFn: () => api<School>(path, { method: 'POST' }),
     onSuccess: (data) => {
       apply(data);
-      setConfirm(false);
       toast.success('Örnek veriler silindi');
     },
     onError: (e) => toast.error(e.message),
@@ -119,28 +118,23 @@ export function SampleDataCard() {
           kalır.
         </p>
       </div>
-      <Button variant="danger" icon={<Eraser className="size-4" />} onClick={() => setConfirm(true)}>
+      <Button
+        variant="danger"
+        icon={<Eraser className="size-4" />}
+        loading={clear.isPending}
+        onClick={async () => {
+          const ok = await confirm({
+            title: 'Örnek veriler silinsin mi?',
+            message: 'Örnek öğretmenlere bağlı nöbet ve ders programı kayıtları da silinir. Örnek zil çizelgesini kendinize göre düzenlediyseniz o da silinir.',
+            tone: 'danger',
+            hold: true,
+            holdLabel: 'Silmek için basılı tutun',
+          });
+          if (ok) clear.mutate();
+        }}
+      >
         Örnek verileri temizle
       </Button>
-      <Modal
-        open={confirm}
-        onClose={() => setConfirm(false)}
-        title="Örnek veriler silinsin mi?"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setConfirm(false)}>
-              Vazgeç
-            </Button>
-            <Button variant="danger" loading={clear.isPending} onClick={() => clear.mutate()}>
-              Sil
-            </Button>
-          </>
-        }
-      >
-        <p className="text-sm text-slate-600">
-          Örnek öğretmenlere bağlı nöbet ve ders programı kayıtları da silinir. Örnek zil çizelgesini kendinize göre düzenlediyseniz o da silinir.
-        </p>
-      </Modal>
     </Card>
   );
 }

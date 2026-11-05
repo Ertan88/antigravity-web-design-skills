@@ -1,6 +1,6 @@
 import { parseYouTubeUrl, youTubeThumbnail } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Check, Megaphone, Pencil, Undo2 } from 'lucide-react';
+import { Check, Megaphone, Pencil, Undo2 } from '../../components/icons.tsx';
 import { useState } from 'react';
 import { useToast } from '../../components/Toast.tsx';
 import { Button, Field, Modal, Textarea } from '../../components/ui.tsx';

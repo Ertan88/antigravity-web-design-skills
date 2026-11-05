@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { Check, Copy, KeyRound, Mail } from 'lucide-react';
+import { Check, Copy, KeyRound, Mail } from '../../components/icons.tsx';
 import { useState } from 'react';
 import { useToast } from '../../components/Toast.tsx';
 import { Alert, Button, Field, Modal, PasswordInput, Toggle } from '../../components/ui.tsx';

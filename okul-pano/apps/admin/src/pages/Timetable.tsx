@@ -1,7 +1,7 @@
 import { classLongName, compareClassNames, gradeOf, timetableEntrySchema, WEEKDAY_NAMES, WEEKDAY_SHORT, type Period } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { CalendarClock, FileUp, Pencil, Plus, Trash2, Users } from 'lucide-react';
+import { CalendarClock, FileUp, Pencil, Plus, Trash2, Users } from '../components/icons.tsx';
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useToast } from '../components/Toast.tsx';

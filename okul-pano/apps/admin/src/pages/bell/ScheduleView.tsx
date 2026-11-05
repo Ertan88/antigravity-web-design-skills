@@ -1,6 +1,6 @@
 import { computeBellStatus, halfDayPeriods, lunchIndex, parseClock, periodLabel, pickSchedule, sortPeriods, WEEKDAY_NAMES, WEEKDAY_SHORT, zonedParts, type Period } from '@okulpano/shared';
 import clsx from 'clsx';
-import { BellRing, CalendarOff, Clock, Coffee, CopyPlus, Pencil, Sunrise, Sunset, Utensils } from 'lucide-react';
+import { BellRing, CalendarOff, Clock, Coffee, CopyPlus, Pencil, Sunrise, Sunset, Utensils } from '../../components/icons.tsx';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { DeleteButton } from '../../components/ui.tsx';

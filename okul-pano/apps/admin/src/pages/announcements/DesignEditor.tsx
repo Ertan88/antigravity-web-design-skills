@@ -1,7 +1,7 @@
 import { ANNOUNCEMENT_TEMPLATES, DESIGN_PALETTE_IDS, DESIGN_PALETTES, designFields, designTemplate, type AnnouncementDesign } from '@okulpano/shared';
 import { DesignSlide } from '@okulpano/slides';
 import clsx from 'clsx';
-import { Check } from 'lucide-react';
+import { Check } from '../../components/icons.tsx';
 import { ImageUpload } from '../../components/ImageUpload.tsx';
 import { Field, Input, Textarea } from '../../components/ui.tsx';
 import { useSchool } from '../../lib/data.ts';

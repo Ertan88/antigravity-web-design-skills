@@ -15,7 +15,7 @@ import {
 } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { ArrowUpRight, Check, ClipboardCheck, Download, FileSpreadsheet, Gauge, HeartHandshake, Pencil, Plus, Star, Undo2, Users } from 'lucide-react';
+import { ArrowUpRight, Check, ClipboardCheck, Download, FileSpreadsheet, Gauge, HeartHandshake, Pencil, Plus, Star, Undo2, Users } from '../components/icons.tsx';
 import { useEffect, useState } from 'react';
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, MonthPicker, PageHeader, Segmented, Select, Spinner, Table, Td, Textarea, Toggle } from '../components/ui.tsx';

@@ -1,4 +1,4 @@
-import { CheckCircle2, XCircle } from 'lucide-react';
+import { CheckCircle2, XCircle } from './icons.tsx';
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
 interface ToastItem {

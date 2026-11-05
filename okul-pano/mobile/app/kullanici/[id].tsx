@@ -164,7 +164,7 @@ function MemberDetail({ m }: { m: Member }) {
             variant="danger"
             icon="trash-outline"
             loading={remove.isPending}
-            onPress={() => void confirm('Erişim kaldırılsın mı?', `${m.fullName} artık bu okula giriş yapamaz.`, 'Kaldır').then((ok) => ok && remove.mutate())}
+            onPress={() => void confirm({ title: 'Erişim kaldırılsın mı?', subtitle: m.fullName, message: 'Bu kişi artık bu okula giriş yapamaz.', tone: 'warning', icon: 'person-outline', confirmLabel: 'Erişimi kaldır' }).then((ok) => ok && remove.mutate())}
           >
             Okul erişimini kaldır
           </Button>

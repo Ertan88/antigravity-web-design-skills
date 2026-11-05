@@ -1,4 +1,4 @@
-import { BellRing, GraduationCap, Megaphone, MonitorSmartphone, ShieldCheck } from 'lucide-react';
+import { BellRing, GraduationCap, Megaphone, MonitorSmartphone, ShieldCheck } from '../components/icons.tsx';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BrandMark, BrandName } from '../components/Brand.tsx';

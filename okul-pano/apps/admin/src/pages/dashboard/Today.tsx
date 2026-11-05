@@ -13,7 +13,7 @@ import {
   type DisplayState,
 } from '@okulpano/shared';
 import { useQuery } from '@tanstack/react-query';
-import { BellRing, Cake, GraduationCap, MonitorSmartphone, ShieldCheck, UserMinus, type LucideIcon } from 'lucide-react';
+import { BellRing, Cake, GraduationCap, MonitorSmartphone, ShieldCheck, UserMinus, type LucideIcon } from '../../components/icons.tsx';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Card } from '../../components/ui.tsx';

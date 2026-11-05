@@ -256,11 +256,19 @@ function SchoolSheet({ s, onClose }: { s: PlatformSchool; onClose: () => void })
                 icon="pause-circle-outline"
                 loading={patch.isPending && patch.variables?.isActive === false}
                 onPress={() =>
-                  void confirm(
-                    'Abonelik kapatılsın mı?',
-                    `${nameParts(s).name}: panolar ve panel girişi durur. Veriler silinmez, abonelik sonra yeniden başlatılabilir.`,
-                    'Aboneliği kapat',
-                  ).then((ok) => ok && patch.mutate({ isActive: false }))
+                  void confirm({
+                    title: 'Aboneliği kapat',
+                    subtitle: s.name,
+                    effects: [
+                      { text: 'Panolar yayını durdurur' },
+                      { text: 'Okul kullanıcıları giriş yapamaz' },
+                      { text: 'Veriler silinmez; yeniden başlatınca kaldığı yerden sürer', ok: true },
+                    ],
+                    tone: 'danger',
+                    icon: 'power-outline',
+                    hold: true,
+                    holdLabel: 'Kapatmak için basılı tutun',
+                  }).then((ok) => ok && patch.mutate({ isActive: false }))
                 }
               >
                 Aboneliği kapat

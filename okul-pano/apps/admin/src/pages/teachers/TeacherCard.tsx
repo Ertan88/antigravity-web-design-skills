@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2 } from '../../components/icons.tsx';
 import type { Teacher } from '../../lib/data.ts';
 
 /** Branşa göre sabit avatar rengi: aynı branştaki öğretmenler listede görsel olarak gruplanır. */

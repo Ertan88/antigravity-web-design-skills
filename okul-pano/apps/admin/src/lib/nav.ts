@@ -27,7 +27,7 @@ import {
   UserMinus,
   Users,
   type LucideIcon,
-} from 'lucide-react';
+} from '../components/icons.tsx';
 
 export interface NavItem {
   to: string;

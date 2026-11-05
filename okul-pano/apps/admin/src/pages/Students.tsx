@@ -1,12 +1,13 @@
 import { compareClassNames, layoutModules, normalizeClassName, resolveLayout, studentSchema } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { Cake, ClipboardPaste, FileUp, Search, Trash2 } from 'lucide-react';
+import { Cake, ClipboardPaste, FileUp, Search, Trash2 } from '../components/icons.tsx';
 import { useMemo, useRef, useState } from 'react';
 import { CrudPage } from '../components/CrudPage.tsx';
 import { ExcelButtons } from '../components/ExcelButtons.tsx';
 import { ExcelImportDialog, type ImportPreview } from '../components/ExcelImportDialog.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Badge, Button, Field, Input, Modal, Select, Textarea, Toggle } from '../components/ui.tsx';
+import { confirm } from '../components/confirm.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { nameMap, useList, useSchool, useSchoolPath, type ClassGroup, type Student } from '../lib/data.ts';
@@ -237,7 +238,6 @@ function ClearStudents({ count }: { count: number }) {
   const path = useSchoolPath('students');
   const qc = useQueryClient();
   const toast = useToast();
-  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const clear = async () => {
     setBusy(true);
@@ -245,7 +245,6 @@ function ClearStudents({ count }: { count: number }) {
       const res = await api<{ deleted: number }>(`${path}/delete-all`, { method: 'POST', body: { confirm: 'delete-all' } });
       await qc.invalidateQueries({ queryKey: [schoolId, 'students'] });
       toast.success(`Öğrenci listesi temizlendi (${res.deleted} öğrenci)`);
-      setOpen(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Silinemedi');
     } finally {
@@ -259,30 +258,20 @@ function ClearStudents({ count }: { count: number }) {
         size="sm"
         className="ml-auto text-red-600! hover:bg-red-50 hover:text-red-700!"
         icon={<Trash2 className="size-3.5" />}
-        onClick={() => setOpen(true)}
+        loading={busy}
+        onClick={async () => {
+          const ok = await confirm({
+            title: 'Öğrenci listesi temizlensin mi?',
+            message: `${count} öğrenci ve doğum tarihleri silinir; panoda doğum günü kutlaması görünmez. Sınıflar kalır. Bu işlem geri alınamaz; gerekiyorsa önce "Excel'e aktar" ile listeyi indirin.`,
+            tone: 'danger',
+            hold: true,
+            holdLabel: 'Silmek için basılı tutun',
+          });
+          if (ok) void clear();
+        }}
       >
         Listeyi temizle
       </Button>
-      <Modal
-        open={open}
-        onClose={() => setOpen(false)}
-        title="Öğrenci listesi temizlensin mi?"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setOpen(false)}>
-              Vazgeç
-            </Button>
-            <Button variant="danger" loading={busy} onClick={() => void clear()}>
-              {count} öğrenciyi sil
-            </Button>
-          </>
-        }
-      >
-        <p className="text-sm text-slate-600">
-          Bütün öğrenciler ve doğum tarihleri silinir; panoda doğum günü kutlaması görünmez. Sınıflar kalır. Bu işlem geri alınamaz; gerekiyorsa önce
-          "Excel'e aktar" ile listeyi indirin.
-        </p>
-      </Modal>
     </>
   );
 }

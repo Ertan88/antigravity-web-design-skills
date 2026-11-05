@@ -1,6 +1,6 @@
 import { normalizeName } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { Check, X } from 'lucide-react';
+import { Check, X } from '../../components/icons.tsx';
 import { useState } from 'react';
 import { Button, IconButton, Input, Select } from '../../components/ui.tsx';
 import { api } from '../../lib/api.ts';

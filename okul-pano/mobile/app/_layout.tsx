@@ -16,6 +16,7 @@ import { Animated, Easing, Image, Platform, StyleSheet, View } from 'react-nativ
 import { Text } from '../src/text.tsx';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../src/auth.tsx';
+import { ConfirmHost } from '../src/confirm.tsx';
 import { restored } from '../src/persist.ts';
 import { registerForPush } from '../src/push.ts';
 import { colors } from '../src/theme.ts';
@@ -145,6 +146,7 @@ function Gate({ fontsReady }: { fontsReady: boolean }) {
           <Stack.Screen name="izin" options={{ presentation: 'modal' }} />
         </Stack>
       )}
+      <ConfirmHost />
       {!splashHidden &&
         (fontsReady ? (
           <BrandSplash finishing={splashFinishing} onHidden={hideSplash} />

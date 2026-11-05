@@ -1,6 +1,6 @@
 import { SCHOOL_TYPES, splitSchoolName, updateSchoolSchema, type SchoolSettings } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Copy, Download, ExternalLink, FileText, MapPin, Search } from 'lucide-react';
+import { Copy, Download, ExternalLink, FileText, MapPin, Search } from '../components/icons.tsx';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ImageUpload } from '../components/ImageUpload.tsx';
 import { SampleDataCard } from '../components/Onboarding.tsx';
@@ -8,6 +8,7 @@ import { SupportAccessCard } from '../components/SupportAccess.tsx';
 import { SaveBar } from '../components/SaveBar.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Button, Card, Field, Input, PageHeader, Select, Spinner, Textarea, Toggle } from '../components/ui.tsx';
+import { confirm } from '../components/confirm.tsx';
 import { downloadJson } from '../lib/download.ts';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.ts';
@@ -136,7 +137,7 @@ function PrivacySection({ value, onChange, slug }: { value: string; onChange: (v
   const publicUrl = `${location.origin}/aydinlatma/${slug}`;
 
   const fillTemplate = async () => {
-    if (value.trim() && !confirm('Mevcut metin şablonla değiştirilsin mi?')) return;
+    if (value.trim() && !(await confirm({ title: 'Mevcut metin şablonla değiştirilsin mi?', message: 'Kutudaki metnin yerine şablon gelir. Kaydetmeden önce değişikliği gözden geçirebilirsiniz.', tone: 'warning', confirmLabel: 'Şablonla değiştir', icon: FileText }))) return;
     setBusy('template');
     try {
       const { text } = await api<{ text: string }>(`${path}/privacy-template`);

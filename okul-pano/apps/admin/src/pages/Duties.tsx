@@ -1,6 +1,6 @@
 import { dutySchema, holidayFullName, labelOf, WEEKDAY_NAMES, WEEKDAY_SHORT, type Labels } from '@okulpano/shared';
 import clsx from 'clsx';
-import { Bus, CalendarDays, CopyPlus, ShieldCheck, UserCog } from 'lucide-react';
+import { Bus, CalendarDays, CopyPlus, ShieldCheck, UserCog } from '../components/icons.tsx';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';

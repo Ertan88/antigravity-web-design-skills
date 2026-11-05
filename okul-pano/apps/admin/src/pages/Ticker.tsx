@@ -1,5 +1,5 @@
 import { tickerSchema } from '@okulpano/shared';
-import { TextCursorInput } from 'lucide-react';
+import { TextCursorInput } from '../components/icons.tsx';
 import { CrudPage } from '../components/CrudPage.tsx';
 import { Field, Input, Toggle } from '../components/ui.tsx';
 import type { TickerItem } from '../lib/data.ts';

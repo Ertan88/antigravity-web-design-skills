@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { Building2, ChevronRight, ChevronsUpDown, LogOut, Menu, Moon, School, Sun, X } from 'lucide-react';
+import { Building2, ChevronRight, ChevronsUpDown, LogOut, Menu, Moon, School, Sun, X } from './icons.tsx';
 import { Suspense, useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth.tsx';

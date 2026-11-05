@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { CalendarCheck2, CalendarRange } from 'lucide-react';
+import { CalendarCheck2, CalendarRange } from '../../components/icons.tsx';
 import { MonthNav, monthLabel } from './calendar.tsx';
 
 export interface MonthResolution {

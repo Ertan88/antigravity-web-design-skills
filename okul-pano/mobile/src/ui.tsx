@@ -1,18 +1,25 @@
-import { Ionicons } from '@expo/vector-icons';
 import { router, usePathname } from 'expo-router';
-import { useEffect, useRef, useState, type ComponentProps, type ComponentRef, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, Animated, Easing, Keyboard, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, TextInput as NativeTextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
+import { useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
+import { ActivityIndicator, Animated, Easing, Keyboard, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, TextInput as NativeTextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 import { Text, TextInput } from './text.tsx';
+import { ICONS, type IconName } from './icons.tsx';
+import { openConfirm, type ConfirmOptions } from './confirm.tsx';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { scrollMemory, scrollRestore } from './scroll.ts';
 import { colors, dark, radius, space, tiles, type TileTone } from './theme.ts';
 import { shortSchoolName } from '@okulpano/shared/schoolName';
 import { dayTitle, greeting, localIso } from './day.ts';
 
-export type IconName = ComponentProps<typeof Ionicons>['name'];
+export type { IconName } from './icons.tsx';
 
-export function Icon({ name, size = 22, color = colors.ink }: { name: IconName; size?: number; color?: string }) {
-  return <Ionicons name={name} size={size} color={color} accessibilityElementsHidden importantForAccessibility="no" />;
+/** Simge (Tabler); `name` kısa addır, karşılığı src/icons.tsx'te */
+export function Icon({ name, size = 22, color = colors.ink, strokeWidth = 2 }: { name: IconName; size?: number; color?: string; strokeWidth?: number }) {
+  const C = ICONS[name];
+  return (
+    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" pointerEvents="none">
+      <C size={size} color={color} strokeWidth={strokeWidth} />
+    </View>
+  );
 }
 
 /**
@@ -563,15 +570,15 @@ export function refreshStyles() {
   Object.assign(styles, makeStyles());
 }
 
-/** Geri alınamayan işlemlerden önce onay (web'de tarayıcının onay penceresi) */
-export function confirm(title: string, message: string, ok = 'Evet', destructive = true): Promise<boolean> {
-  if (Platform.OS === 'web') return Promise.resolve(window.confirm(`${title}\n\n${message}`));
-  return new Promise((resolve) =>
-    Alert.alert(title, message, [
-      { text: 'Vazgeç', style: 'cancel', onPress: () => resolve(false) },
-      { text: ok, style: destructive ? 'destructive' : 'default', onPress: () => resolve(true) },
-    ], { cancelable: true, onDismiss: () => resolve(false) }),
-  );
+/**
+ * Geri alınamayan işlemlerden önce onay: ortak alt sayfa penceresi (src/confirm.tsx).
+ * Kısa kullanım: confirm(başlık, açıklama, düğme yazısı, kırmızı mı); ayrıntılı kullanım: confirm({ ... }).
+ */
+export function confirm(options: ConfirmOptions): Promise<boolean>;
+export function confirm(title: string, message: string, ok?: string, destructive?: boolean): Promise<boolean>;
+export function confirm(a: string | ConfirmOptions, message = '', ok?: string, destructive = true): Promise<boolean> {
+  if (typeof a !== 'string') return openConfirm(a);
+  return openConfirm({ title: a, message, confirmLabel: ok ?? (destructive ? 'Sil' : 'Evet'), tone: destructive ? 'danger' : 'neutral' });
 }
 
 /** Ad soyaddan iki harf (Ayşe Yılmaz → AY); ad yoksa okul adından */

@@ -1,5 +1,5 @@
 import type { Permission } from '@okulpano/shared';
-import { Loader2, Lock, SearchX } from 'lucide-react';
+import { Loader2, Lock, SearchX } from './components/icons.tsx';
 import { lazy, type ComponentType, type ReactNode } from 'react';
 import { Link, Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout.tsx';

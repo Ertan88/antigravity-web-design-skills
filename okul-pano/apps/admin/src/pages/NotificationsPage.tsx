@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { BellOff, CheckCheck, Mail, MailOpen, Trash2 } from 'lucide-react';
+import { BellOff, CheckCheck, Mail, MailOpen, Trash2 } from '../components/icons.tsx';
 import { useState } from 'react';
 import { Badge, Button, Card, EmptyState, PageHeader, Segmented, Spinner } from '../components/ui.tsx';
 import { kindStyle, useInboxActions, useInboxList, useOpenNotification, type InboxFilter, type InboxItem } from '../lib/inbox.tsx';

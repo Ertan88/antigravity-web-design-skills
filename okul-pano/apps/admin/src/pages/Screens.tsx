@@ -1,6 +1,6 @@
 import { pairScreenSchema, screenSchema } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Check, Copy, KeyRound, LayoutTemplate, MonitorSmartphone, Pencil, Plus, RectangleHorizontal, RectangleVertical, RefreshCw, ScanEye } from 'lucide-react';
+import { Check, Copy, KeyRound, LayoutTemplate, MonitorSmartphone, Pencil, Plus, RectangleHorizontal, RectangleVertical, RefreshCw, ScanEye } from '../components/icons.tsx';
 import { useState } from 'react';
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Spinner } from '../components/ui.tsx';

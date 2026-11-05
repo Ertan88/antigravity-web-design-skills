@@ -1,6 +1,6 @@
 import { layoutModules, leaveSchema, resolveLayout } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { Check, UserMinus, X } from 'lucide-react';
+import { Check, UserMinus, X } from '../components/icons.tsx';
 import { useState } from 'react';
 import { CrudPage } from '../components/CrudPage.tsx';
 import { useToast } from '../components/Toast.tsx';

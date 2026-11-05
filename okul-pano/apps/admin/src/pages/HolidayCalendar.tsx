@@ -1,4 +1,4 @@
-import { CalendarRange } from 'lucide-react';
+import { CalendarRange } from '../components/icons.tsx';
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { PageHeader } from '../components/ui.tsx';

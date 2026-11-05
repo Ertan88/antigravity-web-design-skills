@@ -1,6 +1,6 @@
 import { trCompare } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Check, ListPlus, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { Check, ListPlus, Pencil, Plus, Search, Trash2, X } from '../../components/icons.tsx';
 import { useState } from 'react';
 import { useToast } from '../../components/Toast.tsx';
 import { Badge, Button, IconButton, Input, Modal, Segmented, Spinner } from '../../components/ui.tsx';

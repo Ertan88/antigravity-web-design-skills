@@ -1,6 +1,6 @@
 import { trialStatus } from '@okulpano/shared';
 import clsx from 'clsx';
-import { Clock } from 'lucide-react';
+import { Clock } from './icons.tsx';
 import { useSchool } from '../lib/data.ts';
 
 /**

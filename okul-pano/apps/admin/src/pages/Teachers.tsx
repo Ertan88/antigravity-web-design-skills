@@ -1,7 +1,7 @@
 import { normalizeName, surnameOf, teacherSchema, trCompare } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Download, FileDown, FileSpreadsheet, Search, Tags, Trash2, Upload, UserPlus, Users, X } from 'lucide-react';
+import { Download, FileDown, FileSpreadsheet, Search, Tags, Trash2, Upload, UserPlus, Users, X } from '../components/icons.tsx';
 import { useMemo, useRef, useState } from 'react';
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Button, Card, EmptyState, Field, Input, Modal, PageHeader, Select, Spinner, Toggle } from '../components/ui.tsx';

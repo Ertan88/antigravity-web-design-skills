@@ -12,7 +12,7 @@ import {
   TimerOff,
   Undo2,
   type LucideIcon,
-} from 'lucide-react';
+} from '../components/icons.tsx';
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from './api.ts';

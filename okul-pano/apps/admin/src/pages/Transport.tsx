@@ -1,7 +1,7 @@
 import { holidayFullName, isHalfDayHoliday, labelOf } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Bus, Sunrise, Sunset, Utensils, Wand2 } from 'lucide-react';
+import { Bus, Sunrise, Sunset, Utensils, Wand2 } from '../components/icons.tsx';
 import { useState } from 'react';
 import { ExcelImportDialog, NewTeachersOption, type ImportPreview } from '../components/ExcelImportDialog.tsx';
 import { useToast } from '../components/Toast.tsx';

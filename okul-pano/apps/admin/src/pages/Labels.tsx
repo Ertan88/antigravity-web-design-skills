@@ -1,6 +1,6 @@
 import { LABEL_KEYS, LABELS, type LabelKey, type Labels as LabelMap } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { RotateCcw, Type } from 'lucide-react';
+import { RotateCcw, Type } from '../components/icons.tsx';
 import { useEffect, useState } from 'react';
 import { SaveBar } from '../components/SaveBar.tsx';
 import { useToast } from '../components/Toast.tsx';

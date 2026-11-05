@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Bell, ChevronRight } from 'lucide-react';
+import { Bell, ChevronRight } from './icons.tsx';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth.tsx';

@@ -1,6 +1,6 @@
 import { quoteOfDay, todayInHistory, type SchoolSettings } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Rss } from 'lucide-react';
+import { Plus, Rss } from '../components/icons.tsx';
 import { useEffect, useState } from 'react';
 import { SaveBar } from '../components/SaveBar.tsx';
 import { useToast } from '../components/Toast.tsx';

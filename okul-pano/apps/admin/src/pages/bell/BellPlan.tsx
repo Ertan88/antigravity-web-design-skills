@@ -1,7 +1,7 @@
 import { compareClassNames, joinClassNames, latestClasses, scheduleLessonCount, WEEKDAY_NAMES, WEEKDAY_SHORT, type Period, type Shift } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Lock, Settings2 } from 'lucide-react';
+import { Lock, Settings2 } from '../../components/icons.tsx';
 import { useState } from 'react';
 import { useToast } from '../../components/Toast.tsx';
 import { Badge, Button, Card, Modal, Toggle } from '../../components/ui.tsx';

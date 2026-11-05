@@ -1,5 +1,5 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { History } from 'lucide-react';
+import { History } from '../components/icons.tsx';
 import { Badge, Button, Card, EmptyState, PageHeader, Spinner, Table, Td } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
