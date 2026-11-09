@@ -2,7 +2,7 @@ import { lunchIndex, type Period } from '@okulpano/shared/bell';
 import { useEffect, useState } from 'react';
 import { examReminderText, examRoles } from '@okulpano/shared/examCore';
 import { useExamSchedule, useMeToday, useMyDuties } from './data.ts';
-import { scheduleReminders } from './push.ts';
+import { ackExamReminders, scheduleReminders } from './push.ts';
 import type { MeToday, MyDuties } from './data.ts';
 import { dayBellPeriods } from './day.ts';
 import { storage } from './storage.ts';
@@ -180,10 +180,13 @@ export function useExamReminders(enabled: boolean) {
         if (!e.notifyAt || (!roles.proctor && !roles.subject)) return [];
         const at = new Date(e.notifyAt);
         if (at.getTime() <= now || at.getTime() > now + 21 * 86400_000) return [];
-        return [{ at, ...examReminderText(e, roles), url: `/sinav-takvimi?gun=${e.date}` }];
+        return [{ at, examId: e.id, notifyAt: e.notifyAt, ...examReminderText(e, roles), url: `/sinav-takvimi?gun=${e.date}` }];
       })
       .sort((a, b) => a.at.getTime() - b.at.getTime())
       .slice(0, 30);
-    void scheduleReminders(items, 'exam').catch(() => undefined);
+    // Kurulan hatırlatmalar sunucuya bildirilir: sunucu yalnızca kurmamış telefonlara gönderir
+    void scheduleReminders(items, 'exam')
+      .then((ok) => (ok ? ackExamReminders(items.map((i) => ({ examId: i.examId, notifyAt: i.notifyAt }))) : undefined))
+      .catch(() => undefined);
   }, [enabled, me.data, exams.data]);
 }

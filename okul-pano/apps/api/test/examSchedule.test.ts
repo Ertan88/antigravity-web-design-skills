@@ -188,3 +188,25 @@ describe('kademe / çok şube', () => {
     expect(prev.json().errors).toHaveLength(0);
   });
 });
+
+describe('sunucudan sınav hatırlatması', () => {
+  it('teneffüs başında gider; telefonunda kurmuş olana gitmez; aynı an için bir kez', async () => {
+    const { runExamReminders } = await import('../src/lib/examReminders.ts');
+    const list = (await owner.get(`${base}/exam-schedule?from=${WED}&to=${WED}`)).json().exams as { id: string; periodNo: number; className: string; notifyAt: string; proctors: { fullName: string }[] }[];
+    const exam = list.find((x) => x.periodNo === 3 && x.className === '10-A')!;
+    expect(exam.proctors[0]!.fullName).toBe('Burak Fizik');
+    // Matematik öğretmeni (dersin öğretmeni) hatırlatmayı telefonunda kurdu; gözetmen (Burak) kurmadı
+    expectStatus(await editor.post('/api/me/exam-reminders', { token: TOKENS.math, items: [{ examId: exam.id, notifyAt: exam.notifyAt }] }), 204);
+    sentPushes.length = 0;
+    // Bildirim anından önce gönderilmez
+    await runExamReminders(t.app.deps, new Date(Date.parse(exam.notifyAt) - 60_000));
+    expect(pushesTo(TOKENS.phys)).toHaveLength(0);
+    await runExamReminders(t.app.deps, new Date(Date.parse(exam.notifyAt) + 30_000));
+    expect(pushesTo(TOKENS.phys)).toHaveLength(1);
+    expect(pushesTo(TOKENS.phys)[0]!.message.body).toContain('Gözetmen sizsiniz');
+    expect(pushesTo(TOKENS.math)).toHaveLength(0);
+    // Tekrar çalışınca ikinci kez gitmez; çok geç (10 dk sonra) de gönderilmez
+    await runExamReminders(t.app.deps, new Date(Date.parse(exam.notifyAt) + 90_000));
+    expect(pushesTo(TOKENS.phys)).toHaveLength(1);
+  });
+});

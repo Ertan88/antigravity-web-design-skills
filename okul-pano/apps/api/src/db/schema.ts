@@ -10,6 +10,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -982,3 +983,33 @@ export const platformSettings = pgTable('platform_settings', {
   updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
   updatedAt: updatedAt(),
 });
+
+/**
+ * Sınav hatırlatması: telefon, hatırlatmayı kendinde kurduğunu bildirir (anahtar + sınav + an). Sunucu teneffüs
+ * başında yalnızca kurmamış telefonlara bildirim gönderir: çift bildirim olmaz, uygulamayı açmamış öğretmen de alır.
+ */
+export const examReminderAcks = pgTable(
+  'exam_reminder_acks',
+  {
+    token: text('token').notNull(),
+    examId: uuid('exam_id')
+      .notNull()
+      .references(() => examSchedule.id, { onDelete: 'cascade' }),
+    notifyAt: timestamp('notify_at', { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.token, t.examId] })],
+);
+
+/** Sunucudan gönderilmiş sınav hatırlatmaları (aynı an için bir kez) */
+export const examRemindersSent = pgTable(
+  'exam_reminders_sent',
+  {
+    examId: uuid('exam_id')
+      .notNull()
+      .references(() => examSchedule.id, { onDelete: 'cascade' }),
+    notifyAt: timestamp('notify_at', { withTimezone: true }).notNull(),
+    sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.examId, t.notifyAt] })],
+);

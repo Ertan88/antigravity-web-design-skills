@@ -1,9 +1,9 @@
 import { bellClassDays, joinClassNames, leaveRequestSchema, lessonCounts, normalizeName, pushTokenSchema, schoolSettingsSchema, zonedParts } from '@okulpano/shared';
-import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { accessUser, audit, schoolGuard } from '../context.ts';
-import { bellOverrides, bellSchedules, classGroups, pushTokens, teacherLeaves, teachers, timetableEntries } from '../db/schema.ts';
+import { bellOverrides, bellSchedules, classGroups, examReminderAcks, examSchedule, pushTokens, teacherLeaves, teachers, timetableEntries } from '../db/schema.ts';
 import { addDays, dutyDay, dutyScheduleStatus, effectiveHolidays, holidaysAndHalfDays, monthEnd, teacherDutyDays } from '../lib/dayinfo.ts';
 import { badRequest, notFound, parse } from '../lib/errors.ts';
 import { notifyUsers, usersWithPermission } from '../lib/push.ts';
@@ -242,6 +242,26 @@ export async function meRoutes(app: FastifyInstance) {
       .insert(pushTokens)
       .values({ userId: sub, token: body.token, platform: body.platform })
       .onConflictDoUpdate({ target: pushTokens.token, set: { userId: sub, platform: body.platform } });
+    return reply.status(204).send();
+  });
+
+  /**
+   * Telefon, sınav hatırlatmalarını kendinde kurduğunu bildirir (her kurulumda listenin tamamı). Sunucu bu
+   * telefonlara aynı hatırlatmayı ayrıca göndermez; bildirmeyenlere teneffüs başında kendisi gönderir.
+   */
+  app.post('/api/me/exam-reminders', { preHandler: app.authenticate }, async (req, reply) => {
+    const { sub } = accessUser(req);
+    const body = parse(
+      z.object({ token: z.string().min(10).max(300), items: z.array(z.object({ examId: z.uuid(), notifyAt: z.iso.datetime({ offset: true }) })).max(60) }),
+      req.body,
+    );
+    const [own] = await db.select({ id: pushTokens.id }).from(pushTokens).where(and(eq(pushTokens.token, body.token), eq(pushTokens.userId, sub)));
+    if (!own) return reply.status(204).send();
+    await db.delete(examReminderAcks).where(eq(examReminderAcks.token, body.token));
+    const ids = [...new Set(body.items.map((i) => i.examId))];
+    const existing = ids.length ? new Set((await db.select({ id: examSchedule.id }).from(examSchedule).where(inArray(examSchedule.id, ids))).map((r) => r.id)) : new Set<string>();
+    const rows = body.items.filter((i) => existing.has(i.examId)).map((i) => ({ token: body.token, examId: i.examId, notifyAt: new Date(i.notifyAt) }));
+    if (rows.length) await db.insert(examReminderAcks).values(rows).onConflictDoNothing();
     return reply.status(204).send();
   });
 

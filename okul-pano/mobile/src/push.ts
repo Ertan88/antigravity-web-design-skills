@@ -81,10 +81,10 @@ export async function unregisterPush() {
  * Hatırlatmalar telefonda yerel olarak kurulur (sunucu ve internet gerekmez); her kurulumda aynı türdeki
  * öncekiler silinir. Tür: "duty" (nöbet) ya da "exam" (sınav takvimi).
  */
-export async function scheduleReminders(items: { at: Date; title: string; body: string; url: string }[], kind: 'duty' | 'exam' = 'duty') {
-  if (Platform.OS === 'web') return;
+export async function scheduleReminders(items: { at: Date; title: string; body: string; url: string }[], kind: 'duty' | 'exam' = 'duty'): Promise<boolean> {
+  if (Platform.OS === 'web') return false;
   const perm = await Notifications.getPermissionsAsync();
-  if (!perm.granted) return;
+  if (!perm.granted) return false;
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   await Promise.all(
     scheduled.filter((n) => (n.content.data as { kind?: string } | undefined)?.kind === kind).map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
@@ -96,6 +96,17 @@ export async function scheduleReminders(items: { at: Date; title: string; body: 
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: item.at },
     });
   }
+  return true;
+}
+
+/**
+ * Telefonda kurulan sınav hatırlatmalarını sunucuya bildirir: sunucu bu telefona aynılarını ayrıca göndermez
+ * (çift bildirim olmaz). Bu telefonun sunucu bildirim anahtarı yoksa bildirilecek bir şey yoktur.
+ */
+export async function ackExamReminders(items: { examId: string; notifyAt: string }[]) {
+  const token = await storage.get(TOKEN_KEY);
+  if (!token) return;
+  await api('/api/me/exam-reminders', { method: 'POST', body: { token, items } }).catch(() => undefined);
 }
 
 /** Deneme bildirimi: birkaç saniye sonra gelir (izin yoksa önce izin istenir) */

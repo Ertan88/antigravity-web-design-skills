@@ -32,6 +32,7 @@ import { notificationRoutes } from './routes/notifications.ts';
 import { memberRoutes } from './routes/members.ts';
 import { enrollRoutes } from './routes/enroll.ts';
 import { loadPlatformMail, platformSettingsRoutes } from './routes/platformSettings.ts';
+import { runExamReminders } from './lib/examReminders.ts';
 import { controlRoutes } from './routes/control.ts';
 import { meRoutes } from './routes/me.ts';
 import { bellOverrideRoutes } from './routes/bellOverrides.ts';
@@ -147,11 +148,15 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     };
     const first = setTimeout(run, 60_000);
     const hourly = setInterval(run, 3600_000);
+    // Sınav hatırlatmaları dakika hassasiyetinde (teneffüs başı)
+    const minutely = setInterval(() => void runExamReminders(deps).catch((err) => app.log.error(err, 'sınav hatırlatması')), 60_000);
+    minutely.unref();
     first.unref();
     hourly.unref();
     app.addHook('onClose', async () => {
       clearTimeout(first);
       clearInterval(hourly);
+      clearInterval(minutely);
     });
   }
 

@@ -27,10 +27,14 @@ export function notifyUsers(deps: AppDeps, userIds: readonly string[], message: 
 
 async function send(deps: AppDeps, userIds: string[], message: PushMessage) {
   const rows = await deps.db.select({ token: pushTokens.token }).from(pushTokens).where(inArray(pushTokens.userId, userIds));
-  const tokens = rows.map((r) => r.token);
-  if (!tokens.length) return;
+  await sendToTokens(deps, rows.map((r) => r.token), message);
+}
+
+/** Belirli telefonlara gönderir (ör. sınav hatırlatmasını kendinde kurmamış olanlara) */
+export async function sendToTokens(deps: Pick<AppDeps, "db" | "env">, tokens: readonly string[], message: PushMessage) {
+  if (!tokens.length || deps.env.PUSH_URL === 'off') return;
   if (deps.env.PUSH_URL === 'memory') {
-    sentPushes.push({ to: tokens, message });
+    sentPushes.push({ to: [...tokens], message });
     return;
   }
   for (let i = 0; i < tokens.length; i += CHUNK) {
