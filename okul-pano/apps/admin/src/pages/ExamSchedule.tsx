@@ -80,7 +80,7 @@ export function ExamSchedule() {
   const [showPast, setShowPast] = useState(false);
   const [week, setWeek] = useState<string | null>(null);
   const [grade, setGrade] = useState<number | null>(null);
-  const [editing, setEditing] = useState<Partial<ScheduledExam> | null>(null);
+  const [editing, setEditing] = useState<(Partial<ScheduledExam> & { classGroupIds?: string[] }) | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -214,7 +214,7 @@ export function ExamSchedule() {
           classes={classes.filter((c) => grade == null || gradeOf(c.name) === grade)}
           monday={monday}
           onOpen={editable ? setEditing : undefined}
-          onAdd={editable ? (classGroupId, date) => setEditing({ classGroupId, date, periodNo: 1, kind: 'written' }) : undefined}
+          onAdd={editable ? (classGroupIds, date) => setEditing({ classGroupId: classGroupIds[0], classGroupIds, date, periodNo: 1, kind: 'written' }) : undefined}
         />
       )}
 
@@ -358,6 +358,21 @@ function ExamList({ exams, today, onOpen }: { exams: ScheduledExam[]; today: str
   );
 }
 
+/** Derse göre renk: o haftanın dersleri sırayla renk alır (haftada 6 derse kadar çakışma olmaz; okula özel liste yok) */
+const SUBJECT_TONES = [
+  'bg-tile-sky text-tile-sky-ink',
+  'bg-tile-mint text-tile-mint-ink',
+  'bg-tile-peach text-tile-peach-ink',
+  'bg-tile-lilac text-tile-lilac-ink',
+  'bg-tile-sun text-tile-sun-ink',
+  'bg-tile-rose text-tile-rose-ink',
+];
+const subjectKeyOf = (subject: string) => subject.trim().toLocaleLowerCase('tr-TR');
+
+/**
+ * Haftalık ızgara: satırlar kademe ("9. sınıflar"), hücrede o günün sınavları tek düğme (ders + hangi şubeler).
+ * "Şubeleri aç" ile kademenin şube satırları açılır; tek tek düzenleme oradan. Sütunlar eşit genişlikte.
+ */
 function ExamGrid({
   exams,
   classes,
@@ -369,18 +384,46 @@ function ExamGrid({
   classes: { id: string; name: string }[];
   monday: string;
   onOpen?: (e: ScheduledExam) => void;
-  onAdd?: (classGroupId: string, date: string) => void;
+  onAdd?: (classGroupIds: string[], date: string) => void;
 }) {
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  // Haftanın dersleri alfabetik sırayla renk alır: aynı hafta içinde aynı ders hep aynı renkte
+  const subjectTone = useMemo(() => {
+    const list = [...new Set(exams.map((e) => subjectKeyOf(e.subject)))].sort((a, b) => a.localeCompare(b, 'tr'));
+    return (subject: string) => SUBJECT_TONES[Math.max(0, list.indexOf(subjectKeyOf(subject))) % SUBJECT_TONES.length]!;
+  }, [exams]);
   const days = [0, 1, 2, 3, 4].map((i) => addDays(monday, i));
   // Hafta sonu sınavı varsa sütun eklenir
   for (const extra of [5, 6]) if (exams.some((e) => e.date === addDays(monday, extra))) days.push(addDays(monday, extra));
+  const levels = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; classes: { id: string; name: string }[] }>();
+    for (const c of [...classes].sort((a, b) => compareClassNames(a.name, b.name))) {
+      const p = parseClassName(c.name);
+      const key = p ? `${p.program ? `${p.program} ` : ''}${p.grade}` : `#${c.name}`;
+      const g = map.get(key) ?? { key, label: p ? `${key}. sınıflar` : c.name, classes: [] };
+      g.classes.push(c);
+      map.set(key, g);
+    }
+    return [...map.values()];
+  }, [classes]);
   if (!classes.length) return <EmptyState icon={<ClipboardCheck className="size-6" />} title="Sınıf yok" description="Önce Öğretmenler ve Sınıflar sayfasından sınıf ekleyin." />;
+  const toggle = (key: string) =>
+    setOpen((cur) => {
+      const next = new Set(cur);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  const cellClass = (empty: boolean, many: boolean) =>
+    clsx('h-16 rounded-xl bg-slate-50 p-1 align-top', onAdd && empty && 'cursor-pointer hover:bg-slate-100', many && 'ring-2 ring-amber-300');
+
   return (
     <div className="overflow-x-auto rounded-3xl bg-surface p-3 ring-1 ring-slate-200/70">
-      <table className="rt-scroll w-full min-w-[720px] border-separate border-spacing-1.5 text-xs">
+      <table className="rt-scroll w-full min-w-[720px] table-fixed border-separate border-spacing-1.5 text-xs">
         <thead>
           <tr>
-            <th className="w-20" />
+            <th className="w-32" />
             {days.map((d) => (
               <th key={d} className="px-1 pb-1 text-left text-[11px] font-bold tracking-wide text-slate-500 uppercase">
                 {fmtDay(d, { weekday: 'short', day: 'numeric' })}
@@ -389,51 +432,113 @@ function ExamGrid({
           </tr>
         </thead>
         <tbody>
-          {classes.map((c) => (
-            <tr key={c.id}>
-              <th className="pr-2 text-left text-sm font-extrabold text-ink">{c.name}</th>
-              {days.map((d) => {
-                const cell = exams.filter((e) => e.classGroupId === c.id && e.date === d).sort((a, b) => a.periodNo - b.periodNo);
-                return (
-                  <td
-                    key={d}
-                    className={clsx('h-16 rounded-xl bg-slate-50 p-1 align-top', onAdd && !cell.length && 'cursor-pointer hover:bg-slate-100', cell.length > 1 && 'ring-2 ring-amber-300')}
-                    onClick={() => !cell.length && onAdd?.(c.id, d)}
-                    title={cell.length > 1 ? 'Bu sınıfın aynı gün birden çok sınavı var' : undefined}
-                  >
-                    {/* Aynı gün birden çok sınavda düğmeler tek satır: satırlar eşit yükseklikte kalır */}
-                    <div className={cell.length > 1 ? 'space-y-0.5' : 'space-y-1'}>
-                      {cell.map((e) => (
-                        <button
-                          key={e.id}
-                          type="button"
-                          title={cell.length > 1 ? `${e.periodNo}. ders · ${e.subject} · ${EXAM_KINDS[e.kind]}${e.start ? ` · ${e.start}` : ''}` : undefined}
-                          onClick={(ev) => {
-                            ev.stopPropagation();
-                            onOpen?.(e);
-                          }}
-                          className={clsx('block w-full rounded-lg text-left leading-tight font-bold', cell.length > 1 ? 'px-2 py-0.5 text-[11.5px]' : 'px-2 py-1', KIND_TONE[e.kind])}
-                        >
-                          <span className="flex min-w-0 items-center justify-between gap-1">
-                            <span className={clsx(cell.length > 1 && 'truncate')}>
-                              {e.periodNo}. ders · {e.subject}
-                            </span>
-                            <WarnIcon warnings={e.warnings} />
-                          </span>
-                          {cell.length === 1 && (
-                            <span className="block text-[10.5px] font-semibold opacity-75">
-                              {EXAM_KINDS[e.kind]}
-                              {e.start ? ` · ${e.start}` : ''}
-                            </span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
+          {levels.map((lv) => {
+            const ids = new Set(lv.classes.map((c) => c.id));
+            const isOpen = open.has(lv.key);
+            const single = lv.classes.length === 1;
+            return (
+              <Fragment key={lv.key}>
+                <tr>
+                  <th className="pr-2 text-left align-middle">
+                    <span className="block truncate text-sm font-extrabold text-ink">{single ? lv.classes[0]!.name : lv.label}</span>
+                    {!single && (
+                      <button type="button" aria-expanded={isOpen} onClick={() => toggle(lv.key)} className="text-[11px] font-semibold text-slate-400 hover:text-ink">
+                        {isOpen ? 'şubeleri kapat ▴' : 'şubeleri aç ▾'}
+                      </button>
+                    )}
+                  </th>
+                  {days.map((d) => {
+                    const dayExams = exams.filter((e) => ids.has(e.classGroupId) && e.date === d).sort((a, b) => a.periodNo - b.periodNo);
+                    const groups = groupExams(dayExams);
+                    // Aynı şubenin aynı gün birden çok sınavı varsa uyarı çerçevesi
+                    const perClass = new Map<string, number>();
+                    for (const e of dayExams) perClass.set(e.classGroupId, (perClass.get(e.classGroupId) ?? 0) + 1);
+                    const many = [...perClass.values()].some((n) => n > 1);
+                    return (
+                      <td
+                        key={d}
+                        className={cellClass(!dayExams.length, many)}
+                        onClick={() => !dayExams.length && onAdd?.([...ids], d)}
+                        title={many ? 'Bir şubenin aynı gün birden çok sınavı var' : undefined}
+                      >
+                        <div className={groups.length > 1 ? 'space-y-0.5' : 'space-y-1'}>
+                          {groups.map((g) => {
+                            const first = g.items[0]!;
+                            const multi = g.items.length > 1;
+                            const sections = g.classNames.map((n) => parseClassName(n)?.section ?? n);
+                            const sub = single
+                              ? `${EXAM_KINDS[first.kind]}${first.start ? ` · ${first.start}` : ''}`
+                              : multi
+                                ? `Şube ${sections.join(', ')}`
+                                : `Yalnız ${first.className}`;
+                            const warnings = g.items.flatMap((e) => e.warnings.map((w) => (multi ? `${e.className}: ${w}` : w)));
+                            return (
+                              <button
+                                key={g.key}
+                                type="button"
+                                title={`${g.samePeriod ? `${first.periodNo}. ders` : examGroupPeriods(g)} · ${first.subject} · ${EXAM_KINDS[first.kind]}${first.start && g.samePeriod ? ` · ${first.start}` : ''}\n${g.classNames.join(', ')}`}
+                                onClick={(ev) => {
+                                  ev.stopPropagation();
+                                  if (multi) toggle(lv.key);
+                                  else onOpen?.(first);
+                                }}
+                                className={clsx('block w-full min-w-0 rounded-lg text-left leading-tight font-bold', groups.length > 1 ? 'px-2 py-0.5' : 'px-2 py-1', subjectTone(first.subject))}
+                              >
+                                <span className="flex min-w-0 items-center justify-between gap-1">
+                                  <span className="truncate">
+                                    {g.samePeriod ? `${first.periodNo}. ders` : examGroupPeriods(g)} · {first.subject}
+                                  </span>
+                                  <WarnIcon warnings={warnings} />
+                                </span>
+                                <span className="block truncate text-[10.5px] font-semibold opacity-80">{sub}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+                {isOpen &&
+                  lv.classes.map((c) => (
+                    <tr key={c.id}>
+                      <th className="pr-2 pl-3 text-left text-[13px] font-bold text-slate-500">
+                        <span className="mr-1 text-slate-300">↳</span>
+                        {c.name}
+                      </th>
+                      {days.map((d) => {
+                        const cell = exams.filter((e) => e.classGroupId === c.id && e.date === d).sort((a, b) => a.periodNo - b.periodNo);
+                        return (
+                          <td key={d} className={clsx(cellClass(!cell.length, cell.length > 1), 'h-12 bg-slate-50/60')} onClick={() => !cell.length && onAdd?.([c.id], d)}>
+                            <div className="space-y-0.5">
+                              {cell.map((e) => (
+                                <button
+                                  key={e.id}
+                                  type="button"
+                                  title={`${e.periodNo}. ders · ${e.subject} · ${EXAM_KINDS[e.kind]}${e.start ? ` · ${e.start}` : ''}`}
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    onOpen?.(e);
+                                  }}
+                                  className={clsx('block w-full min-w-0 rounded-lg px-2 py-0.5 text-left leading-tight font-bold', subjectTone(e.subject))}
+                                >
+                                  <span className="flex min-w-0 items-center justify-between gap-1">
+                                    <span className="truncate">
+                                      {e.periodNo}. ders · {e.subject}
+                                    </span>
+                                    <WarnIcon warnings={e.warnings} />
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -445,7 +550,7 @@ const chip = 'h-8 rounded-full px-3 text-[13px] font-bold transition-colors';
 const chipOn = 'bg-ink text-surface';
 const chipOff = 'bg-surface text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100';
 
-function ExamDialog({ exam, options, onClose }: { exam: Partial<ScheduledExam>; options: Options; onClose: () => void }) {
+function ExamDialog({ exam, options, onClose }: { exam: Partial<ScheduledExam> & { classGroupIds?: string[] }; options: Options; onClose: () => void }) {
   const { schoolId } = useAuth();
   const path = useSchoolPath('exam-schedule');
   const qc = useQueryClient();
@@ -461,7 +566,7 @@ function ExamDialog({ exam, options, onClose }: { exam: Partial<ScheduledExam>; 
   });
   // Eklerken birden çok şube seçilebilir (kademe ya da tek tek); düzenlemede tek şube
   const adding = !exam.id;
-  const [classIds, setClassIds] = useState<string[]>(exam.classGroupId ? [exam.classGroupId] : []);
+  const [classIds, setClassIds] = useState<string[]>(exam.classGroupIds ?? (exam.classGroupId ? [exam.classGroupId] : []));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const chosen = adding ? classIds : v.classGroupId ? [v.classGroupId] : [];
