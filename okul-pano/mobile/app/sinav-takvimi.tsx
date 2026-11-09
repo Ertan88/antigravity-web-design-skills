@@ -1,10 +1,11 @@
-import { EXAM_KINDS, examGroupClasses, examGroupPeriods, examRoles, groupExams, type ExamGroup, type ExamKind, type ScheduledExam } from '@okulpano/shared/examCore';
+import { EXAM_KINDS, examGroupPeriods, examRoles, groupExams, type ExamGroup, type ExamKind, type ScheduledExam } from '@okulpano/shared/examCore';
 import { compareClassNames } from '@okulpano/shared/grade';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useExamSchedule, useMeToday } from '../src/data.ts';
 import { dayTitle, localIso } from '../src/day.ts';
 import { colors, tiles, type TileTone } from '../src/theme.ts';
+import { Text } from '../src/text.tsx';
 import { Card, Chip, Empty, ErrorNote, Icon, Loading, Screen, Segmented, T } from '../src/ui.tsx';
 
 /*
@@ -163,12 +164,13 @@ function GroupRow({ group: g, teacherId, first }: { group: ExamGroup<ScheduledEx
           </T>
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <T size={14.5} weight="800" lines={1}>
-            {g.label} · {e.subject}
+          <T size={14.5} weight="800" lines={2}>
+            {e.subject}
           </T>
-          <T size={12.5} color={mine.length ? colors.ink : colors.muted} weight={mine.length ? '600' : '400'} lines={2}>
-            {mine.length ? `Sizin: ${mine.map((x) => x.className).join(', ')} · ` : ''}
-            {examGroupClasses(g)} · {proctors} gözetmen
+          <T size={12.5} color={colors.muted} lines={2}>
+            {mine.length > 0 && <Me>{`Sizin: ${mine.map((x) => x.className).join(', ')}`}</Me>}
+            {mine.length > 0 ? ' · ' : ''}
+            {g.label} · {g.items.length} şube · {proctors} gözetmen
           </T>
         </View>
         <KindPill kind={e.kind} />
@@ -186,11 +188,14 @@ function GroupRow({ group: g, teacherId, first }: { group: ExamGroup<ScheduledEx
   );
 }
 
+/** Uygulamayı kullanan öğretmenin adı: farklı renkte ve belirgin */
+function Me({ children }: { children: string }) {
+  return <Text style={{ color: colors.info, fontWeight: '800', backgroundColor: colors.infoSoft }}>{` ${children} `}</Text>;
+}
+
 function ExamRow({ exam: e, teacherId, first, sub }: { exam: ScheduledExam; teacherId: string | null; first: boolean; sub?: boolean }) {
   const r = examRoles(e, teacherId);
-  const role = r.proctor && r.subject ? 'Gözetmen sizsiniz · dersiniz' : r.proctor ? 'Gözetmen sizsiniz' : r.subject ? 'Dersinizin sınavı' : null;
-  const proctor = e.proctors.filter((p) => !p.onLeave).map((p) => p.fullName).join(', ');
-  const line = role ?? (proctor ? `Gözetmen: ${proctor}` : 'Gözetmen belirlenmedi');
+  const proctors = e.proctors.filter((p) => !p.onLeave);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, borderTopWidth: first ? 0 : 1, borderTopColor: colors.divider }}>
       <View style={{ width: 58 }}>
@@ -202,11 +207,20 @@ function ExamRow({ exam: e, teacherId, first, sub }: { exam: ScheduledExam; teac
         </T>
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <T size={14.5} weight="800" lines={1}>
+        <T size={14.5} weight="800" lines={2}>
           {sub ? e.className : `${e.className} · ${e.subject}`}
         </T>
-        <T size={12.5} color={role ? colors.ink : colors.muted} weight={role ? '600' : '400'} lines={2}>
-          {line}
+        <T size={12.5} color={colors.muted} lines={3}>
+          {proctors.length ? 'Gözetmen: ' : 'Gözetmen belirlenmedi'}
+          {proctors.map((p, i) => (
+            <Text key={p.teacherId}>
+              {i > 0 ? ', ' : ''}
+              {p.teacherId === teacherId ? <Me>{`${p.fullName} (siz)`}</Me> : p.fullName}
+            </Text>
+          ))}
+          {r.subject && !r.proctor ? ' · ' : ''}
+          {r.subject && !r.proctor && <Me>Dersinizin sınavı</Me>}
+          {r.subject && r.proctor ? ' · dersiniz' : ''}
           {e.note ? ` · ${e.note}` : ''}
         </T>
       </View>
