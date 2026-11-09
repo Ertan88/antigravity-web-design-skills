@@ -1154,7 +1154,7 @@ export function Businesses() {
             : "Eklediğiniz ve koordinatörü olduğunuz işletmeler. Eklediğiniz işletmenin alanı branşınızdan gelir, koordinatörü siz olursunuz."
         }
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {manager && (
               <Button
                 variant="secondary"

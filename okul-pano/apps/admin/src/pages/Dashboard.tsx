@@ -162,7 +162,7 @@ export function Dashboard() {
 
       <TodaySummary />
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_320px]">
         <Card className="p-5 sm:p-6">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-extrabold tracking-tight">Canlı önizleme</h2>
