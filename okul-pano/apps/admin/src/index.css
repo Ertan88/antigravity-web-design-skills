@@ -220,3 +220,77 @@ input[list]::-webkit-calendar-picker-indicator {
 .animate-fade {
   animation: fade-in 0.18s ease-out both;
 }
+
+/*
+ * Telefonda tablolar (640 px'den dar; masaüstü görünümü değişmez):
+ * - .rt-cards: kişi/kayıt listeleri; her satır etiketli bir kart olur (etiketleri lib/responsiveTables.ts yazar)
+ * - .rt-scroll: tarih/gün sütunlu çizelgeler; yana kayar, ilk sütun solda sabit kalır
+ */
+@media (max-width: 639px) {
+  table.rt-cards,
+  table.rt-cards > tbody {
+    display: block;
+    width: 100%;
+    min-width: 0 !important;
+  }
+  table.rt-cards > thead {
+    display: none;
+  }
+  table.rt-cards > tbody > tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 10px 18px;
+    padding: 14px 20px;
+  }
+  table.rt-cards > tbody > tr > td {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    padding: 0 !important;
+    border: 0;
+    text-align: left;
+  }
+  table.rt-cards > tbody > tr > td[data-label]:not([data-label=''])::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 2px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--color-slate-500);
+  }
+  table.rt-cards > tbody > tr > td[data-cell='primary'] {
+    flex: 1 1 0;
+    min-width: 60%;
+  }
+  table.rt-cards > tbody > tr > td[data-cell='primary']::before,
+  table.rt-cards > tbody > tr > td[data-cell='check']::before,
+  table.rt-cards > tbody > tr > td[data-cell='actions']::before {
+    display: none !important;
+  }
+  table.rt-cards > tbody > tr > td[data-cell='empty'] {
+    display: none;
+  }
+  table.rt-cards > tbody > tr > td[data-cell='check'] {
+    flex: 0 0 auto;
+    padding-top: 2px !important;
+  }
+  table.rt-cards > tbody > tr > td[data-cell='actions'] {
+    flex: 1 1 100%;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  table.rt-cards > tbody > tr > td[data-cell='actions'] > * {
+    margin: 0;
+  }
+
+  table.rt-scroll tr > :first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--color-surface);
+    box-shadow: 6px 0 8px -6px rgb(0 0 0 / 0.15);
+  }
+}

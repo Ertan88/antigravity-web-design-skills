@@ -242,7 +242,7 @@ function ExamList({ exams, today, onOpen }: { exams: ScheduledExam[]; today: str
             {fmtDay(d)}
             {d === today && <Badge tone="blue">Bugün</Badge>}
           </h2>
-          <table className="min-w-full text-sm">
+          <table className="rt-cards min-w-full text-sm">
             <thead className="text-left text-[11px] font-bold tracking-wide text-slate-400 uppercase">
               <tr>
                 <th className="w-28 px-5 py-2">Ders saati</th>
@@ -316,7 +316,7 @@ function ExamGrid({
   if (!classes.length) return <EmptyState icon={<ClipboardCheck className="size-6" />} title="Sınıf yok" description="Önce Öğretmenler ve Sınıflar sayfasından sınıf ekleyin." />;
   return (
     <div className="overflow-x-auto rounded-3xl bg-surface p-3 ring-1 ring-slate-200/70">
-      <table className="w-full min-w-[720px] border-separate border-spacing-1.5 text-xs">
+      <table className="rt-scroll w-full min-w-[720px] border-separate border-spacing-1.5 text-xs">
         <thead>
           <tr>
             <th className="w-20" />
@@ -686,7 +686,7 @@ function ExamImportDialog({ file, onClose }: { file: File | null; onClose: () =>
           )}
           {p.rows.length > 0 && (
             <div className="max-h-96 overflow-auto rounded-xl ring-1 ring-slate-200">
-              <table className="min-w-full text-sm">
+              <table className="rt-scroll min-w-full text-sm">
                 <thead className="sticky top-0 bg-slate-50 text-left text-[11px] font-bold tracking-wide text-slate-500 uppercase">
                   <tr>
                     <th className="px-3 py-2" />

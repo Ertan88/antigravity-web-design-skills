@@ -25,7 +25,7 @@ const when = (iso: string) => new Intl.DateTimeFormat('tr-TR', { day: 'numeric',
 function TicketTable({ rows, onOpen, platform }: { rows: SupportTicket[]; onOpen: (id: string) => void; platform?: boolean }) {
   return (
     <div className="overflow-hidden rounded-3xl bg-surface ring-1 ring-slate-200/70">
-      <table className="min-w-full text-sm">
+      <table className="rt-cards min-w-full text-sm">
         <thead className="text-left text-[11px] font-bold tracking-wide text-slate-400 uppercase">
           <tr>
             <th className="px-4 py-2.5">Tür</th>

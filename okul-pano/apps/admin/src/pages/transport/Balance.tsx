@@ -78,7 +78,7 @@ export function BalanceCard({ month, stats }: { month: string; stats: TransportS
       </div>
       {list.length ? (
         <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
+          <table className="rt-cards min-w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs font-semibold tracking-wide text-slate-500 uppercase">
               <tr>
                 <th className="px-5 py-2">Öğretmen</th>

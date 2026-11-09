@@ -224,7 +224,7 @@ export function ExcelImportDialog<R, P extends ImportPreview<R>, O>(props: Excel
           {preview.rows.length > 0 ? (
             <div className="overflow-hidden rounded-xl ring-1 ring-slate-200">
               <div className="max-h-80 overflow-auto">
-                <table className="min-w-full text-sm">
+                <table className="rt-scroll min-w-full text-sm">
                   <thead className="sticky top-0 bg-slate-50 text-left text-xs font-semibold tracking-wide text-slate-500 uppercase">
                     <tr>
                       <th className="px-3 py-2">Satır</th>

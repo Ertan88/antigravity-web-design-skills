@@ -661,10 +661,14 @@ export function DeleteButton({
 
 /* ---------- Tablo ---------- */
 
-export function Table({ head, children }: { head: ReactNode[]; children: ReactNode }) {
+/**
+ * Tablo. Telefonda (640 px'den dar) "cards": her satır etiketli kart olur (kişi ve kayıt listeleri);
+ * "scroll": yana kayar, ilk sütun sabit kalır (tarih/gün sütunlu çizelgeler). Masaüstü görünümü aynıdır.
+ */
+export function Table({ head, children, mobile = 'cards' }: { head: ReactNode[]; children: ReactNode; mobile?: 'cards' | 'scroll' }) {
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full text-sm">
+      <table className={clsx('min-w-full text-sm', mobile === 'cards' ? 'rt-cards' : 'rt-scroll')}>
         <thead>
           <tr className="border-b border-slate-100 text-left text-xs font-bold text-slate-500">
             {head.map((h, i) => (

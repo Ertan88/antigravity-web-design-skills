@@ -297,7 +297,7 @@ export function Timetable() {
             )}
           </div>
           <div className="overflow-x-auto p-3 sm:p-5">
-            <table className="w-full min-w-[760px] table-fixed border-separate border-spacing-1.5 text-sm">
+            <table className="rt-scroll w-full min-w-[760px] table-fixed border-separate border-spacing-1.5 text-sm">
               <thead>
                 <tr>
                   <th className="w-20" />

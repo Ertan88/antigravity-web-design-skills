@@ -9,11 +9,14 @@ import { ConfirmHost } from './components/confirm.tsx';
 import { ApiError } from './lib/api.ts';
 import { AuthProvider } from './lib/auth.tsx';
 import { applyTheme, currentTheme } from './lib/theme.ts';
+import { startResponsiveTables } from './lib/responsiveTables.ts';
 import '@okulpano/slides/slides.css';
 import './index.css';
 
 // Sayfa çizilmeden tema uygulanır (açılışta beyaz parlama olmasın)
 applyTheme(currentTheme());
+// Telefonda liste tabloları kart olarak gösterilir (masaüstü değişmez)
+startResponsiveTables();
 
 const queryClient = new QueryClient({
   defaultOptions: {
