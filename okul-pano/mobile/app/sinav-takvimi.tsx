@@ -1,11 +1,11 @@
 import { examGroupPeriods, examRoles, groupExams, type ExamGroup, type ScheduledExam } from '@okulpano/shared/examCore';
-import { compareClassNames } from '@okulpano/shared/grade';
+import { compareClassNames, parseClassName } from '@okulpano/shared/grade';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useExamSchedule, useMeToday, useNow } from '../src/data.ts';
 import { dayTitle, localIso } from '../src/day.ts';
-import { colors } from '../src/theme.ts';
+import { colors, tiles, type TileTone } from '../src/theme.ts';
 import { Text } from '../src/text.tsx';
 import { Card, Chip, Empty, ErrorNote, Icon, Loading, Screen, Segmented, T } from '../src/ui.tsx';
 
@@ -24,6 +24,17 @@ const SHORT = ['', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
 /** Görünen sınıf adı; eski sunucu sürümü bu alanı göndermezse sınıfın tam adı */
 const labelOf = (e: Pick<ScheduledExam, 'className'> & { classLabel?: string }) => e.classLabel || e.className;
 
+/** Kademe anahtarı ve adı: "9" → "9. sınıflar", "ATP 10" → "ATP 10. sınıflar"; tanınmayan ad kendisi */
+const levelOf = (name: string): { key: string; label: string } => {
+  const p = parseClassName(name);
+  if (!p) return { key: `#${name}`, label: name };
+  const key = `${p.program ? `${p.program} ` : ''}${p.grade}`;
+  return { key, label: `${key}. sınıflar` };
+};
+const mondayOf = (iso: string) => addDays(iso, 1 - weekday(iso));
+/** Haftanın dersleri sırayla renk alır (web ızgarasıyla aynı kural) */
+const WEEK_TONES: TileTone[] = ['sky', 'mint', 'peach', 'lilac', 'sun', 'rose'];
+
 export default function SinavTakvimi() {
   const q = useExamSchedule();
   const me = useMeToday();
@@ -38,6 +49,10 @@ export default function SinavTakvimi() {
     if (gun && /^\d{4}-\d{2}-\d{2}$/.test(gun)) setPicked(gun);
   }, [gun]);
   const active: Filter = filter ?? (teacherId ? 'mine' : 'all');
+  // Gün | Hafta: haftada kademe seçilir, Pazartesi–Cuma alt alta
+  const [view, setView] = useState<'day' | 'week'>('day');
+  const [weekStart, setWeekStart] = useState<string | null>(null);
+  const [level, setLevel] = useState<string | null>(null);
 
   const today = q.data?.today ?? localIso();
   const all = q.data?.exams ?? [];
@@ -58,6 +73,25 @@ export default function SinavTakvimi() {
   const dayExams = shown.filter((e) => e.date === selected).sort((a, b) => a.periodNo - b.periodNo || compareClassNames(a.className, b.className));
   const later = shown.filter((e) => e.date > strip[strip.length - 1]!);
 
+  const monday = weekStart ?? mondayOf(today);
+  const weekDays = [0, 1, 2, 3, 4].map((i) => addDays(monday, i));
+  const weekExams = all.filter((e) => e.date >= monday && e.date <= addDays(monday, 6));
+  for (const extra of [5, 6]) if (weekExams.some((e) => e.date === addDays(monday, extra))) weekDays.push(addDays(monday, extra));
+  const levels = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const e of all) {
+      const l = levelOf(labelOf(e));
+      map.set(l.key, l.label);
+    }
+    return [...map].sort((a, b) => compareClassNames(a[0], b[0]));
+  }, [all]);
+  const activeLevel = level && levels.some(([k]) => k === level) ? level : (levels[0]?.[0] ?? null);
+  const subjects = [...new Set(weekExams.map((e) => e.subject.trim().toLocaleLowerCase('tr-TR')))].sort((a, b) => a.localeCompare(b, 'tr'));
+  const toneOf = (subject: string) => tiles[WEEK_TONES[Math.max(0, subjects.indexOf(subject.trim().toLocaleLowerCase('tr-TR'))) % WEEK_TONES.length]!];
+  const friday = weekDays[Math.min(4, weekDays.length - 1)]!;
+  // "9 – 13 Kasım"; ay değişiyorsa "30 Kasım – 4 Aralık"
+  const weekLabel = `${monday.slice(0, 7) === friday.slice(0, 7) ? Number(monday.slice(8, 10)) : dayTitle(monday, { day: 'numeric', month: 'long' })} – ${dayTitle(friday, { day: 'numeric', month: 'long' })}`;
+
   return (
     <Screen back title="Sınav takvimi" subtitle="Yazılı, uygulama ve ortak sınavlar" refreshing={q.isRefetching} onRefresh={() => void q.refetch()}>
       <ErrorNote error={q.error} />
@@ -65,6 +99,103 @@ export default function SinavTakvimi() {
         <Loading />
       ) : (
         <>
+          <Segmented
+            value={view}
+            onChange={(v) => setView(v)}
+            options={[
+              { value: 'day' as const, label: 'Gün' },
+              { value: 'week' as const, label: 'Hafta' },
+            ]}
+          />
+          {view === 'week' ? (
+            <>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Önceki hafta" onPress={() => setWeekStart(addDays(monday, -7))} style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
+              <Icon name="chevron-back" size={18} color={colors.ink} />
+            </Pressable>
+            <Pressable accessibilityRole="button" onPress={() => setWeekStart(null)} style={{ paddingHorizontal: 14, height: 40, borderRadius: 20, justifyContent: 'center', backgroundColor: monday === mondayOf(today) ? colors.primary : colors.card, borderWidth: 1, borderColor: monday === mondayOf(today) ? colors.primary : colors.border }}>
+              <T size={13} weight="700" color={monday === mondayOf(today) ? colors.onPrimary : colors.ink}>
+                Bu hafta
+              </T>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Sonraki hafta" onPress={() => setWeekStart(addDays(monday, 7))} style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
+              <Icon name="chevron-forward" size={18} color={colors.ink} />
+            </Pressable>
+            <T size={13.5} weight="700" color={colors.muted} style={{ flex: 1 }} lines={1}>
+              {weekLabel}
+            </T>
+          </View>
+          {levels.length > 1 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 6, alignItems: 'flex-start' }}>
+              {levels.map(([k, label]) => (
+                <Chip key={k} label={label} selected={activeLevel === k} onPress={() => setLevel(k)} />
+              ))}
+            </ScrollView>
+          )}
+          <Card style={{ paddingVertical: 2, gap: 0 }}>
+            {weekDays.map((d, i) => {
+              const dayGroups = groupExams(weekExams.filter((e) => e.date === d && levelOf(labelOf(e)).key === activeLevel).sort((a, b) => a.periodNo - b.periodNo));
+              return (
+                <View key={d} style={{ flexDirection: 'row', gap: 12, paddingVertical: 10, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: colors.divider }}>
+                  <View style={{ width: 48 }}>
+                    <T size={14} weight="800" color={dayGroups.length ? colors.ink : colors.subtle}>
+                      {SHORT[weekday(d)]}
+                    </T>
+                    <T size={11.5} color={d === today ? colors.danger : colors.faint} weight={d === today ? '700' : '400'}>
+                      {d === today ? 'Bugün' : Number(d.slice(8, 10))}
+                    </T>
+                  </View>
+                  <View style={{ flex: 1, gap: 6 }}>
+                    {dayGroups.length ? (
+                      dayGroups.map((g) => {
+                        const first = g.items[0]!;
+                        const t = toneOf(first.subject);
+                        const multi = g.items.length > 1;
+                        const sections = g.classNames.map((n) => parseClassName(n)?.section ?? n);
+                        const mine = g.items.some((x) => {
+                          const r = examRoles(x, teacherId);
+                          return r.proctor || r.subject;
+                        });
+                        return (
+                          <Pressable
+                            key={g.key}
+                            accessibilityRole="button"
+                            onPress={() => {
+                              setView('day');
+                              setFilter('all');
+                              setPicked(d);
+                            }}
+                            style={({ pressed }) => ({ backgroundColor: t.bg, borderRadius: 12, paddingHorizontal: 11, paddingVertical: 7, opacity: pressed ? 0.7 : 1 })}
+                          >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <T size={14} weight="800" color={t.fg} style={{ flex: 1 }} lines={2}>
+                                {first.subject}
+                              </T>
+                              {mine && <Icon name="person" size={14} color={t.fg} />}
+                              {g.items.some((x) => x.warnings.length > 0) && <Icon name="warning-outline" size={14} color={colors.warning} />}
+                            </View>
+                            <T size={12} weight="600" color={t.fg} style={{ opacity: 0.85 }}>
+                              {g.samePeriod ? `${first.periodNo}. ders` : examGroupPeriods(g)} · {multi ? sections.join(', ') : `Yalnız ${g.classNames[0]}`}
+                            </T>
+                          </Pressable>
+                        );
+                      })
+                    ) : (
+                      <T size={13.5} color={colors.subtle} style={{ paddingTop: 2 }}>
+                        Sınav yok
+                      </T>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </Card>
+          <T size={12} color={colors.faint} style={{ textAlign: 'center' }}>
+            Bir sınava dokununca o günün listesi açılır.
+          </T>
+            </>
+          ) : (
+            <>
           <Segmented
             value={active}
             onChange={(v) => {
@@ -130,6 +261,8 @@ export default function SinavTakvimi() {
             <T size={12.5} color={colors.faint} style={{ textAlign: 'center' }}>
               4 haftadan sonra {later.length} sınav daha var.
             </T>
+          )}
+            </>
           )}
           {!all.length && <Empty icon="clipboard-check" title="Sınav takvimi boş" text="Sınavlar panelden (Sınav Takvimi) eklenir." />}
         </>
