@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useToast } from '../../components/Toast.tsx';
@@ -38,7 +39,7 @@ export function ClearDialog({ target, count, onClose }: { target: ClearScope | n
       toast.success(`${res.deleted} ders saati silindi`);
       close();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Silinemedi.');
+      setError(errorText(err, 'Silinemedi.'));
     } finally {
       setBusy(false);
     }

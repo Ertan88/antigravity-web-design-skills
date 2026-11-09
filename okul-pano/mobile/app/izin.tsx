@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
@@ -89,7 +90,7 @@ export default function Izin() {
       setKind('');
       setTab('list');
     } catch (err) {
-      setMessage({ ok: false, text: err instanceof Error ? err.message : 'Gönderilemedi' });
+      setMessage({ ok: false, text: errorText(err, 'Gönderilemedi') });
     } finally {
       setBusy(false);
     }
@@ -110,7 +111,7 @@ export default function Izin() {
       await Promise.all(['me/leaves', 'me/today'].map((k) => qc.invalidateQueries({ queryKey: [school?.id, k] })));
       setMessage({ ok: true, text: 'İzin bildirimi silindi.' });
     } catch (err) {
-      setMessage({ ok: false, text: err instanceof Error ? err.message : 'Silinemedi' });
+      setMessage({ ok: false, text: errorText(err, 'Silinemedi') });
     }
   };
 

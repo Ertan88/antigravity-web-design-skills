@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { EMERGENCY_INFO, EMERGENCY_TYPES, type EmergencyType } from '@okulpano/shared/emergency';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
@@ -36,7 +37,7 @@ export default function Acil() {
       if (Platform.OS !== 'web') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Başlatılamadı');
+      setError(errorText(err, 'Başlatılamadı'));
     }
   };
   const stop = async () => {
@@ -45,7 +46,7 @@ export default function Acil() {
       await api(path, { method: 'DELETE' });
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Bitirilemedi');
+      setError(errorText(err, 'Bitirilemedi'));
     }
   };
 

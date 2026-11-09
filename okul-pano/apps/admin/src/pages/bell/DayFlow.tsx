@@ -13,8 +13,7 @@ import {
   validatePeriods,
   WEEKDAY_NAMES,
   type DayBell,
-  type Period,
-} from '@okulpano/shared';
+  type Period, errorText } from '@okulpano/shared';
 import clsx from 'clsx';
 import { BellRing, CalendarOff, Coffee, FastForward, Flag, Hand, Scissors, Sunrise, Sunset, Undo2, Utensils, Zap } from '../../components/icons.tsx';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -167,7 +166,7 @@ export function DayFlow({
       );
       setEditing(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Kaydedilemedi');
+      setError(errorText(e, 'Kaydedilemedi'));
     } finally {
       setSaving(false);
     }

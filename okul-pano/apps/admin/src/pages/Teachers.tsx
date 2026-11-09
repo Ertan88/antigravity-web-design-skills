@@ -1,4 +1,4 @@
-import { normalizeName, surnameOf, teacherSchema, trCompare } from '@okulpano/shared';
+import { normalizeName, surnameOf, teacherSchema, trCompare, errorText } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { Download, FileDown, FileSpreadsheet, Search, Tags, Trash2, Upload, UserPlus, Users, X } from '../components/icons.tsx';
@@ -73,7 +73,7 @@ export function Teachers() {
     try {
       await downloadFile(`${teachersPath}/${kind}`, kind === 'template' ? excelFileName(undefined, 'Öğretmen Kadrosu Şablonu') : excelFileName(school.data?.name, 'Öğretmen Kadrosu'));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'İndirilemedi');
+      toast.error(errorText(err, 'İndirilemedi'));
     } finally {
       setDownloading(null);
     }

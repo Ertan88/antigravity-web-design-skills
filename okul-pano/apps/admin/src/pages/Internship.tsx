@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import {
   INTERN_HALF_SHORT,
   INTERN_LEGEND,
@@ -1525,7 +1526,7 @@ function BusinessForm({
       toast.success(isNew ? "İşletme eklendi" : "İşletme güncellendi");
       onClose();
     },
-    onError: (e) => setError(e instanceof Error ? e.message : "Kaydedilemedi."),
+    onError: (e) => setError(errorText(e, "Kaydedilemedi.")),
   });
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));

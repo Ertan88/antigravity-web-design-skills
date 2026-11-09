@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import type { ScreenCommand } from '@okulpano/shared/control';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
@@ -40,7 +41,7 @@ export default function PanoKumanda() {
       setMessage(r.delivered ? (done ?? null) : 'Pano şu an çevrimdışı; komut iletilemedi.');
       setTimeout(() => void qc.invalidateQueries({ queryKey: [school?.id, 'screens'] }), 2500);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Komut gönderilemedi');
+      setMessage(errorText(err, 'Komut gönderilemedi'));
     } finally {
       setBusy(null);
     }
@@ -51,7 +52,7 @@ export default function PanoKumanda() {
       await api(`${base}/mode`, { method: 'POST', body: { mode } });
       await qc.invalidateQueries({ queryKey: [school?.id, 'screens'] });
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Değiştirilemedi');
+      setMessage(errorText(err, 'Değiştirilemedi'));
     } finally {
       setBusy(null);
     }

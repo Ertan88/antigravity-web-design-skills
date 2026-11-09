@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { CheckCircle2, XCircle } from './icons.tsx';
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
@@ -24,7 +25,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const api = useMemo<ToastApi>(
-    () => ({ success: (m) => push('success', m), error: (m) => push('error', m) }),
+    () => ({ success: (m) => push('success', m), error: (m) => push('error', errorText(m)) }),
     [push],
   );
 

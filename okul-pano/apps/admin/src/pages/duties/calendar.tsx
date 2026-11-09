@@ -1,4 +1,4 @@
-import { holidayFullName, isHalfDayHoliday, WEEKDAY_NAMES, WEEKDAY_SHORT } from '@okulpano/shared';
+import { holidayFullName, isHalfDayHoliday, WEEKDAY_NAMES, WEEKDAY_SHORT, errorText } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { Check, Eraser, Loader2 } from '../../components/icons.tsx';
@@ -297,7 +297,7 @@ export function SupervisorCalendar({ month, editable }: { month: string; editabl
       else if (name) await api(path, { method: 'POST', body: { date: iso, name } });
       await qc.invalidateQueries({ queryKey: [schoolId, 'duty-supervisors'] });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Kaydedilemedi');
+      toast.error(errorText(err, 'Kaydedilemedi'));
       throw err;
     }
   };
@@ -368,7 +368,7 @@ export function ClearMonthButton({ month, what, onConfirm }: { month: string; wh
             await onConfirm();
             setAsking(false);
           } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Silinemedi');
+            toast.error(errorText(err, 'Silinemedi'));
           } finally {
             setBusy(false);
           }

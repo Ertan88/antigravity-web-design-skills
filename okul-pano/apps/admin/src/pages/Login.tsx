@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { BellRing, GraduationCap, Megaphone, MonitorSmartphone, ShieldCheck } from '../components/icons.tsx';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -29,7 +30,7 @@ export function Login() {
     try {
       await login(email.trim(), password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Giriş yapılamadı.');
+      setError(errorText(err, 'Giriş yapılamadı.'));
     } finally {
       setBusy(false);
     }

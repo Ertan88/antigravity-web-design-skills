@@ -1,4 +1,4 @@
-import { compareClassNames, joinClassNames, latestClasses, scheduleLessonCount, WEEKDAY_NAMES, WEEKDAY_SHORT, type Period, type Shift } from '@okulpano/shared';
+import { compareClassNames, joinClassNames, latestClasses, scheduleLessonCount, WEEKDAY_NAMES, WEEKDAY_SHORT, type Period, type Shift, errorText } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { Lock, Settings2 } from '../../components/icons.tsx';
@@ -134,7 +134,7 @@ export function WeekDays({
                       toast.success(`${WEEKDAY_NAMES[picking.weekday]}: ${o.id ? o.name : 'otomatik'}`);
                       setPicking(null);
                     } catch (err) {
-                      toast.error(err instanceof Error ? err.message : 'Kaydedilemedi');
+                      toast.error(errorText(err, 'Kaydedilemedi'));
                     } finally {
                       setBusy(false);
                     }

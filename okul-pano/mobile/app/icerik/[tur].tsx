@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import type { Permission } from '@okulpano/shared/permissions';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
@@ -272,7 +273,7 @@ function Editor({ kind, row, path, onDone }: { kind: Kind; row: Row | null; path
       const { url } = await uploadImage(school.id, asset as never);
       set(key, url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fotoğraf yüklenemedi');
+      setError(errorText(err, 'Fotoğraf yüklenemedi'));
     } finally {
       setUploading(null);
     }
@@ -303,7 +304,7 @@ function Editor({ kind, row, path, onDone }: { kind: Kind; row: Row | null; path
       await api(row ? `${path}/${row.id}` : path, { method: row ? 'PUT' : 'POST', body: row ? { ...row, ...body, id: undefined } : body });
       onDone();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Kaydedilemedi');
+      setError(errorText(err, 'Kaydedilemedi'));
     } finally {
       setBusy(false);
     }

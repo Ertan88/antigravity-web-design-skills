@@ -1,4 +1,4 @@
-import { ENROLL_ROLES, type EnrollRole } from '@okulpano/shared';
+import { ENROLL_ROLES, type EnrollRole, errorText } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
@@ -52,7 +52,7 @@ export default function HesapAc() {
     try {
       await fn();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'İşlem yapılamadı');
+      setError(errorText(err, 'İşlem yapılamadı'));
     } finally {
       setBusy(null);
       void qc.invalidateQueries({ queryKey: [school?.id, 'roster'] });

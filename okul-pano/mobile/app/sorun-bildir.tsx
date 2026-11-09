@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { ISSUE_CATEGORIES, ISSUE_CATEGORY_KEYS, type IssueCategory } from '@okulpano/shared/issues';
 import { useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
@@ -40,7 +41,7 @@ export default function SorunBildir() {
       setPhotoUrl(url);
       setPreview(asset.uri);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fotoğraf yüklenemedi');
+      setError(errorText(err, 'Fotoğraf yüklenemedi'));
     } finally {
       setUploading(false);
     }
@@ -55,7 +56,7 @@ export default function SorunBildir() {
       await qc.invalidateQueries({ queryKey: [school?.id, 'issues'] });
       router.replace('/sorunlar');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gönderilemedi');
+      setError(errorText(err, 'Gönderilemedi'));
     } finally {
       setBusy(false);
     }

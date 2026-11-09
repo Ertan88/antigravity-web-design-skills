@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { CONDUCT_GROUPS } from '@okulpano/shared/conduct';
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
@@ -349,7 +350,7 @@ function EntrySheet({
     try {
       await onSave(pick, note.trim());
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Kaydedilemedi');
+      setError(errorText(e, 'Kaydedilemedi'));
     } finally {
       setBusy(false);
     }

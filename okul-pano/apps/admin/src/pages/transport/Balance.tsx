@@ -1,4 +1,4 @@
-import { isHalfDayHoliday } from '@okulpano/shared';
+import { isHalfDayHoliday, errorText } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { Scale } from '../../components/icons.tsx';
@@ -203,7 +203,7 @@ export function AutoFillDialog({
       toast.success(res.days ? `${res.days} gün dolduruldu (${res.assignments} görev). Takvimde değiştirebilirsiniz.` : 'Doldurulacak boş gün yok');
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Dağıtılamadı');
+      setError(errorText(err, 'Dağıtılamadı'));
     } finally {
       setBusy(false);
     }

@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { useState } from 'react';
 import { changePassword } from '../../src/api.ts';
 import { colors } from '../../src/theme.ts';
@@ -23,7 +24,7 @@ export default function Sifre() {
       setAgain('');
       setMessage({ ok: true, text: 'Şifreniz değişti. Diğer cihazlarda yeniden giriş yapmanız gerekecek.' });
     } catch (err) {
-      setMessage({ ok: false, text: err instanceof Error ? err.message : 'Değiştirilemedi' });
+      setMessage({ ok: false, text: errorText(err, 'Değiştirilemedi') });
     } finally {
       setBusy(false);
     }

@@ -1,4 +1,4 @@
-import { dutySchema, holidayFullName, labelOf, WEEKDAY_NAMES, WEEKDAY_SHORT, type Labels } from '@okulpano/shared';
+import { dutySchema, holidayFullName, labelOf, WEEKDAY_NAMES, WEEKDAY_SHORT, type Labels, errorText } from '@okulpano/shared';
 import clsx from 'clsx';
 import { Bus, CalendarDays, CopyPlus, ShieldCheck, UserCog } from '../components/icons.tsx';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -315,7 +315,7 @@ export function Duties() {
       await refresh();
       toast.success(`${monthLabel(from)} listesi ${monthLabel(month)} ayına kopyalandı (${res.copied} nöbet)`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Kopyalanamadı');
+      toast.error(errorText(err, 'Kopyalanamadı'));
     }
   };
 

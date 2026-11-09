@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
@@ -49,7 +50,7 @@ export default function Katil() {
       await session.setServer(server);
       await fn();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'İşlem yapılamadı');
+      setError(errorText(err, 'İşlem yapılamadı'));
     } finally {
       setBusy(false);
     }

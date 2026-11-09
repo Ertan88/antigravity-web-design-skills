@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { SUPPORT_AREAS, SUPPORT_KINDS, type SupportTicket } from '@okulpano/shared/issues';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
@@ -30,7 +31,7 @@ export default function Talep() {
       void qc.invalidateQueries({ queryKey: platform ? ['platform-support'] : [school?.id, 'support'] });
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'İşlem yapılamadı');
+      setError(errorText(err, 'İşlem yapılamadı'));
       return false;
     } finally {
       setBusy(null);

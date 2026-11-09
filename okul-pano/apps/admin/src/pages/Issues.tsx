@@ -1,4 +1,4 @@
-import { isVocationalBranchName, ISSUE_CATEGORIES, ISSUE_CATEGORY_KEYS, ISSUE_STATUSES, trCompare, type IssueCategory, type IssueMessage, type IssueStatus, type SchoolIssue } from '@okulpano/shared';
+import { isVocationalBranchName, ISSUE_CATEGORIES, ISSUE_CATEGORY_KEYS, ISSUE_STATUSES, trCompare, type IssueCategory, type IssueMessage, type IssueStatus, type SchoolIssue, errorText } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { useEffect, useRef, useState } from 'react';
@@ -106,7 +106,7 @@ export function Issues() {
       await api(`${path}/${id}`, { method: 'PATCH', body: { status } });
       await qc.invalidateQueries({ queryKey: [school?.id, 'issues'] });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Değiştirilemedi');
+      toast.error(errorText(err, 'Değiştirilemedi'));
     }
   };
   const counts = { new: cols[0]!.items.length, in_progress: cols[1]!.items.length };
@@ -239,7 +239,7 @@ function IssueDetail({ id, manager, onClose }: { id: string; manager: boolean; o
       refresh(await api<SchoolIssue>(url, { method, body }));
       return true;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'İşlem yapılamadı');
+      toast.error(errorText(err, 'İşlem yapılamadı'));
       return false;
     } finally {
       setBusy(false);
@@ -319,7 +319,7 @@ export function IssueForm({ onClose }: { onClose: () => void }) {
       const { url } = await api<{ url: string }>(`${path}/photo`, { method: 'POST', form });
       setV((x) => ({ ...x, photoUrl: url }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fotoğraf yüklenemedi');
+      setError(errorText(err, 'Fotoğraf yüklenemedi'));
     } finally {
       setUploading(false);
     }
@@ -333,7 +333,7 @@ export function IssueForm({ onClose }: { onClose: () => void }) {
       toast.success('Sorun idareye iletildi');
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gönderilemedi');
+      setError(errorText(err, 'Gönderilemedi'));
     } finally {
       setBusy(false);
     }
@@ -451,7 +451,7 @@ function OwnersDialog({ onClose }: { onClose: () => void }) {
       toast.success('Sorumlular kaydedildi');
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Kaydedilemedi');
+      toast.error(errorText(err, 'Kaydedilemedi'));
     } finally {
       setBusy(false);
     }

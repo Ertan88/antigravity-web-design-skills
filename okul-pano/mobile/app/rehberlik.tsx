@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -42,7 +43,7 @@ export default function Rehberlik() {
         predicate: (q) => String(q.queryKey[1] ?? '').startsWith('conduct/alerts'),
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Kaydedilemedi');
+      setError(errorText(e, 'Kaydedilemedi'));
     } finally {
       setBusy(false);
     }

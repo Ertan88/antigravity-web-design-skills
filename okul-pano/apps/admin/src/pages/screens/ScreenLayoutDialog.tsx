@@ -1,4 +1,4 @@
-import { resolveLayout, type BoardLayout } from '@okulpano/shared';
+import { resolveLayout, type BoardLayout, errorText } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { LayoutEditor } from '../../components/LayoutEditor.tsx';
@@ -40,7 +40,7 @@ export function ScreenLayoutPanel({ screen, editable, onDone }: { screen: Screen
       toast.success(custom ? `${screen.name} için özel düzen kaydedildi` : `${screen.name} okulun varsayılan düzenini kullanacak`);
       onDone?.();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Kaydedilemedi');
+      toast.error(errorText(err, 'Kaydedilemedi'));
     } finally {
       setSaving(false);
     }

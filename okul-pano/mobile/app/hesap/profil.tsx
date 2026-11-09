@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { api } from '../../src/api.ts';
@@ -29,7 +30,7 @@ export default function Profil() {
       setPassword('');
       setMessage({ ok: true, text: emailChanged ? 'Kaydedildi. Bundan sonra yeni e-postanızla giriş yapın.' : 'Kaydedildi.' });
     } catch (err) {
-      setMessage({ ok: false, text: err instanceof Error ? err.message : 'Kaydedilemedi' });
+      setMessage({ ok: false, text: errorText(err, 'Kaydedilemedi') });
     } finally {
       setBusy(false);
     }

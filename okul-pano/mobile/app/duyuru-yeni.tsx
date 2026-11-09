@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { ANNOUNCEMENT_TEMPLATES, designFields, designTemplate, designTitle, type AnnouncementDesign } from '@okulpano/shared/designs';
 import { useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
@@ -56,7 +57,7 @@ export default function DuyuruYeni() {
       setImageUrl(url);
       setKind('image');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fotoğraf yüklenemedi');
+      setError(errorText(err, 'Fotoğraf yüklenemedi'));
     } finally {
       setUploading(false);
     }
@@ -89,7 +90,7 @@ export default function DuyuruYeni() {
       await Promise.all(['announcements', 'control-center'].map((k) => qc.invalidateQueries({ queryKey: [school?.id, k] })));
       router.back();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Kaydedilemedi');
+      setError(errorText(err, 'Kaydedilemedi'));
     } finally {
       setBusy(false);
     }

@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { AlertTriangle, FileSpreadsheet, Loader2, UserPlus } from './icons.tsx';
@@ -145,7 +146,7 @@ export function ExcelImportDialog<R, P extends ImportPreview<R>, O>(props: Excel
       toast.success(props.successMessage(result, preview, options));
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'İçe aktarma başarısız.');
+      setError(errorText(err, 'İçe aktarma başarısız.'));
     } finally {
       setSaving(false);
     }

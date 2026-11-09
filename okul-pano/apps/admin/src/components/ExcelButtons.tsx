@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { FileDown, FileSpreadsheet, Upload } from './icons.tsx';
 import { useRef, useState, type ReactNode } from 'react';
 import { downloadFile, excelFileName } from '../lib/api.ts';
@@ -46,7 +47,7 @@ export function ExcelButtons({
         excelFileName(kind === 'template' ? undefined : school.data?.name, `${module}${kind === 'template' ? ' Şablonu' : ''}${period ? ` (${period})` : ''}`),
       );
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'İndirilemedi');
+      toast.error(errorText(err, 'İndirilemedi'));
     } finally {
       setBusy(null);
     }

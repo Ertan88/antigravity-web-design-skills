@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Linking, Pressable, ScrollView, View } from 'react-native';
@@ -62,7 +63,7 @@ export default function Isletmelerim() {
       setOpen(null);
       refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Silinemedi');
+      setError(errorText(e, 'Silinemedi'));
     }
   };
 
@@ -188,7 +189,7 @@ function InfoSheet({ business, onClose, onSaved }: { business: Business | null; 
       else await api(path, { method: 'POST', body });
       onSaved();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Kaydedilemedi');
+      setError(errorText(e, 'Kaydedilemedi'));
     } finally {
       setBusy(false);
     }

@@ -1,4 +1,4 @@
-import { SUPPORT_AREAS, SUPPORT_KINDS, SUPPORT_STATUSES, type SupportArea, type SupportKind, type SupportStatus, type SupportTicket } from '@okulpano/shared';
+import { SUPPORT_AREAS, SUPPORT_KINDS, SUPPORT_STATUSES, type SupportArea, type SupportKind, type SupportStatus, type SupportTicket, errorText } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { useRef, useState } from 'react';
@@ -74,7 +74,7 @@ function TicketDialog({ id, base, platform, onClose }: { id: string; base: strin
       void qc.invalidateQueries({ queryKey: ['support', base, 'list'] });
       return true;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Gönderilemedi');
+      toast.error(errorText(err, 'Gönderilemedi'));
       return false;
     } finally {
       setBusy(false);
@@ -156,7 +156,7 @@ function NewTicket({ base, onClose, onCreated }: { base: string; onClose: () => 
     try {
       setV({ ...v, attachmentUrl: await uploadImage(schoolId, await shrinkImage(f)) });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Yüklenemedi');
+      setError(errorText(err, 'Yüklenemedi'));
     }
   };
   const save = async () => {
@@ -169,7 +169,7 @@ function NewTicket({ base, onClose, onCreated }: { base: string; onClose: () => 
       onClose();
       onCreated(t.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gönderilemedi');
+      setError(errorText(err, 'Gönderilemedi'));
     } finally {
       setBusy(false);
     }

@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { useCallback, useState } from 'react';
 import type { ZodType } from 'zod';
 import { ApiError } from './api.ts';
@@ -40,7 +41,7 @@ export function useForm<T extends Record<string, unknown>>(initial: T) {
       for (const i of err.issues) next[i.path.split('.')[0] || '_form'] ??= i.message;
       setErrors(next);
     } else {
-      setErrors({ _form: err instanceof Error ? err.message : 'Beklenmeyen bir hata oluştu.' });
+      setErrors({ _form: errorText(err, 'Beklenmeyen bir hata oluştu.') });
     }
   }, []);
 

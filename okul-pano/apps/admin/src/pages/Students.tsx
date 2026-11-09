@@ -1,4 +1,4 @@
-import { compareClassNames, layoutModules, normalizeClassName, resolveLayout, studentSchema } from '@okulpano/shared';
+import { compareClassNames, layoutModules, normalizeClassName, resolveLayout, studentSchema, errorText } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { Cake, ClipboardPaste, FileUp, Search, Trash2 } from '../components/icons.tsx';
 import { useMemo, useRef, useState } from 'react';
@@ -168,7 +168,7 @@ function ImportModal({ open, onClose }: { open: boolean; onClose: () => void }) 
       setText('');
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'İçe aktarma başarısız.');
+      setError(errorText(err, 'İçe aktarma başarısız.'));
     } finally {
       setBusy(false);
     }
@@ -246,7 +246,7 @@ function ClearStudents({ count }: { count: number }) {
       await qc.invalidateQueries({ queryKey: [schoolId, 'students'] });
       toast.success(`Öğrenci listesi temizlendi (${res.deleted} öğrenci)`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Silinemedi');
+      toast.error(errorText(err, 'Silinemedi'));
     } finally {
       setBusy(false);
     }

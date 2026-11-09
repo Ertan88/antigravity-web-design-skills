@@ -1,4 +1,4 @@
-import { SCHOOL_TYPES, SPECIAL_DAYS, specialDayFor, splitSchoolName, updateSchoolSchema, type SchoolSettings } from '@okulpano/shared';
+import { SCHOOL_TYPES, SPECIAL_DAYS, specialDayFor, splitSchoolName, updateSchoolSchema, type SchoolSettings, errorText } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Download, ExternalLink, FileText, MapPin, Search } from '../components/icons.tsx';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -72,7 +72,7 @@ function CitySearch({ onPick }: { onPick: (r: GeoResult) => void }) {
     try {
       setResults(await api<GeoResult[]>(`/api/geocode?q=${encodeURIComponent(q.trim())}`));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Arama başarısız');
+      setError(errorText(err, 'Arama başarısız'));
     } finally {
       setBusy(false);
     }
@@ -144,7 +144,7 @@ function PrivacySection({ value, onChange, slug }: { value: string; onChange: (v
       onChange(text);
       toast.success('Şablon dolduruldu: köşeli parantezli yerleri okulunuzun bilgileriyle değiştirip kaydedin');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Şablon alınamadı');
+      toast.error(errorText(err, 'Şablon alınamadı'));
     } finally {
       setBusy(null);
     }
@@ -155,7 +155,7 @@ function PrivacySection({ value, onChange, slug }: { value: string; onChange: (v
       const data = await api(`${path}/export`);
       downloadJson(data, `okul-pano-${slug}-${new Date().toISOString().slice(0, 10)}.json`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Dışa aktarılamadı');
+      toast.error(errorText(err, 'Dışa aktarılamadı'));
     } finally {
       setBusy(null);
     }

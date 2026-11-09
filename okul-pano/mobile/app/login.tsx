@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { useState } from 'react';
 import { Image, Linking, Pressable, View } from 'react-native';
 import { Text } from '../src/text.tsx';
@@ -39,7 +40,7 @@ export default function Login() {
     try {
       await signIn(server, email, password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Giriş yapılamadı');
+      setError(errorText(err, 'Giriş yapılamadı'));
     } finally {
       setBusy(false);
     }

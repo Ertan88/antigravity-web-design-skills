@@ -1,4 +1,4 @@
-import { compareClassNames, gradeHue, gradeOf, normalizeClassName } from '@okulpano/shared';
+import { compareClassNames, gradeHue, gradeOf, normalizeClassName, errorText } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { Check, Pencil, Plus, Trash2, X } from '../../components/icons.tsx';
@@ -64,7 +64,7 @@ export function ClassesPanel({
       toast.success(fresh.length > 1 ? `${fresh.length} sınıf eklendi` : `${fresh[0]} eklendi`);
       if (!activeId && created[0]) onSelect(created[0].id);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Eklenemedi');
+      toast.error(errorText(err, 'Eklenemedi'));
     } finally {
       setBusy(false);
     }
@@ -81,7 +81,7 @@ export function ClassesPanel({
       await refresh();
       setEditing(null);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Kaydedilemedi');
+      toast.error(errorText(err, 'Kaydedilemedi'));
     }
   };
 
@@ -94,7 +94,7 @@ export function ClassesPanel({
       if (id === activeId) onSelect('');
       toast.success('Sınıf silindi');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Silinemedi');
+      toast.error(errorText(err, 'Silinemedi'));
     }
   };
 

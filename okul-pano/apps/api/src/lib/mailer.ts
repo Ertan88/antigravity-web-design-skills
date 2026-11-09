@@ -31,7 +31,41 @@ async function sendBrevo(url: string, apiKey: string, from: string, msg: { to: s
     body: JSON.stringify({ sender: parseFrom(from), to: [{ email: msg.to }], subject: msg.subject, textContent: msg.text }),
     signal: AbortSignal.timeout(15_000),
   });
-  if (!res.ok) throw new Error(`E-posta gönderilemedi (Brevo ${res.status}): ${(await res.text()).slice(0, 200)}`);
+  if (!res.ok) throw new Error(brevoError(res.status, await res.text().catch(() => '')));
+}
+
+/** Brevo'nun İngilizce hata yanıtını yöneticinin anlayacağı Türkçe açıklamaya çevirir */
+export function brevoError(status: number, body: string): string {
+  let text = body;
+  try {
+    const json = JSON.parse(body) as { message?: string; code?: string };
+    text = `${json.code ?? ''} ${json.message ?? ''}`;
+  } catch {
+    /* düz metin */
+  }
+  const ip = /(\d{1,3}(?:\.\d{1,3}){3}|[0-9a-f]{1,4}(?::[0-9a-f]{0,4}){2,7})/i.exec(text)?.[1];
+  if (/unrecogni[sz]ed ip|ip address/i.test(text))
+    return `Brevo bu sunucunun IP adresini${ip ? ` (${ip})` : ''} tanımıyor. Brevo'da Security → Authorised IPs sayfasından bu adresi onaylayın ya da IP engellemeyi kapatın.`;
+  if (status === 401 || /key not found|unauthori[sz]ed|invalid api key/i.test(text)) return 'Brevo API anahtarı geçersiz ya da silinmiş. Brevo → SMTP & API → API Keys bölümünden yeni anahtar oluşturup girin.';
+  if (/sender|from/i.test(text) && /valid|verif|not (?:allowed|found)/i.test(text))
+    return "Gönderen e-posta adresi Brevo'da doğrulanmamış. Brevo → Senders bölümünden adresi ekleyip gelen onay e-postasını onaylayın.";
+  if (status === 402 || /credit|plan|not enough/i.test(text)) return 'Brevo hesabınızda gönderim hakkı kalmadı (günlük ücretsiz sınır dolmuş olabilir). Yarın tekrar deneyin ya da Brevo planınızı kontrol edin.';
+  if (/not (?:yet )?activated|account.*(?:suspend|block|validat)/i.test(text)) return 'Brevo hesabınız henüz onaylanmamış ya da askıya alınmış. Brevo panelindeki uyarıları kontrol edin.';
+  if (status === 403) return 'Brevo bu gönderime izin vermedi. Brevo panelindeki hesap ve güvenlik uyarılarını kontrol edin.';
+  if (status === 429) return 'Brevo kısa sürede çok fazla istek aldı. Birkaç dakika sonra tekrar deneyin.';
+  if (/email.*(?:invalid|valid)|invalid.*email/i.test(text)) return 'Alıcı e-posta adresi geçersiz.';
+  if (status >= 500) return 'Brevo şu anda yanıt vermiyor. Biraz sonra tekrar deneyin.';
+  return `E-posta gönderilemedi (Brevo hata kodu ${status}).`;
+}
+
+/** SMTP (nodemailer) hatalarını Türkçeye çevirir */
+export function smtpError(err: unknown): string {
+  const e = err as { code?: string; responseCode?: number; message?: string };
+  if (e?.code === 'EAUTH' || e?.responseCode === 535) return 'E-posta sunucusu kullanıcı adını ya da şifreyi kabul etmedi (SMTP_USER / SMTP_PASS).';
+  if (['ECONNECTION', 'ETIMEDOUT', 'ESOCKET', 'ECONNREFUSED', 'EDNS', 'ENOTFOUND'].includes(e?.code ?? ''))
+    return 'E-posta sunucusuna bağlanılamadı. Sunucu adresini ve portu kontrol edin; bazı barındırmalar (ör. Render) SMTP portlarını kapatır, Brevo API anahtarı kullanın.';
+  if (e?.code === 'EENVELOPE') return 'Gönderen ya da alıcı e-posta adresi geçersiz.';
+  return 'E-posta gönderilemedi. E-posta ayarlarını kontrol edin.';
 }
 
 /** Panelden girilmiş (henüz kaydedilmemiş olabilecek) ayarla deneme gönderimi */
@@ -72,7 +106,12 @@ export async function sendMail(env: Env, msg: { to: string; subject: string; tex
             }),
     };
   }
-  await cached.transport.sendMail({ from: env.SMTP_FROM, ...msg });
+  try {
+    await cached.transport.sendMail({ from: env.SMTP_FROM, ...msg });
+  } catch (err) {
+    console.error('[e-posta] SMTP:', err instanceof Error ? err.message : err);
+    throw new Error(smtpError(err));
+  }
   return true;
 }
 

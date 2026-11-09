@@ -28,11 +28,63 @@ function pgCode(err: unknown): string | undefined {
   return undefined;
 }
 
+/** Doğrulama hatasında alanın Türkçe adı (mesajın başına yazılır; bilinmeyen alanlarda yalnızca mesaj) */
+const FIELD_LABELS: Record<string, string> = {
+  email: 'E-posta',
+  fullName: 'Ad soyad',
+  name: 'Ad',
+  password: 'Şifre',
+  currentPassword: 'Mevcut şifre',
+  phone: 'Telefon',
+  title: 'Başlık',
+  body: 'Metin',
+  message: 'Mesaj',
+  description: 'Açıklama',
+  note: 'Not',
+  date: 'Tarih',
+  startDate: 'Başlangıç tarihi',
+  endDate: 'Bitiş tarihi',
+  startsAt: 'Başlangıç',
+  endsAt: 'Bitiş',
+  time: 'Saat',
+  role: 'Rol',
+  className: 'Sınıf',
+  subject: 'Ders',
+  schoolNo: 'Okul numarası',
+  birthDate: 'Doğum tarihi',
+  url: 'Bağlantı',
+  website: 'Web sitesi',
+  youtubeUrl: 'YouTube bağlantısı',
+  location: 'Konum',
+  label: 'Etiket',
+  slug: 'Okul adresi',
+  from: 'Gönderen',
+  code: 'Kod',
+  emailCode: 'Doğrulama kodu',
+};
+
+/** Fastify ve eklentilerinin İngilizce hata metinleri yerine durum koduna göre Türkçe açıklama */
+const STATUS_MESSAGES: Record<number, string> = {
+  400: 'İstek okunamadı. Sayfayı yenileyip tekrar deneyin.',
+  401: 'Oturum açmanız gerekiyor.',
+  403: 'Bu işlem için yetkiniz yok.',
+  404: 'Kayıt bulunamadı.',
+  405: 'Bu işlem desteklenmiyor.',
+  406: 'İstek biçimi desteklenmiyor.',
+  408: 'İstek zaman aşımına uğradı. Lütfen tekrar deneyin.',
+  409: 'Bu kayıt başka bir işlemle çakışıyor.',
+  411: 'İstek okunamadı. Sayfayı yenileyip tekrar deneyin.',
+  413: 'Gönderilen veri çok büyük.',
+  414: 'Adres çok uzun.',
+  415: 'Gönderilen içerik türü desteklenmiyor.',
+  429: 'Çok fazla deneme yaptınız, lütfen biraz bekleyin.',
+};
+
 export function errorHandler(err: FastifyError | Error, req: FastifyRequest, reply: FastifyReply) {
   if (err instanceof ZodError) {
     return reply.status(400).send({
       error: 'validation',
-      message: err.issues[0]?.message ?? 'Geçersiz veri.',
+      message: validationMessage(err),
       issues: err.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
     });
   }
@@ -57,9 +109,18 @@ export function errorHandler(err: FastifyError | Error, req: FastifyRequest, rep
     return reply.status(400).send({ error: 'bad_upload', message: 'Dosya okunamadı. Lütfen tekrar seçip yükleyin.' });
   }
   if (status && status < 500) {
-    const message = status === 429 ? 'Çok fazla deneme yaptınız, lütfen biraz bekleyin.' : err.message;
+    // Buraya yalnızca Fastify ve eklentilerinin hataları düşer (kendi hatalarımız HttpError); mesajları İngilizcedir
+    const message = STATUS_MESSAGES[status] ?? 'İstek işlenemedi. Lütfen tekrar deneyin.';
     return reply.status(status).send({ error: (err as FastifyError).code ?? 'error', message });
   }
   req.log.error(err);
   return reply.status(500).send({ error: 'internal', message: 'Beklenmeyen bir hata oluştu.' });
+}
+
+function validationMessage(err: ZodError): string {
+  const issue = err.issues[0];
+  if (!issue) return 'Geçersiz veri.';
+  const key = [...issue.path].reverse().find((p): p is string => typeof p === 'string');
+  const label = key ? FIELD_LABELS[key] : undefined;
+  return label && !issue.message.toLocaleLowerCase('tr-TR').includes(label.toLocaleLowerCase('tr-TR')) ? `${label}: ${issue.message}` : issue.message;
 }

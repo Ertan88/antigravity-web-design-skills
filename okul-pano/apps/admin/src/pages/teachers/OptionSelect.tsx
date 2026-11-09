@@ -1,4 +1,4 @@
-import { normalizeName } from '@okulpano/shared';
+import { normalizeName, errorText } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { Check, X } from '../../components/icons.tsx';
 import { useState } from 'react';
@@ -62,7 +62,7 @@ export function OptionSelect({
       setAdding(false);
       setName('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Eklenemedi');
+      setError(errorText(err, 'Eklenemedi'));
     } finally {
       setBusy(false);
     }

@@ -1,3 +1,4 @@
+export * from './zodTr.ts';
 export * from './bell.ts';
 export * from './classes.ts';
 export * from './display.ts';

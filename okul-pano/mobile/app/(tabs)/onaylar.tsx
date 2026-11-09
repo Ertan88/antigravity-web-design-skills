@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { View } from 'react-native';
@@ -67,7 +68,7 @@ function useReview(resource: 'announcements' | 'leaves', id: string, onDone: () 
       await api(`${path}/${action}`, { method: 'POST', body: note ? { note } : {} });
       await onDone();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'İşlem yapılamadı');
+      setError(errorText(err, 'İşlem yapılamadı'));
     } finally {
       setBusy(null);
     }

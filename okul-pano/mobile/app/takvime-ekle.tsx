@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { useState } from 'react';
 import { Platform } from 'react-native';
 import { syncToPhoneCalendar, type CalendarItem } from '../src/calendar.ts';
@@ -67,7 +68,7 @@ export default function TakvimeEkle() {
             : { ok: false, text: 'Bu cihazda telefon takvimi kullanılamıyor.' },
       );
     } catch (err) {
-      setMessage({ ok: false, text: err instanceof Error ? err.message : 'Takvime yazılamadı' });
+      setMessage({ ok: false, text: errorText(err, 'Takvime yazılamadı') });
     } finally {
       setBusy(false);
     }

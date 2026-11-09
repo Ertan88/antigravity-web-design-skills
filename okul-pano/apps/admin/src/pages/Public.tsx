@@ -1,4 +1,4 @@
-import { SCHOOL_TYPES } from '@okulpano/shared';
+import { SCHOOL_TYPES, errorText } from '@okulpano/shared';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, CheckCircle2, MailCheck } from '../components/icons.tsx';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -95,7 +95,7 @@ export function Signup() {
     try {
       setSent(await api<{ emailed: boolean }>('/api/signup', { method: 'POST', body: { ...form, district: form.district || null, kvkk, marketing, website } }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Kayıt yapılamadı.');
+      setError(errorText(err, 'Kayıt yapılamadı.'));
     } finally {
       setBusy(false);
     }
@@ -287,7 +287,7 @@ export function AcceptInvite() {
       window.history.replaceState(null, '', `${import.meta.env.BASE_URL}`);
       await login(email, password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Şifre kaydedilemedi.');
+      setError(errorText(err, 'Şifre kaydedilemedi.'));
       setBusy(false);
     }
   };

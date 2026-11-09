@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { router, usePathname } from 'expo-router';
 import { useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { ActivityIndicator, Animated, Easing, Keyboard, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, TextInput as NativeTextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
@@ -528,7 +529,7 @@ export function ErrorNote({ error }: { error: unknown }) {
   return (
     <Card tone="danger">
       <T color={colors.danger} weight="600">
-        {error instanceof Error ? error.message : 'Bir hata oluştu'}
+        {errorText(error, 'Bir hata oluştu')}
       </T>
     </Card>
   );

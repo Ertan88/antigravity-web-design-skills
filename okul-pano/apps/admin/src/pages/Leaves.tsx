@@ -1,4 +1,4 @@
-import { layoutModules, leaveSchema, resolveLayout } from '@okulpano/shared';
+import { layoutModules, leaveSchema, resolveLayout, errorText } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { Check, UserMinus, X } from '../components/icons.tsx';
 import { useState } from 'react';
@@ -33,7 +33,7 @@ export function Leaves() {
       await qc.invalidateQueries({ queryKey: [schoolId, 'leaves'] });
       toast.success(status === 'approve' ? `${names.get(row.teacherId) ?? 'İzin'} onaylandı, panoda görünüyor` : 'İzin talebi reddedildi');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'İşlem yapılamadı');
+      toast.error(errorText(err, 'İşlem yapılamadı'));
     } finally {
       setBusy(null);
     }

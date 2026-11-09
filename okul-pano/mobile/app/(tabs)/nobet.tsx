@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { normalizeName } from '@okulpano/shared/teachers';
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
@@ -403,7 +404,7 @@ function GapCard({ day, gap, canAssign }: { day: DutyDay; gap: DutyDay['entries'
         qc.invalidateQueries({ queryKey: [school?.id, 'control-center'] }),
       ]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Atanamadı');
+      setError(errorText(err, 'Atanamadı'));
     } finally {
       setBusy(null);
     }

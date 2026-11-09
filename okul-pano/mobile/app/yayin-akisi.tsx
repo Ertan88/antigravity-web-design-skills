@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { DESIGN_PALETTES } from '@okulpano/shared/designs';
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
@@ -46,7 +47,7 @@ export default function YayinAkisi() {
       await api(`${path}/${a.id}`, { method: 'PATCH', body: { isActive: !a.isActive } });
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Değiştirilemedi');
+      setError(errorText(err, 'Değiştirilemedi'));
     }
   };
   // Panodaki sıra: listedeki sıra (yukarı / aşağı taşıyınca bütün liste yeniden numaralanır)
@@ -63,7 +64,7 @@ export default function YayinAkisi() {
       await api(`${path}/reorder`, { method: 'POST', body: { ids } });
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sıralanamadı');
+      setError(errorText(err, 'Sıralanamadı'));
     }
   };
 

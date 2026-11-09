@@ -1,4 +1,4 @@
-import { compareClassNames, EXAM_KINDS, gradeOf, type ExamKind, type ScheduledExam } from '@okulpano/shared';
+import { compareClassNames, EXAM_KINDS, gradeOf, type ExamKind, type ScheduledExam, errorText } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { useMemo, useRef, useState } from 'react';
@@ -111,7 +111,7 @@ export function ExamSchedule() {
     try {
       await downloadFile(`${path}/template`, 'Sınav Takvimi Şablonu.xlsx');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'İndirilemedi');
+      toast.error(errorText(err, 'İndirilemedi'));
     }
   };
 
@@ -404,7 +404,7 @@ function ExamDialog({ exam, options, onClose }: { exam: Partial<ScheduledExam>; 
       else toast.success(`Kaydedildi · ${saved.className} ${saved.subject}, ${saved.periodNo}. ders${saved.start ? ` (${saved.start})` : ''}`);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Kaydedilemedi.');
+      setError(errorText(err, 'Kaydedilemedi.'));
     } finally {
       setBusy(false);
     }
@@ -425,7 +425,7 @@ function ExamDialog({ exam, options, onClose }: { exam: Partial<ScheduledExam>; 
       toast.success('Sınav silindi');
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Silinemedi.');
+      setError(errorText(err, 'Silinemedi.'));
     }
   };
 
@@ -610,7 +610,7 @@ function ExamImportDialog({ file, onClose }: { file: File | null; onClose: () =>
       toast.success(`${res.created} sınav eklendi${res.updated ? `, ${res.updated} sınav güncellendi` : ''}`);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Kaydedilemedi.');
+      setError(errorText(err, 'Kaydedilemedi.'));
     } finally {
       setSaving(false);
     }

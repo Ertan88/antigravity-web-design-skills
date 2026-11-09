@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { ISSUE_CATEGORIES, type SchoolIssue } from '@okulpano/shared/issues';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
@@ -37,7 +38,7 @@ export default function SorunDetay() {
       void qc.invalidateQueries({ queryKey: [school?.id, 'issues'] });
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'İşlem yapılamadı');
+      setError(errorText(err, 'İşlem yapılamadı'));
       return false;
     } finally {
       setBusy(null);

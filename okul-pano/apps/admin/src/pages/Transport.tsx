@@ -1,4 +1,4 @@
-import { holidayFullName, isHalfDayHoliday, labelOf } from '@okulpano/shared';
+import { holidayFullName, isHalfDayHoliday, labelOf, errorText } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { Bus, Sunrise, Sunset, Utensils, Wand2 } from '../components/icons.tsx';
@@ -291,7 +291,7 @@ export function TransportView({ month }: { month: string }) {
       await api(`${path}/${iso}`, { method: 'PUT', body: { teacherIds } });
       await qc.invalidateQueries({ queryKey: [schoolId, 'transport-duties'] });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Kaydedilemedi');
+      toast.error(errorText(err, 'Kaydedilemedi'));
       throw err;
     }
   };

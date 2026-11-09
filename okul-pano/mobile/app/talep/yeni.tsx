@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { SUPPORT_AREAS, SUPPORT_KIND_KEYS, SUPPORT_KINDS, type SupportArea, type SupportKind, type SupportTicket } from '@okulpano/shared/issues';
 import { useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
@@ -39,7 +40,7 @@ export default function YeniTalep() {
       setAttachmentUrl(url);
       setPreview(asset.uri);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Görsel yüklenemedi');
+      setError(errorText(err, 'Görsel yüklenemedi'));
     } finally {
       setUploading(false);
     }
@@ -53,7 +54,7 @@ export default function YeniTalep() {
       await qc.invalidateQueries({ queryKey: [school?.id, 'support'] });
       router.replace(`/talep/${t.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gönderilemedi');
+      setError(errorText(err, 'Gönderilemedi'));
     } finally {
       setBusy(false);
     }

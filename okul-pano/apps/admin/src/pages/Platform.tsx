@@ -1,4 +1,4 @@
-import { createSchoolSchema, PLANS, trialStatus, type Plan } from '@okulpano/shared';
+import { createSchoolSchema, PLANS, trialStatus, type Plan, errorText } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Building2, Check, Download, Inbox, Lock, Plus, Trash2 } from '../components/icons.tsx';
 import { useState } from 'react';
@@ -90,7 +90,7 @@ export function Platform() {
     try {
       downloadJson(await api(`/api/schools/${s.id}/export`), `okul-pano-${s.slug}-${new Date().toISOString().slice(0, 10)}.json`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Dışa aktarılamadı');
+      toast.error(errorText(err, 'Dışa aktarılamadı'));
     }
   };
 

@@ -46,7 +46,17 @@ describe('platform e-posta ayarı', () => {
   it('yanlış anahtarla deneme hatayı gösterir', async () => {
     const res = await root.post('/api/platform/mail/test', { brevoApiKey: 'yanlis', from: 'Okul <okul.bildirim@gmail.com>' });
     expectStatus(res, 400);
-    expect(res.json().message).toContain('401');
+    expect(res.json().message).toContain('API anahtarı geçersiz');
+  });
+
+  it('Brevo hataları Türkçe açıklanır', async () => {
+    const { brevoError } = await import('../src/lib/mailer.ts');
+    const ip = brevoError(401, JSON.stringify({ code: 'unauthorized', message: 'We have detected you are using an unrecognised IP address 74.220.51.162. If you performed this action make sure to add the new IP address in this link: https://app.brevo.com/security/authorised_ips' }));
+    expect(ip).toContain('74.220.51.162');
+    expect(ip).toContain('Authorised IPs');
+    expect(brevoError(400, JSON.stringify({ code: 'invalid_parameter', message: 'Sender is not valid' }))).toContain('Senders');
+    expect(brevoError(402, '{"message":"Not enough credits"}')).toContain('gönderim hakkı');
+    expect(brevoError(500, 'oops')).toContain('yanıt vermiyor');
   });
 
   it('kaydedilir, anahtar maskelenir ve şifreli saklanır; gönderimler bu ayarla gider', async () => {

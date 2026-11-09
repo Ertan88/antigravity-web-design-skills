@@ -1,4 +1,4 @@
-import { ENROLL_ROLES, normalizeName, type EnrollRole } from '@okulpano/shared';
+import { ENROLL_ROLES, normalizeName, type EnrollRole, errorText } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { Check, Copy, KeyRound, Mail, QrCodeIcon, Search, Tags, X } from '../../components/icons.tsx';
@@ -147,7 +147,7 @@ export function RosterTab() {
         await api(`${enrollPath}/${r.enrollmentId}/approve`, { method: 'POST', body: { role: r.role } });
         ok++;
       } catch (err) {
-        toast.error(`${r.t.fullName}: ${err instanceof Error ? err.message : 'onaylanamadı'}`);
+        toast.error(`${r.t.fullName}: ${errorText(err, 'onaylanamadı')}`);
       }
     }
     setBusy(false);
@@ -173,7 +173,7 @@ export function RosterTab() {
         await api(`${enrollPath}/invite`, { method: 'POST', body: { teacherId: r.t.id, role: r.role } });
         ok++;
       } catch (err) {
-        toast.error(`${r.t.fullName}: ${err instanceof Error ? err.message : 'gönderilemedi'}`);
+        toast.error(`${r.t.fullName}: ${errorText(err, 'gönderilemedi')}`);
       }
     }
     setBusy(false);

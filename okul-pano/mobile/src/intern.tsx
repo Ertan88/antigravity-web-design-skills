@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
@@ -135,7 +136,7 @@ export function useMarks() {
         await qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === school?.id && String(q.queryKey[1] ?? '').startsWith('internship') });
         return true;
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Kaydedilemedi');
+        setError(errorText(e, 'Kaydedilemedi'));
         return false;
       } finally {
         setBusy(false);
@@ -184,7 +185,7 @@ export function ReportSheet({ student, from, onClose, onSaved }: { student: { id
       await api(path, { method: 'POST', body: { date: from, until, items: HALVES.map((half) => ({ studentId: student.id, half, code })) } });
       onSaved(`${student.fullName}: ${days === 1 ? shortDate(from) : `${shortDate(from)} – ${shortDate(until)}`} ${SHEET_CODES.find((c) => c.code === code)!.label.split(' (')[0]!.toLocaleLowerCase('tr-TR')} kaydedildi.`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Kaydedilemedi');
+      setError(errorText(e, 'Kaydedilemedi'));
     } finally {
       setBusy(false);
     }
@@ -297,7 +298,7 @@ export function SendSheet({ rows, onClose, onSent }: { rows: PendingMark[]; onCl
       const r = await api<{ sent: number }>(path, { method: 'POST', body: { ids, note: note.trim() || undefined } });
       onSent(`${days(r.sent / 2)} günlük devamsızlık müdür yardımcısına gönderildi.`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Gönderilemedi');
+      setError(errorText(e, 'Gönderilemedi'));
     } finally {
       setBusy(false);
     }
@@ -402,7 +403,7 @@ export function FillSheet({
       const r = await api<{ changed: number }>(path, { method: 'POST', body: { from: RANGES.find((x) => x.key === range)!.from, until: today, businessId: biz || null } });
       onDone(r.changed ? `${days(r.changed / 2)} gün “İşletmede” işaretlendi.` : 'İşaretsiz gün yoktu.');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Kaydedilemedi');
+      setError(errorText(e, 'Kaydedilemedi'));
     } finally {
       setBusy(false);
     }

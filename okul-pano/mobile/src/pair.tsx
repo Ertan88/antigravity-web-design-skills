@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -48,7 +49,7 @@ export function PairCard({ initialCode, onDone }: { initialCode?: string; onDone
       setName('');
       onDone?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Bağlanamadı');
+      setError(errorText(err, 'Bağlanamadı'));
     } finally {
       setBusy(false);
     }

@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import clsx from 'clsx';
 import { ImagePlus, Loader2, X } from './icons.tsx';
 import { useRef, useState } from 'react';
@@ -59,7 +60,7 @@ export function ImageUpload({
       if (ready.size > MAX_BYTES) return setError('Dosya 10 MB sınırını aşıyor.');
       onChange(await uploadImage(schoolId, ready));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Yükleme başarısız.');
+      setError(errorText(err, 'Yükleme başarısız.'));
     } finally {
       setBusy(false);
     }

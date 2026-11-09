@@ -1,3 +1,4 @@
+import { errorText } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useToast } from '../../components/Toast.tsx';
@@ -47,7 +48,7 @@ export function DeleteAllDialog({ open, onClose }: { open: boolean; onClose: () 
       toast.success(`${res.deleted} öğretmen silindi`);
       close();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Silinemedi.');
+      setError(errorText(err, 'Silinemedi.'));
     } finally {
       setBusy(false);
     }
