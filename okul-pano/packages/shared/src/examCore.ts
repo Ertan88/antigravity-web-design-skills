@@ -105,3 +105,61 @@ export function examReminderText(exam: Pick<ScheduledExam, 'className' | 'subjec
   const role = roles.proctor && roles.subject ? 'Gözetmen sizsiniz; ders de sizin.' : roles.proctor ? 'Gözetmen sizsiniz.' : 'Dersinizin sınavı.';
   return { title: `Sınav: ${exam.className} ${exam.subject}`, body: `${when} ${exam.className} sınıfında ${kind} sınav var. ${role}` };
 }
+
+/**
+ * Aynı gün, aynı kademe (program + sınıf düzeyi: "9", "AMP 10"), aynı ders ve aynı türdeki sınavlar bir grup olur:
+ * listede, panoda ve mobilde tek satır gösterilir. Kayıtlar şube şube tutulmaya devam eder (gözetmen, saat ve
+ * bildirim şubeye göre). Sınıf adı tanınmazsa sınav tek başına kalır. Sıra, ilk sınavın sırasıdır.
+ */
+export interface ExamGroup<T> {
+  key: string;
+  /** "9. sınıflar", "AMP 10. sınıflar"; tek şubede sınıfın kendi adı */
+  label: string;
+  /** Pano etiketi için: "9", "AMP 10"; tek şubede sınıf adı */
+  badge: string;
+  items: T[];
+  /** Şube adları ("9-A", "9-B") */
+  classNames: string[];
+  /** Bütün şubelerde aynı ders saati mi */
+  samePeriod: boolean;
+}
+
+type Groupable = { date: string; className: string; subject: string; kind: ExamKind; periodNo: number };
+
+const CLASS_RE = /^(?:([A-Za-zÇĞİÖŞÜçğıöşü]{2,6})\s+)?(\d{1,2})\s*[-/]\s*(\S+)$/u;
+
+export function groupExams<T extends Groupable>(exams: readonly T[]): ExamGroup<T>[] {
+  const groups = new Map<string, ExamGroup<T>>();
+  for (const e of exams) {
+    const m = CLASS_RE.exec(e.className.trim());
+    const level = m ? `${m[1] ? `${m[1].toLocaleUpperCase('tr-TR')} ` : ''}${Number(m[2])}` : null;
+    const key = [e.date, level ?? `#${e.className}`, e.subject.trim().toLocaleLowerCase('tr-TR'), e.kind].join('|');
+    let g = groups.get(key);
+    if (!g) {
+      g = { key, label: level ? `${level}. sınıflar` : e.className, badge: level ?? e.className, items: [], classNames: [], samePeriod: true };
+      groups.set(key, g);
+    }
+    if (g.items.length && g.items[0]!.periodNo !== e.periodNo) g.samePeriod = false;
+    g.items.push(e);
+    g.classNames.push(e.className);
+  }
+  // Tek şubelik grup sınıfın kendi adıyla görünür
+  for (const g of groups.values()) {
+    if (g.items.length === 1) {
+      g.label = g.items[0]!.className;
+      g.badge = g.items[0]!.className;
+    }
+  }
+  return [...groups.values()];
+}
+
+/** Grubun şubeleri kısaca: "9-A, 9-B" ya da çok şubede "6 şube" */
+export function examGroupClasses(g: Pick<ExamGroup<unknown>, 'classNames'>, max = 4): string {
+  return g.classNames.length > max ? `${g.classNames.length} şube` : g.classNames.join(', ');
+}
+
+/** Grubun ders saati: "2. ders" ya da şubelere göre farklıysa "1. / 3. ders" */
+export function examGroupPeriods(g: Pick<ExamGroup<Groupable>, 'items'>): string {
+  const ps = [...new Set(g.items.map((e) => e.periodNo))].sort((a, b) => a - b);
+  return `${ps.join('. / ')}. ders`;
+}

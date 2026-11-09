@@ -152,3 +152,39 @@ describe('sınav takvimi', () => {
     expect(pushesTo(TOKENS.chem).length).toBe(1);
   });
 });
+
+describe('kademe / çok şube', () => {
+  const NEXT_WED = new Date(Date.parse(`${WED}T12:00:00Z`) + 7 * 86400_000).toISOString().slice(0, 10);
+
+  it('birden çok şubeye tek seferde eklenir; her şubenin gözetmeni kendi dersinden', async () => {
+    const res = await owner.post(`${base}/exam-schedule`, { date: NEXT_WED, periodNo: 1, classGroupIds: [C['10-A'], C['10-B']], subject: 'Kimya', kind: 'common' });
+    expectStatus(res, 201);
+    const exams = res.json().exams as { className: string; proctors: { fullName: string }[] }[];
+    expect(exams.map((e) => e.className).sort()).toEqual(['10-A', '10-B']);
+    expect(exams.find((e) => e.className === '10-A')!.proctors[0]!.fullName).toBe('Cem Kimya');
+    expect(exams.find((e) => e.className === '10-B')!.proctors[0]!.fullName).toBe('Ayşe Matematik');
+  });
+
+  it('dolu saat hangi şubede olduğuyla söylenir; çok şubede elle gözetmen seçilemez', async () => {
+    const dup = await owner.post(`${base}/exam-schedule`, { date: NEXT_WED, periodNo: 1, classGroupIds: [C['10-A'], C['10-B']], subject: 'Kimya' });
+    expectStatus(dup, 400);
+    expect(dup.json().message).toContain('10-A, 10-B');
+    const manual = await owner.post(`${base}/exam-schedule`, { date: NEXT_WED, periodNo: 2, classGroupIds: [C['10-A'], C['10-B']], subject: 'Fizik', proctorTeacherId: T.phys });
+    expectStatus(manual, 400);
+    expectStatus(await owner.post(`${base}/exam-schedule`, { date: NEXT_WED, periodNo: 2, classGroupIds: [], subject: 'Fizik' }), 400);
+  });
+
+  it('Excel: "10. sınıflar" ve "10-A, 10-B" yazılan satır her şube için açılır', async () => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Sınavlar');
+    ws.addRow(['Tarih', 'Ders Saati', 'Sınıf', 'Ders Adı', 'Tür', 'Gözetmen (isteğe bağlı)', 'Not']);
+    ws.addRow(['21.04.2027', 3, '10. sınıflar', 'Matematik', 'Ortak', '', '']);
+    ws.addRow(['21.04.2027', 4, '10-A, 10-B', 'Fizik', 'Yazılı', '', '']);
+    const body = multipartBody('file', 'sinav.xlsx', Buffer.from(await wb.xlsx.writeBuffer()), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    const prev = await t.app.inject({ method: 'POST', url: `${base}/exam-schedule/import/preview`, headers: { ...body.headers, authorization: `Bearer ${(await login(t.app, 'mudur@sinav.test', 'MudurSifre42')).token}` }, payload: body.payload });
+    expectStatus(prev, 200);
+    const rows = prev.json().rows as { classLabel: string; subject: string; periodNo: number }[];
+    expect(rows.map((r) => `${r.periodNo} ${r.classLabel}`).sort()).toEqual(['3 10-A', '3 10-B', '4 10-A', '4 10-B']);
+    expect(prev.json().errors).toHaveLength(0);
+  });
+});

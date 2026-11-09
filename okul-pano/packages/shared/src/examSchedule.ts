@@ -19,6 +19,18 @@ export const examScheduleSchema = z.object({
 });
 export type ExamScheduleInput = z.infer<typeof examScheduleSchema>;
 
+/**
+ * Sınav ekleme: tek şube (classGroupId) ya da birden çok şube / bütün kademe (classGroupIds). Her şube için ayrı
+ * kayıt açılır; gözetmen şubenin o saatteki dersinden bulunur (birden çok şubede elle gözetmen seçilmez).
+ */
+export const examScheduleCreateSchema = examScheduleSchema
+  .extend({
+    classGroupId: z.uuid({ error: 'Sınıf seçin' }).optional(),
+    classGroupIds: z.array(z.uuid()).max(60, 'Tek seferde en fazla 60 şube').optional(),
+  })
+  .refine((v) => Boolean(v.classGroupId) || Boolean(v.classGroupIds?.length), { message: 'En az bir şube seçin', path: ['classGroupIds'] });
+export type ExamScheduleCreateInput = z.infer<typeof examScheduleCreateSchema>;
+
 export const examImportSchema = z.object({
   rows: z.array(examScheduleSchema).min(1, 'Kaydedilecek sınav yok').max(2000, 'Tek seferde en fazla 2000 sınav'),
 });

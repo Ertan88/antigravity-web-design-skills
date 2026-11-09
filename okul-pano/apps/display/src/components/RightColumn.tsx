@@ -1,4 +1,4 @@
-import { formatDuration, gradeHue, periodLabel, type BellStatus, type DisplayState } from '@okulpano/shared/client';
+import { examGroupClasses, examGroupPeriods, formatDuration, gradeHue, groupExams, periodLabel, type BellStatus, type DisplayState } from '@okulpano/shared/client';
 import type { CSSProperties } from 'react';
 import { AutoPager } from './AutoPager.tsx';
 import { useLabel } from './Labels.tsx';
@@ -167,29 +167,38 @@ export function LessonsCard({
 type ScheduledExam = NonNullable<DisplayState['scheduledExams']>[number];
 const EXAM_KIND_LABEL: Record<ScheduledExam['kind'], string> = { written: 'Yazılı', practical: 'Uygulama', common: 'Ortak' };
 
-/** Bugünkü sınavlar: bitmemiş olanlar ders saati sırasıyla; saati gelen sınav vurgulanır (ŞİMDİ) */
+/**
+ * Bugünkü sınavlar: bitmemiş olanlar ders saati sırasıyla; saati gelen sınav vurgulanır (ŞİMDİ). Aynı kademenin
+ * şubelerindeki aynı sınav tek satır olur: "9 · Matematik · 9. sınıflar (9-A, 9-B) · 2. ders".
+ */
 export function TodayExamsCard({ exams, nowClock }: { exams: ScheduledExam[]; nowClock: string }) {
+  const groups = groupExams(exams);
   return (
     <section className="card list-card today-exams-card">
       <div className="card-label">
         <ClipboardIcon size={22} /> {useLabel('todayExams')}
-        <span className="card-label-aside">{exams.length} sınav</span>
+        <span className="card-label-aside">{groups.length} sınav</span>
       </div>
       <AutoPager
-        items={exams}
+        items={groups}
         rowHeight={88}
         intervalMs={8000}
-        keyOf={(e) => e.id}
+        keyOf={(g) => g.key}
         empty="Bugün sınav yok"
-        render={(e) => {
-          const now = Boolean(e.start && e.end && e.start <= nowClock && nowClock < e.end);
+        render={(g) => {
+          const first = g.items[0]!;
+          const now = g.items.some((e) => Boolean(e.start && e.end && e.start <= nowClock && nowClock < e.end));
+          const multi = g.items.length > 1;
+          const start = g.samePeriod && new Set(g.items.map((e) => e.start)).size === 1 ? first.start : null;
           return (
             <div className={`lesson-row${now ? ' exam-now' : ''}`}>
-              <ClassBadge name={e.className} />
+              <ClassBadge name={g.badge} />
               <span className="lesson-info">
-                <span className="lesson-subject">{e.subject}</span>
+                <span className="lesson-subject">{first.subject}</span>
                 <span className="lesson-teacher">
-                  {e.periodNo}. ders{e.start ? ` · ${e.start}` : ''} · {EXAM_KIND_LABEL[e.kind]}
+                  {multi ? `${g.label} (${examGroupClasses(g)}) · ` : ''}
+                  {g.samePeriod ? `${first.periodNo}. ders` : examGroupPeriods(g)}
+                  {start ? ` · ${start}` : ''} · {EXAM_KIND_LABEL[first.kind]}
                 </span>
               </span>
               {now && <span className="exam-badge">Şimdi</span>}

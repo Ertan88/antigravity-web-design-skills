@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { examImportSchema, examScheduleSchema, normalizeName, schoolFullName, trCompare, zonedParts, type ScheduledExam } from '@okulpano/shared';
+import { compareClassNames, examImportSchema, examScheduleCreateSchema, examScheduleSchema, normalizeName, parseClassName, schoolFullName, trCompare, zonedParts, type ScheduledExam } from '@okulpano/shared';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -107,25 +107,42 @@ export async function examScheduleRoutes(app: FastifyInstance) {
   });
 
   app.post(base, write, async (req, reply) => {
-    const body = parse(examScheduleSchema, req.body);
+    const { classGroupId, classGroupIds, ...body } = parse(examScheduleCreateSchema, req.body);
     const { schoolId, school, userId } = req.ctx;
-    await checkRefs(schoolId, body);
-    let id: string;
+    const ids = [...new Set(classGroupIds?.length ? classGroupIds : [classGroupId!])];
+    if (ids.length > 1 && body.proctorTeacherId) throw badRequest('Birden çok şubede gözetmen ders programından bulunur; gerekirse eklendikten sonra şube şube değiştirin.');
+    if (ids.length === 1) await checkRefs(schoolId, { classGroupId: ids[0]!, proctorTeacherId: body.proctorTeacherId });
+    else {
+      const found = await db.select({ id: classGroups.id }).from(classGroups).where(and(eq(classGroups.schoolId, schoolId), inArray(classGroups.id, ids)));
+      if (found.length !== ids.length) throw badRequest('Sınıf bulunamadı.');
+    }
+    // Aynı saatte sınavı olan şubeler önceden söylenir (hangi şube olduğu yazılır)
+    const taken = await db
+      .select({ name: classGroups.name })
+      .from(examSchedule)
+      .innerJoin(classGroups, eq(classGroups.id, examSchedule.classGroupId))
+      .where(and(eq(examSchedule.schoolId, schoolId), eq(examSchedule.date, body.date), eq(examSchedule.periodNo, body.periodNo), inArray(examSchedule.classGroupId, ids)));
+    if (taken.length)
+      throw badRequest(
+        ids.length === 1 ? 'Bu sınıfın o gün o ders saatinde zaten bir sınavı var.' : `Şu şubelerin o gün o ders saatinde zaten sınavı var: ${taken.map((t) => t.name).sort(trCompare).join(', ')}.`,
+      );
+    let rows: { id: string }[];
     try {
-      const [row] = await db
+      rows = await db
         .insert(examSchedule)
-        .values({ schoolId, ...body, proctorTeacherId: body.proctorTeacherId ?? null, note: body.note?.trim() || null, createdBy: userId })
+        .values(ids.map((id) => ({ schoolId, ...body, classGroupId: id, proctorTeacherId: body.proctorTeacherId ?? null, note: body.note?.trim() || null, createdBy: userId })))
         .returning({ id: examSchedule.id });
-      id = row!.id;
     } catch (err) {
       if (slotTaken(err)) throw badRequest('Bu sınıfın o gün o ders saatinde zaten bir sınavı var.');
       throw err;
     }
-    const exam = (await resolveOne(school, id))!;
-    await audit(req, 'create', 'Sınav takvimi', id, `${exam.className} ${exam.subject} · ${exam.date} ${exam.periodNo}. ders`);
+    const exams = (await Promise.all(rows.map((r) => resolveOne(school, r.id)))).filter((e): e is ScheduledExam => Boolean(e));
+    const first = exams[0]!;
+    await audit(req, 'create', 'Sınav takvimi', first.id, `${exams.map((e) => e.className).join(', ')} ${first.subject} · ${first.date} ${first.periodNo}. ders`);
     bus.contentChanged(schoolId);
-    await tellTeachers(app.deps, schoolId, todayOf(school.timezone), [{ exam, what: 'added' }]);
-    return reply.status(201).send(exam);
+    await tellTeachers(app.deps, schoolId, todayOf(school.timezone), exams.map((exam) => ({ exam, what: 'added' as const })));
+    // Tek şubede eski yanıt biçimi korunur; çok şubede bütün kayıtlar döner
+    return reply.status(201).send(ids.length === 1 ? first : { exams });
   });
 
   app.put(`${base}/:id`, write, async (req) => {
@@ -209,7 +226,27 @@ export async function examScheduleRoutes(app: FastifyInstance) {
     const bellCache = new Map();
     const today = todayOf(school.timezone);
 
-    const rows = parsed.rows.map((r) => {
+    // "9", "9. sınıflar", "AMP 10" ya da "9-A, 9-B" yazılan satır o kademenin / listedeki şubelerin her biri için açılır
+    const expandClasses = (raw: string): string[] | null => {
+      const t = raw.trim();
+      if (classByKey.has(classKey(t))) return null;
+      if (/[,;]/.test(t)) return t.split(/[,;]/).map((x) => x.trim()).filter(Boolean);
+      const m = /^(?:([A-Za-zÇĞİÖŞÜçğıöşü]{2,6})\s+)?(\d{1,2})\s*\.?\s*(?:sınıf(?:lar|ları)?)?$/iu.exec(t);
+      if (!m) return null;
+      const program = m[1] ? m[1].toLocaleUpperCase('tr-TR') : null;
+      const level = Number(m[2]);
+      const names = ctx.classes
+        .map((c) => c.name)
+        .filter((n) => {
+          const p = parseClassName(n);
+          return p && p.grade === level && p.program === program;
+        })
+        .sort(compareClassNames);
+      return names.length ? names : null;
+    };
+    const sourceRows = parsed.rows.flatMap((r) => expandClasses(r.className)?.map((className) => ({ ...r, className })) ?? [r]);
+
+    const rows = sourceRows.map((r) => {
       const messages: string[] = [];
       const cls = classByKey.get(classKey(r.className));
       if (!cls) return { ...r, status: 'error' as const, messages: [`"${r.className}" sınıfı bulunamadı`], classGroupId: null, classLabel: r.className, exists: false };

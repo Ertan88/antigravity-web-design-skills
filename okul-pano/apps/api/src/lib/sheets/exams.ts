@@ -1,4 +1,4 @@
-import { EXAM_KINDS, type ExamKind } from '@okulpano/shared';
+import { EXAM_KINDS, parseClassName, type ExamKind } from '@okulpano/shared';
 import type ExcelJS from 'exceljs';
 import { badRequest } from '../errors.ts';
 import {
@@ -150,7 +150,9 @@ export async function buildExamsWorkbook(opts: { schoolName: string; classes: st
     { header: 'Not', key: 'note', width: 28 },
   ];
   styleHeader(ws);
-  const [classRange, subjectRange, kindRange, teacherRange] = addListsSheet(wb, [opts.classes, opts.subjects, Object.values(EXAM_KINDS), opts.teachers]);
+  // Sınıf listesine kademeler de eklenir ("9. sınıflar"): o kademenin bütün şubeleri için ayrı kayıt açılır
+  const levels = [...new Set(opts.classes.map((n) => parseClassName(n)).filter((p) => p !== null).map((p) => `${p.program ? `${p.program} ` : ''}${p.grade}. sınıflar`))];
+  const [classRange, subjectRange, kindRange, teacherRange] = addListsSheet(wb, [[...levels, ...opts.classes], opts.subjects, Object.values(EXAM_KINDS), opts.teachers]);
   const last = TEMPLATE_ROWS;
   validations(ws).add(`A2:A${last}`, {
     type: 'date',
@@ -178,7 +180,7 @@ export async function buildExamsWorkbook(opts: { schoolName: string; classes: st
     errorTitle: 'Ders saati',
     error: '1 ile 16 arasında bir sayı yazın.',
   });
-  validations(ws).add(`C2:C${last}`, listRule(classRange!, 'Sınıf', { allowNew: false }));
+  validations(ws).add(`C2:C${last}`, listRule(classRange!, 'Sınıf', { allowNew: true, error: 'Listede yok. Birden çok şube için "9-A, 9-B" gibi virgülle yazabilirsiniz.' }));
   validations(ws).add(`D2:D${last}`, listRule(subjectRange!, 'Ders', { allowNew: true, error: 'Bu ders ders programında yok. Yine de yazabilirsiniz; ama dersin öğretmenine bildirim gitmez.' }));
   validations(ws).add(`E2:E${last}`, listRule(kindRange!, 'Tür', { allowNew: false }));
   validations(ws).add(`F2:F${last}`, listRule(teacherRange!, 'Gözetmen', { allowNew: false }));
@@ -189,7 +191,7 @@ export async function buildExamsWorkbook(opts: { schoolName: string; classes: st
     [
       '1. "Sınavlar" sayfasında her satıra bir sınıfın bir sınavını yazın. Tarih, Ders Saati, Sınıf ve Ders Adı zorunludur.',
       '2. Ders Saati: kaçıncı ders olduğunu yazın (ör. 3). Saat yazmayın; sınavın saati o sınıfın o günkü zilinden hesaplanır.',
-      '3. Aynı sınav birden çok sınıfta yapılacaksa (ortak sınav) her sınıf için ayrı satır yazın.',
+      '3. Aynı sınav bir kademenin bütün şubelerinde yapılacaksa Sınıf sütununda "9. sınıflar" gibi kademeyi seçin; her şube için ayrı kayıt açılır. Yalnızca bazı şubelerse "9-A, 9-B" yazın ya da her şubeye ayrı satır yazın.',
       '4. Gözetmen boş bırakılırsa, o saatte o sınıfta dersi olan öğretmen gözetmen sayılır. Farklı biri gözetmen olacaksa listeden seçin.',
       '5. Sınavdan önceki teneffüsün başında (sınav 1. dersteyse ilk zilden 15 dakika önce) gözetmene ve dersin öğretmenine bildirim gider.',
       '6. Aynı tarih, ders saati ve sınıf için ikinci kez yükleme yapılırsa eski kayıt güncellenir.',

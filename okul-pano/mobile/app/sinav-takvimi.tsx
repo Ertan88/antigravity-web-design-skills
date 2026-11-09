@@ -1,4 +1,4 @@
-import { EXAM_KINDS, examRoles, type ExamKind, type ScheduledExam } from '@okulpano/shared/examCore';
+import { EXAM_KINDS, examGroupClasses, examGroupPeriods, examRoles, groupExams, type ExamGroup, type ExamKind, type ScheduledExam } from '@okulpano/shared/examCore';
 import { compareClassNames } from '@okulpano/shared/grade';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
@@ -114,7 +114,13 @@ export default function SinavTakvimi() {
           </T>
           <Card style={{ paddingVertical: 4, gap: 0 }}>
             {dayExams.length ? (
-              dayExams.map((e, i) => <ExamRow key={e.id} exam={e} teacherId={teacherId} first={i === 0} />)
+              groupExams(dayExams).map((g, i) =>
+                g.items.length === 1 ? (
+                  <ExamRow key={g.key} exam={g.items[0]!} teacherId={teacherId} first={i === 0} />
+                ) : (
+                  <GroupRow key={g.key} group={g} teacherId={teacherId} first={i === 0} />
+                ),
+              )
             ) : (
               <Empty icon="clipboard-check" title="Bu gün sınav yok" text={active === 'mine' ? 'Gözetmen olduğunuz ya da dersinizin sınavı görünür.' : undefined} />
             )}
@@ -132,7 +138,55 @@ export default function SinavTakvimi() {
   );
 }
 
-function ExamRow({ exam: e, teacherId, first }: { exam: ScheduledExam; teacherId: string | null; first: boolean }) {
+/**
+ * Aynı kademenin şubelerindeki aynı sınav tek satır: "9. sınıflar · Matematik", altında şubeler ve gözetmen sayısı.
+ * Dokununca şube şube saat ve gözetmen açılır.
+ */
+function GroupRow({ group: g, teacherId, first }: { group: ExamGroup<ScheduledExam>; teacherId: string | null; first: boolean }) {
+  const [open, setOpen] = useState(false);
+  const e = g.items[0]!;
+  const mine = g.items.filter((x) => {
+    const r = examRoles(x, teacherId);
+    return r.proctor || r.subject;
+  });
+  const proctors = new Set(g.items.flatMap((x) => x.proctors.map((p) => p.teacherId))).size;
+  const starts = [...new Set(g.items.map((x) => x.start ?? '—'))];
+  return (
+    <View style={{ borderTopWidth: first ? 0 : 1, borderTopColor: colors.divider }}>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen(!open)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, opacity: pressed ? 0.7 : 1 })}>
+        <View style={{ width: 58 }}>
+          <T size={13.5} weight="800">
+            {g.samePeriod ? `${e.periodNo}. ders` : 'Şubeye göre'}
+          </T>
+          <T size={11.5} color={colors.faint}>
+            {g.samePeriod ? (starts.length === 1 ? starts[0] : 'şubeye göre') : examGroupPeriods(g)}
+          </T>
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <T size={14.5} weight="800" lines={1}>
+            {g.label} · {e.subject}
+          </T>
+          <T size={12.5} color={mine.length ? colors.ink : colors.muted} weight={mine.length ? '600' : '400'} lines={2}>
+            {mine.length ? `Sizin: ${mine.map((x) => x.className).join(', ')} · ` : ''}
+            {examGroupClasses(g)} · {proctors} gözetmen
+          </T>
+        </View>
+        <KindPill kind={e.kind} />
+        {g.items.some((x) => x.warnings.length > 0) && <Icon name="warning-outline" size={16} color={colors.warning} />}
+        <Icon name={open ? 'chevron-up' : 'chevron-down'} size={16} color={colors.muted} />
+      </Pressable>
+      {open && (
+        <View style={{ paddingLeft: 14, marginBottom: 6, borderLeftWidth: 2, borderLeftColor: colors.divider }}>
+          {g.items.map((x, i) => (
+            <ExamRow key={x.id} exam={x} teacherId={teacherId} first={i === 0} sub />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function ExamRow({ exam: e, teacherId, first, sub }: { exam: ScheduledExam; teacherId: string | null; first: boolean; sub?: boolean }) {
   const r = examRoles(e, teacherId);
   const role = r.proctor && r.subject ? 'Gözetmen sizsiniz · dersiniz' : r.proctor ? 'Gözetmen sizsiniz' : r.subject ? 'Dersinizin sınavı' : null;
   const proctor = e.proctors.filter((p) => !p.onLeave).map((p) => p.fullName).join(', ');
@@ -149,14 +203,14 @@ function ExamRow({ exam: e, teacherId, first }: { exam: ScheduledExam; teacherId
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <T size={14.5} weight="800" lines={1}>
-          {e.className} · {e.subject}
+          {sub ? e.className : `${e.className} · ${e.subject}`}
         </T>
         <T size={12.5} color={role ? colors.ink : colors.muted} weight={role ? '600' : '400'} lines={2}>
           {line}
           {e.note ? ` · ${e.note}` : ''}
         </T>
       </View>
-      <KindPill kind={e.kind} />
+      {!sub && <KindPill kind={e.kind} />}
       {e.warnings.length > 0 && <Icon name="warning-outline" size={16} color={colors.warning} />}
     </View>
   );

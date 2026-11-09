@@ -1,7 +1,7 @@
-import { compareClassNames, EXAM_KINDS, gradeOf, type ExamKind, type ScheduledExam, errorText } from '@okulpano/shared';
+import { compareClassNames, EXAM_KINDS, examGroupClasses, examGroupPeriods, gradeOf, groupExams, parseClassName, type ExamKind, type ScheduledExam, errorText } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { useMemo, useRef, useState } from 'react';
+import { Fragment, useMemo, useRef, useState } from 'react';
 import { confirm } from '../components/confirm.tsx';
 import {
   AlertTriangle,
@@ -224,7 +224,50 @@ export function ExamSchedule() {
   );
 }
 
+const clock = (iso: string) => new Intl.DateTimeFormat('tr-TR', { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+
+/** Tek sınavın satırı; gruptaki şube satırı (sub) girintili ve dersi tekrar yazmadan */
+function ExamRow({ e, onOpen, sub }: { e: ScheduledExam; onOpen?: (e: ScheduledExam) => void; sub?: boolean }) {
+  return (
+    <tr className={clsx(onOpen && 'cursor-pointer hover:bg-slate-50', sub && 'bg-slate-50/70')} onClick={() => onOpen?.(e)}>
+      <td className={clsx('px-5 py-2.5 font-bold text-ink', sub && 'pl-9 font-semibold whitespace-nowrap text-slate-500')}>
+        {sub && <span className="mr-1 text-slate-300">↳</span>}
+        {e.periodNo}. ders <span className="font-medium text-slate-400">{e.start ?? '—'}</span>
+      </td>
+      <td className="px-3 py-2.5 font-bold text-ink">{e.className}</td>
+      <td className="px-3 py-2.5 text-ink">
+        {sub ? <span className="text-slate-400">aynı sınav</span> : e.subject}
+        {e.note && <span className="ml-2 text-xs text-slate-400">{e.note}</span>}
+      </td>
+      <td className="px-3 py-2.5">{!sub && <KindPill kind={e.kind} />}</td>
+      <td className="px-3 py-2.5 text-slate-600">
+        {e.proctors.length
+          ? e.proctors.map((p) => (
+              <span key={p.teacherId} className={clsx('mr-2', p.onLeave && 'text-rose-600 line-through')}>
+                {p.fullName}
+              </span>
+            ))
+          : '—'}
+      </td>
+      <td className="px-3 py-2.5 text-slate-600">{e.subjectTeachers.map((t) => t.fullName).join(', ') || '—'}</td>
+      <td className="px-3 py-2.5 text-xs text-slate-500">{e.notifyAt ? clock(e.notifyAt) : '—'}</td>
+      <td className="pr-4">
+        <WarnIcon warnings={e.warnings} />
+      </td>
+    </tr>
+  );
+}
+
 function ExamList({ exams, today, onOpen }: { exams: ScheduledExam[]; today: string; onOpen?: (e: ScheduledExam) => void }) {
+  // Açık gruplar (şube ayrıntıları görünür)
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const toggle = (key: string) =>
+    setOpen((cur) => {
+      const next = new Set(cur);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   if (!exams.length)
     return (
       <EmptyState
@@ -256,39 +299,57 @@ function ExamList({ exams, today, onOpen }: { exams: ScheduledExam[]; today: str
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {exams
-                .filter((e) => e.date === d)
-                .map((e) => (
-                  <tr key={e.id} className={clsx(onOpen && 'cursor-pointer hover:bg-slate-50')} onClick={() => onOpen?.(e)}>
-                    <td className="px-5 py-2.5 font-bold text-ink">
-                      {e.periodNo}. ders <span className="font-medium text-slate-400">{e.start ?? '—'}</span>
-                    </td>
-                    <td className="px-3 py-2.5 font-bold text-ink">{e.className}</td>
-                    <td className="px-3 py-2.5 text-ink">
-                      {e.subject}
-                      {e.note && <span className="ml-2 text-xs text-slate-400">{e.note}</span>}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <KindPill kind={e.kind} />
-                    </td>
-                    <td className="px-3 py-2.5 text-slate-600">
-                      {e.proctors.length
-                        ? e.proctors.map((p) => (
-                            <span key={p.teacherId} className={clsx('mr-2', p.onLeave && 'text-rose-600 line-through')}>
-                              {p.fullName}
-                            </span>
-                          ))
-                        : '—'}
-                    </td>
-                    <td className="px-3 py-2.5 text-slate-600">{e.subjectTeachers.map((t) => t.fullName).join(', ') || '—'}</td>
-                    <td className="px-3 py-2.5 text-xs text-slate-500">
-                      {e.notifyAt ? new Intl.DateTimeFormat('tr-TR', { hour: '2-digit', minute: '2-digit' }).format(new Date(e.notifyAt)) : '—'}
-                    </td>
-                    <td className="pr-4">
-                      <WarnIcon warnings={e.warnings} />
-                    </td>
-                  </tr>
-                ))}
+              {groupExams(exams.filter((e) => e.date === d)).map((g) => {
+                if (g.items.length === 1) return <ExamRow key={g.key} e={g.items[0]!} onOpen={onOpen} />;
+                const isOpen = open.has(g.key);
+                const first = g.items[0]!;
+                const proctors = new Set(g.items.flatMap((e) => e.proctors.map((p) => p.teacherId)));
+                const teachers = [...new Set(g.items.flatMap((e) => e.subjectTeachers.map((t) => t.fullName)))];
+                const notify = [...new Set(g.items.map((e) => (e.notifyAt ? clock(e.notifyAt) : '—')))];
+                const starts = [...new Set(g.items.map((e) => e.start ?? '—'))];
+                const notes = [...new Set(g.items.map((e) => e.note ?? ''))];
+                const warnings = g.items.flatMap((e) => e.warnings.map((w) => `${e.className}: ${w}`));
+                return (
+                  <Fragment key={g.key}>
+                    <tr className={clsx('cursor-pointer hover:bg-slate-50', isOpen && 'bg-slate-50')} onClick={() => toggle(g.key)}>
+                      <td className="px-5 py-2.5 font-bold text-ink">
+                        {g.samePeriod ? (
+                          <>
+                            {first.periodNo}. ders <span className="font-medium text-slate-400">{starts.length === 1 ? starts[0] : 'şubeye göre'}</span>
+                          </>
+                        ) : (
+                          <>
+                            Şubeye göre <span className="block text-xs font-medium text-slate-400">{examGroupPeriods(g)}</span>
+                          </>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span className="block font-extrabold whitespace-nowrap text-ink">{g.label}</span>
+                        <span className="block text-xs font-semibold whitespace-nowrap text-slate-500">{examGroupClasses(g, 6)}</span>
+                      </td>
+                      <td className="px-3 py-2.5 text-ink">
+                        {first.subject}
+                        {notes.length === 1 && notes[0] && <span className="ml-2 text-xs text-slate-400">{notes[0]}</span>}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <KindPill kind={first.kind} />
+                      </td>
+                      <td className="px-3 py-2.5 text-slate-500">
+                        {g.items.length} şube · {proctors.size} gözetmen
+                        <button type="button" aria-expanded={isOpen} className="ml-2 font-bold text-ink hover:underline">
+                          {isOpen ? 'Gizle ▴' : 'Ayrıntı ▾'}
+                        </button>
+                      </td>
+                      <td className="px-3 py-2.5 text-slate-600">{teachers.join(', ') || '—'}</td>
+                      <td className="px-3 py-2.5 text-xs text-slate-500">{notify.length === 1 ? notify[0] : 'şubeye göre'}</td>
+                      <td className="pr-4">
+                        <WarnIcon warnings={warnings} />
+                      </td>
+                    </tr>
+                    {isOpen && g.items.map((e) => <ExamRow key={e.id} e={e} onOpen={onOpen} sub />)}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </section>
@@ -374,6 +435,10 @@ function ExamGrid({
 }
 
 /** Sınav ekle / düzenle: kaydedilince saat, gözetmen ve uyarılar sunucudan hesaplanmış döner */
+const chip = 'h-8 rounded-full px-3 text-[13px] font-bold transition-colors';
+const chipOn = 'bg-ink text-surface';
+const chipOff = 'bg-surface text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100';
+
 function ExamDialog({ exam, options, onClose }: { exam: Partial<ScheduledExam>; options: Options; onClose: () => void }) {
   const { schoolId } = useAuth();
   const path = useSchoolPath('exam-schedule');
@@ -388,20 +453,50 @@ function ExamDialog({ exam, options, onClose }: { exam: Partial<ScheduledExam>; 
     proctorTeacherId: exam.proctorTeacherId ?? '',
     note: exam.note ?? '',
   });
+  // Eklerken birden çok şube seçilebilir (kademe ya da tek tek); düzenlemede tek şube
+  const adding = !exam.id;
+  const [classIds, setClassIds] = useState<string[]>(exam.classGroupId ? [exam.classGroupId] : []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const subjects = (v.classGroupId && options.subjectsByClass[v.classGroupId]) || options.subjects;
+  const chosen = adding ? classIds : v.classGroupId ? [v.classGroupId] : [];
+  const multi = chosen.length > 1;
+  const subjects = chosen.length
+    ? [...new Set(chosen.flatMap((id) => options.subjectsByClass[id] ?? []))].sort((a, b) => a.localeCompare(b, 'tr'))
+    : options.subjects;
+  const sortedClasses = useMemo(() => [...options.classes].sort((a, b) => compareClassNames(a.name, b.name)), [options.classes]);
+  // Kademeler: "9. sınıflar", "AMP 10. sınıflar" (sınıf adlarından; okula özel sabit yok)
+  const levels = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const c of sortedClasses) {
+      const p = parseClassName(c.name);
+      if (!p) continue;
+      const label = `${p.program ? `${p.program} ` : ''}${p.grade}. sınıflar`;
+      map.set(label, [...(map.get(label) ?? []), c.id]);
+    }
+    return [...map].filter(([, ids]) => ids.length > 1);
+  }, [sortedClasses]);
+  const toggleClass = (id: string) => setClassIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+  const toggleLevel = (ids: string[]) => setClassIds((cur) => (ids.every((id) => cur.includes(id)) ? cur.filter((x) => !ids.includes(x)) : [...new Set([...cur, ...ids])]));
   const refresh = () => qc.invalidateQueries({ queryKey: [schoolId, 'exam-schedule'] });
 
   const save = async () => {
     setBusy(true);
     setError(null);
     try {
-      const body = { ...v, proctorTeacherId: v.proctorTeacherId || null, note: v.note || null };
-      const saved = await api<ScheduledExam>(exam.id ? `${path}/${exam.id}` : path, { method: exam.id ? 'PUT' : 'POST', body });
+      const base = { ...v, proctorTeacherId: multi ? null : v.proctorTeacherId || null, note: v.note || null };
+      const body = adding ? { ...base, classGroupId: multi ? undefined : chosen[0], classGroupIds: multi ? chosen : undefined } : base;
+      const res = await api<ScheduledExam | { exams: ScheduledExam[] }>(exam.id ? `${path}/${exam.id}` : path, { method: exam.id ? 'PUT' : 'POST', body });
       await refresh();
-      if (saved.warnings.length) toast.error(`Kaydedildi, ama kontrol edin: ${saved.warnings[0]}`);
-      else toast.success(`Kaydedildi · ${saved.className} ${saved.subject}, ${saved.periodNo}. ders${saved.start ? ` (${saved.start})` : ''}`);
+      const saved = 'exams' in res ? res.exams : [res];
+      const warn = saved.find((e) => e.warnings.length);
+      const first = saved[0]!;
+      if (warn) toast.error(`Kaydedildi, ama kontrol edin: ${saved.length > 1 ? `${warn.className}: ` : ''}${warn.warnings[0]}`);
+      else
+        toast.success(
+          saved.length > 1
+            ? `Kaydedildi · ${saved.length} şube (${saved.map((e) => e.className).join(', ')}) ${first.subject}, ${first.periodNo}. ders`
+            : `Kaydedildi · ${first.className} ${first.subject}, ${first.periodNo}. ders${first.start ? ` (${first.start})` : ''}`,
+        );
       onClose();
     } catch (err) {
       setError(errorText(err, 'Kaydedilemedi.'));
@@ -450,7 +545,7 @@ function ExamDialog({ exam, options, onClose }: { exam: Partial<ScheduledExam>; 
           <Button variant="secondary" onClick={onClose}>
             Vazgeç
           </Button>
-          <Button loading={busy} disabled={!v.date || !v.classGroupId || !v.subject.trim()} onClick={() => void save()}>
+          <Button loading={busy} disabled={!v.date || !chosen.length || !v.subject.trim()} onClick={() => void save()}>
             Kaydet
           </Button>
         </>
@@ -469,21 +564,59 @@ function ExamDialog({ exam, options, onClose }: { exam: Partial<ScheduledExam>; 
             </Select>
           )}
         </Field>
-        <Field label="Sınıf">
-          {(id) => (
-            <Select id={id} value={v.classGroupId} onChange={(e) => setV({ ...v, classGroupId: e.target.value })}>
-              <option value="">Sınıf seçin</option>
-              {[...options.classes]
-                .sort((a, b) => compareClassNames(a.name, b.name))
-                .map((c) => (
+        {adding ? (
+          <div className="sm:col-span-2">
+            <Field
+              label="Sınıflar"
+              help={
+                multi
+                  ? `${chosen.length} şube seçildi: her şube için ayrı kayıt açılır, gözetmen o saatte o şubede dersi olan öğretmenden bulunur. Listede tek satır görünür.`
+                  : 'Bir kademenin bütün şubeleri ya da birkaç şube seçilebilir.'
+              }
+            >
+              {() => (
+                <div className="space-y-2">
+                  {levels.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {levels.map(([label, ids]) => {
+                        const on = ids.every((id) => classIds.includes(id));
+                        return (
+                          <button key={label} type="button" aria-pressed={on} onClick={() => toggleLevel(ids)} className={clsx(chip, on ? chipOn : chipOff)}>
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-1.5">
+                    {sortedClasses.map((c) => {
+                      const on = classIds.includes(c.id);
+                      return (
+                        <button key={c.id} type="button" aria-pressed={on} onClick={() => toggleClass(c.id)} className={clsx(chip, on ? chipOn : chipOff)}>
+                          {c.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </Field>
+          </div>
+        ) : (
+          <Field label="Sınıf">
+            {(id) => (
+              <Select id={id} value={v.classGroupId} onChange={(e) => setV({ ...v, classGroupId: e.target.value })}>
+                <option value="">Sınıf seçin</option>
+                {sortedClasses.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
                 ))}
-            </Select>
-          )}
-        </Field>
-        <Field label="Ders" help={v.classGroupId && options.subjectsByClass[v.classGroupId] ? 'Öneriler sınıfın ders programından' : undefined}>
+              </Select>
+            )}
+          </Field>
+        )}
+        <Field label="Ders" help={chosen.some((id) => options.subjectsByClass[id]) ? 'Öneriler seçilen sınıfların ders programından' : undefined}>
           {(id) => (
             <>
               <Input id={id} list="exam-subjects" value={v.subject} maxLength={80} onChange={(e) => setV({ ...v, subject: e.target.value })} placeholder="ör. Matematik" />
@@ -517,9 +650,12 @@ function ExamDialog({ exam, options, onClose }: { exam: Partial<ScheduledExam>; 
             </div>
           )}
         </Field>
-        <Field label="Gözetmen" help="Boş bırakılırsa o saatte o sınıfta dersi olan öğretmen gözetmen olur.">
+        <Field
+          label="Gözetmen"
+          help={multi ? 'Birden çok şubede her şubenin gözetmeni o saatteki dersinden bulunur; gerekirse eklendikten sonra şube şube değiştirin.' : 'Boş bırakılırsa o saatte o sınıfta dersi olan öğretmen gözetmen olur.'}
+        >
           {(id) => (
-            <Select id={id} value={v.proctorTeacherId} onChange={(e) => setV({ ...v, proctorTeacherId: e.target.value })}>
+            <Select id={id} value={multi ? '' : v.proctorTeacherId} disabled={multi} onChange={(e) => setV({ ...v, proctorTeacherId: e.target.value })}>
               <option value="">Ders programından (otomatik)</option>
               {options.teachers.map((t) => (
                 <option key={t.id} value={t.id}>
