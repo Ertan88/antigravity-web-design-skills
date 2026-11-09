@@ -1,4 +1,4 @@
-import { EXAM_KINDS, examGroupPeriods, examRoles, groupExams, type ExamGroup, type ExamKind, type ScheduledExam } from '@okulpano/shared/examCore';
+import { EXAM_KINDS, examGroupClasses, examGroupPeriods, examRoles, groupExams, type ExamGroup, type ExamKind, type ScheduledExam } from '@okulpano/shared/examCore';
 import { compareClassNames } from '@okulpano/shared/grade';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
@@ -150,7 +150,6 @@ function GroupRow({ group: g, teacherId, first }: { group: ExamGroup<ScheduledEx
     const r = examRoles(x, teacherId);
     return r.proctor || r.subject;
   });
-  const proctors = new Set(g.items.flatMap((x) => x.proctors.map((p) => p.teacherId))).size;
   const starts = [...new Set(g.items.map((x) => x.start ?? '—'))];
   return (
     <View style={{ borderTopWidth: first ? 0 : 1, borderTopColor: colors.divider }}>
@@ -170,7 +169,7 @@ function GroupRow({ group: g, teacherId, first }: { group: ExamGroup<ScheduledEx
           <T size={12.5} color={colors.muted} lines={2}>
             {mine.length > 0 && <Me>{`Sizin: ${mine.map((x) => x.className).join(', ')}`}</Me>}
             {mine.length > 0 ? ' · ' : ''}
-            {g.label} · {g.items.length} şube · {proctors} gözetmen
+            {examGroupClasses(g, 8)}
           </T>
         </View>
         <KindPill kind={e.kind} />

@@ -397,29 +397,35 @@ function ExamGrid({
                 return (
                   <td
                     key={d}
-                    className={clsx('h-14 rounded-xl bg-slate-50 p-1 align-top', onAdd && !cell.length && 'cursor-pointer hover:bg-slate-100', cell.length > 1 && 'ring-2 ring-amber-300')}
+                    className={clsx('h-16 rounded-xl bg-slate-50 p-1 align-top', onAdd && !cell.length && 'cursor-pointer hover:bg-slate-100', cell.length > 1 && 'ring-2 ring-amber-300')}
                     onClick={() => !cell.length && onAdd?.(c.id, d)}
                     title={cell.length > 1 ? 'Bu sınıfın aynı gün birden çok sınavı var' : undefined}
                   >
-                    <div className="space-y-1">
+                    {/* Aynı gün birden çok sınavda düğmeler tek satır: satırlar eşit yükseklikte kalır */}
+                    <div className={cell.length > 1 ? 'space-y-0.5' : 'space-y-1'}>
                       {cell.map((e) => (
                         <button
                           key={e.id}
                           type="button"
+                          title={cell.length > 1 ? `${e.periodNo}. ders · ${e.subject} · ${EXAM_KINDS[e.kind]}${e.start ? ` · ${e.start}` : ''}` : undefined}
                           onClick={(ev) => {
                             ev.stopPropagation();
                             onOpen?.(e);
                           }}
-                          className={clsx('block w-full rounded-lg px-2 py-1 text-left leading-tight font-bold', KIND_TONE[e.kind])}
+                          className={clsx('block w-full rounded-lg text-left leading-tight font-bold', cell.length > 1 ? 'px-2 py-0.5 text-[11.5px]' : 'px-2 py-1', KIND_TONE[e.kind])}
                         >
-                          <span className="flex items-center justify-between gap-1">
-                            {e.periodNo}. ders · {e.subject}
+                          <span className="flex min-w-0 items-center justify-between gap-1">
+                            <span className={clsx(cell.length > 1 && 'truncate')}>
+                              {e.periodNo}. ders · {e.subject}
+                            </span>
                             <WarnIcon warnings={e.warnings} />
                           </span>
-                          <span className="block text-[10.5px] font-semibold opacity-75">
-                            {EXAM_KINDS[e.kind]}
-                            {e.start ? ` · ${e.start}` : ''}
-                          </span>
+                          {cell.length === 1 && (
+                            <span className="block text-[10.5px] font-semibold opacity-75">
+                              {EXAM_KINDS[e.kind]}
+                              {e.start ? ` · ${e.start}` : ''}
+                            </span>
+                          )}
                         </button>
                       ))}
                     </div>
