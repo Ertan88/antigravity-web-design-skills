@@ -118,17 +118,29 @@ export function classLongName(names: string | string[]): string {
  * yazılmaz, diğerleri önekiyle ayrılır: "9/A" ve "ATP 9/A". Hangi programın yazılmayacağı okulun sınıflarından çıkar.
  */
 export function shortClassLabeler(allNames: readonly string[]): (name: string) => string {
-  const count = new Map<string, number>();
-  for (const n of allNames) {
-    const p = parseClassName(n)?.program;
-    if (p) count.set(p, (count.get(p) ?? 0) + 1);
-  }
-  const main = [...count].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  const main = mainClassProgram(allNames);
   return (name: string) => {
     const p = parseClassName(name);
     if (!p) return name;
     return `${p.program && p.program !== main ? `${p.program} ` : ''}${p.grade}/${p.section}`;
   };
+}
+
+/** Okulda en çok sınıfı olan program öneki (ör. AMP); önekli sınıf yoksa null. Okula özel sabit yok, sınıflardan çıkar. */
+export function mainClassProgram(allNames: readonly string[]): string | null {
+  const count = new Map<string, number>();
+  for (const n of allNames) {
+    const p = parseClassName(n)?.program;
+    if (p) count.set(p, (count.get(p) ?? 0) + 1);
+  }
+  return [...count].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+}
+
+/** Görünen sınıf adı: ana programın öneki yazılmaz ("AMP 10-A" → "10-A"), diğerleri kalır ("ATP 10-A") */
+export function classDisplayName(name: string, main: string | null): string {
+  const p = parseClassName(name);
+  if (!p || !p.program || p.program !== main) return name;
+  return name.trim().replace(/^\S+\s+/, '');
 }
 
 /**

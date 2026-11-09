@@ -278,7 +278,7 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
     display: resolveScreenDisplay(auth.screen?.display),
     emergency: school.emergency ? { type: school.emergency.type, message: school.emergency.message, sound: school.emergency.sound, startedAt: school.emergency.startedAt } : null,
     exams: examRows.map((e) => ({ ...e, examAt: e.examAt.toISOString() })),
-    scheduledExams: scheduled.map((e) => ({ id: e.id, date: e.date, periodNo: e.periodNo, classId: e.classGroupId, className: e.className, subject: e.subject, kind: e.kind, start: e.start, end: e.end })),
+    scheduledExams: scheduled.map((e) => ({ id: e.id, date: e.date, periodNo: e.periodNo, classId: e.classGroupId, className: e.className, classLabel: e.classLabel, subject: e.subject, kind: e.kind, start: e.start, end: e.end })),
     duties: dutyRows,
     dutySupervisors: supervisorRows,
     holidays: holidayRows.holidays,

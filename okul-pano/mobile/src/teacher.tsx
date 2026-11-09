@@ -141,7 +141,7 @@ function ExamTodayCard({ teacherId }: { teacherId: string | null }) {
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={{ fontSize: 15, fontWeight: '800', color: t.fg }}>{mine.length === 1 ? 'Bugün sınavınız var' : `Bugün ${mine.length} sınavınız var`}</Text>
         <Text style={{ fontSize: 12.5, color: t.sub, marginTop: 1 }} numberOfLines={2}>
-          {first.className} {first.subject} · {first.periodNo}. ders{first.start ? ` · ${first.start}` : ''} · {role}
+          {first.classLabel || first.className} {first.subject} · {first.periodNo}. ders{first.start ? ` · ${first.start}` : ''} · {role}
         </Text>
       </View>
       <Icon name="chevron-forward" size={18} color={t.fg} />

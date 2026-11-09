@@ -1,4 +1,4 @@
-import { compareClassNames, EXAM_KINDS, examGroupClasses, examGroupPeriods, gradeOf, groupExams, parseClassName, type ExamKind, type ScheduledExam, errorText } from '@okulpano/shared';
+import { classDisplayName, compareClassNames, EXAM_KINDS, mainClassProgram, examGroupClasses, examGroupPeriods, gradeOf, groupExams, parseClassName, type ExamKind, type ScheduledExam, errorText } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { Fragment, useMemo, useRef, useState } from 'react';
@@ -234,7 +234,7 @@ function ExamRow({ e, onOpen, sub }: { e: ScheduledExam; onOpen?: (e: ScheduledE
         {sub && <span className="mr-1 text-slate-300">↳</span>}
         {e.periodNo}. ders <span className="font-medium text-slate-400">{e.start ?? '—'}</span>
       </td>
-      <td className="px-3 py-2.5 font-bold text-ink">{e.className}</td>
+      <td className="px-3 py-2.5 font-bold text-ink">{e.classLabel}</td>
       <td className="px-3 py-2.5 text-ink">
         {sub ? <span className="text-slate-400">aynı sınav</span> : e.subject}
         {e.note && <span className="ml-2 text-xs text-slate-400">{e.note}</span>}
@@ -308,7 +308,7 @@ function ExamList({ exams, today, onOpen }: { exams: ScheduledExam[]; today: str
                 const notify = [...new Set(g.items.map((e) => (e.notifyAt ? clock(e.notifyAt) : '—')))];
                 const starts = [...new Set(g.items.map((e) => e.start ?? '—'))];
                 const notes = [...new Set(g.items.map((e) => e.note ?? ''))];
-                const warnings = g.items.flatMap((e) => e.warnings.map((w) => `${e.className}: ${w}`));
+                const warnings = g.items.flatMap((e) => e.warnings.map((w) => `${e.classLabel}: ${w}`));
                 return (
                   <Fragment key={g.key}>
                     <tr className={clsx('cursor-pointer hover:bg-slate-50', isOpen && 'bg-slate-50')} onClick={() => toggle(g.key)}>
@@ -396,8 +396,11 @@ function ExamGrid({
   // Hafta sonu sınavı varsa sütun eklenir
   for (const extra of [5, 6]) if (exams.some((e) => e.date === addDays(monday, extra))) days.push(addDays(monday, extra));
   const levels = useMemo(() => {
+    const main = mainClassProgram(classes.map((c) => c.name));
     const map = new Map<string, { key: string; label: string; classes: { id: string; name: string }[] }>();
-    for (const c of [...classes].sort((a, b) => compareClassNames(a.name, b.name))) {
+    for (const raw of [...classes].sort((a, b) => compareClassNames(a.name, b.name))) {
+      // Okulun ana programının öneki yazılmaz (ör. AMP), diğerleri kalır (ör. ATP)
+      const c = { id: raw.id, name: classDisplayName(raw.name, main) };
       const p = parseClassName(c.name);
       const key = p ? `${p.program ? `${p.program} ` : ''}${p.grade}` : `#${c.name}`;
       const g = map.get(key) ?? { key, label: p ? `${key}. sınıflar` : c.name, classes: [] };
@@ -470,8 +473,8 @@ function ExamGrid({
                               ? `${EXAM_KINDS[first.kind]}${first.start ? ` · ${first.start}` : ''}`
                               : multi
                                 ? `Şube ${sections.join(', ')}`
-                                : `Yalnız ${first.className}`;
-                            const warnings = g.items.flatMap((e) => e.warnings.map((w) => (multi ? `${e.className}: ${w}` : w)));
+                                : `Yalnız ${first.classLabel}`;
+                            const warnings = g.items.flatMap((e) => e.warnings.map((w) => (multi ? `${e.classLabel}: ${w}` : w)));
                             return (
                               <button
                                 key={g.key}
@@ -574,7 +577,10 @@ function ExamDialog({ exam, options, onClose }: { exam: Partial<ScheduledExam> &
   const subjects = chosen.length
     ? [...new Set(chosen.flatMap((id) => options.subjectsByClass[id] ?? []))].sort((a, b) => a.localeCompare(b, 'tr'))
     : options.subjects;
-  const sortedClasses = useMemo(() => [...options.classes].sort((a, b) => compareClassNames(a.name, b.name)), [options.classes]);
+  const sortedClasses = useMemo(() => {
+    const main = mainClassProgram(options.classes.map((c) => c.name));
+    return [...options.classes].sort((a, b) => compareClassNames(a.name, b.name)).map((c) => ({ id: c.id, name: classDisplayName(c.name, main) }));
+  }, [options.classes]);
   // Kademeler: "9. sınıflar", "AMP 10. sınıflar" (sınıf adlarından; okula özel sabit yok)
   const levels = useMemo(() => {
     const map = new Map<string, string[]>();
@@ -601,12 +607,12 @@ function ExamDialog({ exam, options, onClose }: { exam: Partial<ScheduledExam> &
       const saved = 'exams' in res ? res.exams : [res];
       const warn = saved.find((e) => e.warnings.length);
       const first = saved[0]!;
-      if (warn) toast.error(`Kaydedildi, ama kontrol edin: ${saved.length > 1 ? `${warn.className}: ` : ''}${warn.warnings[0]}`);
+      if (warn) toast.error(`Kaydedildi, ama kontrol edin: ${saved.length > 1 ? `${warn.classLabel}: ` : ''}${warn.warnings[0]}`);
       else
         toast.success(
           saved.length > 1
-            ? `Kaydedildi · ${saved.length} şube (${saved.map((e) => e.className).join(', ')}) ${first.subject}, ${first.periodNo}. ders`
-            : `Kaydedildi · ${first.className} ${first.subject}, ${first.periodNo}. ders${first.start ? ` (${first.start})` : ''}`,
+            ? `Kaydedildi · ${saved.length} şube (${saved.map((e) => e.classLabel).join(', ')}) ${first.subject}, ${first.periodNo}. ders`
+            : `Kaydedildi · ${first.classLabel} ${first.subject}, ${first.periodNo}. ders${first.start ? ` (${first.start})` : ''}`,
         );
       onClose();
     } catch (err) {
@@ -620,7 +626,7 @@ function ExamDialog({ exam, options, onClose }: { exam: Partial<ScheduledExam> &
     if (!exam.id) return;
     const ok = await confirm({
       title: 'Sınav silinsin mi?',
-      subtitle: `${exam.className} · ${exam.subject}`,
+      subtitle: `${exam.classLabel} · ${exam.subject}`,
       message: 'Sınav takviminden ve panodan kalkar; gözetmene ve dersin öğretmenine bildirilir.',
       confirmLabel: 'Sil',
     });

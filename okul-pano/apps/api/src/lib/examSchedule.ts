@@ -1,10 +1,12 @@
 import {
   bellClassDays,
   classBell,
+  classDisplayName,
   dayBells,
   examTiming,
   isoWeekday,
   lessonCounts,
+  mainClassProgram,
   normalizeClassName,
   normalizeName,
   schoolSettingsSchema,
@@ -62,7 +64,7 @@ export async function loadExamContext(db: DB, school: School, from: string, to: 
     overrides,
     dualShift: settings.dualShift,
   };
-  return { settings, cal, lessons, classes, staff, leaves, timezone: school.timezone };
+  return { settings, cal, lessons, classes, staff, leaves, timezone: school.timezone, mainProgram: mainClassProgram(classes.map((c) => c.name)) };
 }
 
 export type ExamContext = Awaited<ReturnType<typeof loadExamContext>>;
@@ -125,6 +127,7 @@ export function resolveExam(ctx: ExamContext, row: ExamRowLike, bellCache = new 
     periodNo: row.periodNo,
     classGroupId: row.classGroupId,
     className: cls?.name ?? '',
+    classLabel: classDisplayName(cls?.name ?? '', ctx.mainProgram),
     subject: row.subject,
     kind: row.kind,
     note: row.note,

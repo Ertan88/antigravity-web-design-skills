@@ -1,11 +1,11 @@
-import { EXAM_KINDS, examGroupPeriods, examRoles, groupExams, type ExamGroup, type ExamKind, type ScheduledExam } from '@okulpano/shared/examCore';
+import { examGroupPeriods, examRoles, groupExams, type ExamGroup, type ScheduledExam } from '@okulpano/shared/examCore';
 import { compareClassNames } from '@okulpano/shared/grade';
 import { useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useExamSchedule, useMeToday, useNow } from '../src/data.ts';
 import { dayTitle, localIso } from '../src/day.ts';
-import { colors, tiles, type TileTone } from '../src/theme.ts';
+import { colors } from '../src/theme.ts';
 import { Text } from '../src/text.tsx';
 import { Card, Chip, Empty, ErrorNote, Icon, Loading, Screen, Segmented, T } from '../src/ui.tsx';
 
@@ -15,22 +15,14 @@ import { Card, Chip, Empty, ErrorNote, Icon, Loading, Screen, Segmented, T } fro
  */
 
 type Filter = 'mine' | 'all' | 'class';
-const KIND_TONE: Record<ExamKind, TileTone> = { written: 'lilac', common: 'sky', practical: 'sun' };
 const DAY = 86400_000;
 const addDays = (iso: string, n: number) => new Date(Date.parse(`${iso}T12:00:00Z`) + n * DAY).toISOString().slice(0, 10);
 const weekday = (iso: string) => ((new Date(`${iso}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
 const SHORT = ['', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
 
-function KindPill({ kind }: { kind: ExamKind }) {
-  const t = tiles[KIND_TONE[kind]];
-  return (
-    <View style={{ backgroundColor: t.bg, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 }}>
-      <T size={11.5} weight="800" color={t.fg}>
-        {EXAM_KINDS[kind]}
-      </T>
-    </View>
-  );
-}
+
+/** Görünen sınıf adı; eski sunucu sürümü bu alanı göndermezse sınıfın tam adı */
+const labelOf = (e: Pick<ScheduledExam, 'className'> & { classLabel?: string }) => e.classLabel || e.className;
 
 export default function SinavTakvimi() {
   const q = useExamSchedule();
@@ -40,12 +32,16 @@ export default function SinavTakvimi() {
   const [classId, setClassId] = useState<string | null>(null);
   // Bildirimden gelindiyse (?gun=YYYY-AA-GG) o gün seçili açılır
   const { gun } = useLocalSearchParams<{ gun?: string }>();
-  const [picked, setPicked] = useState<string | null>(gun && /^\d{4}-\d{2}-\d{2}$/.test(gun) ? gun : null);
+  const [picked, setPicked] = useState<string | null>(null);
+  // Parametre ilk çizimde henüz hazır olmayabilir: gelince (ya da değişince) o gün seçilir
+  useEffect(() => {
+    if (gun && /^\d{4}-\d{2}-\d{2}$/.test(gun)) setPicked(gun);
+  }, [gun]);
   const active: Filter = filter ?? (teacherId ? 'mine' : 'all');
 
   const today = q.data?.today ?? localIso();
   const all = q.data?.exams ?? [];
-  const classes = useMemo(() => [...new Map(all.map((e) => [e.classGroupId, e.className])).entries()].sort((a, b) => compareClassNames(a[1], b[1])), [all]);
+  const classes = useMemo(() => [...new Map(all.map((e) => [e.classGroupId, labelOf(e)])).entries()].sort((a, b) => compareClassNames(a[1], b[1])), [all]);
   const shown = all.filter((e) => {
     if (active === 'mine') {
       const r = examRoles(e, teacherId);
@@ -177,12 +173,11 @@ function GroupRow({ group: g, teacherId, first }: { group: ExamGroup<ScheduledEx
             {e.subject}
           </T>
           <T size={12.5} color={colors.muted} lines={2}>
-            {mine.length > 0 && <Me>{`Sizin: ${mine.map((x) => x.className).join(', ')}`}</Me>}
+            {mine.length > 0 && <Me>{`Sizin: ${mine.map((x) => labelOf(x)).join(', ')}`}</Me>}
             {mine.length > 0 ? ' · ' : ''}
             {g.label}
           </T>
         </View>
-        <KindPill kind={e.kind} />
         {g.items.some((x) => x.warnings.length > 0) && <Icon name="warning-outline" size={16} color={colors.warning} />}
         <Icon name={open ? 'chevron-up' : 'chevron-down'} size={16} color={colors.muted} />
       </Pressable>
@@ -215,25 +210,38 @@ function ExamRow({ exam: e, teacherId, first, sub }: { exam: ScheduledExam; teac
           {e.start ?? '—'}
         </T>
       </View>
-      <View style={{ flex: 1, minWidth: 0 }}>
+      <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+        {/* Başlıkta ders adı; sınıf adı altında (şube satırında yalnızca sınıf) */}
         <T size={14.5} weight="800" lines={2}>
-          {sub ? e.className : `${e.className} · ${e.subject}`}
+          {sub ? labelOf(e) : e.subject}
         </T>
-        <T size={12.5} color={colors.muted} lines={3}>
-          {proctors.length ? 'Gözetmen: ' : 'Gözetmen belirlenmedi'}
-          {proctors.map((p, i) => (
-            <Text key={p.teacherId}>
-              {i > 0 ? ', ' : ''}
+        {!sub && (
+          <T size={12.5} color={colors.muted}>
+            {labelOf(e)}
+          </T>
+        )}
+        {/* Gözetmenler alt alta */}
+        {proctors.length ? (
+          proctors.map((p, i) => (
+            <T key={p.teacherId} size={12.5} color={colors.muted}>
+              {i === 0 ? 'Gözetmen: ' : '                  '}
               {p.teacherId === teacherId ? <Me>{`${p.fullName} (siz)`}</Me> : p.fullName}
-            </Text>
-          ))}
-          {r.subject && !r.proctor ? ' · ' : ''}
-          {r.subject && !r.proctor && <Me>Dersinizin sınavı</Me>}
-          {r.subject && r.proctor ? ' · dersiniz' : ''}
-          {e.note ? ` · ${e.note}` : ''}
-        </T>
+            </T>
+          ))
+        ) : (
+          <T size={12.5} color={colors.muted}>
+            Gözetmen belirlenmedi
+          </T>
+        )}
+        {(r.subject || e.note) && (
+          <T size={12.5} color={colors.muted}>
+            {r.subject && !r.proctor && <Me>Dersinizin sınavı</Me>}
+            {r.subject && r.proctor ? 'Dersiniz' : ''}
+            {r.subject && e.note ? ' · ' : ''}
+            {e.note ?? ''}
+          </T>
+        )}
       </View>
-      {!sub && <KindPill kind={e.kind} />}
       {e.warnings.length > 0 && <Icon name="warning-outline" size={16} color={colors.warning} />}
     </View>
   );

@@ -70,6 +70,8 @@ export interface ScheduledExam {
   periodNo: number;
   classGroupId: string;
   className: string;
+  /** Görünen ad: okulun ana programının öneki yazılmaz ("AMP 10-A" → "10-A"; "ATP 10-A" kalır) */
+  classLabel: string;
   subject: string;
   kind: ExamKind;
   note: string | null;
@@ -99,11 +101,12 @@ export function examRoles(exam: Pick<ScheduledExam, 'proctors' | 'subjectTeacher
 }
 
 /** Sınav kaydının bildirim metni: öğretmenin rolüne göre */
-export function examReminderText(exam: Pick<ScheduledExam, 'className' | 'subject' | 'kind' | 'periodNo' | 'start' | 'notifyKind'>, roles: { proctor: boolean; subject: boolean }) {
+export function examReminderText(exam: Pick<ScheduledExam, 'className' | 'subject' | 'kind' | 'periodNo' | 'start' | 'notifyKind'> & { classLabel?: string }, roles: { proctor: boolean; subject: boolean }) {
   const kind = EXAM_KINDS[exam.kind].toLocaleLowerCase('tr-TR');
   const when = exam.notifyKind === 'first' ? `Birazdan (${exam.periodNo}. ders${exam.start ? `, ${exam.start}` : ''})` : `Bir sonraki derste (${exam.periodNo}. ders${exam.start ? `, ${exam.start}` : ''})`;
   const role = roles.proctor && roles.subject ? 'Gözetmen sizsiniz; ders de sizin.' : roles.proctor ? 'Gözetmen sizsiniz.' : 'Dersinizin sınavı.';
-  return { title: `Sınav: ${exam.className} ${exam.subject}`, body: `${when} ${exam.className} sınıfında ${kind} sınav var. ${role}` };
+  const name = exam.classLabel ?? exam.className;
+  return { title: `Sınav: ${name} ${exam.subject}`, body: `${when} ${name} sınıfında ${kind} sınav var. ${role}` };
 }
 
 /**
@@ -124,30 +127,31 @@ export interface ExamGroup<T> {
   samePeriod: boolean;
 }
 
-type Groupable = { date: string; className: string; subject: string; kind: ExamKind; periodNo: number };
+type Groupable = { date: string; className: string; classLabel?: string; subject: string; kind: ExamKind; periodNo: number };
 
 const CLASS_RE = /^(?:([A-Za-zÇĞİÖŞÜçğıöşü]{2,6})\s+)?(\d{1,2})\s*[-/]\s*(\S+)$/u;
 
 export function groupExams<T extends Groupable>(exams: readonly T[]): ExamGroup<T>[] {
   const groups = new Map<string, ExamGroup<T>>();
   for (const e of exams) {
-    const m = CLASS_RE.exec(e.className.trim());
+    const name = e.classLabel ?? e.className;
+    const m = CLASS_RE.exec(name.trim());
     const level = m ? `${m[1] ? `${m[1].toLocaleUpperCase('tr-TR')} ` : ''}${Number(m[2])}` : null;
-    const key = [e.date, level ?? `#${e.className}`, e.subject.trim().toLocaleLowerCase('tr-TR'), e.kind].join('|');
+    const key = [e.date, level ?? `#${name}`, e.subject.trim().toLocaleLowerCase('tr-TR'), e.kind].join('|');
     let g = groups.get(key);
     if (!g) {
-      g = { key, label: level ? `${level}. sınıflar` : e.className, badge: level ?? e.className, items: [], classNames: [], samePeriod: true };
+      g = { key, label: level ? `${level}. sınıflar` : name, badge: level ?? name, items: [], classNames: [], samePeriod: true };
       groups.set(key, g);
     }
     if (g.items.length && g.items[0]!.periodNo !== e.periodNo) g.samePeriod = false;
     g.items.push(e);
-    g.classNames.push(e.className);
+    g.classNames.push(name);
   }
   // Tek şubelik grup sınıfın kendi adıyla görünür
   for (const g of groups.values()) {
     if (g.items.length === 1) {
-      g.label = g.items[0]!.className;
-      g.badge = g.items[0]!.className;
+      g.label = g.classNames[0]!;
+      g.badge = g.classNames[0]!;
     }
   }
   return [...groups.values()];
