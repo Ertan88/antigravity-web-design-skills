@@ -4,12 +4,13 @@ import { client, createTestApp, expectStatus, login, SUPER, type TestCtx } from 
 let t: TestCtx;
 let schoolId: string;
 let owner: ReturnType<typeof client>;
+let root: ReturnType<typeof client>;
 const path = (p: string) => `/api/schools/${schoolId}/${p}`;
 
 beforeAll(async () => {
   // SMTP_HOST=json: e-posta gerçekten gönderilmeden üretilir
   t = await createTestApp({ SMTP_HOST: 'json' });
-  const root = client(t.app, (await login(t.app, SUPER.email, SUPER.password)).token);
+  root = client(t.app, (await login(t.app, SUPER.email, SUPER.password)).token);
   const res = await root.post('/api/platform/schools', { name: 'Şifre Okulu', slug: 'sifre-okulu', ownerEmail: 'mudur@sifre.local', ownerName: 'Müdür', ownerPassword: 'MudurSF123!' });
   expectStatus(res, 201);
   schoolId = res.json().id;
@@ -71,5 +72,47 @@ describe('kullanıcı şifreleri', () => {
     const members = (await owner.get(path('members'))).json() as { id: string; role: string }[];
     const own = members.find((m) => m.role === 'owner')!;
     expect((await owner.post(path(`members/${own.id}/password`), {})).statusCode).toBe(403);
+  });
+});
+
+describe('silinen kullanıcıyı yeniden ekleme', () => {
+  type Row = { id: string; email: string; fullName: string; invitePending: boolean };
+  const list = async () => (await owner.get(path('members'))).json() as Row[];
+
+  it('başka okulda hesabı yoksa silinince hesabı da kalkar; yeniden eklenince yeni ad ve davetle açılır', async () => {
+    const first = await owner.post(path('members'), { email: 'eski@sifre.local', fullName: 'Eski Ad', password: 'EskiSifre123', role: 'editor', permissions: [] });
+    expectStatus(first, 201);
+    const m = (await list()).find((r) => r.email === 'eski@sifre.local')!;
+    expectStatus(await owner.del(path(`members/${m.id}`)), 204);
+    expect((await tryLogin('eski@sifre.local', 'EskiSifre123')).statusCode).toBe(401);
+
+    const again = await owner.post(path('members'), { email: 'eski@sifre.local', fullName: 'Yeni Ad', role: 'editor', permissions: [], invite: true });
+    expectStatus(again, 201);
+    expect(again.json()).toMatchObject({ existingUser: false });
+    expect(again.json().invite.inviteUrl).toBeTruthy();
+    expect((await list()).find((r) => r.email === 'eski@sifre.local')).toMatchObject({ fullName: 'Yeni Ad', invitePending: true });
+  });
+
+  it('daha önce sahipsiz kalmış hesap da yeni hesap gibi ele alınır (eski şifre geçersiz olur)', async () => {
+    const { users } = await import('../src/db/schema.ts');
+    await t.database.db.insert(users).values({ email: 'sahipsiz@sifre.local', fullName: 'Eski İsim', passwordHash: 'x' });
+    const res = await owner.post(path('members'), { email: 'sahipsiz@sifre.local', fullName: 'Doğru İsim', password: 'DogruSifre123', role: 'editor', permissions: [] });
+    expect(res.json().existingUser).toBe(false);
+    expect((await list()).find((r) => r.email === 'sahipsiz@sifre.local')?.fullName).toBe('Doğru İsim');
+    expect((await tryLogin('sahipsiz@sifre.local', 'DogruSifre123')).statusCode).toBe(200);
+  });
+
+  it('başka okulda hesabı olan kişinin adı ve şifresi değişmez; silinince yalnızca bu okuldan çıkar', async () => {
+    expectStatus(await root.post('/api/platform/schools', { name: 'Diğer Okul', slug: 'diger-okul', ownerEmail: 'iki@okul.local', ownerName: 'İki Okullu', ownerPassword: 'IkiOkul123!' }), 201);
+    const res = await owner.post(path('members'), { email: 'iki@okul.local', fullName: 'Başka Ad', password: 'BaskaSifre123', role: 'editor', permissions: [] });
+    expect(res.json().existingUser).toBe(true);
+    const m = (await list()).find((r) => r.email === 'iki@okul.local')!;
+    expect(m.fullName).toBe('İki Okullu');
+    expectStatus(await owner.del(path(`members/${m.id}`)), 204);
+    // Hesap ve diğer okuldaki bağı durur (giriş deneme sınırına takılmamak için veritabanından bakılır)
+    const { users } = await import('../src/db/schema.ts');
+    const { eq } = await import('drizzle-orm');
+    const [u] = await t.database.db.select({ fullName: users.fullName }).from(users).where(eq(users.email, 'iki@okul.local'));
+    expect(u?.fullName).toBe('İki Okullu');
   });
 });

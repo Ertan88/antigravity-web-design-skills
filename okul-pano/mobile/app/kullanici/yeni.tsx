@@ -56,7 +56,7 @@ export default function AddMember() {
           <Card style={{ gap: 10 }}>
             <T weight="700">{fullName.trim()} eklendi.</T>
             <T size={13.5} color={colors.muted}>
-              Bu e-posta sistemde zaten kayıtlı olduğu için mevcut şifresi geçerli; kişi kendi şifresiyle bu okula da girer. Gerekirse kullanıcının sayfasından "Şifreyi sıfırla"yı kullanın.
+              Bu kişinin başka bir okulda hesabı var; adı ve şifresi değişmez, kendi şifresiyle bu okula da girer. Gerekirse kullanıcının sayfasından "Şifreyi sıfırla"yı kullanın.
             </T>
             <Button onPress={() => router.back()}>Tamam</Button>
           </Card>

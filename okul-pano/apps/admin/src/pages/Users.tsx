@@ -190,7 +190,7 @@ export function Users() {
           toast.success(`${v.fullName} davet edildi`);
         } else if (res.existingUser) {
           // E-posta sistemde kayıtlı: girilen şifre kullanılmadı, kullanıcı kendi şifresiyle girer
-          toast.success(`${v.fullName} eklendi. Bu e-posta sistemde zaten kayıtlı olduğu için mevcut şifresi geçerli; gerekirse "Şifreyi sıfırla"yı kullanın.`);
+          toast.success(`${v.fullName} eklendi. Bu kişinin başka bir okulda hesabı var; adı ve şifresi değişmez, kendi şifresiyle girer. Gerekirse "Şifreyi sıfırla"yı kullanın.`);
         } else {
           setCreated({ email: v.email, fullName: v.fullName, password: v.password });
           toast.success(`${v.fullName} eklendi`);

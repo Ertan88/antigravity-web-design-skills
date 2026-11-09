@@ -1,5 +1,5 @@
 import { createMemberSchema, effectivePermissions, resetPasswordSchema, updateMemberSchema } from '@okulpano/shared';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, count, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { audit, schoolGuard, UUID_RE } from '../context.ts';
@@ -70,15 +70,29 @@ export async function memberRoutes(app: FastifyInstance) {
     }));
   });
 
+  const membershipCount = async (userId: string) =>
+    (await db.select({ n: count() }).from(memberships).where(eq(memberships.userId, userId)))[0]!.n;
+
   app.post(base, manage, async (req, reply) => {
     const body = parse(createMemberSchema, req.body);
     if (body.role !== 'editor' && req.ctx.role !== 'owner') throw forbidden('Yönetici atamayı yalnızca okul müdürü yapabilir.');
     await checkTeacher(req, body.teacherId);
     const email = body.email.toLowerCase();
     let [user] = await db.select().from(users).where(eq(users.email, email));
-    const created = !user;
+    // Hiçbir okula bağlı olmayan eski hesap (ör. önceden silinmiş kullanıcı) yeni hesap gibi ele alınır:
+    // yeni ad yazılır, davet ya da geçici şifre verilir. Başka okulda hesabı olan kişiye dokunulmaz.
+    const orphan = Boolean(user && !user.isSuperAdmin && (await membershipCount(user.id)) === 0);
+    const created = !user || orphan;
     // Davet yoksa ve şifre verilmediyse okunaklı geçici şifre üretilir (mobil uygulama) ve yanıtta bir kez döner
-    const generated = !user && !body.invite && !body.password ? readablePassword() : null;
+    const generated = created && !body.invite && !body.password ? readablePassword() : null;
+    if (orphan) {
+      [user] = await db
+        .update(users)
+        .set({ fullName: body.fullName, passwordHash: body.invite ? INVITE_PENDING : await hashPassword(body.password ?? generated!) })
+        .where(eq(users.id, user!.id))
+        .returning();
+      await db.delete(sessions).where(eq(sessions.userId, user!.id));
+    }
     if (!user) {
       [user] = await db
         .insert(users)
@@ -200,6 +214,10 @@ export async function memberRoutes(app: FastifyInstance) {
   app.delete(`${base}/:memberId`, manage, async (req, reply) => {
     const m = await loadMember(req);
     await db.delete(memberships).where(eq(memberships.id, m.membership.id));
+    // Başka okulda hesabı yoksa kişinin hesabı da silinir (oturumlar, bildirimler, davetler birlikte gider):
+    // aynı e-posta yeniden eklenince yeni ad ve yeni şifreyle açılır; gereksiz kişisel veri kalmaz (KVKK)
+    const [u] = await db.select({ isSuperAdmin: users.isSuperAdmin }).from(users).where(eq(users.id, m.membership.userId));
+    if (u && !u.isSuperAdmin && (await membershipCount(m.membership.userId)) === 0) await db.delete(users).where(eq(users.id, m.membership.userId));
     await audit(req, 'delete', 'Kullanıcı', m.membership.id, m.fullName);
     return reply.status(204).send();
   });
