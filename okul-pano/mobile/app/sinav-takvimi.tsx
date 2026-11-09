@@ -1,8 +1,9 @@
-import { EXAM_KINDS, examGroupClasses, examGroupPeriods, examRoles, groupExams, type ExamGroup, type ExamKind, type ScheduledExam } from '@okulpano/shared/examCore';
+import { EXAM_KINDS, examGroupPeriods, examRoles, groupExams, type ExamGroup, type ExamKind, type ScheduledExam } from '@okulpano/shared/examCore';
 import { compareClassNames } from '@okulpano/shared/grade';
+import { useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
-import { useExamSchedule, useMeToday } from '../src/data.ts';
+import { useExamSchedule, useMeToday, useNow } from '../src/data.ts';
 import { dayTitle, localIso } from '../src/day.ts';
 import { colors, tiles, type TileTone } from '../src/theme.ts';
 import { Text } from '../src/text.tsx';
@@ -37,7 +38,9 @@ export default function SinavTakvimi() {
   const teacherId = me.data?.teacher?.id ?? null;
   const [filter, setFilter] = useState<Filter | null>(null);
   const [classId, setClassId] = useState<string | null>(null);
-  const [picked, setPicked] = useState<string | null>(null);
+  // Bildirimden gelindiyse (?gun=YYYY-AA-GG) o gün seçili açılır
+  const { gun } = useLocalSearchParams<{ gun?: string }>();
+  const [picked, setPicked] = useState<string | null>(gun && /^\d{4}-\d{2}-\d{2}$/.test(gun) ? gun : null);
   const active: Filter = filter ?? (teacherId ? 'mine' : 'all');
 
   const today = q.data?.today ?? localIso();
@@ -144,13 +147,20 @@ export default function SinavTakvimi() {
  * Dokununca şube şube saat ve gözetmen açılır.
  */
 function GroupRow({ group: g, teacherId, first }: { group: ExamGroup<ScheduledExam>; teacherId: string | null; first: boolean }) {
-  const [open, setOpen] = useState(false);
+  // Sınavdan önceki teneffüsün başından (bildirim anı) sınav bitene kadar kendiliğinden açık; kullanıcı kapatabilir
+  const now = useNow(30_000).getTime();
+  const starts = g.items.map((x) => (x.notifyAt ? Date.parse(x.notifyAt) : NaN)).filter((t) => !Number.isNaN(t));
+  const ends = g.items.map((x) => (x.end ? new Date(`${x.date}T${x.end}:00`).getTime() : NaN)).filter((t) => !Number.isNaN(t));
+  const auto = starts.length > 0 && ends.length > 0 && now >= Math.min(...starts) && now < Math.max(...ends);
+  const [toggled, setToggled] = useState<boolean | null>(null);
+  const open = toggled ?? auto;
+  const setOpen = (v: boolean) => setToggled(v);
   const e = g.items[0]!;
   const mine = g.items.filter((x) => {
     const r = examRoles(x, teacherId);
     return r.proctor || r.subject;
   });
-  const starts = [...new Set(g.items.map((x) => x.start ?? '—'))];
+  const clocks = [...new Set(g.items.map((x) => x.start ?? '—'))];
   return (
     <View style={{ borderTopWidth: first ? 0 : 1, borderTopColor: colors.divider }}>
       <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen(!open)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, opacity: pressed ? 0.7 : 1 })}>
@@ -159,7 +169,7 @@ function GroupRow({ group: g, teacherId, first }: { group: ExamGroup<ScheduledEx
             {g.samePeriod ? `${e.periodNo}. ders` : 'Şubeye göre'}
           </T>
           <T size={11.5} color={colors.faint}>
-            {g.samePeriod ? (starts.length === 1 ? starts[0] : 'şubeye göre') : examGroupPeriods(g)}
+            {g.samePeriod ? (clocks.length === 1 ? clocks[0] : 'şubeye göre') : examGroupPeriods(g)}
           </T>
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
@@ -169,7 +179,7 @@ function GroupRow({ group: g, teacherId, first }: { group: ExamGroup<ScheduledEx
           <T size={12.5} color={colors.muted} lines={2}>
             {mine.length > 0 && <Me>{`Sizin: ${mine.map((x) => x.className).join(', ')}`}</Me>}
             {mine.length > 0 ? ' · ' : ''}
-            {examGroupClasses(g, 8)}
+            {g.label}
           </T>
         </View>
         <KindPill kind={e.kind} />

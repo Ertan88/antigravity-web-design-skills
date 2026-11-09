@@ -180,7 +180,7 @@ export function useExamReminders(enabled: boolean) {
         if (!e.notifyAt || (!roles.proctor && !roles.subject)) return [];
         const at = new Date(e.notifyAt);
         if (at.getTime() <= now || at.getTime() > now + 21 * 86400_000) return [];
-        return [{ at, ...examReminderText(e, roles), url: '/sinav-takvimi' }];
+        return [{ at, ...examReminderText(e, roles), url: `/sinav-takvimi?gun=${e.date}` }];
       })
       .sort((a, b) => a.at.getTime() - b.at.getTime())
       .slice(0, 30);
