@@ -534,7 +534,7 @@ function SheetTable({
 }) {
   return (
     <div className="overflow-x-auto px-3 py-3">
-      <table className="rt-scroll border-separate border-spacing-0 text-xs">
+      <table className="border-separate border-spacing-0 text-xs">
         <thead>
           <tr className="text-slate-500">
             <th rowSpan={2} className="px-1.5 text-center font-bold">

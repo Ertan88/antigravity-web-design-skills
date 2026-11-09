@@ -289,8 +289,20 @@ input[list]::-webkit-calendar-picker-indicator {
   table.rt-scroll tr > :first-child {
     position: sticky;
     left: 0;
-    z-index: 1;
+    z-index: 2;
     background: var(--color-surface);
     box-shadow: 6px 0 8px -6px rgb(0 0 0 / 0.15);
+  }
+  /* Sabit sütunun solundaki kutu boşluğu ve satır aralıkları da örtülür: kayan içerik arkadan görünmesin */
+  table.rt-scroll tr > :first-child::after {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    top: -8px;
+    bottom: -8px;
+    left: -32px;
+    right: 0;
+    background: var(--color-surface);
+    pointer-events: none;
   }
 }
