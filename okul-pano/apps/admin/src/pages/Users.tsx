@@ -144,6 +144,11 @@ export function Users() {
   const [resetting, setResetting] = useState<Member | null>(null);
   const form = useForm<Form>({ email: '', fullName: '', password: '', invite: true, role: 'editor', permissions: ['announcements.manage'], teacherId: '' });
   const refresh = () => void qc.invalidateQueries({ queryKey: [schoolId, 'members'] });
+  // Seçilen öğretmen kadroda ve henüz hesabı yoksa hesabı Kadro sekmesinden (giriş kodu) açılmalı
+  const kadro =
+    mode === 'add' && form.values.teacherId && list.data && !list.data.some((m) => m.teacherId === form.values.teacherId)
+      ? teacherList.find((t) => t.id === form.values.teacherId)
+      : undefined;
 
   const save = useMutation({
     mutationFn: ({ id, body }: { id?: string; body: unknown }) => (id ? api(`${path}/${id}`, { method: 'PATCH', body }) : api(path, { method: 'POST', body })),
@@ -350,6 +355,25 @@ export function Users() {
                   {(id) => <Input id={id} type="email" value={form.values.email} onChange={(e) => form.set('email', e.target.value)} />}
                 </Field>
               </div>
+              {kadro && (
+                <Alert tone="blue">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="min-w-0 flex-1">
+                      <strong>{kadro.fullName}</strong> kadroda ve henüz hesabı yok. Öğretmenlere hesap Kadro sekmesinden giriş koduyla açılır; şifre ya da bağlantı
+                      paylaşmanız gerekmez. Burayı kadro dışı kişiler (memur, dışarıdan editör) için kullanın.
+                    </span>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setMode(null);
+                        setParams({ sekme: 'kadro', ara: kadro.fullName }, { replace: true });
+                      }}
+                    >
+                      Kadroda giriş kodu ver
+                    </Button>
+                  </div>
+                </Alert>
+              )}
               <Field label="Giriş bilgisi" help={form.values.invite ? 'Kişiye bağlantı gider; şifresini kendisi belirler. E-posta sistemde kayıtlıysa mevcut şifresiyle girer.' : 'Kullanıcı ilk girişten sonra Hesabım sayfasından değiştirebilir. E-posta sistemde kayıtlıysa mevcut şifresi geçerli kalır.'}>
                 {() => (
                   <Segmented

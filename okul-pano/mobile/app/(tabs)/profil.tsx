@@ -282,18 +282,19 @@ export default function Menu() {
       managerial && { title: 'Platforma yaz', subtitle: 'Okul Yayın ekibine sorun, öneri ya da soru', icon: 'lifebuoy', to: '/platforma-yaz' },
     ]);
     add('Yönetim', [
-      (can('users.manage') || can('accounts.enroll')) && {
-        title: 'Öğretmen hesabı aç',
-        subtitle: 'Giriş kodu, toplantı QR’ı, onay bekleyenler',
-        icon: 'key-outline',
-        to: '/hesap-ac',
-      },
-      managerial && {
-        title: 'Kullanıcılar ve yetkiler',
-        subtitle: role === 'owner' ? 'Davet · yönetici ve editör ata · yetki ver' : 'Davet · editör ekle ve yetki ver',
-        icon: 'people-outline',
-        to: '/kullanicilar',
-      },
+      managerial && can('users.manage')
+        ? {
+            title: 'Kullanıcılar ve yetkiler',
+            subtitle: role === 'owner' ? 'Öğretmen hesabı aç · yönetici ve editör ata · yetki ver' : 'Öğretmen hesabı aç · editör ekle ve yetki ver',
+            icon: 'people-outline',
+            to: '/kullanicilar',
+          }
+        : can('accounts.enroll') && {
+            title: 'Öğretmen hesabı aç',
+            subtitle: 'Giriş kodu, toplantı QR’ı, onay bekleyenler',
+            icon: 'key-outline',
+            to: '/hesap-ac',
+          },
       role === 'owner' && !school?.support && !me?.user.isSuperAdmin && {
         title: 'Destek erişimi',
         subtitle: 'Platform desteğine 24 saat ya da 7 gün onay ver, kapat',

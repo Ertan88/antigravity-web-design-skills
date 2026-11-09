@@ -1,3 +1,4 @@
+import { useSearchParams } from 'react-router-dom';
 import { ENROLL_ROLES, normalizeName, type EnrollRole, errorText } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
@@ -76,7 +77,9 @@ export function RosterTab() {
   const full = Boolean(enroll.data?.full);
   const titleRoles = (school.data?.settings?.titleRoles ?? {}) as Record<string, EnrollRole>;
 
-  const [q, setQ] = useState('');
+  // "Kullanıcı ekle"den kadrodaki bir öğretmen için gelindiyse arama onun adıyla açılır
+  const [params] = useSearchParams();
+  const [q, setQ] = useState(params.get('ara') ?? '');
   const [filter, setFilter] = useState<Filter>('all');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [roles, setRoles] = useState<Record<string, EnrollRole>>({});

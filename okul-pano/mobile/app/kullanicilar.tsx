@@ -1,9 +1,11 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
-import { useAuth } from '../src/auth.tsx';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../src/api.ts';
+import { useAuth, useSchoolPath } from '../src/auth.tsx';
 import { useMembers } from '../src/data.ts';
 import { timeAgo } from '../src/day.ts';
-import { formRole, permissionSummary, roleTitle } from '../src/members.tsx';
+import { formRole, permissionSummary, roleTitle, UsersTabs } from '../src/members.tsx';
 import { colors } from '../src/theme.ts';
 import { Badge, Button, Card, Empty, ErrorNote, ListRow, Loading, Screen, T } from '../src/ui.tsx';
 
@@ -12,9 +14,17 @@ import { Badge, Button, Card, Empty, ErrorNote, ListRow, Loading, Screen, T } fr
  * daveti yeniden gönderme ve okuldan çıkarma açılır. Yönetici atamayı yalnızca okul müdürü yapar.
  */
 export default function Kullanicilar() {
-  const { role, can } = useAuth();
+  const { role, can, school } = useAuth();
   const { sekme } = useLocalSearchParams<{ sekme?: string }>();
   const members = useMembers(can('users.manage'));
+  // Hesap aç sekmesindeki onay bekleyen sayısı (aynı veri Hesap aç ekranında da kullanılır)
+  const rosterPath = useSchoolPath('enrollments');
+  const roster = useQuery({
+    queryKey: [school?.id, 'roster'],
+    queryFn: () => api<{ rows: { status: string }[] }>(`${rosterPath}/roster`),
+    enabled: Boolean(school) && can('users.manage'),
+  });
+  const pending = roster.data?.rows.filter((r) => r.status === 'pending').length ?? 0;
 
   // Hesap açma bildirimleri (?sekme=kadro) ve yalnızca "Öğretmen hesabı açma" yetkisi olanlar hesap açma ekranına gider
   if (sekme === 'kadro' || (!can('users.manage') && can('accounts.enroll'))) return <Redirect href="/hesap-ac" />;
@@ -43,6 +53,7 @@ export default function Kullanicilar() {
         </Button>
       }
     >
+      <UsersTabs value="users" pending={pending} />
       <ErrorNote error={members.error} />
       {members.isLoading ? (
         <Loading />

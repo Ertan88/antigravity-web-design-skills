@@ -5,10 +5,10 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { api } from '../../src/api.ts';
 import { useSchoolPath } from '../../src/auth.tsx';
-import { useTeachers } from '../../src/data.ts';
+import { useMembers, useTeachers } from '../../src/data.ts';
 import { AccessResult, apiRole, matchTeacher, RoleEditor, TeacherPicker, type FormRole } from '../../src/members.tsx';
 import { colors } from '../../src/theme.ts';
-import { Button, Card, ErrorNote, Field, Screen, SectionTitle, Segmented, T } from '../../src/ui.tsx';
+import { Button, Card, ErrorNote, Field, Icon, Screen, SectionTitle, Segmented, T } from '../../src/ui.tsx';
 
 type Result = { kind: 'password' | 'invite'; secret: string; emailed: boolean } | { kind: 'existing' };
 
@@ -26,6 +26,9 @@ export default function AddMember() {
   const [role, setRole] = useState<FormRole>('editor');
   const [permissions, setPermissions] = useState<Permission[]>(['announcements.manage']);
   const [result, setResult] = useState<Result | null>(null);
+  const members = useMembers(true);
+  // Seçilen öğretmen kadroda ve henüz hesabı yoksa hesap Hesap aç sekmesinden (giriş kodu) açılmalı
+  const kadro = teacherId && members.data && !members.data.some((m) => m.teacherId === teacherId) ? teacherList.find((t) => t.id === teacherId) : undefined;
 
   const add = useMutation({
     mutationFn: () =>
@@ -69,6 +72,19 @@ export default function AddMember() {
 
   return (
     <Screen back title="Kullanıcı ekle">
+      {kadro && (
+        <Card style={{ gap: 10, backgroundColor: colors.warningSoft, borderColor: colors.warningSoft }}>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Icon name="alert-circle-outline" size={20} color={colors.warning} />
+            <T size={13.5} style={{ flex: 1 }}>
+              {kadro.fullName} kadroda ve henüz hesabı yok. Öğretmenlere hesap Hesap aç sekmesinden giriş koduyla açılır; şifre ya da bağlantı paylaşmanız gerekmez. Burayı kadro dışı kişiler (memur, dışarıdan editör) için kullanın.
+            </T>
+          </View>
+          <Button size="sm" icon="key-outline" onPress={() => router.replace({ pathname: '/hesap-ac', params: { ogretmen: kadro.id } })}>
+            Giriş kodu ver
+          </Button>
+        </Card>
+      )}
       <Card style={{ gap: 12 }}>
         <Field
           label="Ad soyad"

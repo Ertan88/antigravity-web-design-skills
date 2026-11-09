@@ -1,5 +1,6 @@
 import { ADMIN_ONLY_PERMISSIONS, PERMISSION_KEYS, PERMISSIONS, type Permission } from '@okulpano/shared/permissions';
 import { normalizeName } from '@okulpano/shared/teachers';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, Share, View } from 'react-native';
 import { useAuth } from './auth.tsx';
@@ -7,7 +8,7 @@ import type { Member } from './data.ts';
 import { Sheet } from './sheet.tsx';
 import { Text, TextInput } from './text.tsx';
 import { colors, radius } from './theme.ts';
-import { Button, Card, Choice, Icon, T, ToggleRow } from './ui.tsx';
+import { Button, Card, Choice, Icon, Segmented, T, ToggleRow } from './ui.tsx';
 
 /*
  * Kullanıcılar ve yetkiler (panelle aynı kurallar): rehber öğretmen ayrı bir rol olarak seçilir (editör + bütün
@@ -157,5 +158,26 @@ export function AccessResult({ kind, fullName, email, secret, emailed, onDone }:
         </Button>
       </View>
     </Card>
+  );
+}
+
+/**
+ * Kullanıcılar ve yetkiler ekranının iki sekmesi (paneldeki gibi): Kullanıcılar | Hesap aç. Yalnızca kullanıcı
+ * yönetme yetkisi olana görünür; "Öğretmen hesabı açma" yetkisi olan kişi doğrudan Hesap aç ekranını görür.
+ */
+export function UsersTabs({ value, pending }: { value: 'users' | 'enroll'; pending?: number }) {
+  const { can } = useAuth();
+  if (!can('users.manage')) return null;
+  return (
+    <Segmented
+      value={value}
+      onChange={(v) => {
+        if (v !== value) router.replace(v === 'enroll' ? '/hesap-ac' : '/kullanicilar');
+      }}
+      options={[
+        { value: 'users', label: 'Kullanıcılar' },
+        { value: 'enroll', label: pending ? `Hesap aç (${pending})` : 'Hesap aç' },
+      ]}
+    />
   );
 }

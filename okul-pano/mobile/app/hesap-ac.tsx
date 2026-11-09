@@ -1,10 +1,11 @@
 import { ENROLL_ROLES, type EnrollRole, errorText } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { api } from '../src/api.ts';
 import { useAuth, useSchoolPath } from '../src/auth.tsx';
+import { UsersTabs } from '../src/members.tsx';
 import { Sheet } from '../src/sheet.tsx';
 import { Text } from '../src/text.tsx';
 import { colors, tiles, TILE_KEYS, type TileTone } from '../src/theme.ts';
@@ -36,6 +37,7 @@ const toneOf = (name: string) => TONES[[...name].reduce((h, c) => (h * 31 + c.ch
  */
 export default function HesapAc() {
   const { can, school } = useAuth();
+  const { ogretmen } = useLocalSearchParams<{ ogretmen?: string }>();
   const allowed = can('users.manage') || can('accounts.enroll');
   const path = useSchoolPath('enrollments');
   const qc = useQueryClient();
@@ -66,6 +68,17 @@ export default function HesapAc() {
     return rows.filter((r) => (r.status === 'none' || r.status === 'code') && (!needle || r.fullName.toLocaleLowerCase('tr-TR').includes(needle)));
   }, [rows, search]);
   const full = Boolean(q.data?.full);
+  // "Kullanıcı ekle"den kadrodaki bir öğretmen için gelindiyse o öğretmenin penceresi açılır
+  const [opened, setOpened] = useState(false);
+  useEffect(() => {
+    if (opened || !ogretmen || !q.data) return;
+    const row = q.data.rows.find((r) => r.teacherId === ogretmen && (r.status === 'none' || r.status === 'code'));
+    if (row) {
+      setRole(q.data.full ? row.role : 'teacher');
+      setPicked(row);
+    }
+    setOpened(true);
+  }, [ogretmen, q.data, opened]);
 
   const showCode = (r: Row, chosen: EnrollRole) =>
     run(`code-${r.teacherId}`, async () => {
@@ -95,7 +108,7 @@ export default function HesapAc() {
   return (
     <Screen
       back
-      title="Öğretmen hesabı aç"
+      title={can('users.manage') ? 'Kullanıcılar ve yetkiler' : 'Öğretmen hesabı aç'}
       subtitle={q.data ? `${open.length} öğretmenin hesabı yok` : undefined}
       refreshing={q.isRefetching}
       onRefresh={() => void q.refetch()}
@@ -105,6 +118,7 @@ export default function HesapAc() {
         </Button>
       }
     >
+      <UsersTabs value="enroll" pending={pending.length} />
       <ErrorNote error={q.error} />
       {error && (
         <T color={colors.danger} weight="600" size={13.5}>
