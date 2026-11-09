@@ -21,7 +21,7 @@ const ROUTES: Record<string, string> = {
   'support-expired': '/okullar',
   'meb-calendar': '/takvim',
   internship: '/isletme-devam',
-  enroll: '/kullanicilar',
+  enroll: '/hesap-ac',
 };
 const ICONS: Record<string, { icon: IconName; tone: 'primary' | 'warning' | 'danger' | 'gold' | 'muted' }> = {
   approval: { icon: 'checkmark-done-outline', tone: 'primary' },

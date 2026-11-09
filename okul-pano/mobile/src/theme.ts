@@ -74,7 +74,7 @@ const DARK: Palette = {
 export const colors: Palette = { ...LIGHT };
 
 type Tile = { bg: string; fg: string; sub: string; chip: string };
-const TILE_KEYS = ['ink', 'sun', 'peach', 'mint', 'sky', 'lilac', 'rose', 'paper'] as const;
+export const TILE_KEYS = ['ink', 'sun', 'peach', 'mint', 'sky', 'lilac', 'rose', 'paper'] as const;
 export type TileTone = (typeof TILE_KEYS)[number];
 
 /** Bento kutularının renkleri: zemin, yazı ve (varsa) simge kutusu */

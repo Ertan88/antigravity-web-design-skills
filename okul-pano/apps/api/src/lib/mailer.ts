@@ -9,8 +9,33 @@ export function parseFrom(from: string): { name: string; email: string } {
   return m ? { name: m[1]!.trim() || 'Okulyayın', email: m[2]!.trim() } : { name: 'Okulyayın', email: from.trim() };
 }
 
-/** E-posta gönderimi ayarlı mı (Brevo ya da SMTP) */
-export const mailConfigured = (env: Env) => Boolean(env.BREVO_API_KEY || env.SMTP_HOST);
+/** Platform panelinden girilen ayar (sunucuya erişimi olmayan kurulumlar için, ör. Render) */
+export interface MailOverride {
+  brevoApiKey: string;
+  from: string;
+}
+const overrides = new WeakMap<Env, MailOverride>();
+export const setMailOverride = (env: Env, value: MailOverride | null) => (value ? overrides.set(env, value) : overrides.delete(env));
+
+/** Ortam değişkenleri ayarlıysa onlar geçerlidir; değilse panelden girilen ayar kullanılır */
+export const mailSource = (env: Env): 'env' | 'panel' | null => (env.BREVO_API_KEY || env.SMTP_HOST ? 'env' : overrides.has(env) ? 'panel' : null);
+
+/** E-posta gönderimi ayarlı mı (Brevo ya da SMTP; ortam değişkeni ya da platform paneli) */
+export const mailConfigured = (env: Env) => mailSource(env) !== null;
+
+/** Brevo üzerinden gönderim (anahtar ve gönderen verilir) */
+async function sendBrevo(url: string, apiKey: string, from: string, msg: { to: string; subject: string; text: string }) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'api-key': apiKey, 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({ sender: parseFrom(from), to: [{ email: msg.to }], subject: msg.subject, textContent: msg.text }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) throw new Error(`E-posta gönderilemedi (Brevo ${res.status}): ${(await res.text()).slice(0, 200)}`);
+}
+
+/** Panelden girilmiş (henüz kaydedilmemiş olabilecek) ayarla deneme gönderimi */
+export const sendWithOverride = (env: Env, cfg: MailOverride, msg: { to: string; subject: string; text: string }) => sendBrevo(env.BREVO_API_URL, cfg.brevoApiKey, cfg.from, msg);
 
 /**
  * E-posta gönderir; ayarlı değilse false döner (panel bağlantıyı kopyalatır, başvurular elle onaylanır).
@@ -19,16 +44,15 @@ export const mailConfigured = (env: Env) => Boolean(env.BREVO_API_KEY || env.SMT
  */
 export async function sendMail(env: Env, msg: { to: string; subject: string; text: string }): Promise<boolean> {
   if (env.BREVO_API_KEY) {
-    const res = await fetch(env.BREVO_API_URL, {
-      method: 'POST',
-      headers: { 'api-key': env.BREVO_API_KEY, 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify({ sender: parseFrom(env.SMTP_FROM), to: [{ email: msg.to }], subject: msg.subject, textContent: msg.text }),
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!res.ok) throw new Error(`E-posta gönderilemedi (Brevo ${res.status}): ${(await res.text()).slice(0, 200)}`);
+    await sendBrevo(env.BREVO_API_URL, env.BREVO_API_KEY, env.SMTP_FROM, msg);
     return true;
   }
-  if (!env.SMTP_HOST) return false;
+  if (!env.SMTP_HOST) {
+    const panel = overrides.get(env);
+    if (!panel) return false;
+    await sendBrevo(env.BREVO_API_URL, panel.brevoApiKey, panel.from, msg);
+    return true;
+  }
   const key = `${env.SMTP_HOST}:${env.SMTP_PORT}:${env.SMTP_USER ?? ''}`;
   if (cached?.key !== key) {
     cached = {

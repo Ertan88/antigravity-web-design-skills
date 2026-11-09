@@ -1,5 +1,5 @@
 import { ADMIN_ONLY_PERMISSIONS, createMemberSchema, normalizeName, PERMISSION_KEYS, PERMISSIONS, updateMemberSchema, type Permission, type Role } from '@okulpano/shared';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { KeyRound, Pencil, Plus, Send, UserCog } from '../components/icons.tsx';
 import { useState } from 'react';
@@ -123,7 +123,9 @@ export function Users() {
   const path = useSchoolPath('members');
   const qc = useQueryClient();
   const toast = useToast();
-  const list = useList<Member>('members');
+  const { can } = useAuth();
+  const full = can('users.manage');
+  const list = useQuery({ queryKey: [schoolId, 'members'], queryFn: () => api<Member[]>(path), enabled: Boolean(schoolId) && full });
   const teachers = useList<Teacher>('teachers');
   const teacherList = (teachers.data ?? []).filter((t) => t.isActive !== false);
   const linkTeacher = useMutation({
@@ -135,7 +137,7 @@ export function Users() {
     onError: (e) => toast.error(e.message),
   });
   const [params, setParams] = useSearchParams();
-  const tab = params.get('sekme') === 'kadro' ? 'kadro' : 'hesaplar';
+  const tab = params.get('sekme') === 'kadro' || !full ? 'kadro' : 'hesaplar';
   const [mode, setMode] = useState<'add' | Member | null>(null);
   const [created, setCreated] = useState<Credentials | null>(null);
   const [invited, setInvited] = useState<InviteResult | null>(null);
@@ -212,12 +214,14 @@ export function Users() {
         title="Kullanıcılar ve Yetkiler"
         description="Öğretmen ve idarecilere panel erişimi verin. Editörler yalnızca seçtiğiniz bölümleri düzenleyebilir; örneğin bir öğretmen sadece duyuru ekleyebilir."
         actions={
-          <Button icon={<Plus className="size-4" />} onClick={openAdd}>
-            Kullanıcı ekle
-          </Button>
+          full && (
+            <Button icon={<Plus className="size-4" />} onClick={openAdd}>
+              Kullanıcı ekle
+            </Button>
+          )
         }
       />
-      <div className="mb-4">
+      {full && <div className="mb-4">
         <Segmented
           value={tab}
           onChange={(v) => setParams(v === 'kadro' ? { sekme: 'kadro' } : {}, { replace: true })}
@@ -226,9 +230,9 @@ export function Users() {
             { value: 'kadro', label: 'Kadro' },
           ]}
         />
-      </div>
+      </div>}
       {tab === 'kadro' ? (
-        <RosterTab members={list.data ?? []} />
+        <RosterTab />
       ) : (
       <Card>
         {list.isLoading ? (

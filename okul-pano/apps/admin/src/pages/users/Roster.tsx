@@ -7,24 +7,25 @@ import { useToast } from '../../components/Toast.tsx';
 import { Alert, Badge, Button, Card, EmptyState, Input, Modal, Segmented, Select, Spinner, Table, Td } from '../../components/ui.tsx';
 import { api } from '../../lib/api.ts';
 import { useAuth } from '../../lib/auth.tsx';
-import { useList, useSchool, useSchoolPath, type Teacher, type TeacherOption } from '../../lib/data.ts';
+import { useList, useSchool, useSchoolPath, type TeacherOption } from '../../lib/data.ts';
 
-interface RosterMember {
-  id: string;
-  email: string;
-  teacherId: string | null;
-  lastLoginAt: string | null;
-  invitePending: boolean;
-}
-
-interface Enrollment {
-  id: string;
-  teacherId: string | null;
-  kind: 'code' | 'meeting';
+interface RosterRow {
+  teacherId: string;
+  fullName: string;
+  title: string | null;
+  branch: string | null;
+  status: Status;
   role: EnrollRole;
   email: string | null;
-  status: 'waiting' | 'pending';
-  codeExpiresAt: string | null;
+  enrollmentId: string | null;
+}
+
+interface Roster {
+  mail: boolean;
+  /** Kullanıcı yönetimi yetkisi (yoksa dar yetki: yalnızca Öğretmen rolü) */
+  full: boolean;
+  owner: boolean;
+  rows: RosterRow[];
 }
 
 type Status = 'account' | 'invited' | 'pending' | 'code' | 'none';
@@ -57,23 +58,22 @@ function useCountdown(until: string | null) {
  * kadroda e-postası olana davet bağlantısı, kişi başı tek kullanımlık giriş kodu ya da toplantıda okutulan QR (onaylı).
  * Öğretmen e-postasını ve şifresini kendisi girer; ortada yazılı şifre olmaz.
  */
-export function RosterTab({ members }: { members: RosterMember[] }) {
-  const { schoolId, school: access } = useAuth();
-  const isOwner = access?.role === 'owner';
+export function RosterTab() {
+  const { schoolId } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
   const school = useSchool();
-  const teachers = useList<Teacher>('teachers');
   const titles = useList<TeacherOption>('teacher-titles');
   const enrollPath = useSchoolPath('enrollments');
-  const membersPath = useSchoolPath('members');
   const schoolPath = useSchoolPath();
   const enroll = useQuery({
     queryKey: [schoolId, 'enrollments'],
-    queryFn: () => api<{ mail: boolean; items: Enrollment[] }>(enrollPath),
+    queryFn: () => api<Roster>(`${enrollPath}/roster`),
     enabled: Boolean(schoolId),
     refetchInterval: 15_000,
   });
+  const isOwner = Boolean(enroll.data?.owner);
+  const full = Boolean(enroll.data?.full);
   const titleRoles = (school.data?.settings?.titleRoles ?? {}) as Record<string, EnrollRole>;
 
   const [q, setQ] = useState('');
@@ -91,20 +91,16 @@ export function RosterTab({ members }: { members: RosterMember[] }) {
     void qc.invalidateQueries({ queryKey: [schoolId, 'teachers'] });
   };
 
-  const rows = useMemo(() => {
-    const byTeacher = new Map(members.filter((m) => m.teacherId).map((m) => [m.teacherId!, m]));
-    const enr = new Map<string, Enrollment>();
-    for (const e of enroll.data?.items ?? []) if (e.teacherId && (!enr.has(e.teacherId) || e.status === 'pending')) enr.set(e.teacherId, e);
-    return (teachers.data ?? [])
-      .filter((t) => t.isActive)
-      .map((t) => {
-        const m = byTeacher.get(t.id);
-        const e = enr.get(t.id);
-        const status: Status = m ? (m.invitePending ? 'invited' : 'account') : e?.status === 'pending' ? 'pending' : e ? 'code' : 'none';
-        const suggested: EnrollRole = (t.titleId && titleRoles[t.titleId]) || 'teacher';
-        return { t, m, e, status, role: roles[t.id] ?? e?.role ?? suggested, email: m?.email ?? e?.email ?? t.email };
-      });
-  }, [teachers.data, members, enroll.data, titleRoles, roles]);
+  // Dar yetkiyle yalnızca "Öğretmen" rolü seçilebilir
+  const rows = useMemo(
+    () =>
+      (enroll.data?.rows ?? []).map((r) => ({
+        ...r,
+        t: { id: r.teacherId, fullName: r.fullName, title: r.title, branch: r.branch, email: r.email },
+        role: (full ? (roles[r.teacherId] ?? r.role) : 'teacher') as EnrollRole,
+      })),
+    [enroll.data, roles, full],
+  );
 
   const counts = {
     none: rows.filter((r) => r.status === 'none' || r.status === 'code').length,
@@ -148,7 +144,7 @@ export function RosterTab({ members }: { members: RosterMember[] }) {
     let ok = 0;
     for (const r of list) {
       try {
-        await api(`${enrollPath}/${r.e!.id}/approve`, { method: 'POST', body: { role: r.role } });
+        await api(`${enrollPath}/${r.enrollmentId}/approve`, { method: 'POST', body: { role: r.role } });
         ok++;
       } catch (err) {
         toast.error(`${r.t.fullName}: ${err instanceof Error ? err.message : 'onaylanamadı'}`);
@@ -160,7 +156,7 @@ export function RosterTab({ members }: { members: RosterMember[] }) {
     if (ok) toast.success(`${ok} hesap onaylandı`);
   };
   const reject = async (r: (typeof rows)[number]) => {
-    await api(`${enrollPath}/${r.e!.id}/cancel`, { method: 'POST' }).catch((e: Error) => toast.error(e.message));
+    await api(`${enrollPath}/${r.enrollmentId}/cancel`, { method: 'POST' }).catch((e: Error) => toast.error(e.message));
     refresh();
   };
 
@@ -173,16 +169,8 @@ export function RosterTab({ members }: { members: RosterMember[] }) {
     setBusy(true);
     let ok = 0;
     for (const r of invitable) {
-      const role = r.role === 'admin' ? 'admin' : 'editor';
-      if (role === 'admin' && !isOwner) {
-        toast.error(`${r.t.fullName}: yönetici hesabını yalnızca okul müdürü açabilir`);
-        continue;
-      }
       try {
-        await api(membersPath, {
-          method: 'POST',
-          body: { email: r.t.email, fullName: r.t.fullName, role, permissions: r.role === 'counselor' ? ['conduct.counsel'] : [], teacherId: r.t.id, invite: true },
-        });
+        await api(`${enrollPath}/invite`, { method: 'POST', body: { teacherId: r.t.id, role: r.role } });
         ok++;
       } catch (err) {
         toast.error(`${r.t.fullName}: ${err instanceof Error ? err.message : 'gönderilemedi'}`);
@@ -194,7 +182,7 @@ export function RosterTab({ members }: { members: RosterMember[] }) {
     if (ok) toast.success(`${ok} öğretmene davet e-postası gönderildi`);
   };
 
-  if (teachers.isLoading || enroll.isLoading) return <Spinner />;
+  if (enroll.isLoading) return <Spinner />;
 
   return (
     <>
@@ -203,9 +191,11 @@ export function RosterTab({ members }: { members: RosterMember[] }) {
           <Button size="sm" icon={<QrCodeIcon className="size-4" />} loading={openMeeting.isPending} onClick={() => openMeeting.mutate()}>
             Toplantı QR'ı
           </Button>
-          <Button size="sm" variant="secondary" icon={<Tags className="size-4" />} onClick={() => setMapping(true)}>
-            Ünvan → rol
-          </Button>
+          {full && (
+            <Button size="sm" variant="secondary" icon={<Tags className="size-4" />} onClick={() => setMapping(true)}>
+              Ünvan → rol
+            </Button>
+          )}
           <div className="relative ml-auto w-full sm:w-64">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
             <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ad, branş ya da ünvan ara" className="pl-9" aria-label="Öğretmen ara" />
@@ -242,7 +232,7 @@ export function RosterTab({ members }: { members: RosterMember[] }) {
                   <div className="text-slate-500">{[r.t.title, r.t.branch].filter(Boolean).join(' · ') || 'Ünvan girilmemiş'}</div>
                 </Td>
                 <Td className="min-w-40">
-                  {selectable(r) ? (
+                  {selectable(r) && full ? (
                     <Select value={r.role} onChange={(e) => setRoles((x) => ({ ...x, [r.t.id]: e.target.value as EnrollRole }))} aria-label="Rol">
                       {(Object.keys(ENROLL_ROLES) as EnrollRole[])
                         .filter((k) => k !== 'admin' || isOwner || r.role === 'admin')

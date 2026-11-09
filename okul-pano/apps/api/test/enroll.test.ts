@@ -136,3 +136,48 @@ describe('B · toplantı QR’ı ve onay', () => {
     expectStatus(await anon.post('/api/enroll/meeting', { link }), 401);
   });
 });
+
+describe('dar yetki: Öğretmen hesabı açma', () => {
+  let helper: ReturnType<typeof client>;
+  beforeAll(async () => {
+    expectStatus(await owner.post(`${base}/members`, { email: 'bt@katilim.test', fullName: 'Bilişim Öğretmeni', password: 'GizliSifre42', role: 'editor', permissions: ['accounts.enroll'] }), 201);
+    helper = client(t.app, (await login(t.app, 'bt@katilim.test', 'GizliSifre42')).token);
+    for (const [key, body] of Object.entries({ emre: { fullName: 'Emre Dar', titleId: ids.title }, funda: { fullName: 'Funda Davet', email: 'funda@okul.test' } })) {
+      const r = await owner.post(`${base}/teachers`, body);
+      ids[key] = r.json().id;
+    }
+  });
+
+  it('kadro listesini görür ama kullanıcı listesini ve yetkileri göremez', async () => {
+    const roster = await helper.get(`${base}/enrollments/roster`);
+    expectStatus(roster, 200);
+    expect(roster.json()).toMatchObject({ full: false });
+    const emre = (roster.json().rows as { teacherId: string; role: string; status: string }[]).find((r) => r.teacherId === ids.emre);
+    expect(emre).toMatchObject({ status: 'none', role: 'admin' });
+    expectStatus(await helper.get(`${base}/members`), 403);
+  });
+
+  it('yalnızca öğretmen rolüyle kod verir ve davet gönderir', async () => {
+    expectStatus(await helper.post(`${base}/enrollments/code`, { teacherId: ids.emre, role: 'admin' }), 403);
+    expectStatus(await helper.post(`${base}/enrollments/code`, { teacherId: ids.emre, role: 'teacher' }), 200);
+    const inv = await helper.post(`${base}/enrollments/invite`, { teacherId: ids.funda });
+    expectStatus(inv, 200);
+    const roster = (await helper.get(`${base}/enrollments/roster`)).json().rows as { teacherId: string; status: string; email: string }[];
+    expect(roster.find((r) => r.teacherId === ids.funda)).toMatchObject({ status: 'invited', email: 'funda@okul.test' });
+  });
+
+  it('onaylarken ünvandan yönetici önerilse de öğretmen olarak açar', async () => {
+    const res = await owner.post(`${base}/enrollments/meeting`, {});
+    const link = new URL(res.json().url).searchParams.get('okul')!;
+    const start = await anon.post('/api/enroll/meeting/start', { link, teacherId: ids.emre });
+    const token = start.json().token;
+    await anon.post('/api/enroll/email', { token, email: 'emre@okul.test' });
+    await anon.post('/api/enroll/finish', { token, emailCode: lastCode('emre@okul.test'), password: 'EmreSifre42' });
+    const pending = ((await helper.get(`${base}/enrollments/roster`)).json().rows as { teacherId: string; enrollmentId: string; status: string }[]).find((r) => r.teacherId === ids.emre)!;
+    expect(pending.status).toBe('pending');
+    expectStatus(await helper.post(`${base}/enrollments/${pending.enrollmentId}/approve`, { role: 'admin' }), 403);
+    expectStatus(await helper.post(`${base}/enrollments/${pending.enrollmentId}/approve`, {}), 200);
+    const me = client(t.app, (await login(t.app, 'emre@okul.test', 'EmreSifre42')).token);
+    expect((await me.get('/api/me')).json().schools[0]).toMatchObject({ role: 'editor', teacherId: ids.emre });
+  });
+});

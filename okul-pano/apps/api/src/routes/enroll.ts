@@ -16,8 +16,11 @@ import { and, desc, eq, gt, inArray, isNotNull, ne } from 'drizzle-orm';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { audit, schoolGuard, UUID_RE } from '../context.ts';
 import { enrollments, joinLinks, memberships, schools, teacherBranches, teachers, teacherTitles, users } from '../db/schema.ts';
+import { createInvite } from './signup.ts';
+import { INVITE_PENDING } from './members.ts';
 import { burnPasswordCheck, hashPassword, pairingCode, randomToken, sha256, verifyPassword } from '../lib/crypto.ts';
 import { badRequest, conflict, forbidden, notFound, parse, unauthorized } from '../lib/errors.ts';
+import { z } from 'zod';
 import { mailConfigured, trySendMail } from '../lib/mailer.ts';
 import { tell } from './issues.ts';
 
@@ -46,7 +49,27 @@ const membershipToRole = (role: string, permissions: string[]): EnrollRole =>
 export async function enrollRoutes(app: FastifyInstance) {
   const { db, env } = app.deps;
   const base = '/api/schools/:schoolId/enrollments';
-  const manage = { preHandler: [app.authenticate, schoolGuard('users.manage')] };
+  // Okul müdürü / yöneticiler (users.manage) ya da dar yetki "Öğretmen hesabı açma" (accounts.enroll)
+  const manage = {
+    preHandler: [
+      app.authenticate,
+      schoolGuard(),
+      async (req: FastifyRequest) => {
+        if (!req.ctx.permissions.includes('users.manage') && !req.ctx.permissions.includes('accounts.enroll')) throw forbidden();
+      },
+    ],
+  };
+  const fullAccess = (req: FastifyRequest) => req.ctx.permissions.includes('users.manage');
+  /** Dar yetkiyle yalnızca "Öğretmen" rolü; yönetici hesabını yalnızca okul müdürü açar */
+  function checkRole(req: FastifyRequest, role: EnrollRole) {
+    if (role !== 'teacher' && !fullAccess(req)) throw forbidden('Bu yetkiyle yalnızca öğretmen hesabı açılabilir.');
+    if (role === 'admin' && req.ctx.role !== 'owner') throw forbidden('Yönetici hesabını yalnızca okul müdürü açabilir.');
+  }
+  /** Onay bekleyen bildirimi: idareciler ve hesap açma yetkisi olanlar */
+  async function enrollers(schoolId: string) {
+    const rows = await db.select({ userId: memberships.userId, role: memberships.role, permissions: memberships.permissions }).from(memberships).where(eq(memberships.schoolId, schoolId));
+    return rows.filter((m) => m.role === 'owner' || m.role === 'admin' || m.permissions.includes('accounts.enroll')).map((m) => m.userId);
+  }
   const publicLimit = { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } };
   const appUrl = () => `${env.PUBLIC_URL.replace(/\/$/, '')}/app/katil`;
 
@@ -151,7 +174,7 @@ export async function enrollRoutes(app: FastifyInstance) {
   /** A · Kişi başı tek kullanımlık giriş kodu (15 dk). Aynı öğretmenin eski kodu geçersiz olur. */
   app.post(`${base}/code`, manage, async (req) => {
     const body = parse(enrollCodeCreateSchema, req.body);
-    if (body.role === 'admin' && req.ctx.role !== 'owner') throw forbidden('Yönetici hesabını yalnızca okul müdürü açabilir.');
+    checkRole(req, body.role);
     const [t] = await db.select().from(teachers).where(and(eq(teachers.id, body.teacherId), eq(teachers.schoolId, req.ctx.schoolId)));
     if (!t) throw notFound('Öğretmen bulunamadı.');
     if ((await linkedTeacherIds(req.ctx.schoolId)).has(t.id)) throw conflict(`${t.fullName} için zaten bir hesap var.`);
@@ -203,8 +226,9 @@ export async function enrollRoutes(app: FastifyInstance) {
     const e = await loadPending(req);
     if (e.status !== 'pending') throw badRequest('Bu istek onay beklemiyor.');
     const body = parse(enrollApproveSchema, req.body ?? {});
-    const role = body.role ?? membershipToRole(e.role, e.permissions);
-    if (role === 'admin' && req.ctx.role !== 'owner') throw forbidden('Yönetici hesabını yalnızca okul müdürü açabilir; başka bir rol seçin.');
+    // Dar yetkiyle onaylayan, ünvandan önerilen rol ne olursa olsun öğretmen olarak açar
+    const role = body.role ?? (fullAccess(req) ? membershipToRole(e.role, e.permissions) : 'teacher');
+    checkRole(req, role);
     const done = await complete(e, req.ctx.userId, role);
     await audit(req, 'create', 'Kullanıcı', done.userId, `${done.fullName} (${e.email}) toplantı QR'ı ile katıldı, onaylandı`);
     await tell(app.deps, [done.userId], { kind: 'enroll', title: 'Hesabınız onaylandı', body: `${req.ctx.school.name} · artık giriş yapabilirsiniz`, to: '/', schoolId: req.ctx.schoolId });
@@ -222,6 +246,82 @@ export async function enrollRoutes(app: FastifyInstance) {
     const e = await loadPending(req);
     await db.update(enrollments).set({ status: 'cancelled', stepHash: null, codeHash: null, passwordHash: null, updatedAt: new Date() }).where(eq(enrollments.id, e.id));
     return { ok: true };
+  });
+
+  /**
+   * Kadro listesi (hesap durumu ile): web Kullanıcılar → Kadro ve mobil "Öğretmen hesabı aç".
+   * İletişimden yalnızca kadrodaki e-posta döner (davet için); telefon dönmez.
+   */
+  app.get(`${base}/roster`, manage, async (req) => {
+    const schoolId = req.ctx.schoolId;
+    const [list, accounts, open, [s]] = await Promise.all([
+      db
+        .select({ id: teachers.id, fullName: teachers.fullName, titleId: teachers.titleId, title: teacherTitles.name, branch: teacherBranches.name, email: teachers.email })
+        .from(teachers)
+        .leftJoin(teacherBranches, eq(teacherBranches.id, teachers.branchId))
+        .leftJoin(teacherTitles, eq(teacherTitles.id, teachers.titleId))
+        .where(and(eq(teachers.schoolId, schoolId), eq(teachers.isActive, true))),
+      db
+        .select({ teacherId: memberships.teacherId, role: memberships.role, permissions: memberships.permissions, email: users.email, passwordHash: users.passwordHash, lastLoginAt: users.lastLoginAt })
+        .from(memberships)
+        .innerJoin(users, eq(users.id, memberships.userId))
+        .where(and(eq(memberships.schoolId, schoolId), isNotNull(memberships.teacherId))),
+      db
+        .select()
+        .from(enrollments)
+        .where(and(eq(enrollments.schoolId, schoolId), inArray(enrollments.status, ['waiting', 'pending'])))
+        .orderBy(desc(enrollments.updatedAt)),
+      db.select({ settings: schools.settings }).from(schools).where(eq(schools.id, schoolId)),
+    ]);
+    const titleRoles = schoolSettingsSchema.parse(s?.settings ?? {}).titleRoles;
+    const now = Date.now();
+    const live = open.filter((e) => e.status === 'pending' || (e.codeExpiresAt?.getTime() ?? 0) > now || (e.stepExpiresAt?.getTime() ?? 0) > now);
+    const byTeacher = new Map(accounts.map((a) => [a.teacherId!, a]));
+    return {
+      mail: mailConfigured(env),
+      full: fullAccess(req),
+      owner: req.ctx.role === 'owner',
+      rows: list
+        .map((t) => {
+          const a = byTeacher.get(t.id);
+          const e = live.find((x) => x.teacherId === t.id && x.status === 'pending') ?? live.find((x) => x.teacherId === t.id);
+          const status = a ? (a.passwordHash === INVITE_PENDING ? 'invited' : 'account') : e?.status === 'pending' ? 'pending' : e ? 'code' : 'none';
+          return {
+            teacherId: t.id,
+            fullName: t.fullName,
+            title: t.title,
+            branch: t.branch,
+            status,
+            role: a ? membershipToRole(a.role, a.permissions) : e ? membershipToRole(e.role, e.permissions) : ((t.titleId && titleRoles[t.titleId]) || 'teacher'),
+            email: a?.email ?? e?.email ?? t.email,
+            enrollmentId: e?.id ?? null,
+            lastLoginAt: a?.lastLoginAt?.toISOString() ?? null,
+          };
+        })
+        .sort((x, y) => trCompare(x.fullName, y.fullName)),
+    };
+  });
+
+  /** Kadroda e-postası olan öğretmene davet bağlantısı (şifresini kendisi belirler). E-posta başka okulda kayıtlıysa üyelik eklenir. */
+  app.post(`${base}/invite`, manage, async (req) => {
+    const body = parse(z.object({ teacherId: z.uuid(), role: z.enum(['admin', 'teacher', 'counselor']).default('teacher') }), req.body);
+    checkRole(req, body.role);
+    const [t] = await db.select().from(teachers).where(and(eq(teachers.id, body.teacherId), eq(teachers.schoolId, req.ctx.schoolId)));
+    if (!t) throw notFound('Öğretmen bulunamadı.');
+    if (!t.email) throw badRequest(`${t.fullName} için kadroda e-posta yok. Giriş kodu verin.`);
+    if ((await linkedTeacherIds(req.ctx.schoolId)).has(t.id)) throw conflict(`${t.fullName} için zaten bir hesap var.`);
+    const m = roleToMembership(body.role);
+    let [user] = await db.select().from(users).where(eq(users.email, t.email));
+    const created = !user;
+    if (!user) [user] = await db.insert(users).values({ email: t.email, fullName: t.fullName, passwordHash: INVITE_PENDING }).returning();
+    const [already] = await db.select({ id: memberships.id }).from(memberships).where(and(eq(memberships.userId, user!.id), eq(memberships.schoolId, req.ctx.schoolId)));
+    if (already) throw conflict(`${t.email} bu okulda başka bir hesaba bağlı.`);
+    await db.insert(memberships).values({ userId: user!.id, schoolId: req.ctx.schoolId, role: m.role, permissions: m.permissions, teacherId: t.id });
+    await audit(req, 'create', 'Kullanıcı', user!.id, `${t.fullName} (${t.email}) davet edildi`);
+    const invite = created
+      ? await createInvite(app.deps, { userId: user!.id, schoolId: req.ctx.schoolId, schoolName: req.ctx.school.name, email: t.email, fullName: t.fullName, createdBy: req.ctx.userId })
+      : null;
+    return { existingUser: !created, emailed: invite?.emailed ?? false, inviteUrl: invite?.inviteUrl ?? null };
   });
 
   /* ---------- Öğretmen (giriş yapmadan) ---------- */
@@ -348,10 +448,7 @@ export async function enrollRoutes(app: FastifyInstance) {
         .set({ status: 'pending', existingUserId, passwordHash, stepHash: null, emailCodeHash: null, updatedAt: new Date() })
         .where(eq(enrollments.id, e.id));
       const info = await intro(e);
-      const managers = (await db.select({ userId: memberships.userId, role: memberships.role }).from(memberships).where(eq(memberships.schoolId, e.schoolId)))
-        .filter((m) => m.role === 'owner' || m.role === 'admin')
-        .map((m) => m.userId);
-      await tell(app.deps, managers, {
+      await tell(app.deps, await enrollers(e.schoolId), {
         kind: 'enroll',
         title: 'Hesap onayı bekleniyor',
         body: `${info.fullName} (${e.email}) toplantı QR'ı ile hesap açtı`,

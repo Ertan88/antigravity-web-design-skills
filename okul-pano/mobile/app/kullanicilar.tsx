@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
 import { useAuth } from '../src/auth.tsx';
 import { useMembers } from '../src/data.ts';
@@ -13,7 +13,11 @@ import { Badge, Button, Card, Empty, ErrorNote, ListRow, Loading, Screen, T } fr
  */
 export default function Kullanicilar() {
   const { role, can } = useAuth();
+  const { sekme } = useLocalSearchParams<{ sekme?: string }>();
   const members = useMembers(can('users.manage'));
+
+  // Hesap açma bildirimleri (?sekme=kadro) ve yalnızca "Öğretmen hesabı açma" yetkisi olanlar hesap açma ekranına gider
+  if (sekme === 'kadro' || (!can('users.manage') && can('accounts.enroll'))) return <Redirect href="/hesap-ac" />;
 
   if (!can('users.manage')) {
     return (

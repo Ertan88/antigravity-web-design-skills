@@ -20,6 +20,8 @@ export const PERMISSIONS = {
   'settings.manage': 'Okul ayarları',
   'labels.manage': 'Başlıkları düzenleme',
   'users.manage': 'Kullanıcılar ve yetkiler',
+  /** Dar yetki: yalnızca "Öğretmen" rolüyle hesap açar (giriş kodu, toplantı QR'ı, onay, davet); yetki veremez, şifre sıfırlayamaz */
+  'accounts.enroll': 'Öğretmen hesabı açma',
   'conduct.manage': 'Gözlem kriterleri ve ayın öğrencisi',
   'internship.manage': 'İşletmeler ve işletmede devam çizelgesi',
   /** Rehber öğretmen: bütün öğrencilerin gözlem kayıtlarını görür (panelde "Rehber öğretmen" rolü olarak verilir) */

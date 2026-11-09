@@ -282,6 +282,12 @@ export default function Menu() {
       managerial && { title: 'Platforma yaz', subtitle: 'Okul Yayın ekibine sorun, öneri ya da soru', icon: 'lifebuoy', to: '/platforma-yaz' },
     ]);
     add('Yönetim', [
+      (can('users.manage') || can('accounts.enroll')) && {
+        title: 'Öğretmen hesabı aç',
+        subtitle: 'Giriş kodu, toplantı QR’ı, onay bekleyenler',
+        icon: 'key-outline',
+        to: '/hesap-ac',
+      },
       managerial && {
         title: 'Kullanıcılar ve yetkiler',
         subtitle: role === 'owner' ? 'Davet · yönetici ve editör ata · yetki ver' : 'Davet · editör ekle ve yetki ver',

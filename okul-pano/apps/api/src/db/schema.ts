@@ -971,3 +971,14 @@ export const joinLinks = pgTable(
   },
   (t) => [index('join_links_school_idx').on(t.schoolId)],
 );
+
+/**
+ * Platform geneli ayarlar (anahtar → değer). Ör. "mail": panelden girilen e-posta gönderim ayarı;
+ * API anahtarı JWT_SECRET'tan türetilen anahtarla şifreli saklanır.
+ */
+export const platformSettings = pgTable('platform_settings', {
+  key: text('key').primaryKey(),
+  value: jsonb('value').$type<Record<string, unknown>>().notNull(),
+  updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
+  updatedAt: updatedAt(),
+});

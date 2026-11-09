@@ -24,6 +24,7 @@ const ExamSchedule = page(() => import('./pages/ExamSchedule.tsx'), 'ExamSchedul
 const Issues = page(() => import('./pages/Issues.tsx'), 'Issues');
 const SupportPage = page(() => import('./pages/Support.tsx'), 'SupportPage');
 const PlatformSupportPage = page(() => import('./pages/Support.tsx'), 'PlatformSupportPage');
+const MailSettingsPage = page(() => import('./pages/platform/MailSettings.tsx'), 'MailSettingsPage');
 const Achievements = page(() => import('./pages/SchoolLife.tsx'), 'Achievements');
 const Events = page(() => import('./pages/SchoolLife.tsx'), 'Events');
 const Books = page(() => import('./pages/SchoolLife.tsx'), 'Books');
@@ -47,9 +48,9 @@ const ConductAlerts = page(() => import('./pages/Conduct.tsx'), 'ConductAlerts')
 const InternshipSheet = page(() => import('./pages/Internship.tsx'), 'InternshipSheet');
 const Businesses = page(() => import('./pages/Internship.tsx'), 'Businesses');
 
-function Guard({ permission, children }: { permission: Permission; children: ReactNode }) {
+function Guard({ permission, children }: { permission: Permission | Permission[]; children: ReactNode }) {
   const { can } = useAuth();
-  if (!can(permission)) {
+  if (!(Array.isArray(permission) ? permission.some((p) => can(p)) : can(permission))) {
     return (
       <EmptyState
         icon={<Lock className="size-6" />}
@@ -112,6 +113,7 @@ export function App() {
         <Route path="sorunlar" element={needsSchool(<Issues />)} />
         <Route path="platforma-yaz" element={needsSchool(<SupportPage />)} />
         <Route path="platform/destek" element={me.user.isSuperAdmin ? <PlatformSupportPage /> : null} />
+        <Route path="platform/e-posta" element={me.user.isSuperAdmin ? <MailSettingsPage /> : null} />
         <Route path="basarilar" element={needsSchool(<Guard permission="highlights.manage"><Achievements /></Guard>)} />
         <Route path="etkinlikler" element={needsSchool(<Guard permission="highlights.manage"><Events /></Guard>)} />
         <Route path="haftanin-kitabi" element={needsSchool(<Guard permission="highlights.manage"><Books /></Guard>)} />
@@ -132,7 +134,7 @@ export function App() {
         {/* Sınıflar artık ders programı sayfasında */}
         <Route path="siniflar" element={<Navigate to="/ders-programi" replace />} />
         <Route path="ekranlar" element={needsSchool(<Guard permission="screens.manage"><Screens /></Guard>)} />
-        <Route path="kullanicilar" element={needsSchool(<Guard permission="users.manage"><Users /></Guard>)} />
+        <Route path="kullanicilar" element={needsSchool(<Guard permission={['users.manage', 'accounts.enroll']}><Users /></Guard>)} />
         <Route path="ayarlar" element={needsSchool(<Guard permission="settings.manage"><Settings /></Guard>)} />
         <Route path="basliklar" element={needsSchool(<Guard permission="labels.manage"><Labels /></Guard>)} />
         <Route path="gecmis" element={needsSchool(<Guard permission="users.manage"><Audit /></Guard>)} />

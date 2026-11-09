@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomInt, scrypt, timingSafeEqual, type ScryptOptions } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes, randomInt, scrypt, timingSafeEqual, type ScryptOptions } from 'node:crypto';
 
 const SCRYPT = { N: 2 ** 15, r: 8, p: 1, maxmem: 64 * 1024 * 1024 } satisfies ScryptOptions;
 const KEYLEN = 64;
@@ -55,4 +55,30 @@ export function readablePassword(length = 10): string {
   const out = Array.from({ length: length - 1 }, () => all[randomInt(all.length)]!);
   out.splice(randomInt(length), 0, digits[randomInt(digits.length)]!);
   return out.join('');
+}
+
+/**
+ * Sunucuda saklanan gizli ayarlar (ör. e-posta API anahtarı) için AES-256-GCM. Anahtar JWT_SECRET'tan türetilir;
+ * veritabanı yedeği tek başına ele geçse de değer okunamaz. Biçim: "gcm$iv$etiket$şifreli" (base64url).
+ */
+const secretKey = (secret: string) => createHash('sha256').update(`okulpano:ayar:${secret}`).digest();
+
+export function encryptSecret(value: string, secret: string): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', secretKey(secret), iv);
+  const data = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
+  return ['gcm', iv.toString('base64url'), cipher.getAuthTag().toString('base64url'), data.toString('base64url')].join('$');
+}
+
+/** Çözülemezse (ör. JWT_SECRET değişti) null döner */
+export function decryptSecret(stored: string, secret: string): string | null {
+  const [tag, iv, auth, data] = stored.split('$');
+  if (tag !== 'gcm' || !iv || !auth || !data) return null;
+  try {
+    const decipher = createDecipheriv('aes-256-gcm', secretKey(secret), Buffer.from(iv, 'base64url'));
+    decipher.setAuthTag(Buffer.from(auth, 'base64url'));
+    return Buffer.concat([decipher.update(Buffer.from(data, 'base64url')), decipher.final()]).toString('utf8');
+  } catch {
+    return null;
+  }
 }

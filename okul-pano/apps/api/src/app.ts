@@ -31,6 +31,7 @@ import { emergencyRoutes } from './routes/emergency.ts';
 import { notificationRoutes } from './routes/notifications.ts';
 import { memberRoutes } from './routes/members.ts';
 import { enrollRoutes } from './routes/enroll.ts';
+import { loadPlatformMail, platformSettingsRoutes } from './routes/platformSettings.ts';
 import { controlRoutes } from './routes/control.ts';
 import { meRoutes } from './routes/me.ts';
 import { bellOverrideRoutes } from './routes/bellOverrides.ts';
@@ -129,6 +130,9 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   await app.register(internshipRoutes);
   await app.register(examScheduleRoutes);
   await app.register(issueRoutes);
+  await app.register(platformSettingsRoutes);
+  // Panelden girilmiş e-posta ayarı (ortam değişkeni yoksa kullanılır)
+  await loadPlatformMail(deps).catch((err) => app.log.error(err, 'e-posta ayarı okunamadı'));
 
   // Deneme süresi hatırlatmaları: açılıştan kısa süre sonra ve saatte bir (testlerde elle çağrılır)
   if (env.NODE_ENV !== 'test') {
