@@ -1,5 +1,5 @@
 import { errorText } from '@okulpano/shared';
-import { router, usePathname } from 'expo-router';
+import { router, usePathname, useRoute } from 'expo-router';
 import { useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { ActivityIndicator, Animated, Easing, Keyboard, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, TextInput as NativeTextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 import { Text, TextInput } from './text.tsx';
@@ -28,6 +28,22 @@ export function Icon({ name, size = 22, color = colors.ink, strokeWidth = 2 }: {
  * Ekran iskeleti: güvenli alan, başlık (geri düğmesi isteğe bağlı), kaydırılabilir gövde ve
  * altta sabit düğme alanı. Aşağı çekince yenilenir.
  */
+/**
+ * Kaydırma belleğinin anahtarı: ekranın kendi kimliği (rota adı ve parametreleri). Adres (yol) tema değişince
+ * yeniden kurulan gezinmede bir an önceki ekranı gösterebildiği için kullanılmaz; aksi halde ekran başka bir
+ * ekranın konumuna (ör. en üste) kaydırılıyordu.
+ */
+function useScrollKey(): string {
+  const pathname = usePathname();
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const route = useRoute();
+    return `${route.name}|${JSON.stringify(route.params ?? {})}`;
+  } catch {
+    return pathname;
+  }
+}
+
 export function Screen({
   title,
   subtitle,
@@ -53,7 +69,7 @@ export function Screen({
 }) {
   const bg = tone === 'danger' ? colors.dangerTint : colors.bg;
   // Kaydırma konumu saklanır; tema değişince ekran yeniden kurulduğunda aynı yere dönülür
-  const path = usePathname();
+  const path = useScrollKey();
   const scroller = useRef<ComponentRef<typeof ScrollView>>(null);
   const viewH = useRef(0);
   const contentH = useRef(0);
