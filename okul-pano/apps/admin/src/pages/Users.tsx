@@ -1,7 +1,7 @@
 import { ADMIN_ONLY_PERMISSIONS, createMemberSchema, titleRoleFor, type EnrollRole, normalizeName, PERMISSION_KEYS, PERMISSIONS, updateMemberSchema, type Permission, type Role } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { ArrowLeftRight, KeyRound, Pencil, Plus, Send, UserCog } from '../components/icons.tsx';
+import { ArrowLeftRight, Check, KeyRound, Pencil, Plus, Send, ShieldCheck, UserCog, X } from '../components/icons.tsx';
 import { OwnerTransferDialog, type TransferResult } from '../components/OwnerTransferDialog.tsx';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -29,6 +29,8 @@ interface Member {
   lastLoginAt: string | null;
   /** Davetle eklendi, henüz şifresini belirlemedi */
   invitePending: boolean;
+  /** Bir yöneticinin "Yönetici yapılsın" önerisi: müdürün onayını bekler */
+  promotionRequest: { byName: string; at: string } | null;
 }
 
 // Rehber öğretmen ayrı bir rol olarak seçilir (editör + bütün gözlem kayıtlarını görme yetkisi)
@@ -94,6 +96,9 @@ function RoleAndPermissions({ form }: { form: ReturnType<typeof useForm<Form>> }
           </button>
         ))}
       </div>
+      {school?.role !== 'owner' && (
+        <p className="text-xs text-slate-500">Yönetici atamayı okul müdürü yapar. Gerekirse listede kişinin satırındaki kalkan simgesiyle müdüre önerin.</p>
+      )}
       {v.role !== 'admin' && (
         <div>
           <div className="mb-2 text-sm font-medium text-slate-700">Düzenleyebileceği bölümler</div>
@@ -171,6 +176,29 @@ export function Users() {
     onSuccess: (r) => setInvited(r),
     onError: (e) => toast.error(e.message),
   });
+  // Yönetici önerisi: yönetici önerir, müdür onaylar ya da reddeder (Yönetici atamayı yalnızca müdür yapar)
+  const promotion = useMutation({
+    mutationFn: ({ m, action }: { m: Member; action: 'request' | 'approve' | 'reject' }) =>
+      action === 'request'
+        ? api(`${path}/${m.id}/promotion-request`, { method: 'POST', body: {} })
+        : action === 'approve'
+          ? api(`${path}/${m.id}/promotion-request/approve`, { method: 'POST', body: {} })
+          : api(`${path}/${m.id}/promotion-request`, { method: 'DELETE' }),
+    onSuccess: (_d, { m, action }) => {
+      refresh();
+      toast.success(
+        action === 'request'
+          ? `${m.fullName} için öneri müdüre gönderildi`
+          : action === 'approve'
+            ? `${m.fullName} artık Yönetici`
+            : school?.role === 'owner'
+              ? 'Öneri reddedildi'
+              : 'Öneri geri çekildi',
+      );
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const pendingPromotions = (list.data ?? []).filter((m) => m.promotionRequest);
   const remove = useMutation({
     mutationFn: (id: string) => api(`${path}/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
@@ -252,6 +280,17 @@ export function Users() {
       {tab === 'kadro' ? (
         <RosterTab />
       ) : (
+      <>
+      {school?.role === 'owner' && pendingPromotions.length > 0 && (
+        <div className="mb-4">
+          <Alert tone="amber">
+            {pendingPromotions.length === 1
+              ? `${pendingPromotions[0]!.promotionRequest!.byName}, ${pendingPromotions[0]!.fullName} kişisinin Yönetici yapılmasını öneriyor.`
+              : `${pendingPromotions.length} kişi için Yönetici önerisi var.`}{' '}
+            Aşağıdaki listeden onaylayın ya da reddedin.
+          </Alert>
+        </div>
+      )}
       <Card>
         {list.isLoading ? (
           <Spinner />
@@ -271,6 +310,25 @@ export function Users() {
                     <Badge tone={m.role === 'editor' ? (formRole(m) === 'counselor' ? 'green' : 'slate') : 'blue'}>
                       {m.role === 'owner' ? 'Okul müdürü' : ROLE_INFO[formRole(m)].title}
                     </Badge>
+                    {m.promotionRequest && (
+                      <div className="mt-1.5 space-y-1.5">
+                        <div className="text-xs text-amber-700">Yönetici önerisi · {m.promotionRequest.byName}</div>
+                        {school?.role === 'owner' ? (
+                          <div className="flex gap-1.5">
+                            <Button size="sm" icon={<Check className="size-4" />} loading={promotion.isPending} onClick={() => promotion.mutate({ m, action: 'approve' })}>
+                              Onayla
+                            </Button>
+                            <Button size="sm" variant="secondary" icon={<X className="size-4" />} onClick={() => promotion.mutate({ m, action: 'reject' })}>
+                              Reddet
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button size="sm" variant="ghost" onClick={() => promotion.mutate({ m, action: 'reject' })}>
+                            Geri çek
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </Td>
                   <Td className="max-w-md">
                     {m.role === 'editor' ? (
@@ -308,6 +366,11 @@ export function Users() {
                         <IconButton label="Yetkileri düzenle" onClick={() => openEdit(m)}>
                           <Pencil className="size-4" />
                         </IconButton>
+                        {school?.role === 'admin' && m.role === 'editor' && !m.promotionRequest && (
+                          <IconButton label="Yönetici yapılmasını müdüre öner" onClick={() => promotion.mutate({ m, action: 'request' })}>
+                            <ShieldCheck className="size-4" />
+                          </IconButton>
+                        )}
                         {m.invitePending && (
                           <IconButton label="Daveti yeniden gönder" onClick={() => reinvite.mutate(m)}>
                             <Send className="size-4" />
@@ -326,6 +389,7 @@ export function Users() {
           </Table>
         )}
       </Card>
+      </>
       )}
 
       <Modal

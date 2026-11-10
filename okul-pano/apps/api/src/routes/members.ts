@@ -1,11 +1,13 @@
 import { createMemberSchema, effectivePermissions, resetPasswordSchema, updateMemberSchema } from '@okulpano/shared';
-import { and, asc, count, eq } from 'drizzle-orm';
+import { and, asc, count, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { audit, schoolGuard, UUID_RE } from '../context.ts';
 import { memberships, sessions, teachers, users } from '../db/schema.ts';
 import { hashPassword, readablePassword } from '../lib/crypto.ts';
 import { trySendMail } from '../lib/mailer.ts';
+import { notifyUsers } from '../lib/push.ts';
+import { addToInbox } from './notifications.ts';
 import { createInvite } from './signup.ts';
 import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
 
@@ -56,6 +58,8 @@ export async function memberRoutes(app: FastifyInstance) {
         teacherName: teachers.fullName,
         lastLoginAt: users.lastLoginAt,
         passwordHash: users.passwordHash,
+        promotionRequestedBy: memberships.promotionRequestedBy,
+        promotionRequestedAt: memberships.promotionRequestedAt,
         createdAt: memberships.createdAt,
       })
       .from(memberships)
@@ -63,11 +67,66 @@ export async function memberRoutes(app: FastifyInstance) {
       .leftJoin(teachers, eq(teachers.id, memberships.teacherId))
       .where(eq(memberships.schoolId, req.ctx.schoolId))
       .orderBy(asc(users.fullName));
-    return rows.map(({ passwordHash, ...r }) => ({
+    const requesterIds = [...new Set(rows.map((r) => r.promotionRequestedBy).filter((x): x is string => Boolean(x)))];
+    const names = new Map(
+      requesterIds.length ? (await db.select({ id: users.id, fullName: users.fullName }).from(users).where(inArray(users.id, requesterIds))).map((u) => [u.id, u.fullName]) : [],
+    );
+    return rows.map(({ passwordHash, promotionRequestedBy, promotionRequestedAt, ...r }) => ({
       ...r,
       invitePending: passwordHash === INVITE_PENDING,
       effectivePermissions: effectivePermissions(r.role, r.permissions),
+      /** Bir yöneticinin "Yönetici yapılsın" önerisi (müdürün onayını bekler) */
+      promotionRequest:
+        r.role === 'editor' && promotionRequestedAt ? { byName: (promotionRequestedBy && names.get(promotionRequestedBy)) || 'Bir yönetici', at: promotionRequestedAt.toISOString() } : null,
     }));
+  });
+
+  /* ---------- Yönetici önerisi: yönetici önerir, müdür onaylar (Yönetici atamayı yalnızca müdür yapar) ---------- */
+
+  app.post(`${base}/:memberId/promotion-request`, manage, async (req) => {
+    if (req.ctx.role !== 'admin') throw forbidden(req.ctx.role === 'owner' ? 'Müdür olarak kişiyi doğrudan Yönetici yapabilirsiniz.' : 'Öneriyi yalnızca yöneticiler gönderebilir.');
+    const m = await loadMember(req);
+    if (m.membership.role !== 'editor') throw badRequest(`${m.fullName} zaten yönetici.`);
+    if (m.membership.promotionRequestedAt) throw conflict(`${m.fullName} için öneri zaten gönderildi; müdürün onayını bekliyor.`);
+    await db.update(memberships).set({ promotionRequestedBy: req.ctx.userId, promotionRequestedAt: new Date() }).where(eq(memberships.id, m.membership.id));
+    await audit(req, 'update', 'Yönetici önerisi', m.membership.id, `${m.fullName} için Yönetici önerildi`);
+    const [owner] = await db
+      .select({ id: users.id, email: users.email, fullName: users.fullName })
+      .from(memberships)
+      .innerJoin(users, eq(users.id, memberships.userId))
+      .where(and(eq(memberships.schoolId, req.ctx.schoolId), eq(memberships.role, 'owner')));
+    const [me] = await db.select({ fullName: users.fullName }).from(users).where(eq(users.id, req.ctx.userId));
+    if (owner) {
+      const title = 'Yönetici önerisi';
+      const body = `${me?.fullName ?? 'Bir yönetici'}, ${m.fullName} kişisinin Yönetici yapılmasını öneriyor. Kullanıcılar ve Yetkiler'den onaylayabilirsiniz.`;
+      notifyUsers(app.deps, [owner.id], { title, body, url: '/kullanicilar' });
+      await addToInbox(db, [owner.id], { key: `promotion:${m.membership.id}:${Date.now()}`, kind: 'approval', title, body, to: '/kullanicilar', schoolId: req.ctx.schoolId, openSchoolId: req.ctx.schoolId });
+      await trySendMail(app.deps.env, { to: owner.email, subject: `${req.ctx.school.name} · ${title}`, text: `Merhaba ${owner.fullName},\n\n${body}\n` });
+    }
+    return { ok: true };
+  });
+
+  app.post(`${base}/:memberId/promotion-request/approve`, manage, async (req) => {
+    if (req.ctx.role !== 'owner') throw forbidden('Öneriyi yalnızca okul müdürü onaylayabilir.');
+    const m = await loadMember(req);
+    if (m.membership.role !== 'editor') throw badRequest(`${m.fullName} zaten yönetici.`);
+    await db.update(memberships).set({ role: 'admin', permissions: [], promotionRequestedBy: null, promotionRequestedAt: null }).where(eq(memberships.id, m.membership.id));
+    await audit(req, 'update', 'Yönetici önerisi', m.membership.id, `${m.fullName} Yönetici yapıldı (öneri onaylandı)`);
+    const title = 'Yönetici yapıldınız';
+    const body = `${req.ctx.school.name} okulunda artık Yönetici olarak bütün bölümleri düzenleyebilirsiniz.`;
+    notifyUsers(app.deps, [m.membership.userId], { title, body, url: '/' });
+    await addToInbox(db, [m.membership.userId], { key: `promoted:${m.membership.id}:${Date.now()}`, kind: 'approved', title, body, schoolId: req.ctx.schoolId, openSchoolId: req.ctx.schoolId });
+    return { ok: true };
+  });
+
+  /** Müdür reddeder ya da öneriyi gönderen yönetici geri çeker */
+  app.delete(`${base}/:memberId/promotion-request`, manage, async (req, reply) => {
+    if (req.ctx.role !== 'owner' && req.ctx.role !== 'admin') throw forbidden();
+    const m = await loadMember(req);
+    if (!m.membership.promotionRequestedAt) return reply.status(204).send();
+    await db.update(memberships).set({ promotionRequestedBy: null, promotionRequestedAt: null }).where(eq(memberships.id, m.membership.id));
+    await audit(req, 'update', 'Yönetici önerisi', m.membership.id, `${m.fullName} için Yönetici önerisi ${req.ctx.role === 'owner' ? 'reddedildi' : 'geri çekildi'}`);
+    return reply.status(204).send();
   });
 
   const membershipCount = async (userId: string) =>
@@ -165,7 +224,7 @@ export async function memberRoutes(app: FastifyInstance) {
     await checkTeacher(req, body.teacherId);
     await db
       .update(memberships)
-      .set({ role, permissions, ...(body.teacherId !== undefined ? { teacherId: body.teacherId } : {}) })
+      .set({ role, permissions, ...(role === 'admin' ? { promotionRequestedBy: null, promotionRequestedAt: null } : {}), ...(body.teacherId !== undefined ? { teacherId: body.teacherId } : {}) })
       .where(eq(memberships.id, m.membership.id));
     await audit(req, 'update', 'Kullanıcı yetkisi', m.membership.id, m.fullName);
     return { ok: true };
