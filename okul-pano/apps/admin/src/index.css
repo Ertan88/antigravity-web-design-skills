@@ -306,3 +306,21 @@ input[list]::-webkit-calendar-picker-indicator {
     pointer-events: none;
   }
 }
+
+/* Açık/koyu tema geçişi: görünüm geçişi destekleniyorsa eski ve yeni ekran karışır; yoksa renkler kısa geçişle değişir */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.35s;
+  animation-timing-function: ease-in-out;
+}
+html.theme-switching,
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease,
+    fill 0.3s ease,
+    stroke 0.3s ease !important;
+}

@@ -39,7 +39,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const system = useColorScheme();
   const nav = useNavigationContainerRef();
   const [mode, setModeState] = useState<ThemeMode | null>(null);
-  // Yumuşak geçiş: yeni tema eski temanın zemin renginde yarı saydam bir perdenin altından hızla belirir
+  // Yumuşak geçiş: yeni tema, eski temanın zemin renginde bir perdenin altından yavaşça belirir
   const veil = useRef(new Animated.Value(0)).current;
   const [veilColor, setVeilColor] = useState<string | null>(null);
 
@@ -80,8 +80,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     previousBg = null;
     if (!from) return;
     setVeilColor(from);
-    veil.setValue(0.65);
-    const anim = Animated.timing(veil, { toValue: 0, duration: 260, easing: Easing.out(Easing.quad), useNativeDriver: true });
+    // Perde önce tamamen örter: ekranlar yeniden kurulurken (gezinme geri yüklenir, alt menü yerine oturur) hiçbir
+    // ara kare görünmez; sonra yeni tema yavaşça açılır
+    veil.setValue(1);
+    const anim = Animated.sequence([
+      Animated.delay(160),
+      Animated.timing(veil, { toValue: 0, duration: 380, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
+    ]);
     anim.start(() => setVeilColor(null));
     return () => anim.stop();
   }, [isDark, veil]);

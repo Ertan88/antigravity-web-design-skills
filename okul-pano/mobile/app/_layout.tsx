@@ -14,7 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, Platform, StyleSheet, View } from 'react-native';
 import { Text } from '../src/text.tsx';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { initialWindowMetrics, SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../src/auth.tsx';
 import { ConfirmHost } from '../src/confirm.tsx';
 import { restored } from '../src/persist.ts';
@@ -173,7 +173,8 @@ export default function RootLayout() {
   });
   const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 10_000, gcTime: 30 * 60_000 } } }));
   return (
-    <SafeAreaProvider>
+    // Güvenli alan ölçüleri ilk karede hazır: alt menü açılışta ya da yeniden kurulurken kaymaz
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <QueryClientProvider client={client}>
         <AuthProvider>
           <ThemeProvider>

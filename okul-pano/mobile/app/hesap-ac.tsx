@@ -85,7 +85,12 @@ export default function HesapAc() {
   const invalid = needsEmail && rows.some((r) => r.email.trim() && !emailOk(r));
   const set = (key: string, patch: Partial<Row>) => setRows((x) => x.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   const roleChoices = (r: Row): RowRole[] => (ctx.full ? [r.teacherId ? 'teacher' : 'staff', 'counselor', ...(isOwner ? (['admin'] as const) : [])] : ['teacher']);
-  const remaining = candidates.filter((p) => !rows.some((r) => r.key === p.key) && (!q || normalizeName(p.fullName).includes(normalizeName(q))));
+  // Seçim listesi: aramayla eşleşen herkes (seçili olanlar işaretli); dokununca seçilir ya da seçim kalkar
+  const listed = candidates.filter((p) => !q || normalizeName(`${p.fullName} ${p.sub}`).includes(normalizeName(q)));
+  const isPicked = (key: string) => rows.some((r) => r.key === key);
+  const toggle = (p: Person) => setRows((x) => (x.some((r) => r.key === p.key) ? x.filter((r) => r.key !== p.key) : [...x, toRow(p)]));
+  const allListedPicked = listed.length > 0 && listed.every((p) => isPicked(p.key));
+  const withEmail = listed.filter((p) => p.email);
 
   const meeting = async () => {
     setBusy(true);
@@ -283,7 +288,7 @@ export default function HesapAc() {
                 </Button>
               )}
               <Button variant="secondary" icon="person-add-outline" onPress={() => setPicking(true)} disabled={!candidates.length}>
-                {candidates.length ? `Kadrodan ekle (${candidates.length - rows.filter((r) => r.teacherId).length} kişi)` : 'Kadroda hesabı olmayan kalmadı'}
+                {candidates.length ? `Kadrodan seç (${rows.filter((r) => r.teacherId).length}/${candidates.length} seçili)` : 'Kadroda hesabı olmayan kalmadı'}
               </Button>
               {ctx.full && method !== 'code' && (
                 <Card style={{ gap: 8 }}>
@@ -316,43 +321,76 @@ export default function HesapAc() {
       )}
 
       <Sheet open={picking} onClose={() => setPicking(false)}>
-        <Text style={{ fontSize: 17, fontWeight: '800', color: colors.ink }}>Kadrodan ekle</Text>
-        <Field label="Ara" value={q} onChangeText={setQ} placeholder="Ad soyad" />
-        {remaining.length > 0 && (
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={{ flex: 1, fontSize: 17, fontWeight: '800', color: colors.ink }}>Kadrodan seç</Text>
+          <T size={13} weight="700" color={colors.muted}>
+            {`${rows.filter((r) => r.teacherId).length} seçili`}
+          </T>
+        </View>
+        <Field label="Ara" value={q} onChangeText={setQ} placeholder="Ad soyad ya da branş" />
+        {listed.length > 0 && (
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-            <Button size="sm" variant="secondary" icon="checkmark-done-outline" style={{ flex: 1 }} onPress={() => setRows((x) => [...x, ...remaining.map(toRow)])}>
-              {`Hepsini seç (${remaining.length})`}
-            </Button>
+            {allListedPicked ? (
+              <Button size="sm" variant="secondary" icon="close" style={{ flex: 1 }} onPress={() => setRows((x) => x.filter((r) => !listed.some((p) => p.key === r.key)))}>
+                {q ? 'Bunların seçimini kaldır' : 'Seçimi kaldır'}
+              </Button>
+            ) : (
+              <Button size="sm" variant="secondary" icon="checkmark-done-outline" style={{ flex: 1 }} onPress={() => setRows((x) => [...x, ...listed.filter((p) => !x.some((r) => r.key === p.key)).map(toRow)])}>
+                {`Hepsini seç (${listed.length})`}
+              </Button>
+            )}
             <Button
               size="sm"
               variant="secondary"
               icon="mail-outline"
               style={{ flex: 1 }}
-              disabled={!remaining.some((p) => p.email)}
-              onPress={() => setRows((x) => [...x, ...remaining.filter((p) => p.email).map(toRow)])}
+              disabled={!withEmail.length}
+              onPress={() => setRows((x) => [...x.filter((r) => !r.teacherId || withEmail.some((p) => p.key === r.key) || !listed.some((p) => p.key === r.key)), ...withEmail.filter((p) => !x.some((r) => r.key === p.key)).map(toRow)])}
             >
-              {`E-postası olan (${remaining.filter((p) => p.email).length})`}
+              {`E-postası olan (${withEmail.length})`}
             </Button>
           </View>
         )}
         <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 4, maxHeight: 420 }} keyboardShouldPersistTaps="handled">
-          {remaining.map((p) => (
-            <Pressable key={p.key} accessibilityRole="button" onPress={() => setRows((x) => [...x, toRow(p)])} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: colors.divider }}>
-              <Avatar name={p.fullName} size={34} />
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <T weight="700" size={14.5} lines={1}>
-                  {p.fullName}
-                </T>
-                <T size={12} color={colors.muted} lines={1}>
-                  {p.sub}
-                </T>
-              </View>
-              <Icon name="add" size={20} color={colors.primary} />
-            </Pressable>
-          ))}
-          {!remaining.length && (
+          {listed.map((p) => {
+            const on = isPicked(p.key);
+            return (
+              <Pressable
+                key={p.key}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: on }}
+                onPress={() => toggle(p)}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: colors.divider }}
+              >
+                <View
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: 7,
+                    borderWidth: 2,
+                    borderColor: on ? colors.ink : colors.borderStrong,
+                    backgroundColor: on ? colors.ink : 'transparent',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {on && <Icon name="checkmark" size={15} strokeWidth={3} color={colors.bg} />}
+                </View>
+                <Avatar name={p.fullName} size={34} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <T weight="700" size={14.5} lines={1}>
+                    {p.fullName}
+                  </T>
+                  <T size={12} color={colors.muted} lines={1}>
+                    {p.email ? `${p.sub} · ${p.email}` : `${p.sub} · e-posta yok`}
+                  </T>
+                </View>
+              </Pressable>
+            );
+          })}
+          {!listed.length && (
             <T size={13.5} color={colors.muted} style={{ textAlign: 'center', padding: 16 }}>
-              Eklenecek kişi kalmadı.
+              {q ? 'Aramayla eşleşen kişi yok.' : 'Kadroda hesabı olmayan kalmadı.'}
             </T>
           )}
         </ScrollView>
