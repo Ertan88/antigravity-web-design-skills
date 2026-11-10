@@ -319,7 +319,15 @@ export async function enrollRoutes(app: FastifyInstance) {
     await db.insert(memberships).values({ userId: user!.id, schoolId: req.ctx.schoolId, role: m.role, permissions: m.permissions, teacherId: t.id });
     await audit(req, 'create', 'Kullanıcı', user!.id, `${t.fullName} (${t.email}) davet edildi`);
     const invite = created
-      ? await createInvite(app.deps, { userId: user!.id, schoolId: req.ctx.schoolId, schoolName: req.ctx.school.name, email: t.email, fullName: t.fullName, createdBy: req.ctx.userId })
+      ? await createInvite(app.deps, {
+          userId: user!.id,
+          schoolId: req.ctx.schoolId,
+          school: req.ctx.school,
+          membership: { ...m, teacherId: t.id },
+          email: t.email,
+          fullName: t.fullName,
+          createdBy: req.ctx.userId,
+        })
       : null;
     return { existingUser: !created, emailed: invite?.emailed ?? false, inviteUrl: invite?.inviteUrl ?? null };
   });

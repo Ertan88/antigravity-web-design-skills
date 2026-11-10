@@ -164,6 +164,9 @@ describe('dar yetki: Öğretmen hesabı açma', () => {
     expectStatus(inv, 200);
     const roster = (await helper.get(`${base}/enrollments/roster`)).json().rows as { teacherId: string; status: string; email: string }[];
     expect(roster.find((r) => r.teacherId === ids.funda)).toMatchObject({ status: 'invited', email: 'funda@okul.test' });
+    // Davet e-postası: okulun adı + "idaresi olarak" + rol
+    const mail = [...mails].reverse().find((m) => m.to === 'funda@okul.test')!;
+    expect(mail.text).toContain('Katılım Lisesi idaresi olarak sizi Okulyayın\'a Öğretmen olarak davet ediyoruz.');
   });
 
   it('onaylarken ünvandan yönetici önerilse de öğretmen olarak açar', async () => {

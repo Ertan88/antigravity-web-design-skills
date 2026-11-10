@@ -127,7 +127,8 @@ export async function memberRoutes(app: FastifyInstance) {
         ? await createInvite(app.deps, {
             userId: user!.id,
             schoolId: req.ctx.schoolId,
-            schoolName: req.ctx.school.name,
+            school: req.ctx.school,
+            membership: m!,
             email,
             fullName: body.fullName,
             createdBy: req.ctx.userId,
@@ -145,7 +146,8 @@ export async function memberRoutes(app: FastifyInstance) {
     const invite = await createInvite(app.deps, {
       userId: m.membership.userId,
       schoolId: req.ctx.schoolId,
-      schoolName: req.ctx.school.name,
+      school: req.ctx.school,
+      membership: m.membership,
       email: m.email,
       fullName: m.fullName,
       createdBy: req.ctx.userId,

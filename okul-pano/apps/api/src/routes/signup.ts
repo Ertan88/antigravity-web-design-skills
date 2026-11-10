@@ -1,4 +1,4 @@
-import { acceptInviteSchema, dueTrialReminder, signupSchema, slugify, tokenSchema, trialStatus } from '@okulpano/shared';
+import { acceptInviteSchema, dueTrialReminder, PERMISSIONS, schoolFullName, signupSchema, slugify, tokenSchema, trialStatus, type Permission } from '@okulpano/shared';
 import { and, desc, eq, gt, isNull, lt } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { AppDeps } from '../context.ts';
@@ -14,10 +14,27 @@ export const INVITE_TTL_MS = 7 * 86400_000;
 
 const panelUrl = (deps: AppDeps, path = '') => `${deps.env.PUBLIC_URL.replace(/\/$/, '')}/admin/${path}`;
 
+/** Davet e-postasındaki rol: üyelikten okunur ("Yönetici", "Rehber öğretmen", "Öğretmen", "Editör") ve editörün yetkileri */
+export function inviteRole(m: { role: string; permissions?: readonly string[] | null; teacherId?: string | null }): { label: string; permissions: string[] } {
+  const perms = (m.permissions ?? []).filter((p): p is Permission => p in PERMISSIONS);
+  if (m.role === 'owner') return { label: 'Okul müdürü', permissions: [] };
+  if (m.role === 'admin') return { label: 'Yönetici', permissions: [] };
+  const label = perms.includes('conduct.counsel' as Permission) ? 'Rehber öğretmen' : m.teacherId ? 'Öğretmen' : 'Editör';
+  return { label, permissions: perms.filter((p) => p !== 'conduct.counsel').map((p) => PERMISSIONS[p]) };
+}
+
 /** Kullanıcı daveti: tek kullanımlık bağlantı üretir, e-postayla gönderir; gönderilemezse bağlantı panelde gösterilir */
 export async function createInvite(
   deps: AppDeps,
-  opts: { userId: string; schoolId: string; schoolName: string; email: string; fullName: string; createdBy: string },
+  opts: {
+    userId: string;
+    schoolId: string;
+    school: { name: string; settings?: { schoolType?: string | null } | null };
+    membership: { role: string; permissions?: readonly string[] | null; teacherId?: string | null };
+    email: string;
+    fullName: string;
+    createdBy: string;
+  },
 ): Promise<{ inviteUrl: string; emailed: boolean }> {
   const token = randomToken('inv');
   await deps.db.delete(userInvites).where(and(eq(userInvites.userId, opts.userId), isNull(userInvites.usedAt)));
@@ -29,10 +46,24 @@ export async function createInvite(
     createdBy: opts.createdBy,
   });
   const inviteUrl = panelUrl(deps, `davet?token=${encodeURIComponent(token)}`);
+  // Okulun tam adı (türüyle: "… Mesleki ve Teknik Anadolu Lisesi"); okula özel sabit yok, ayardan gelir
+  const schoolName = schoolFullName(opts.school.name, opts.school.settings?.schoolType);
+  const role = inviteRole(opts.membership);
   const emailed = await trySendMail(deps.env, {
     to: opts.email,
-    subject: `${opts.schoolName} · Okulyayın daveti`,
-    text: `Merhaba ${opts.fullName},\n\n${opts.schoolName} sizi Okulyayın yönetim paneline davet etti.\n\nŞifrenizi belirleyip giriş yapmak için bağlantıyı açın (7 gün geçerli):\n${inviteUrl}\n\nMobil uygulamaya da aynı e-posta ve şifreyle giriş yapabilirsiniz.\n`,
+    subject: `${schoolName} · Okulyayın daveti`,
+    text: [
+      `Merhaba ${opts.fullName},`,
+      '',
+      `${schoolName} idaresi olarak sizi Okulyayın'a ${role.label} olarak davet ediyoruz.`,
+      ...(role.permissions.length ? [`Düzenleyebileceğiniz bölümler: ${role.permissions.join(', ')}.`] : []),
+      '',
+      'Şifrenizi belirleyip giriş yapmak için bağlantıyı açın (7 gün geçerli):',
+      inviteUrl,
+      '',
+      'Mobil uygulamaya da aynı e-posta ve şifreyle giriş yapabilirsiniz.',
+      '',
+    ].join('\n'),
   });
   return { inviteUrl, emailed };
 }
