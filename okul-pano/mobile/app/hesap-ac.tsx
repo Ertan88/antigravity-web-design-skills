@@ -277,6 +277,11 @@ export default function HesapAc() {
                   </Card>
                 );
               })}
+              {rows.length > 1 && (
+                <Button size="sm" variant="ghost" icon="close" onPress={() => setRows([])}>
+                  {`Seçimi temizle (${rows.length} kişi)`}
+                </Button>
+              )}
               <Button variant="secondary" icon="person-add-outline" onPress={() => setPicking(true)} disabled={!candidates.length}>
                 {candidates.length ? `Kadrodan ekle (${candidates.length - rows.filter((r) => r.teacherId).length} kişi)` : 'Kadroda hesabı olmayan kalmadı'}
               </Button>
@@ -313,6 +318,23 @@ export default function HesapAc() {
       <Sheet open={picking} onClose={() => setPicking(false)}>
         <Text style={{ fontSize: 17, fontWeight: '800', color: colors.ink }}>Kadrodan ekle</Text>
         <Field label="Ara" value={q} onChangeText={setQ} placeholder="Ad soyad" />
+        {remaining.length > 0 && (
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+            <Button size="sm" variant="secondary" icon="checkmark-done-outline" style={{ flex: 1 }} onPress={() => setRows((x) => [...x, ...remaining.map(toRow)])}>
+              {`Hepsini seç (${remaining.length})`}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              icon="mail-outline"
+              style={{ flex: 1 }}
+              disabled={!remaining.some((p) => p.email)}
+              onPress={() => setRows((x) => [...x, ...remaining.filter((p) => p.email).map(toRow)])}
+            >
+              {`E-postası olan (${remaining.filter((p) => p.email).length})`}
+            </Button>
+          </View>
+        )}
         <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 4, maxHeight: 420 }} keyboardShouldPersistTaps="handled">
           {remaining.map((p) => (
             <Pressable key={p.key} accessibilityRole="button" onPress={() => setRows((x) => [...x, toRow(p)])} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: colors.divider }}>

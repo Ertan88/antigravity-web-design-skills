@@ -1,7 +1,7 @@
 import { applyPersonRole, errorText, PERSON_ROLES, type EnrollRole, type PersonRole } from '@okulpano/shared';
 import clsx from 'clsx';
 import { useEffect, useState } from 'react';
-import { Check, Copy, Plus, X } from '../../components/icons.tsx';
+import { Check, CheckCheck, Copy, Mail, Plus, X } from '../../components/icons.tsx';
 import { Alert, Button, Input, Modal, Select } from '../../components/ui.tsx';
 import { api } from '../../lib/api.ts';
 import { formatCode } from './dialogs.tsx';
@@ -285,6 +285,27 @@ export function OpenAccountsDialog({
               {!rows.length && <p className="py-3 text-sm text-slate-500">Aşağıdan kadrodan kişi ekleyin{full ? ' ya da kadro dışı bir kişi yazın' : ''}.</p>}
             </div>
 
+            {(remaining.length > 0 || rows.length > 1) && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button size="sm" variant="secondary" icon={<CheckCheck className="size-4" />} disabled={!remaining.length} onClick={() => setRows((x) => [...x, ...remaining.map(toRow)])}>
+                  Hepsini seç ({remaining.length})
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={<Mail className="size-4" />}
+                  disabled={!remaining.some((p) => p.email)}
+                  onClick={() => setRows((x) => [...x, ...remaining.filter((p) => p.email).map(toRow)])}
+                >
+                  Yalnızca e-postası kadroda olanlar ({remaining.filter((p) => p.email).length})
+                </Button>
+                {rows.length > 1 && (
+                  <Button size="sm" variant="ghost" icon={<X className="size-4" />} onClick={() => setRows([])}>
+                    Seçimi temizle ({rows.length})
+                  </Button>
+                )}
+              </div>
+            )}
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               <Select
                 value=""
