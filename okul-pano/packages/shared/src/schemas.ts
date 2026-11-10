@@ -796,6 +796,19 @@ export const conductAwardSchema = z.object({
 export const ENROLL_ROLES = { teacher: 'Öğretmen', counselor: 'Rehber öğretmen', admin: 'Yönetici' } as const;
 export type EnrollRole = keyof typeof ENROLL_ROLES;
 
+/**
+ * Ünvana göre varsayılan rol önerisi: MEB ünvanı müdür yardımcısı ya da müdür başyardımcısı ise Yönetici, diğerleri
+ * Öğretmen. Okul "Ünvan → rol" ile her ünvan için başka rol seçebilir (okulun seçimi her zaman önceliklidir).
+ */
+export function defaultTitleRole(title?: string | null): EnrollRole {
+  const n = (title ?? '').toLocaleLowerCase('tr-TR').replace(/[.]/g, ' ').replace(/\s+/g, ' ').trim();
+  return /(^| )müd(ür)? ?(baş ?)?(yardımcısı|yrd)( |$)/u.test(n) ? 'admin' : 'teacher';
+}
+
+/** Ünvan için önerilen rol: okulun eşlemesi, yoksa varsayılan öneri */
+export const titleRoleFor = (titleRoles: Record<string, EnrollRole>, titleId: string | null | undefined, titleName: string | null | undefined): EnrollRole =>
+  (titleId ? titleRoles[titleId] : undefined) ?? (titleId ? defaultTitleRole(titleName) : 'teacher');
+
 export const enrollCodeCreateSchema = z.object({
   teacherId: id,
   role: z.enum(['admin', 'teacher', 'counselor']).default('teacher'),

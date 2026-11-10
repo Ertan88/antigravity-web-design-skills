@@ -8,6 +8,7 @@ import {
   enrollMeetingStartSchema,
   enrollStartCodeSchema,
   schoolSettingsSchema,
+  titleRoleFor,
   trCompare,
   type EnrollRole,
 } from '@okulpano/shared';
@@ -85,7 +86,8 @@ export async function enrollRoutes(app: FastifyInstance) {
   async function suggestedRole(schoolId: string, titleId: string | null): Promise<EnrollRole> {
     if (!titleId) return 'teacher';
     const [s] = await db.select({ settings: schools.settings }).from(schools).where(eq(schools.id, schoolId));
-    return schoolSettingsSchema.parse(s?.settings ?? {}).titleRoles[titleId] ?? 'teacher';
+    const [title] = await db.select({ name: teacherTitles.name }).from(teacherTitles).where(eq(teacherTitles.id, titleId));
+    return titleRoleFor(schoolSettingsSchema.parse(s?.settings ?? {}).titleRoles, titleId, title?.name);
   }
 
   async function newStep(enrollmentId: string) {
@@ -292,7 +294,7 @@ export async function enrollRoutes(app: FastifyInstance) {
             title: t.title,
             branch: t.branch,
             status,
-            role: a ? membershipToRole(a.role, a.permissions) : e ? membershipToRole(e.role, e.permissions) : ((t.titleId && titleRoles[t.titleId]) || 'teacher'),
+            role: a ? membershipToRole(a.role, a.permissions) : e ? membershipToRole(e.role, e.permissions) : titleRoleFor(titleRoles, t.titleId, t.title),
             email: a?.email ?? e?.email ?? t.email,
             enrollmentId: e?.id ?? null,
             lastLoginAt: a?.lastLoginAt?.toISOString() ?? null,

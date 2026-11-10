@@ -1,4 +1,4 @@
-import { ADMIN_ONLY_PERMISSIONS, createMemberSchema, normalizeName, PERMISSION_KEYS, PERMISSIONS, updateMemberSchema, type Permission, type Role } from '@okulpano/shared';
+import { ADMIN_ONLY_PERMISSIONS, createMemberSchema, titleRoleFor, type EnrollRole, normalizeName, PERMISSION_KEYS, PERMISSIONS, updateMemberSchema, type Permission, type Role } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { ArrowLeftRight, KeyRound, Pencil, Plus, Send, UserCog } from '../components/icons.tsx';
@@ -11,7 +11,7 @@ import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Field, IconButton
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { CredentialsDialog, InviteDialog, ResetPasswordDialog, type Credentials, type InviteResult } from './users/Credentials.tsx';
-import { useList, useSchoolPath, type Teacher } from '../lib/data.ts';
+import { useList, useSchool, useSchoolPath, type Teacher } from '../lib/data.ts';
 import { useForm } from '../lib/form.ts';
 import { timeAgo } from '../lib/format.ts';
 
@@ -129,6 +129,17 @@ export function Users() {
   const list = useQuery({ queryKey: [schoolId, 'members'], queryFn: () => api<Member[]>(path), enabled: Boolean(schoolId) && full });
   const teachers = useList<Teacher>('teachers');
   const teacherList = (teachers.data ?? []).filter((t) => t.isActive !== false);
+  const schoolData = useSchool();
+  /** Kadrodan öğretmen seçilince rol ünvandan önerilir (ör. müdür yardımcısı → Yönetici; Yöneticiyi yalnızca müdür verir) */
+  const pickTeacher = (teacherId: string) => {
+    form.set('teacherId', teacherId);
+    const t = teacherList.find((x) => x.id === teacherId);
+    if (!t) return;
+    const titleRoles = (schoolData.data?.settings?.titleRoles ?? {}) as Record<string, EnrollRole>;
+    const r = titleRoleFor(titleRoles, t.titleId, t.title);
+    const next: FormRole = r === 'admin' ? (school?.role === 'owner' ? 'admin' : 'editor') : r === 'counselor' ? 'counselor' : 'editor';
+    form.set('role', next);
+  };
   const linkTeacher = useMutation({
     mutationFn: ({ id, teacherId }: { id: string; teacherId: string | null }) => api(`${path}/${id}/teacher`, { method: 'PUT', body: { teacherId } }),
     onSuccess: (_d, v) => {
@@ -353,7 +364,7 @@ export function Users() {
                         form.set('fullName', e.target.value);
                         // Adı kadrodaki bir öğretmenle aynıysa öğretmen kaydı kendiliğinden seçilir
                         const match = teacherList.find((t) => normalizeName(t.fullName) === normalizeName(e.target.value));
-                        if (match && !form.values.teacherId) form.set('teacherId', match.id);
+                        if (match && !form.values.teacherId) pickTeacher(match.id);
                       }}
                     />
                   )}
@@ -406,7 +417,7 @@ export function Users() {
               </Field>
               )}
               <Field label="Öğretmen kaydı" help="Öğretmense seçin: mobil uygulamada kendi ders programını ve nöbetlerini görür, izin bildirebilir.">
-                {(id) => <TeacherSelect id={id} value={form.values.teacherId} teachers={teacherList} onChange={(t) => form.set('teacherId', t)} />}
+                {(id) => <TeacherSelect id={id} value={form.values.teacherId} teachers={teacherList} onChange={(t) => (t ? pickTeacher(t) : form.set('teacherId', ''))} />}
               </Field>
             </>
           )}

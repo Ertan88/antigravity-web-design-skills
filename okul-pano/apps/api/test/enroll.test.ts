@@ -201,3 +201,18 @@ describe('davet penceresi: kadroda e-postası olmayan öğretmen', () => {
     expect((await owner.post(`${base}/enrollments/invite`, { teacherId: id, email: 'baska@okul.test' })).statusCode).toBe(409);
   });
 });
+
+describe('ünvandan rol önerisi', () => {
+  it('müdür başyardımcısı ünvanı eşleme yokken Yönetici önerilir; okul Öğretmen seçerse o geçerli', async () => {
+    const titles = (await owner.get(`${base}/teacher-titles`)).json() as { id: string; name: string }[];
+    const title = titles.find((x) => x.name === 'Müdür Başyardımcısı') ?? ((await owner.post(`${base}/teacher-titles`, { name: 'Müdür Başyardımcısı' })).json() as { id: string });
+    const r = await owner.post(`${base}/teachers`, { fullName: 'Başyardımcı Deneme', titleId: title.id });
+    expectStatus(r, 201);
+    const id = r.json().id as string;
+    const roleOf = async () => ((await owner.get(`${base}/enrollments/roster`)).json().rows as { teacherId: string; role: string }[]).find((x) => x.teacherId === id)?.role;
+    expect(await roleOf()).toBe('admin');
+    const s = (await owner.get(base)).json();
+    expectStatus(await owner.patch(base, { settings: { titleRoles: { ...s.settings.titleRoles, [title.id]: 'teacher' } } }), 200);
+    expect(await roleOf()).toBe('teacher');
+  });
+});

@@ -1,5 +1,5 @@
 import { useSearchParams } from 'react-router-dom';
-import { ENROLL_ROLES, normalizeName, type EnrollRole, errorText } from '@okulpano/shared';
+import { defaultTitleRole, ENROLL_ROLES, normalizeName, type EnrollRole, errorText } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { Check, Copy, KeyRound, Mail, QrCodeIcon, Search, Tags, X } from '../../components/icons.tsx';
@@ -419,7 +419,7 @@ function TitleRoleDialog({
       open={open}
       onClose={onClose}
       title="Ünvan → rol"
-      description="Kadrodaki ünvana göre hesap açılırken önerilecek rol. Her öğretmen için ayrıca değiştirebilirsiniz."
+      description="Kadrodaki ünvana göre hesap açılırken önerilecek rol. Müdür yardımcısı ünvanları için Yönetici önerilir; isterseniz değiştirin. Her öğretmen için ayrıca da değiştirebilirsiniz."
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -430,7 +430,9 @@ function TitleRoleDialog({
             onClick={async () => {
               setSaving(true);
               try {
-                await onSave(Object.fromEntries(Object.entries(draft).filter(([, r]) => r !== 'teacher')));
+                // Varsayılan öneriyle aynı olanlar saklanmaz (ör. müdür yardımcısı → Yönetici); farklı seçim saklanır
+                const nameOf = (id: string) => titles.find((t) => t.id === id)?.name;
+                await onSave(Object.fromEntries(Object.entries(draft).filter(([id, r]) => r !== defaultTitleRole(nameOf(id)))));
               } finally {
                 setSaving(false);
               }
@@ -451,9 +453,9 @@ function TitleRoleDialog({
                 <div className="text-xs text-slate-500">{t.teacherCount} öğretmen</div>
               </div>
               <div className="w-48">
-                <Select value={draft[t.id] ?? 'teacher'} onChange={(e) => setDraft((d) => ({ ...d, [t.id]: e.target.value as EnrollRole }))} aria-label={`${t.name} rolü`}>
+                <Select value={draft[t.id] ?? defaultTitleRole(t.name)} onChange={(e) => setDraft((d) => ({ ...d, [t.id]: e.target.value as EnrollRole }))} aria-label={`${t.name} rolü`}>
                   {(Object.keys(ENROLL_ROLES) as EnrollRole[])
-                    .filter((k) => k !== 'admin' || isOwner || draft[t.id] === 'admin')
+                    .filter((k) => k !== 'admin' || isOwner || (draft[t.id] ?? defaultTitleRole(t.name)) === 'admin')
                     .map((k) => (
                       <option key={k} value={k}>
                         {ENROLL_ROLES[k]}
