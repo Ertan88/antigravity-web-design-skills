@@ -31,3 +31,4 @@ export * from './examSchedule.ts';
 export * from './specialDays.ts';
 export * from './issues.ts';
 export * from './duties.ts';
+export * from './people.ts';

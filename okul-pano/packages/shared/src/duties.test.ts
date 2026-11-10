@@ -25,3 +25,24 @@ describe('görev paketleri', () => {
     expect(applyPersonRole('admin', ['exams.manage'])).toEqual({ role: 'admin', permissions: [] });
   });
 });
+
+import { mergePeople, type Member, type RosterRow } from './people.ts';
+
+describe('kişi listesi', () => {
+  const row = (id: string, name: string, status: RosterRow['status'] = 'none'): RosterRow => ({ teacherId: id, fullName: name, title: 'Öğretmen', branch: 'Fizik', status, role: 'teacher', email: null, enrollmentId: null, lastLoginAt: null });
+  const member = (id: string, name: string, extra: Partial<Member>): Member => ({ id, userId: `u${id}`, email: `${id}@okul.test`, fullName: name, role: 'editor', permissions: [], effectivePermissions: [], teacherId: null, teacherName: null, lastLoginAt: null, invitePending: false, promotionRequest: null, ...extra });
+  it('kadro ve hesap birleşir; kadro dışı görevli olur; yönetim önce gelir', () => {
+    const list = mergePeople([row('t1', 'Zeynep Kara'), row('t2', 'Ali Can')], [
+      member('m1', 'Zeynep Kara', { teacherId: 't1', permissions: ['exams.manage'] }),
+      member('m2', 'Memur Kişi', {}),
+      member('m3', 'Müdür', { role: 'owner' }),
+    ]);
+    expect(list.map((p) => [p.fullName, p.role, p.status])).toEqual([
+      ['Müdür', 'owner', 'account'],
+      ['Ali Can', 'teacher', 'none'],
+      ['Zeynep Kara', 'teacher', 'account'],
+      ['Memur Kişi', 'staff', 'account'],
+    ]);
+    expect(list.find((p) => p.fullName === 'Zeynep Kara')?.duties).toEqual(['exams']);
+  });
+});

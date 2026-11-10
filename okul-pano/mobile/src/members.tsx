@@ -1,66 +1,13 @@
-import { ADMIN_ONLY_PERMISSIONS, PERMISSION_KEYS, PERMISSIONS, type Permission } from '@okulpano/shared/permissions';
 import { normalizeName } from '@okulpano/shared/teachers';
-import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, Share, View } from 'react-native';
 import { useAuth } from './auth.tsx';
-import type { Member } from './data.ts';
 import { Sheet } from './sheet.tsx';
 import { Text, TextInput } from './text.tsx';
 import { colors, radius } from './theme.ts';
-import { Button, Card, Choice, Icon, Segmented, T, ToggleRow } from './ui.tsx';
+import { Button, Card, Icon, T } from './ui.tsx';
 
-/*
- * Kullanıcılar ve yetkiler (panelle aynı kurallar): rehber öğretmen ayrı bir rol olarak seçilir (editör + bütün
- * gözlem kayıtlarını görme yetkisi); yönetici atamayı yalnızca okul müdürü yapar.
- */
-
-export const GRANTABLE = PERMISSION_KEYS.filter((p) => !ADMIN_ONLY_PERMISSIONS.includes(p) && p !== 'conduct.counsel');
-export type FormRole = 'admin' | 'editor' | 'counselor';
-export const ROLE_INFO: Record<FormRole, { title: string; text: string }> = {
-  editor: { title: 'Editör', text: 'Yalnızca aşağıda seçtiğiniz bölümleri düzenleyebilir.' },
-  counselor: { title: 'Rehber öğretmen', text: 'Bütün öğrencilerin gözlem kayıtlarını ve ayın öğrencisi önerilerini görür; ayrıca seçtiğiniz bölümleri düzenler.' },
-  admin: { title: 'Yönetici', text: 'Tüm bölümleri düzenler, kullanıcı ekler ve yetki verir.' },
-};
-
-/** Üyenin görünen rolü: rehber öğretmen yetkisi olan editör "Rehber öğretmen" */
-export const formRole = (m: { role: string; permissions: string[] }): FormRole =>
-  m.role === 'admin' ? 'admin' : m.permissions.includes('conduct.counsel') ? 'counselor' : 'editor';
-export const roleTitle = (m: Member) => (m.role === 'owner' ? 'Okul müdürü' : ROLE_INFO[formRole(m)].title);
-
-/** Formdaki rol API'deki role ve yetkilere çevrilir */
-export const apiRole = (role: FormRole, permissions: Permission[]) =>
-  role === 'admin'
-    ? { role: 'admin' as const, permissions: [] as Permission[] }
-    : { role: 'editor' as const, permissions: [...permissions.filter((p) => p !== 'conduct.counsel'), ...(role === 'counselor' ? (['conduct.counsel'] as Permission[]) : [])] };
-
-/** Üyenin yetkileri kısaca: "Tüm yetkiler", "Yalnızca görüntüleme" ya da yetki adları */
-export function permissionSummary(m: Member): string {
-  if (m.role !== 'editor') return 'Tüm yetkiler';
-  const list = m.effectivePermissions.filter((p) => p !== 'conduct.counsel');
-  return list.length ? list.map((p) => PERMISSIONS[p]).join(', ') : 'Yalnızca görüntüleme';
-}
-
-/** Rol ve düzenleyebileceği bölümler */
-export function RoleEditor({ role, permissions, onRole, onPermissions }: { role: FormRole; permissions: Permission[]; onRole: (r: FormRole) => void; onPermissions: (p: Permission[]) => void }) {
-  const { role: myRole } = useAuth();
-  const roles: FormRole[] = myRole === 'owner' ? ['editor', 'counselor', 'admin'] : ['editor', 'counselor'];
-  return (
-    <View style={{ gap: 10 }}>
-      <Choice columns={1} value={role} onChange={onRole} options={roles.map((r) => ({ value: r, label: ROLE_INFO[r].title, description: ROLE_INFO[r].text }))} />
-      {role !== 'admin' && (
-        <View style={{ gap: 4 }}>
-          <T size={13} weight="700" color={colors.muted}>
-            Düzenleyebileceği bölümler
-          </T>
-          {GRANTABLE.map((p) => (
-            <ToggleRow key={p} label={PERMISSIONS[p]} value={permissions.includes(p)} onChange={(on) => onPermissions(on ? [...permissions, p] : permissions.filter((x) => x !== p))} />
-          ))}
-        </View>
-      )}
-    </View>
-  );
-}
+/* Kişiler ve yetkiler: öğretmen kaydı seçimi ve giriş bilgileri/davet sonucu (ekranlar app/kullanicilar, app/kullanici/[id], app/hesap-ac) */
 
 type TeacherOption = { id: string; fullName: string };
 
@@ -158,26 +105,5 @@ export function AccessResult({ kind, fullName, email, secret, emailed, onDone }:
         </Button>
       </View>
     </Card>
-  );
-}
-
-/**
- * Kullanıcılar ve yetkiler ekranının iki sekmesi (paneldeki gibi): Kullanıcılar | Hesap aç. Yalnızca kullanıcı
- * yönetme yetkisi olana görünür; "Öğretmen hesabı açma" yetkisi olan kişi doğrudan Hesap aç ekranını görür.
- */
-export function UsersTabs({ value, pending }: { value: 'users' | 'enroll'; pending?: number }) {
-  const { can } = useAuth();
-  if (!can('users.manage')) return null;
-  return (
-    <Segmented
-      value={value}
-      onChange={(v) => {
-        if (v !== value) router.replace(v === 'enroll' ? '/hesap-ac' : '/kullanicilar');
-      }}
-      options={[
-        { value: 'users', label: 'Kullanıcılar' },
-        { value: 'enroll', label: pending ? `Hesap aç (${pending})` : 'Hesap aç' },
-      ]}
-    />
   );
 }
