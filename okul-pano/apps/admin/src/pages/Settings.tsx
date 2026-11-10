@@ -379,7 +379,7 @@ export function Settings() {
             checked={s.requireApproval}
             onChange={(x) => setting('requireApproval', x)}
             label="Duyurular onaydan sonra yayınlansın"
-            description="Açıkken 'Duyuruları onaylama' yetkisi olmayan kullanıcıların (ör. öğretmenler) eklediği ya da değiştirdiği duyurular, okul müdürü, yöneticiler veya bu yetkiyi verdiğiniz kişiler (ör. müdür yardımcısı) onaylayınca panoya çıkar. Yetkiyi Kullanıcılar ve Yetkiler sayfasından verin."
+            description="Açıkken 'Duyuruları onaylama' yetkisi olmayan kullanıcıların (ör. öğretmenler) eklediği ya da değiştirdiği duyurular, okul müdürü, yöneticiler veya bu yetkiyi verdiğiniz kişiler (ör. müdür yardımcısı) onaylayınca panoya çıkar. Yetkiyi Kişiler ve Yetkiler sayfasında kişinin kartından (Diğer yetkiler) verin."
           />
           <Toggle
             checked={Boolean(s.internshipEnabled)}

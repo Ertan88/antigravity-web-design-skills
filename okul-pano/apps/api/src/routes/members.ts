@@ -98,7 +98,7 @@ export async function memberRoutes(app: FastifyInstance) {
     const [me] = await db.select({ fullName: users.fullName }).from(users).where(eq(users.id, req.ctx.userId));
     if (owner) {
       const title = 'Yönetici önerisi';
-      const body = `${me?.fullName ?? 'Bir yönetici'}, ${m.fullName} kişisinin Yönetici yapılmasını öneriyor. Kullanıcılar ve Yetkiler'den onaylayabilirsiniz.`;
+      const body = `${me?.fullName ?? 'Bir yönetici'}, ${m.fullName} kişisinin Yönetici yapılmasını öneriyor. Kişiler ve Yetkiler'den onaylayabilirsiniz.`;
       notifyUsers(app.deps, [owner.id], { title, body, url: '/kullanicilar' });
       await addToInbox(db, [owner.id], { key: `promotion:${m.membership.id}:${Date.now()}`, kind: 'approval', title, body, to: '/kullanicilar', schoolId: req.ctx.schoolId, openSchoolId: req.ctx.schoolId });
       await trySendMail(app.deps.env, { to: owner.email, subject: `${req.ctx.school.name} · ${title}`, text: `Merhaba ${owner.fullName},\n\n${body}\n` });

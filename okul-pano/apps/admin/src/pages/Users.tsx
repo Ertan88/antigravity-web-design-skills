@@ -1,504 +1,204 @@
-import { ADMIN_ONLY_PERMISSIONS, createMemberSchema, titleRoleFor, type EnrollRole, normalizeName, PERMISSION_KEYS, PERMISSIONS, updateMemberSchema, type Permission, type Role } from '@okulpano/shared';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import clsx from 'clsx';
-import { ArrowLeftRight, Check, KeyRound, Pencil, Plus, Send, ShieldCheck, UserCog, X } from '../components/icons.tsx';
-import { OwnerTransferDialog, type TransferResult } from '../components/OwnerTransferDialog.tsx';
+import { errorText, type EnrollRole } from '@okulpano/shared';
+import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { RosterTab } from './users/Roster.tsx';
+import { OwnerTransferDialog, type TransferResult } from '../components/OwnerTransferDialog.tsx';
+import { Plus, QrCodeIcon, Tags } from '../components/icons.tsx';
 import { useToast } from '../components/Toast.tsx';
-import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Select, Spinner, Table, Td } from '../components/ui.tsx';
+import { Alert, Button, PageHeader, Segmented, Spinner } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
+import { useList, useSchool, useSchoolPath, type TeacherOption } from '../lib/data.ts';
 import { CredentialsDialog, InviteDialog, ResetPasswordDialog, type Credentials, type InviteResult } from './users/Credentials.tsx';
-import { useList, useSchool, useSchoolPath, type Teacher } from '../lib/data.ts';
-import { useForm } from '../lib/form.ts';
-import { timeAgo } from '../lib/format.ts';
+import { CodeDialog, MeetingDialog, TitleRoleDialog } from './users/dialogs.tsx';
+import { DutiesTab } from './users/DutiesTab.tsx';
+import { OpenAccountsDialog } from './users/OpenAccounts.tsx';
+import { PeopleTab } from './users/PeopleTab.tsx';
+import type { CardContext } from './users/PersonCard.tsx';
+import { usePeople, type Person } from './users/people.ts';
 
-interface Member {
-  id: string;
-  userId: string;
-  email: string;
-  fullName: string;
-  role: Role;
-  permissions: string[];
-  effectivePermissions: Permission[];
-  /** Bağlı öğretmen kaydı: mobil uygulamada kendi nöbetleri ve ders programı görünür */
-  teacherId: string | null;
-  teacherName: string | null;
-  lastLoginAt: string | null;
-  /** Davetle eklendi, henüz şifresini belirlemedi */
-  invitePending: boolean;
-  /** Bir yöneticinin "Yönetici yapılsın" önerisi: müdürün onayını bekler */
-  promotionRequest: { byName: string; at: string } | null;
-}
+type Tab = 'kisiler' | 'gorevler';
 
-// Rehber öğretmen ayrı bir rol olarak seçilir (editör + bütün gözlem kayıtlarını görme yetkisi)
-const GRANTABLE = PERMISSION_KEYS.filter((p) => !ADMIN_ONLY_PERMISSIONS.includes(p) && p !== 'conduct.counsel');
-type FormRole = 'admin' | 'editor' | 'counselor';
-const ROLE_INFO: Record<FormRole, { title: string; text: string }> = {
-  admin: { title: 'Yönetici', text: 'Tüm bölümleri düzenler, kullanıcı ekler ve yetki verir.' },
-  editor: { title: 'Editör', text: 'Yalnızca aşağıda seçtiğiniz bölümleri düzenleyebilir.' },
-  counselor: { title: 'Rehber öğretmen', text: 'Bütün öğrencilerin gözlem kayıtlarını ve ayın öğrencisi önerilerini görür; ayrıca seçtiğiniz bölümleri düzenler.' },
-};
-
-/** Üyenin paneldeki rol adı: rehber öğretmen yetkisi olan editör "Rehber öğretmen" görünür */
-const formRole = (m: { role: string; permissions: string[] }): FormRole =>
-  m.role === 'admin' ? 'admin' : m.permissions.includes('conduct.counsel') ? 'counselor' : 'editor';
-/** Formdaki rol API'deki role ve yetkilere çevrilir */
-const apiRole = (role: FormRole, permissions: Permission[]) =>
-  role === 'admin'
-    ? { role: 'admin' as const, permissions }
-    : { role: 'editor' as const, permissions: [...permissions.filter((p) => p !== 'conduct.counsel'), ...(role === 'counselor' ? (['conduct.counsel'] as Permission[]) : [])] };
-
-function tempPassword() {
-  const alphabet = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
-  const bytes = crypto.getRandomValues(new Uint8Array(10));
-  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('');
-}
-
-type Form = { email: string; fullName: string; password: string; invite: boolean; role: FormRole; permissions: Permission[]; teacherId: string };
-
-/** Kullanıcının bağlı olduğu öğretmen kaydı (mobil uygulama: "Bugün" ve "Nöbetlerim") */
-function TeacherSelect({ value, onChange, teachers, id }: { value: string; onChange: (v: string) => void; teachers: Teacher[]; id?: string }) {
-  return (
-    <Select id={id} value={value} onChange={(e) => onChange(e.target.value)} aria-label="Öğretmen kaydı">
-      <option value="">Öğretmen değil</option>
-      {teachers.map((t) => (
-        <option key={t.id} value={t.id}>
-          {t.fullName}
-        </option>
-      ))}
-    </Select>
-  );
-}
-
-function RoleAndPermissions({ form }: { form: ReturnType<typeof useForm<Form>> }) {
-  const { values: v, set } = form;
-  // Yönetici atama okul müdüründe (müdür); yönetici yalnızca editör ekler
-  const { school } = useAuth();
-  const roles = school?.role === 'owner' ? (['editor', 'counselor', 'admin'] as const) : (['editor', 'counselor'] as const);
-  return (
-    <>
-      <div className="grid gap-2 sm:grid-cols-3">
-        {roles.map((r) => (
-          <button
-            key={r}
-            type="button"
-            onClick={() => set('role', r)}
-            className={clsx(
-              'rounded-xl p-3.5 text-left ring-1 transition-colors',
-              v.role === r ? 'bg-brand-50 ring-2 ring-brand-500' : 'ring-slate-200 hover:bg-slate-50',
-            )}
-          >
-            <div className="text-sm font-semibold">{ROLE_INFO[r].title}</div>
-            <div className="mt-0.5 text-xs text-slate-500">{ROLE_INFO[r].text}</div>
-          </button>
-        ))}
-      </div>
-      {school?.role !== 'owner' && (
-        <p className="text-xs text-slate-500">Yönetici atamayı okul müdürü yapar. Gerekirse listede kişinin satırındaki kalkan simgesiyle müdüre önerin.</p>
-      )}
-      {v.role !== 'admin' && (
-        <div>
-          <div className="mb-2 text-sm font-medium text-slate-700">Düzenleyebileceği bölümler</div>
-          <div className="grid gap-1.5 sm:grid-cols-2">
-            {GRANTABLE.map((p) => {
-              const on = v.permissions.includes(p);
-              return (
-                <label key={p} className={clsx('flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm ring-1', on ? 'bg-brand-50 ring-brand-200' : 'ring-slate-200 hover:bg-slate-50')}>
-                  <input
-                    type="checkbox"
-                    className="size-4 accent-brand-600"
-                    checked={on}
-                    onChange={() => set('permissions', on ? v.permissions.filter((x) => x !== p) : [...v.permissions, p])}
-                  />
-                  {PERMISSIONS[p]}
-                </label>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-
+/**
+ * Kişiler ve Yetkiler. Kadrodaki öğretmenler ve kadro dışı kişiler tek listede (Kişiler); rol 5 sabit rolden biri,
+ * düzenleme yetkisi görev paketleriyle verilir. Görevler sekmesi iş bölümünü gösterir. Hesap tek pencereden açılır.
+ */
 export function Users() {
-  const { me, schoolId, school, reloadMe } = useAuth();
-  const path = useSchoolPath('members');
+  const { me, school, schoolId, reloadMe } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
-  const { can } = useAuth();
-  const full = can('users.manage');
-  const list = useQuery({ queryKey: [schoolId, 'members'], queryFn: () => api<Member[]>(path), enabled: Boolean(schoolId) && full });
-  const teachers = useList<Teacher>('teachers');
-  const teacherList = (teachers.data ?? []).filter((t) => t.isActive !== false);
+  const { people, loading, full, mail, isOwner, membersPath, enrollPath, refresh } = usePeople();
+  const schoolPath = useSchoolPath();
   const schoolData = useSchool();
-  /** Kadrodan öğretmen seçilince rol ünvandan önerilir (ör. müdür yardımcısı → Yönetici; Yöneticiyi yalnızca müdür verir) */
-  const pickTeacher = (teacherId: string) => {
-    form.set('teacherId', teacherId);
-    const t = teacherList.find((x) => x.id === teacherId);
-    if (!t) return;
-    const titleRoles = (schoolData.data?.settings?.titleRoles ?? {}) as Record<string, EnrollRole>;
-    const r = titleRoleFor(titleRoles, t.titleId, t.title);
-    const next: FormRole = r === 'admin' ? (school?.role === 'owner' ? 'admin' : 'editor') : r === 'counselor' ? 'counselor' : 'editor';
-    form.set('role', next);
-  };
-  const linkTeacher = useMutation({
-    mutationFn: ({ id, teacherId }: { id: string; teacherId: string | null }) => api(`${path}/${id}/teacher`, { method: 'PUT', body: { teacherId } }),
-    onSuccess: (_d, v) => {
-      refresh();
-      toast.success(v.teacherId ? 'Öğretmen kaydı eşleştirildi: mobil uygulamada kendi nöbetleri ve programı görünür' : 'Öğretmen eşleşmesi kaldırıldı');
-    },
-    onError: (e) => toast.error(e.message),
-  });
+  const titles = useList<TeacherOption>('teacher-titles');
   const [params, setParams] = useSearchParams();
-  const tab = params.get('sekme') === 'kadro' || !full ? 'kadro' : 'hesaplar';
-  const [mode, setMode] = useState<'add' | Member | null>(null);
-  const [created, setCreated] = useState<Credentials | null>(null);
-  const [invited, setInvited] = useState<InviteResult | null>(null);
-  const [resetting, setResetting] = useState<Member | null>(null);
+  const tab: Tab = params.get('sekme') === 'gorevler' && full ? 'gorevler' : 'kisiler';
+
+  const [opening, setOpening] = useState<string[] | null>(null);
+  const [code, setCode] = useState<{ code: string; url: string; expiresAt: string; fullName: string } | null>(null);
+  const [meeting, setMeeting] = useState<{ url: string; expiresAt: string } | null>(null);
+  const [mapping, setMapping] = useState(false);
   const [transferring, setTransferring] = useState(false);
-  const form = useForm<Form>({ email: '', fullName: '', password: '', invite: true, role: 'editor', permissions: ['announcements.manage'], teacherId: '' });
-  const refresh = () => void qc.invalidateQueries({ queryKey: [schoolId, 'members'] });
-  // Seçilen öğretmen kadroda ve henüz hesabı yoksa hesabı Kadro sekmesinden (giriş kodu) açılmalı
-  const kadro =
-    mode === 'add' && form.values.teacherId && list.data && !list.data.some((m) => m.teacherId === form.values.teacherId)
-      ? teacherList.find((t) => t.id === form.values.teacherId)
-      : undefined;
+  const [invited, setInvited] = useState<InviteResult | null>(null);
+  const [created, setCreated] = useState<Credentials | null>(null);
+  const [resetting, setResetting] = useState<{ id: string; fullName: string; email: string } | null>(null);
+  const [approving, setApproving] = useState(false);
 
-  const save = useMutation({
-    mutationFn: ({ id, body }: { id?: string; body: unknown }) => (id ? api(`${path}/${id}`, { method: 'PATCH', body }) : api(path, { method: 'POST', body })),
-  });
-  const reinvite = useMutation({
-    mutationFn: (m: Member) => api<{ inviteUrl: string; emailed: boolean }>(`${path}/${m.id}/invite`, { method: 'POST' }).then((r) => ({ ...r, email: m.email, fullName: m.fullName })),
-    onSuccess: (r) => setInvited(r),
-    onError: (e) => toast.error(e.message),
-  });
-  // Yönetici önerisi: yönetici önerir, müdür onaylar ya da reddeder (Yönetici atamayı yalnızca müdür yapar)
-  const promotion = useMutation({
-    mutationFn: ({ m, action }: { m: Member; action: 'request' | 'approve' | 'reject' }) =>
-      action === 'request'
-        ? api(`${path}/${m.id}/promotion-request`, { method: 'POST', body: {} })
-        : action === 'approve'
-          ? api(`${path}/${m.id}/promotion-request/approve`, { method: 'POST', body: {} })
-          : api(`${path}/${m.id}/promotion-request`, { method: 'DELETE' }),
-    onSuccess: (_d, { m, action }) => {
-      refresh();
-      toast.success(
-        action === 'request'
-          ? `${m.fullName} için öneri müdüre gönderildi`
-          : action === 'approve'
-            ? `${m.fullName} artık Yönetici`
-            : school?.role === 'owner'
-              ? 'Öneri reddedildi'
-              : 'Öneri geri çekildi',
-      );
-    },
-    onError: (e) => toast.error(e.message),
-  });
-  const pendingPromotions = (list.data ?? []).filter((m) => m.promotionRequest);
-  const remove = useMutation({
-    mutationFn: (id: string) => api(`${path}/${id}`, { method: 'DELETE' }),
-    onSuccess: () => {
-      refresh();
-      toast.success('Kullanıcının okul erişimi kaldırıldı');
-    },
-    onError: (e) => toast.error(e.message),
-  });
-
-  const openAdd = () => {
-    form.reset({ email: '', fullName: '', password: tempPassword(), invite: true, role: 'editor', permissions: ['announcements.manage'], teacherId: '' });
-    setMode('add');
-  };
-  const openEdit = (m: Member) => {
-    form.reset({ email: m.email, fullName: m.fullName, password: '', invite: false, role: formRole(m), permissions: (m.permissions as Permission[]).filter((p) => p !== 'conduct.counsel'), teacherId: m.teacherId ?? '' });
-    setMode(m);
-  };
-
-  const submit = async () => {
-    const v = form.values;
+  const openMeeting = async () => {
     try {
-      if (mode === 'add') {
-        const payload = form.validate(createMemberSchema, {
-          email: v.email,
-          fullName: v.fullName,
-          password: v.invite ? undefined : v.password || undefined,
-          invite: v.invite,
-          ...apiRole(v.role, v.permissions),
-          teacherId: v.teacherId || null,
-        });
-        if (!payload) return;
-        const res = (await save.mutateAsync({ body: payload })) as { existingUser?: boolean; invite?: { inviteUrl: string; emailed: boolean } | null };
-        if (res.invite) {
-          setInvited({ email: v.email, fullName: v.fullName, ...res.invite });
-          toast.success(`${v.fullName} davet edildi`);
-        } else if (res.existingUser) {
-          // E-posta sistemde kayıtlı: girilen şifre kullanılmadı, kullanıcı kendi şifresiyle girer
-          toast.success(`${v.fullName} eklendi. Bu kişinin başka bir okulda hesabı var; adı ve şifresi değişmez, kendi şifresiyle girer. Gerekirse "Şifreyi sıfırla"yı kullanın.`);
-        } else {
-          setCreated({ email: v.email, fullName: v.fullName, password: v.password });
-          toast.success(`${v.fullName} eklendi`);
-        }
-      } else if (mode) {
-        const payload = form.validate(updateMemberSchema, apiRole(v.role, v.permissions));
-        if (!payload) return;
-        await save.mutateAsync({ id: mode.id, body: payload });
-        toast.success('Yetkiler güncellendi');
-      }
-      refresh();
-      setMode(null);
-    } catch (err) {
-      form.fail(err);
+      setMeeting(await api<{ url: string; expiresAt: string }>(`${enrollPath}/meeting`, { method: 'POST', body: {} }));
+      setOpening(null);
+    } catch (e) {
+      toast.error((e as Error).message);
     }
   };
+  const closeMeeting = async () => {
+    await api(`${enrollPath}/meeting`, { method: 'DELETE' }).catch(() => undefined);
+    setMeeting(null);
+    toast.success('Toplantı QR’ı kapatıldı');
+  };
+
+  const approveAll = async (list: Person[]) => {
+    setApproving(true);
+    let ok = 0;
+    for (const p of list.filter((x) => x.status === 'pending' && x.roster?.enrollmentId)) {
+      try {
+        await api(`${enrollPath}/${p.roster!.enrollmentId}/approve`, { method: 'POST', body: { role: full ? p.roster!.role : 'teacher' } });
+        ok++;
+      } catch (err) {
+        toast.error(`${p.fullName}: ${errorText(err, 'onaylanamadı')}`);
+      }
+    }
+    setApproving(false);
+    refresh();
+    if (ok) toast.success(`${ok} hesap onaylandı`);
+  };
+
+  const ctx: CardContext = {
+    full,
+    isOwner,
+    membersPath,
+    enrollPath,
+    refresh,
+    onOpenAccount: (p) => setOpening([p.key]),
+    onCode: async (p) => {
+      try {
+        const res = await api<{ code: string; url: string; expiresAt: string; fullName: string }>(`${enrollPath}/code`, {
+          method: 'POST',
+          body: { teacherId: p.teacherId, role: full && (p.role !== 'admin' || isOwner) ? (p.roster?.role ?? 'teacher') : 'teacher' },
+        });
+        setCode(res);
+        refresh();
+      } catch (e) {
+        toast.error((e as Error).message);
+      }
+    },
+    onReset: setResetting,
+    onInvited: setInvited,
+    onTransfer: () => setTransferring(true),
+  };
+
+  const pendingPromotions = people.filter((p) => p.member?.promotionRequest);
+  const pendingEnrollments = people.filter((p) => p.status === 'pending').length;
+  const titleRoles = (schoolData.data?.settings?.titleRoles ?? {}) as Record<string, EnrollRole>;
 
   return (
     <>
       <PageHeader
-        title="Kullanıcılar ve Yetkiler"
-        description="Öğretmen ve idarecilere panel erişimi verin. Editörler yalnızca seçtiğiniz bölümleri düzenleyebilir; örneğin bir öğretmen sadece duyuru ekleyebilir."
+        title="Kişiler ve Yetkiler"
+        description="Kadrodaki öğretmenler ve kadro dışı kişiler tek listede. Bir kişiye tıklayın; rolünü, görevlerini ve hesabını yanda düzenleyin."
         actions={
-          full && (
-            <Button icon={<Plus className="size-4" />} onClick={openAdd}>
-              Kullanıcı ekle
+          <div className="flex flex-wrap gap-2">
+            {full && (
+              <Button variant="secondary" icon={<Tags className="size-4" />} onClick={() => setMapping(true)}>
+                Ünvan → rol
+              </Button>
+            )}
+            <Button variant="secondary" icon={<QrCodeIcon className="size-4" />} onClick={() => void openMeeting()}>
+              Toplantı QR’ı
             </Button>
-          )
+            <Button icon={<Plus className="size-4" />} onClick={() => setOpening([])}>
+              Hesap aç
+            </Button>
+          </div>
         }
       />
-      {full && <div className="mb-4">
-        <Segmented
-          value={tab}
-          onChange={(v) => setParams(v === 'kadro' ? { sekme: 'kadro' } : {}, { replace: true })}
-          options={[
-            { value: 'hesaplar', label: `Hesaplar (${list.data?.length ?? 0})` },
-            { value: 'kadro', label: 'Kadro' },
-          ]}
-        />
-      </div>}
-      {tab === 'kadro' ? (
-        <RosterTab />
-      ) : (
-      <>
+
       {school?.role === 'owner' && pendingPromotions.length > 0 && (
         <div className="mb-4">
           <Alert tone="amber">
             {pendingPromotions.length === 1
-              ? `${pendingPromotions[0]!.promotionRequest!.byName}, ${pendingPromotions[0]!.fullName} kişisinin Yönetici yapılmasını öneriyor.`
-              : `${pendingPromotions.length} kişi için Yönetici önerisi var.`}{' '}
-            Aşağıdaki listeden onaylayın ya da reddedin.
+              ? `${pendingPromotions[0]!.member!.promotionRequest!.byName}, ${pendingPromotions[0]!.fullName} kişisinin Müdür yardımcısı yapılmasını öneriyor.`
+              : `${pendingPromotions.length} kişi için Müdür yardımcısı önerisi var.`}{' '}
+            Kişinin kartından onaylayın ya da reddedin.
           </Alert>
         </div>
       )}
-      <Card>
-        {list.isLoading ? (
-          <Spinner />
-        ) : !list.data?.length ? (
-          <EmptyState icon={<UserCog className="size-6" />} title="Kullanıcı yok" />
-        ) : (
-          <Table head={['Kullanıcı', 'Rol', 'Yetkiler', 'Öğretmen kaydı', 'Son giriş', '']}>
-            {list.data.map((m) => {
-              const locked = m.role === 'owner' || m.userId === me?.user.id || (m.role === 'admin' && school?.role !== 'owner');
-              return (
-                <tr key={m.id}>
-                  <Td>
-                    <div className="font-semibold text-ink">{m.fullName}</div>
-                    <div className="text-slate-500">{m.email}</div>
-                  </Td>
-                  <Td>
-                    <Badge tone={m.role === 'editor' ? (formRole(m) === 'counselor' ? 'green' : 'slate') : 'blue'}>
-                      {m.role === 'owner' ? 'Okul müdürü' : ROLE_INFO[formRole(m)].title}
-                    </Badge>
-                    {m.promotionRequest && (
-                      <div className="mt-1.5 space-y-1.5">
-                        <div className="text-xs text-amber-700">Yönetici önerisi · {m.promotionRequest.byName}</div>
-                        {school?.role === 'owner' ? (
-                          <div className="flex gap-1.5">
-                            <Button size="sm" icon={<Check className="size-4" />} loading={promotion.isPending} onClick={() => promotion.mutate({ m, action: 'approve' })}>
-                              Onayla
-                            </Button>
-                            <Button size="sm" variant="secondary" icon={<X className="size-4" />} onClick={() => promotion.mutate({ m, action: 'reject' })}>
-                              Reddet
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button size="sm" variant="ghost" onClick={() => promotion.mutate({ m, action: 'reject' })}>
-                            Geri çek
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </Td>
-                  <Td className="max-w-md">
-                    {m.role === 'editor' ? (
-                      m.effectivePermissions.length ? (
-                        <div className="flex flex-wrap gap-1">
-                          {m.effectivePermissions.map((p) => (
-                            <span key={p} className="rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600">
-                              {PERMISSIONS[p]}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-slate-400">Yalnızca görüntüleme</span>
-                      )
-                    ) : (
-                      <span className="text-slate-500">Tüm yetkiler</span>
-                    )}
-                  </Td>
-                  <Td className="min-w-44">
-                    <TeacherSelect
-                      value={m.teacherId ?? ''}
-                      teachers={teacherList}
-                      onChange={(teacherId) => linkTeacher.mutate({ id: m.id, teacherId: teacherId || null })}
-                    />
-                  </Td>
-                  <Td className="whitespace-nowrap text-slate-500">{m.invitePending ? <Badge tone="amber">Davet bekliyor</Badge> : timeAgo(m.lastLoginAt)}</Td>
-                  <Td className="w-px text-right">
-                    {m.role === 'owner' && school?.role === 'owner' && m.userId === me?.user.id && (
-                      <Button size="sm" variant="secondary" className="whitespace-nowrap" icon={<ArrowLeftRight className="size-4" />} onClick={() => setTransferring(true)}>
-                        Müdürlüğü devret
-                      </Button>
-                    )}
-                    {!locked && (
-                      <div className="flex justify-end">
-                        <IconButton label="Yetkileri düzenle" onClick={() => openEdit(m)}>
-                          <Pencil className="size-4" />
-                        </IconButton>
-                        {school?.role === 'admin' && m.role === 'editor' && !m.promotionRequest && (
-                          <IconButton label="Yönetici yapılmasını müdüre öner" onClick={() => promotion.mutate({ m, action: 'request' })}>
-                            <ShieldCheck className="size-4" />
-                          </IconButton>
-                        )}
-                        {m.invitePending && (
-                          <IconButton label="Daveti yeniden gönder" onClick={() => reinvite.mutate(m)}>
-                            <Send className="size-4" />
-                          </IconButton>
-                        )}
-                        <IconButton label="Şifreyi sıfırla" onClick={() => setResetting(m)}>
-                          <KeyRound className="size-4" />
-                        </IconButton>
-                        <DeleteButton label="Erişimi kaldır" onConfirm={() => remove.mutate(m.id)} />
-                      </div>
-                    )}
-                  </Td>
-                </tr>
-              );
-            })}
-          </Table>
-        )}
-      </Card>
-      </>
+      {pendingEnrollments > 0 && (
+        <div className="mb-4">
+          <Alert tone="blue">{pendingEnrollments} kişi toplantı QR’ı ile hesap açtı ve onayınızı bekliyor: “Onay bekliyor” süzgecine bakın.</Alert>
+        </div>
       )}
 
-      <Modal
-        open={mode !== null}
-        onClose={() => setMode(null)}
-        size="lg"
-        title={mode === 'add' ? 'Kullanıcı ekle' : `${form.values.fullName} · yetkiler`}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setMode(null)}>
-              Vazgeç
-            </Button>
-            <Button loading={save.isPending} onClick={() => void submit()}>
-              Kaydet
-            </Button>
-          </>
-        }
-      >
-        <form
-          className="space-y-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void submit();
-          }}
-        >
-          {form.errors._form && <Alert tone="red">{form.errors._form}</Alert>}
-          {mode === 'add' && (
-            <>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Ad soyad" error={form.errors.fullName}>
-                  {(id) => (
-                    <Input
-                      id={id}
-                      value={form.values.fullName}
-                      onChange={(e) => {
-                        form.set('fullName', e.target.value);
-                        // Adı kadrodaki bir öğretmenle aynıysa öğretmen kaydı kendiliğinden seçilir
-                        const match = teacherList.find((t) => normalizeName(t.fullName) === normalizeName(e.target.value));
-                        if (match && !form.values.teacherId) pickTeacher(match.id);
-                      }}
-                    />
-                  )}
-                </Field>
-                <Field label="E-posta" error={form.errors.email}>
-                  {(id) => <Input id={id} type="email" value={form.values.email} onChange={(e) => form.set('email', e.target.value)} />}
-                </Field>
-              </div>
-              {kadro && (
-                <Alert tone="blue">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="min-w-0 flex-1">
-                      <strong>{kadro.fullName}</strong> kadroda ve henüz hesabı yok. Öğretmenlere hesap Kadro sekmesinden giriş koduyla açılır; şifre ya da bağlantı
-                      paylaşmanız gerekmez. Burayı kadro dışı kişiler (memur, dışarıdan editör) için kullanın.
-                    </span>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setMode(null);
-                        setParams({ sekme: 'kadro', ara: kadro.fullName }, { replace: true });
-                      }}
-                    >
-                      Kadroda giriş kodu ver
-                    </Button>
-                  </div>
-                </Alert>
-              )}
-              <Field label="Giriş bilgisi" help={form.values.invite ? 'Kişiye bağlantı gider; şifresini kendisi belirler. E-posta sistemde kayıtlıysa mevcut şifresiyle girer.' : 'Kullanıcı ilk girişten sonra Hesabım sayfasından değiştirebilir. E-posta sistemde kayıtlıysa mevcut şifresi geçerli kalır.'}>
-                {() => (
-                  <Segmented
-                    value={form.values.invite ? 'invite' : 'password'}
-                    onChange={(v) => form.set('invite', v === 'invite')}
-                    options={[
-                      { value: 'invite', label: 'Davet bağlantısı gönder' },
-                      { value: 'password', label: 'Geçici şifre ver' },
-                    ]}
-                  />
-                )}
-              </Field>
-              {!form.values.invite && (
-              <Field label="Geçici şifre" error={form.errors.password}>
-                {(id) => (
-                  <div className="flex gap-2">
-                    <Input id={id} value={form.values.password} onChange={(e) => form.set('password', e.target.value)} className="font-mono" />
-                    <Button variant="secondary" icon={<KeyRound className="size-4" />} onClick={() => form.set('password', tempPassword())}>
-                      Üret
-                    </Button>
-                  </div>
-                )}
-              </Field>
-              )}
-              <Field label="Öğretmen kaydı" help="Öğretmense seçin: mobil uygulamada kendi ders programını ve nöbetlerini görür, izin bildirebilir.">
-                {(id) => <TeacherSelect id={id} value={form.values.teacherId} teachers={teacherList} onChange={(t) => (t ? pickTeacher(t) : form.set('teacherId', ''))} />}
-              </Field>
-            </>
-          )}
-          <RoleAndPermissions form={form} />
-          <button type="submit" className="hidden" />
-        </form>
-      </Modal>
+      {full && (
+        <div className="mb-4">
+          <Segmented<Tab>
+            value={tab}
+            onChange={(v) => setParams(v === 'gorevler' ? { sekme: 'gorevler' } : {}, { replace: true })}
+            options={[
+              { value: 'kisiler', label: `Kişiler (${people.length})` },
+              { value: 'gorevler', label: 'Görevler' },
+            ]}
+          />
+        </div>
+      )}
 
+      {loading ? (
+        <Spinner />
+      ) : tab === 'gorevler' ? (
+        <DutiesTab people={people} membersPath={membersPath} refresh={refresh} />
+      ) : (
+        <PeopleTab people={people} ctx={ctx} initialQuery={params.get('ara') ?? undefined} onApproveAll={(l) => void approveAll(l)} approving={approving} />
+      )}
+
+      <OpenAccountsDialog
+        open={opening !== null}
+        initial={opening ?? []}
+        people={people}
+        full={full}
+        isOwner={isOwner}
+        mail={mail}
+        membersPath={membersPath}
+        enrollPath={enrollPath}
+        onClose={() => setOpening(null)}
+        onDone={refresh}
+        onMeeting={() => void openMeeting()}
+      />
+      <CodeDialog value={code} onClose={() => setCode(null)} />
+      <MeetingDialog value={meeting} onClose={() => setMeeting(null)} onStop={() => void closeMeeting()} />
+      <TitleRoleDialog
+        open={mapping}
+        onClose={() => setMapping(false)}
+        titles={titles.data ?? []}
+        value={titleRoles}
+        isOwner={isOwner}
+        onSave={async (v) => {
+          await api(schoolPath, { method: 'PATCH', body: { settings: { titleRoles: v } } });
+          void qc.invalidateQueries({ queryKey: [schoolId, 'school'] });
+          refresh();
+          toast.success('Ünvan → rol eşleştirmesi kaydedildi');
+          setMapping(false);
+        }}
+      />
       <OwnerTransferDialog
         open={transferring}
         onClose={() => setTransferring(false)}
         schoolName={school?.name ?? ''}
         currentOwner={me ? { fullName: me.user.fullName, email: me.user.email } : null}
         ownerIsMe
-        members={(list.data ?? []).filter((m) => m.role !== 'owner').map((m) => ({ id: m.id, fullName: m.fullName, email: m.email }))}
+        members={people.filter((p) => p.member && p.member.role !== 'owner').map((p) => ({ id: p.member!.id, fullName: p.fullName, email: p.member!.email }))}
         onSubmit={async (body) => {
-          const r = await api<TransferResult>(`${path.replace(/\/members$/, '')}/transfer-ownership`, { method: 'POST', body });
+          const r = await api<TransferResult>(`${schoolPath}/transfer-ownership`, { method: 'POST', body });
           setTransferring(false);
           toast.success(`Müdürlük ${r.newOwner.fullName} kişisine devredildi`);
           if (r.invite) setInvited({ email: r.newOwner.email, fullName: r.newOwner.fullName, ...r.invite });
@@ -507,8 +207,8 @@ export function Users() {
           return r;
         }}
       />
-      <CredentialsDialog value={created} onClose={() => setCreated(null)} />
       <InviteDialog value={invited} onClose={() => setInvited(null)} />
+      <CredentialsDialog value={created} onClose={() => setCreated(null)} />
       <ResetPasswordDialog
         member={resetting}
         onClose={() => setResetting(null)}
