@@ -2,7 +2,8 @@ import { useNavigationContainerRef } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { Animated, Appearance, DeviceEventEmitter, Easing, Platform, StyleSheet, useColorScheme, View } from 'react-native';
 import { scrollMemory, scrollRestore } from './scroll.ts';
-import { snapshot } from './snapshot.ts';
+// Uzantısız: web'de snapshot.web.ts seçilir
+import { snapshot } from './snapshot';
 import { storage } from './storage.ts';
 import { applyPalette, colors } from './theme.ts';
 import { refreshStyles } from './ui.tsx';
