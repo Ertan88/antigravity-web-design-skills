@@ -348,7 +348,7 @@ export function Timetable() {
                                   ))}
                                   {editable && (
                                     <div className="absolute top-0.5 right-0.5 flex flex-col">
-                                      <IconButton label="Düzenle" className="size-7 hover:bg-white" onClick={() => openCell(d, p)}>
+                                      <IconButton label="Düzenle" className="size-7 hover:bg-surface" onClick={() => openCell(d, p)}>
                                         <Pencil className="size-3.5" />
                                       </IconButton>
                                       <DeleteButton className="size-7" label="Dersi sil" what="Bu ders" onConfirm={() => clear.mutate(list.map((x) => x.id))} />
@@ -371,7 +371,7 @@ export function Timetable() {
                             ) : (
                               editable &&
                               mode === 'class' && (
-                                <IconButton label="Ders ekle" className="size-8 text-slate-300 hover:bg-white hover:text-brand-600" onClick={() => openCell(d, p)}>
+                                <IconButton label="Ders ekle" className="size-8 text-slate-300 hover:bg-surface hover:text-brand-600" onClick={() => openCell(d, p)}>
                                   <Plus className="size-4" />
                                 </IconButton>
                               )

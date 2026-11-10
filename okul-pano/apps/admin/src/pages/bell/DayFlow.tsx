@@ -581,7 +581,7 @@ export function NowCards({ bells, nowSec, lunchThresholdMin }: { bells: FlowBell
           const caption = s.kind === 'lesson' ? 'kaldı' : s.kind === 'break' ? `sonra ${periodLabel(s.next)}` : s.kind === 'before' ? `sonra ilk ders (${s.next.start})` : '';
           const progress = s.kind === 'lesson' || s.kind === 'break' ? 1 - s.remainingSec / s.totalSec : null;
           return (
-            <div key={b.target} className={clsx('rounded-2xl p-5 text-white shadow-sm', b.special ? 'bg-orange-700' : 'bg-brand-600')}>
+            <div key={b.target} className={clsx('rounded-2xl p-5 text-white shadow-sm', b.special ? 'bg-orange-600' : 'bg-brand-600')}>
               <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-white/75 uppercase">
                 <BellRing className="size-4" /> Şu an · {b.label}
                 {b.overridden && <Hand className="size-3.5" />}

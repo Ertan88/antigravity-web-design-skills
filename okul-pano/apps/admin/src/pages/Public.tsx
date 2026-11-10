@@ -55,7 +55,7 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
   return (
     <fieldset className="space-y-4">
       <legend className="mb-4 flex items-center gap-2.5">
-        <span className="flex size-7 items-center justify-center rounded-full bg-ink text-xs font-extrabold text-white dark:text-[#1c1917]">{n}</span>
+        <span className="flex size-7 items-center justify-center rounded-full bg-ink text-xs font-extrabold text-surface">{n}</span>
         <span className="text-base font-extrabold tracking-tight">{title}</span>
       </legend>
       {children}

@@ -129,7 +129,7 @@ export function DutiesTab({ people, membersPath, refresh }: { people: Person[]; 
             <div className="text-xs text-violet-700">Okul müdürü ve müdür yardımcıları. {iAmOwner ? 'Müdür yardımcısını siz atarsınız.' : 'Müdür yardımcısını müdür atar; ＋ ile müdüre önerirsiniz.'}</div>
           </div>
           {management.map((p) => (
-            <div key={p.key} className="flex items-center gap-2 rounded-full bg-white/70 py-1 pr-2 pl-1">
+            <div key={p.key} className="flex items-center gap-2 rounded-full bg-surface/70 py-1 pr-2 pl-1">
               <Avatar name={p.fullName} className="size-8 bg-violet-100 text-violet-800" />
               <span className="text-sm font-semibold">{p.fullName}</span>
               {iAmOwner && p.role === 'admin' && (

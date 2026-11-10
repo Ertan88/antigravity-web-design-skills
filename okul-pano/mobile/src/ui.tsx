@@ -595,7 +595,8 @@ export function initials(name?: string | null): string {
   return pick.toLocaleUpperCase('tr-TR');
 }
 
-const AVATAR_COLORS = ['#6366f1', '#0ea5e9', '#14b8a6', '#f59e0b', '#ec4899', '#8b5cf6', '#22c55e'];
+// Beyaz baş harfler okunsun diye 600 tonları (açık ve koyu temada)
+const AVATAR_COLORS = ['#4f46e5', '#0284c7', '#0d9488', '#d97706', '#db2777', '#7c3aed', '#16a34a'];
 
 /** Yuvarlak baş harf rozeti; rengi isimden türetilir, her kullanıcıda sabit kalır */
 export function Avatar({ name, size = 44 }: { name?: string | null; size?: number }) {

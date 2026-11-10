@@ -231,7 +231,7 @@ function ExamRow({ e, onOpen, sub }: { e: ScheduledExam; onOpen?: (e: ScheduledE
   return (
     <tr className={clsx(onOpen && 'cursor-pointer hover:bg-slate-50', sub && 'bg-slate-50/70')} onClick={() => onOpen?.(e)}>
       <td className={clsx('px-5 py-2.5 font-bold text-ink', sub && 'pl-9 font-semibold whitespace-nowrap text-slate-500')}>
-        {sub && <span className="mr-1 text-slate-300">↳</span>}
+        {sub && <span className="mr-1 text-slate-400">↳</span>}
         {e.periodNo}. ders <span className="font-medium text-slate-400">{e.start ?? '—'}</span>
       </td>
       <td className="px-3 py-2.5 font-bold text-ink">{e.classLabel}</td>
@@ -506,7 +506,7 @@ function ExamGrid({
                   lv.classes.map((c) => (
                     <tr key={c.id}>
                       <th className="pr-2 pl-3 text-left text-[13px] font-bold text-slate-500">
-                        <span className="mr-1 text-slate-300">↳</span>
+                        <span className="mr-1 text-slate-400">↳</span>
                         {c.name}
                       </th>
                       {days.map((d) => {
@@ -898,9 +898,9 @@ function ExamImportDialog({ file, onClose }: { file: File | null; onClose: () =>
     >
       <div className="mb-4 flex flex-wrap items-center gap-3">
         {step(1, 'Dosya', 'done')}
-        <span className="text-slate-300">—</span>
+        <span className="text-slate-400">—</span>
         {step(2, 'Önizleme', p ? 'on' : 'off')}
-        <span className="text-slate-300">—</span>
+        <span className="text-slate-400">—</span>
         {step(3, 'Kaydet', 'off')}
       </div>
       {preview.isLoading && <Spinner label="Dosya okunuyor…" />}

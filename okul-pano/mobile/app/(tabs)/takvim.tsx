@@ -71,7 +71,7 @@ export default function Takvim() {
       <ErrorNote error={calendars.error ?? scan.error ?? decide.error} />
       {note && (
         <Card tone="primary">
-          <T color="#fff" weight="600">
+          <T color={colors.onPrimary} weight="600">
             {note}
           </T>
         </Card>

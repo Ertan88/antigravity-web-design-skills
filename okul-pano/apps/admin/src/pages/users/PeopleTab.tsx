@@ -78,7 +78,7 @@ export function PeopleTab({
             onClick={() => setFilter(f.key)}
             className={clsx(
               'rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors',
-              filter === f.key ? 'bg-ink text-white' : 'text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50',
+              filter === f.key ? 'bg-ink text-surface' : 'text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50',
               f.key === 'pending' && counts.pending > 0 && filter !== f.key && 'text-amber-800 ring-amber-300',
             )}
           >

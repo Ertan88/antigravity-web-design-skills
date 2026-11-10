@@ -1,7 +1,7 @@
 import { applyPersonRole, errorText, PERSON_ROLES, type EnrollRole, type PersonRole } from '@okulpano/shared';
 import clsx from 'clsx';
 import { useEffect, useState } from 'react';
-import { Check, CheckCheck, Copy, Mail, Plus, X } from '../../components/icons.tsx';
+import { Check, CheckCheck, Copy, Mail, X } from '../../components/icons.tsx';
 import { Alert, Button, Input, Modal, Select } from '../../components/ui.tsx';
 import { api } from '../../lib/api.ts';
 import { formatCode } from './dialogs.tsx';
@@ -33,7 +33,7 @@ function tempPassword() {
 }
 
 /**
- * Tek "Hesap aç" penceresi: 1) kimler (kadrodan ya da kadro dışı) 2) nasıl giriş yapacaklar (e-posta daveti, giriş kodu,
+ * Tek "Hesap aç" penceresi: 1) kimler (kadrodan) 2) nasıl giriş yapacaklar (e-posta daveti, giriş kodu,
  * toplantı QR'ı, geçici şifre) 3) rol (ünvandan önerilir). Görevler hesap açıldıktan sonra kişi kartından verilir.
  */
 export function OpenAccountsDialog({
@@ -76,22 +76,17 @@ export function OpenAccountsDialog({
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<Result[] | null>(null);
   const [copied, setCopied] = useState(false);
-  const [extName, setExtName] = useState('');
-  const [extEmail, setExtEmail] = useState('');
 
   useEffect(() => {
     if (!open) return;
     setRows(candidates.filter((p) => initial.includes(p.key)).map(toRow));
     setMethod('invite');
     setResults(null);
-    setExtName('');
-    setExtEmail('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   if (!open) return null;
 
-  const external = rows.some((r) => !r.teacherId);
   const needsEmail = method === 'invite' || method === 'password';
   const emailOk = (r: Row) => EMAIL_RE.test(r.email.trim());
   const ready = method === 'code' ? rows.filter((r) => r.teacherId) : needsEmail ? rows.filter(emailOk) : [];
@@ -115,7 +110,7 @@ export function OpenAccountsDialog({
           });
           out.push({ key: r.key, fullName: r.fullName, email, state: res.existingUser ? 'existing' : res.emailed ? 'emailed' : 'link', value: res.inviteUrl ?? undefined });
         } else {
-          // Kadro dışı kişi ya da geçici şifre: üyelik doğrudan açılır
+          // Geçici şifre: üyelik doğrudan açılır (kadrodaki öğretmen kaydına bağlı)
           const password = method === 'password' ? tempPassword() : undefined;
           const res = await api<{ existingUser: boolean; invite?: { inviteUrl: string; emailed: boolean } | null }>(membersPath, {
             method: 'POST',
@@ -188,7 +183,7 @@ export function OpenAccountsDialog({
 
   const methods: { key: Method; title: string; text: string; disabled?: string }[] = [
     { key: 'invite', title: 'E-posta daveti', text: 'Bağlantı gider, şifresini kendisi belirler. E-postası yoksa aşağıda yazılır.' },
-    { key: 'code', title: 'Giriş kodu', text: 'Kişiye 8 haneli kod verilir; telefondan girer. E-posta gerekmez.', disabled: external ? 'Kadro dışı kişiye giriş kodu verilemez' : undefined },
+    { key: 'code', title: 'Giriş kodu', text: 'Kişiye 8 haneli kod verilir; telefondan girer. E-posta gerekmez.' },
     { key: 'meeting', title: 'Toplantı QR’ı', text: 'Toplantıda ekrana yansıtın; herkes kendi hesabını açar, siz onaylarsınız.' },
     ...(full ? [{ key: 'password' as const, title: 'Geçici şifre', text: 'Şifre üretilir, siz iletirsiniz; ilk girişte değiştirilir.' }] : []),
   ];
@@ -282,7 +277,7 @@ export function OpenAccountsDialog({
                   </div>
                 );
               })}
-              {!rows.length && <p className="py-3 text-sm text-slate-500">Aşağıdan kadrodan kişi ekleyin{full ? ' ya da kadro dışı bir kişi yazın' : ''}.</p>}
+              {!rows.length && <p className="py-3 text-sm text-slate-500">Aşağıdan kadrodan kişi ekleyin.</p>}
             </div>
 
             {(remaining.length > 0 || rows.length > 1) && (
@@ -306,7 +301,7 @@ export function OpenAccountsDialog({
                 )}
               </div>
             )}
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <div className="mt-3">
               <Select
                 value=""
                 onChange={(e) => {
@@ -322,24 +317,6 @@ export function OpenAccountsDialog({
                   </option>
                 ))}
               </Select>
-              {full && method !== 'code' && (
-                <div className="flex gap-2">
-                  <Input value={extName} onChange={(e) => setExtName(e.target.value)} placeholder="Kadro dışı: ad soyad" aria-label="Kadro dışı kişi adı" />
-                  <Input type="email" value={extEmail} onChange={(e) => setExtEmail(e.target.value)} placeholder="e-posta" aria-label="Kadro dışı kişi e-postası" />
-                  <Button
-                    variant="secondary"
-                    icon={<Plus className="size-4" />}
-                    disabled={extName.trim().length < 2}
-                    onClick={() => {
-                      setRows((x) => [...x, { teacherId: null, key: `x:${Date.now()}`, fullName: extName.trim(), sub: 'Kadro dışı', email: extEmail.trim(), rosterEmail: null, role: 'staff' }]);
-                      setExtName('');
-                      setExtEmail('');
-                    }}
-                  >
-                    Ekle
-                  </Button>
-                </div>
-              )}
             </div>
             <p className="mt-3 text-xs text-slate-500">
               Görevler (duyurular, nöbet…) hesap açıldıktan sonra kişi kartından verilir. E-posta başka bir okulda kayıtlıysa kişi bu okula eklenir ve kendi şifresiyle girer.

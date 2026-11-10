@@ -144,7 +144,7 @@ export function ScreenFormatDialog({ screen, onClose }: { screen: Screen | null;
                         disabled={!editable}
                         aria-pressed={on}
                         onClick={() => set({ classIds: on ? d.classIds.filter((x) => x !== c.id) : [...d.classIds, c.id] })}
-                        className={clsx('rounded-full px-3 py-1 text-xs font-bold transition', on ? 'bg-ink text-white' : 'bg-surface text-slate-700 ring-1 ring-slate-200 hover:ring-slate-300')}
+                        className={clsx('rounded-full px-3 py-1 text-xs font-bold transition', on ? 'bg-ink text-surface' : 'bg-surface text-slate-700 ring-1 ring-slate-200 hover:ring-slate-300')}
                       >
                         {c.name}
                       </button>

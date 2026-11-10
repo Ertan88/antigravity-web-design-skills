@@ -168,7 +168,7 @@ export function Issues() {
                 {c.items.map((r) => (
                   <IssueCard key={r.id} issue={r} onOpen={() => setParams({ id: r.id })} />
                 ))}
-                {!c.items.length && <div className="px-2 py-6 text-center text-xs text-slate-400">Boş</div>}
+                {!c.items.length && <div className="px-2 py-6 text-center text-xs text-slate-500">Boş</div>}
               </div>
             </div>
           ))}

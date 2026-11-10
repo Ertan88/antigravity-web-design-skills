@@ -99,7 +99,7 @@ export function MonthGrid({ month, children }: { month: string; children: (day: 
     <div className="p-3 sm:p-4">
       <div className={clsx('hidden gap-2 pb-1.5 lg:grid', WEEK_COLUMNS)}>
         {[1, 2, 3, 4, 5, 6, 7].map((d) => (
-          <span key={d} className={clsx('truncate px-1 text-[11px] font-semibold tracking-wider uppercase', d > 5 ? 'text-slate-300' : 'text-slate-400')}>
+          <span key={d} className={clsx('truncate px-1 text-[11px] font-semibold tracking-wider uppercase', d > 5 ? 'text-slate-400' : 'text-slate-500')}>
             {d > 5 ? WEEKDAY_SHORT[d] : WEEKDAY_NAMES[d]}
           </span>
         ))}

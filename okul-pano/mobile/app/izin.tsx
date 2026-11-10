@@ -296,7 +296,7 @@ function Step({ no, done, title, hint, children }: { no: number; done: boolean; 
     <Card style={{ gap: 10 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
         <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: done ? colors.success : colors.ink, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: 12.5, fontWeight: '800', color: done ? '#ffffff' : colors.onPrimary }}>{no}</Text>
+          <Text style={{ fontSize: 12.5, fontWeight: '800', color: colors.onPrimary }}>{no}</Text>
         </View>
         <Text style={{ fontSize: 15.5, fontWeight: '800', color: colors.ink }}>{title}</Text>
         {hint && <Text style={{ fontSize: 13, fontWeight: '600', color: colors.faint }}>{hint}</Text>}

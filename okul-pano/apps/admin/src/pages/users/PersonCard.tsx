@@ -183,7 +183,7 @@ export function PersonCard({ person, ctx }: { person: Person; ctx: CardContext }
                       onClick={() => setDuty(d.key, !on)}
                       className={clsx(
                         'rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap transition-colors disabled:cursor-not-allowed',
-                        on ? 'bg-ink text-white' : half ? 'bg-amber-50 text-amber-800 ring-1 ring-amber-300' : 'text-slate-600 ring-1 ring-slate-200 enabled:hover:bg-slate-50',
+                        on ? 'bg-ink text-surface' : half ? 'bg-amber-50 text-amber-800 ring-1 ring-amber-300' : 'text-slate-600 ring-1 ring-slate-200 enabled:hover:bg-slate-50',
                       )}
                     >
                       {on ? '✓ ' : half ? '~ ' : '+ '}

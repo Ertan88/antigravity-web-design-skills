@@ -33,7 +33,7 @@ function tempPassword() {
 
 /**
  * Hesap aç (paneldeki tek pencereyle aynı): 1) nasıl giriş yapacaklar (e-posta daveti, giriş kodu, toplantı QR'ı,
- * geçici şifre) 2) kimler (kadrodan ya da kadro dışı) ve rolleri. Görevler hesap açıldıktan sonra kişi ekranından verilir.
+ * geçici şifre) 2) kimler (kadrodan) ve rolleri. Görevler hesap açıldıktan sonra kişi ekranından verilir.
  */
 export default function HesapAc() {
   const { kisi, ogretmen } = useLocalSearchParams<{ kisi?: string; ogretmen?: string }>();
@@ -54,8 +54,6 @@ export default function HesapAc() {
   const [method, setMethod] = useState<Method>('invite');
   const [picking, setPicking] = useState(false);
   const [q, setQ] = useState('');
-  const [extName, setExtName] = useState('');
-  const [extEmail, setExtEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [results, setResults] = useState<Result[] | null>(null);
@@ -78,7 +76,6 @@ export default function HesapAc() {
     );
   }
 
-  const external = rows.some((r) => !r.teacherId);
   const needsEmail = method === 'invite' || method === 'password';
   const emailOk = (r: Row) => EMAIL_RE.test(r.email.trim());
   const ready = method === 'code' ? rows.filter((r) => r.teacherId) : needsEmail ? rows.filter(emailOk) : [];
@@ -198,7 +195,7 @@ export default function HesapAc() {
 
   const methods: { value: Method; label: string; description: string }[] = [
     { value: 'invite', label: 'E-posta daveti', description: 'Bağlantı gider, şifresini kendisi belirler' },
-    { value: 'code', label: 'Giriş kodu', description: external ? 'Kadro dışı kişiye verilemez' : 'Telefondan kodla girer; e-posta gerekmez' },
+    { value: 'code', label: 'Giriş kodu', description: 'Telefondan kodla girer; e-posta gerekmez' },
     { value: 'meeting', label: 'Toplantı QR’ı', description: 'Herkes kendi açar, siz onaylarsınız' },
     ...(ctx.full ? [{ value: 'password' as const, label: 'Geçici şifre', description: 'Şifre üretilir, siz iletirsiniz' }] : []),
   ];
@@ -215,7 +212,7 @@ export default function HesapAc() {
             Toplantı QR’ını göster
           </Button>
         ) : (
-          <Button loading={busy} disabled={!ready.length || invalid || (method === 'code' && external)} onPress={() => void send()}>
+          <Button loading={busy} disabled={!ready.length || invalid} onPress={() => void send()}>
             {sendLabel.charAt(0).toLocaleUpperCase('tr-TR') + sendLabel.slice(1)}
           </Button>
         )
@@ -227,7 +224,7 @@ export default function HesapAc() {
       ) : (
         <>
           <SectionTitle>1 · Nasıl giriş yapacaklar</SectionTitle>
-          <Choice columns={2} value={method} onChange={(v) => (v === 'code' && external ? undefined : setMethod(v))} options={methods} />
+          <Choice columns={2} value={method} onChange={setMethod} options={methods} />
           {method === 'invite' && !ctx.mail && (
             <T size={12.5} color={colors.warning} weight="600">
               E-posta gönderimi ayarlı değil: davetler oluşturulur, bağlantıları sonraki ekranda paylaşırsınız.
@@ -290,28 +287,6 @@ export default function HesapAc() {
               <Button variant="secondary" icon="person-add-outline" onPress={() => setPicking(true)} disabled={!candidates.length}>
                 {candidates.length ? `Kadrodan seç (${rows.filter((r) => r.teacherId).length}/${candidates.length} seçili)` : 'Kadroda hesabı olmayan kalmadı'}
               </Button>
-              {ctx.full && method !== 'code' && (
-                <Card style={{ gap: 8 }}>
-                  <T size={13} weight="800" color={colors.muted}>
-                    KADRO DIŞI KİŞİ (ör. memur)
-                  </T>
-                  <Field label="Ad soyad" value={extName} onChangeText={setExtName} />
-                  <Field label="E-posta" value={extEmail} onChangeText={setExtEmail} keyboardType="email-address" autoCapitalize="none" />
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    icon="add"
-                    disabled={extName.trim().length < 2}
-                    onPress={() => {
-                      setRows((x) => [...x, { key: `x:${Date.now()}`, teacherId: null, fullName: extName.trim(), sub: 'Kadro dışı', email: extEmail.trim(), rosterEmail: null, role: 'staff' }]);
-                      setExtName('');
-                      setExtEmail('');
-                    }}
-                  >
-                    Listeye ekle
-                  </Button>
-                </Card>
-              )}
               <T size={12} color={colors.muted}>
                 Görevler (duyurular, nöbet…) hesap açıldıktan sonra kişi ekranından verilir. E-posta başka bir okulda kayıtlıysa kişi bu okula eklenir ve kendi şifresiyle girer.
               </T>

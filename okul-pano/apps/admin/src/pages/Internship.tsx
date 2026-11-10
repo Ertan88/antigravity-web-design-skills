@@ -503,7 +503,7 @@ export function InternshipSheet() {
         />
       )}
       {undo && (
-        <div className="no-print fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-white shadow-2xl">
+        <div className="no-print fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-surface shadow-2xl">
           {undo.label}
           <button
             type="button"
@@ -556,14 +556,14 @@ function SheetTable({
                 rowSpan={2}
                 className={clsx(
                   "w-[27px] px-px pb-1 text-center font-semibold",
-                  d.weekday >= 6 && "text-slate-300",
+                  d.weekday >= 6 && "text-slate-400",
                 )}
                 title={d.holiday ?? d.halfDay ?? undefined}
               >
                 <span
                   className={clsx(
                     "block text-[13px] font-extrabold",
-                    d.weekday >= 6 ? "text-slate-300" : "text-ink",
+                    d.weekday >= 6 ? "text-slate-400" : "text-ink",
                   )}
                 >
                   {Number(d.date.slice(8))}
@@ -827,7 +827,7 @@ function CellMenu({
             onClick={() => setScope(v)}
             className={clsx(
               "rounded-full px-3 py-1 disabled:opacity-40",
-              scope === v ? "bg-ink text-white" : "bg-slate-100 text-slate-600",
+              scope === v ? "bg-ink text-surface" : "bg-slate-100 text-slate-600",
             )}
           >
             {v === "one"
@@ -842,7 +842,7 @@ function CellMenu({
           onClick={() => setRangeOpen((x) => !x)}
           className={clsx(
             "ml-auto rounded-full px-3 py-1",
-            rangeOpen ? "bg-ink text-white" : "bg-slate-100 text-slate-600",
+            rangeOpen ? "bg-ink text-surface" : "bg-slate-100 text-slate-600",
           )}
         >
           Birkaç gün
@@ -1200,7 +1200,7 @@ export function Businesses() {
               className={clsx(
                 "rounded-full border px-3.5 py-1.5 text-sm font-bold transition-colors",
                 area === c.id
-                  ? "border-ink bg-ink text-white"
+                  ? "border-ink bg-ink text-surface"
                   : "border-slate-200 bg-surface text-slate-700 hover:border-slate-400",
               )}
             >

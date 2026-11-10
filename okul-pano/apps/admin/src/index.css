@@ -145,11 +145,55 @@
   --color-rose-100: rgb(244 63 94 / 0.2);
   --color-rose-200: rgb(244 63 94 / 0.3);
   --color-rose-700: #fda4af;
+
+  /* Mor, pembe ve yeşil: koyu temada açık leke olmasın (zemin yarı saydam, yazı açık) */
+  --color-violet-50: rgb(139 92 246 / 0.12);
+  --color-violet-100: rgb(139 92 246 / 0.2);
+  --color-violet-200: rgb(139 92 246 / 0.3);
+  --color-violet-300: #a78bfa;
+  --color-violet-400: #c4b5fd;
+  --color-violet-700: #c4b5fd;
+  --color-violet-800: #ddd6fe;
+  --color-violet-900: #ede9fe;
+  --color-pink-100: rgb(236 72 153 / 0.2);
+  --color-pink-900: #fbcfe8;
+  --color-green-100: rgb(34 197 94 / 0.2);
+  --color-green-800: #bbf7d0;
+
+  /* Koyu temada eksik kalan tonlar: açık zeminler yarı saydam, koyu yazılar açık */
+  --color-emerald-900: #d1fae5;
+  --color-orange-50: rgb(249 115 22 / 0.12);
+  --color-orange-200: rgb(249 115 22 / 0.3);
+  --color-orange-700: #fdba74;
+  --color-orange-900: #ffedd5;
+  --color-rose-800: #fecdd3;
+  --color-rose-900: #ffe4e6;
+  --color-sky-50: rgb(14 165 233 / 0.12);
+  --color-sky-200: rgb(14 165 233 / 0.3);
+  --color-sky-800: #bae6fd;
+  --color-sky-900: #e0f2fe;
+  --color-teal-900: #ccfbf1;
 }
 
-/* Koyu temada açık krem mürekkep zeminin üstündeki "beyaz" yazı koyu olur (sayfalara ayrı sınıf gerekmez) */
-.dark :is(.bg-brand-500, .bg-brand-600, .bg-brand-700):is(.text-white, [class*='text-white/']),
-.dark :is(.bg-brand-500, .bg-brand-600, .bg-brand-700) :is(.text-white, [class*='text-white/']) {
+/*
+ * Koyu temada açık krem mürekkep zeminin (seçili düğme ve çip, koyu kutular) üstündeki "beyaz" yazı ve beyaz
+ * süsler koyu olur. Sayfalara ayrı sınıf gerekmez; ileride eklenen düğmeler de okunur kalır.
+ */
+.dark :is(.bg-ink, .bg-brand-500, .bg-brand-600, .bg-brand-700, .bg-slate-700, .bg-slate-800):is(.text-white, [class*='text-white/']),
+.dark :is(.bg-ink, .bg-brand-500, .bg-brand-600, .bg-brand-700, .bg-slate-700, .bg-slate-800) :is(.text-white, [class*='text-white/']) {
+  color: #1c1917;
+}
+.dark :is(.bg-ink, .bg-brand-500, .bg-brand-600, .bg-brand-700, .bg-slate-700, .bg-slate-800) .bg-white {
+  background-color: #1c1917;
+}
+.dark :is(.bg-ink, .bg-brand-500, .bg-brand-600, .bg-brand-700, .bg-slate-700, .bg-slate-800) [class*='bg-white/'] {
+  background-color: rgb(28 25 23 / 0.18);
+}
+.dark :is(.bg-ink, .bg-brand-500, .bg-brand-600, .bg-brand-700, .bg-slate-700, .bg-slate-800) :is(.border-white, [class*='border-white/']) {
+  border-color: rgb(28 25 23 / 0.3);
+}
+/* Koyu temada beyaz zeminli küçük düğmeler (ör. kırmızı acil şeridindeki) beyaz kalır: yazıları koyu olur */
+.dark .bg-white:not([class*='dark:']):is(.text-ink, .text-slate-700, .text-slate-800, .text-brand-600, .text-brand-700) {
   color: #1c1917;
 }
 

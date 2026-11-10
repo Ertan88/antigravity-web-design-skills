@@ -88,7 +88,7 @@ export function EmergencyButton() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-red-600 px-3 text-sm font-bold text-white shadow-[0_1px_2px_rgba(220,38,38,0.4)] transition hover:bg-red-700"
+        className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-red-600 px-3 text-sm font-bold text-white shadow-[0_1px_2px_rgba(220,38,38,0.4)] transition hover:bg-[#b91c1c]"
       >
         <Siren className="size-4" />
         <span className="hidden sm:inline">Acil durum</span>
@@ -189,7 +189,7 @@ export function EmergencyBanner() {
             type="button"
             disabled={stop.isPending}
             onClick={() => stop.mutate()}
-            className="ml-auto rounded-lg bg-white px-3 py-1.5 text-sm font-bold text-red-700 shadow transition hover:bg-red-50 disabled:opacity-60"
+            className="ml-auto rounded-lg bg-white px-3 py-1.5 text-sm font-bold text-[#b91c1c] shadow transition hover:bg-red-50 disabled:opacity-60"
           >
             Acil durumu bitir
           </button>

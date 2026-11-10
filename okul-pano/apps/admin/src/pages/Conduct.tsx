@@ -107,7 +107,8 @@ function initials(name: string) {
   const p = name.trim().split(/\s+/);
   return ((p[0]?.[0] ?? '') + (p.length > 1 ? (p[p.length - 1]?.[0] ?? '') : '')).toLocaleUpperCase('tr-TR');
 }
-const AVATAR = ['#6366f1', '#0ea5e9', '#14b8a6', '#f59e0b', '#ec4899', '#8b5cf6', '#22c55e'];
+// Beyaz baş harfler okunsun diye 600 tonları (açık ve koyu temada)
+const AVATAR = ['#4f46e5', '#0284c7', '#0d9488', '#d97706', '#db2777', '#7c3aed', '#16a34a'];
 function Avatar({ name, size = 'size-10' }: { name: string; size?: string }) {
   const n = [...name].reduce((a, c) => a + c.charCodeAt(0), 0);
   return (
