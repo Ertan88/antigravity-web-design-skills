@@ -1,8 +1,9 @@
 import { createSchoolSchema, PLANS, trialStatus, type Plan, errorText } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeftRight, Building2, Check, Download, Inbox, Lock, Plus, Trash2 } from '../components/icons.tsx';
+import { ArrowLeftRight, Building2, Check, Download, Inbox, Lock, Plus, Search, Trash2 } from '../components/icons.tsx';
 import { OwnerTransferDialog, type TransferResult } from '../components/OwnerTransferDialog.tsx';
 import { InviteDialog, type InviteResult } from './users/Credentials.tsx';
+import { AccountFinderDialog } from './platform/AccountFinder.tsx';
 import { useState } from 'react';
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Badge, Button, Card, EmptyState, Field, IconButton, Input, Modal, PageHeader, Select, Spinner, Table, Td, Toggle } from '../components/ui.tsx';
@@ -54,6 +55,7 @@ export function Platform() {
   const [confirmSlug, setConfirmSlug] = useState('');
   const [ownerOf, setOwnerOf] = useState<Row | null>(null);
   const [invited, setInvited] = useState<InviteResult | null>(null);
+  const [finding, setFinding] = useState(false);
   const form = useForm<Form>(empty);
   const v = form.values;
 
@@ -120,15 +122,20 @@ export function Platform() {
         title="Okullar ve Abonelikler"
         description="Platformdaki tüm okulların kayıt ve abonelik bilgileri. Okulların içeriğini (öğretmen, öğrenci, nöbet…) yalnızca kendi okulunuzda ya da okul yöneticisinin süreli destek erişimi verdiği okullarda açabilirsiniz (KVKK)."
         actions={
-          <Button
-            icon={<Plus className="size-4" />}
-            onClick={() => {
-              form.reset(empty);
-              setOpen(true);
-            }}
-          >
-            Yeni okul
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" icon={<Search className="size-4" />} onClick={() => setFinding(true)}>
+              Hesap bul
+            </Button>
+            <Button
+              icon={<Plus className="size-4" />}
+              onClick={() => {
+                form.reset(empty);
+                setOpen(true);
+              }}
+            >
+              Yeni okul
+            </Button>
+          </div>
         }
       />
       {(signups.data?.length ?? 0) > 0 && (
@@ -299,6 +306,7 @@ export function Platform() {
         }}
       />
       <InviteDialog value={invited} onClose={() => setInvited(null)} />
+      <AccountFinderDialog open={finding} onClose={() => setFinding(false)} onChanged={() => void qc.invalidateQueries({ queryKey: ['platform'] })} />
 
       <Modal
         open={deleting !== null}

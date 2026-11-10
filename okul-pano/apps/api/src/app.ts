@@ -32,6 +32,7 @@ import { notificationRoutes } from './routes/notifications.ts';
 import { memberRoutes } from './routes/members.ts';
 import { enrollRoutes } from './routes/enroll.ts';
 import { loadPlatformMail, platformSettingsRoutes } from './routes/platformSettings.ts';
+import { platformAccountsRoutes } from './routes/platformAccounts.ts';
 import { runExamReminders } from './lib/examReminders.ts';
 import { controlRoutes } from './routes/control.ts';
 import { meRoutes } from './routes/me.ts';
@@ -132,6 +133,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   await app.register(examScheduleRoutes);
   await app.register(issueRoutes);
   await app.register(platformSettingsRoutes);
+  await app.register(platformAccountsRoutes);
   // Panelden girilmiş e-posta ayarı (ortam değişkeni yoksa kullanılır)
   await loadPlatformMail(deps).catch((err) => app.log.error(err, 'e-posta ayarı okunamadı'));
 
