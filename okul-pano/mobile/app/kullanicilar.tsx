@@ -16,8 +16,8 @@ type Tab = 'people' | 'duties';
 const dutyLabel = Object.fromEntries(DUTY_PACKAGES.map((d) => [d.key, d.label])) as Record<DutyKey, string>;
 
 /**
- * Kişiler ve Yetkiler (panelle aynı): kadrodaki öğretmenler ve kadro dışı kişiler tek listede; kişiye dokununca kişi
- * ekranı açılır. Görevler sekmesi iş bölümünü gösterir. Hesap tek "Hesap aç" ekranından açılır.
+ * Kişiler ve Yetkiler (panelle aynı): kadrodaki öğretmenler ve kadro dışı kişiler tek listede; satıra dokunmak bir şey
+ * açmaz, kişinin ekranı yalnızca sağdaki kalemle (Düzenle) açılır. Görevler sekmesi iş bölümünü gösterir. Hesap tek "Hesap aç" ekranından açılır.
  */
 export default function Kisiler() {
   const { filtre } = useLocalSearchParams<{ filtre?: string }>();
@@ -135,11 +135,7 @@ function PersonRow({ p, last, onPress }: { p: Person; last: boolean; onPress: ()
   const st = PERSON_STATUS[p.status];
   const duties = p.role === 'owner' || p.role === 'admin' ? 'Tüm bölümler' : p.duties.map((d) => dutyLabel[d]).join(', ');
   return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, borderBottomWidth: last ? 0 : 1, borderBottomColor: colors.border, opacity: pressed ? 0.7 : 1 })}
-    >
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, borderBottomWidth: last ? 0 : 1, borderBottomColor: colors.border }}>
       <Avatar name={p.fullName} size={40} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={{ fontSize: 15, fontWeight: '800', color: colors.ink }} numberOfLines={1}>
@@ -155,7 +151,16 @@ function PersonRow({ p, last, onPress }: { p: Person; last: boolean; onPress: ()
           <Text style={{ fontSize: 11, fontWeight: '700', color: colors.warning }}>Öneri bekliyor</Text>
         )}
       </View>
-    </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${p.fullName} düzenle`}
+        onPress={onPress}
+        hitSlop={8}
+        style={({ pressed }) => ({ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, backgroundColor: pressed ? colors.primarySoft : colors.card })}
+      >
+        <Icon name="create-outline" size={18} color={colors.muted} />
+      </Pressable>
+    </View>
   );
 }
 

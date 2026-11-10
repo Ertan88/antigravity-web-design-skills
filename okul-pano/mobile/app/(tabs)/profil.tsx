@@ -282,6 +282,7 @@ export default function Menu() {
       managerial && { title: 'Platforma yaz', subtitle: 'Okul Yayın ekibine sorun, öneri ya da soru', icon: 'lifebuoy', to: '/platforma-yaz' },
     ]);
     add('Yönetim', [
+      can('directory.manage') && { title: 'Öğretmen kadrosu', subtitle: 'Ad, branş, ünvan, iletişim · ekle, düzenle', icon: 'school-outline', to: '/kadro' },
       (can('users.manage') || can('accounts.enroll')) && {
         title: 'Kişiler ve yetkiler',
         subtitle: can('users.manage') ? 'Hesap aç · rol ve görev ver · iş bölümü' : 'Öğretmen hesabı aç · onay bekleyenler',

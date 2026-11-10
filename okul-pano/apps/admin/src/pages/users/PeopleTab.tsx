@@ -1,7 +1,7 @@
 import { DUTY_PACKAGES, normalizeName } from '@okulpano/shared';
 import clsx from 'clsx';
 import { useEffect, useState } from 'react';
-import { Check, Search, Users as UsersIcon } from '../../components/icons.tsx';
+import { Check, Pencil, Search, Users as UsersIcon } from '../../components/icons.tsx';
 import { Badge, Button, Card, EmptyState, Input, Modal } from '../../components/ui.tsx';
 import { Avatar, PersonCard, RolePill, type CardContext } from './PersonCard.tsx';
 import { STATUS, type Person } from './people.ts';
@@ -23,7 +23,7 @@ function useWide() {
   return wide;
 }
 
-/** Kişiler: kadro ve kadro dışı hesaplar tek listede; tıklanan kişinin kartı sağda (A) */
+/** Kişiler: kadro ve kadro dışı hesaplar tek listede; satır bir şey açmaz, kişinin kartı yalnızca kalemle (Düzenle) açılır */
 export function PeopleTab({
   people,
   ctx,
@@ -57,8 +57,8 @@ export function PeopleTab({
     if (filter === 'management' && !(p.role === 'owner' || p.role === 'admin')) return false;
     return !needle || normalizeName(`${p.fullName} ${p.sub} ${p.email ?? ''} ${p.duties.map((d) => dutyLabel[d]).join(' ')}`).includes(needle);
   });
-  // Geniş ekranda ilk kişi seçili gelir; seçim listeden düşerse ilk kişiye geçer
-  const selected = people.find((p) => p.key === selectedKey) ?? (wide ? visible[0] : undefined);
+  // Kişinin kartı (iletişim bilgileri dahil) yalnızca kalemle açılır; kendiliğinden seçim yapılmaz
+  const selected = people.find((p) => p.key === selectedKey);
 
   const filters: { key: Filter; label: string }[] = [
     { key: 'all', label: 'Tümü' },
@@ -108,11 +108,7 @@ export function PeopleTab({
                 const on = selected?.key === p.key;
                 return (
                   <li key={p.key}>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedKey(p.key)}
-                      className={clsx('flex w-full items-center gap-3 px-4 py-3 text-left transition-colors sm:px-5', on ? 'bg-slate-50 shadow-[inset_3px_0_0_var(--color-ink)]' : 'hover:bg-slate-50/70')}
-                    >
+                    <div className={clsx('flex w-full items-center gap-3 px-4 py-3 text-left sm:px-5', on && 'bg-slate-50 shadow-[inset_3px_0_0_var(--color-ink)]')}>
                       <Avatar name={p.fullName} />
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-semibold text-ink">{p.fullName}</div>
@@ -138,7 +134,19 @@ export function PeopleTab({
                         <Badge tone={STATUS[p.status].tone}>{STATUS[p.status].label}</Badge>
                         {p.member?.promotionRequest && <div className="mt-1 text-[11px] font-semibold text-amber-700">Öneri bekliyor</div>}
                       </div>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedKey(p.key)}
+                        aria-label={`${p.fullName} düzenle`}
+                        title="Düzenle"
+                        className={clsx(
+                          'inline-flex size-9 shrink-0 items-center justify-center rounded-lg ring-1 transition-colors',
+                          on ? 'bg-ink text-surface ring-ink' : 'bg-surface text-slate-500 ring-slate-200 hover:bg-brand-50 hover:text-brand-700 hover:ring-brand-200',
+                        )}
+                      >
+                        <Pencil className="size-4" />
+                      </button>
+                    </div>
                   </li>
                 );
               })}
@@ -146,11 +154,20 @@ export function PeopleTab({
           )}
         </Card>
 
-        {wide && selected && (
-          <Card className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto p-6">
-            <PersonCard key={selected.key} person={selected} ctx={ctx} />
-          </Card>
-        )}
+        {wide &&
+          (selected ? (
+            <Card className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto p-6">
+              <PersonCard key={selected.key} person={selected} ctx={ctx} />
+            </Card>
+          ) : (
+            <Card className="sticky top-20 flex flex-col items-center gap-2 p-8 text-center">
+              <span className="inline-flex size-11 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                <Pencil className="size-5" />
+              </span>
+              <div className="font-semibold text-ink">Kişiyi düzenlemek için kaleme basın</div>
+              <p className="text-sm text-slate-500">Rol, görevler, hesap ve iletişim bilgileri burada açılır.</p>
+            </Card>
+          ))}
       </div>
 
       {!wide && (

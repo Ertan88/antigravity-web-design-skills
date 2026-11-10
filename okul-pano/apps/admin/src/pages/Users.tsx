@@ -106,7 +106,7 @@ export function Users() {
     <>
       <PageHeader
         title="Kişiler ve Yetkiler"
-        description="Kadrodaki öğretmenler ve kadro dışı kişiler tek listede. Bir kişiye tıklayın; rolünü, görevlerini ve hesabını yanda düzenleyin."
+        description="Kadrodaki öğretmenler ve kadro dışı kişiler tek listede. Kişinin yanındaki kaleme basın; rolünü, görevlerini ve hesabını yanda düzenleyin."
         actions={
           <div className="flex flex-wrap gap-2">
             {full && (
