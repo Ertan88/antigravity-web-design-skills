@@ -36,24 +36,20 @@ function initials(name: string): string {
 export function TeacherCard({
   teacher,
   editable,
-  onOpen,
   onEdit,
   onDelete,
 }: {
   teacher: Teacher;
   editable: boolean;
-  /** Karta tıklayınca bütün bilgiler (iletişim dahil) pencerede açılır */
-  onOpen?: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   return (
+    // Karta tıklamak bir şey açmaz: iletişim bilgileri dahil bütün bilgiler yalnızca "Düzenle" ile açılır
     <article
-      onClick={onOpen}
       className={clsx(
         'group relative flex min-w-0 gap-3 rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-slate-200/70 transition-shadow hover:shadow-md',
         !teacher.isActive && 'bg-slate-50',
-        onOpen && 'cursor-pointer',
       )}
     >
       <div

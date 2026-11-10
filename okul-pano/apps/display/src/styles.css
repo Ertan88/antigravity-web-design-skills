@@ -3364,15 +3364,6 @@ body.cursor-hidden * {
   background: color-mix(in srgb, #fbbf24 20%, transparent);
 }
 
-.exam-when {
-  color: #fbbf24;
-  font-weight: 700;
-}
-
-.theme-light .exam-when {
-  color: #b45309;
-}
-
 .exam-later {
   flex: none;
   display: grid;

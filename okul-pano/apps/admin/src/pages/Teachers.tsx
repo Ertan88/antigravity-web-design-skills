@@ -258,7 +258,7 @@ export function Teachers() {
           ) : (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] gap-3">
               {visible.map((t) => (
-                <TeacherCard key={t.id} teacher={t} editable={editable} onOpen={editable ? () => openEdit(t) : undefined} onEdit={() => openEdit(t)} onDelete={() => setDeleting(t)} />
+                <TeacherCard key={t.id} teacher={t} editable={editable} onEdit={() => openEdit(t)} onDelete={() => setDeleting(t)} />
               ))}
             </div>
           )}

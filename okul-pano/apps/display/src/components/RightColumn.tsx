@@ -125,10 +125,9 @@ export function BellCard({ status, day }: { status: BellStatus; day?: BellDayCon
 
 /** Şu an derste / sıradaki ders: sınıf etiketi, ders adı (gerekirse iki satır) ve altında öğretmen(ler) */
 type ScheduledExam = NonNullable<DisplayState['scheduledExams']>[number];
-const EXAM_ROW_LABEL: Record<ScheduledExam['kind'], string> = { written: 'Yazılı sınav', practical: 'Uygulama sınavı', common: 'Ortak sınav' };
 
 /**
- * Şu an derste (teneffüste: sıradaki ders). Sınavı olan sınıfın satırı vurgulanır ("Yazılı sınav · öğretmen") ve
+ * Şu an derste (teneffüste: sıradaki ders). Sınavı olan sınıfın satırı vurgulanır (SINAV etiketi) ve
  * listenin başına alınır; başlıkta kaç sınıfta sınav olduğu yazar. Altta, bugün daha sonraki sınavlar ders
  * saatine göre tek satırlarda (aynı kademenin aynı sınavı "9. sınıflar Matematik" diye toplanır).
  */
@@ -183,16 +182,8 @@ export function LessonsCard({
               <ClassBadge name={e.className} />
               <span className="lesson-info">
                 <span className="lesson-subject">{e.subject}</span>
-                {(x || e.teacherName) && (
-                  <span className="lesson-teacher">
-                    {x && (
-                      // Saat kartın başlığında ve zil kartında: satırda yalnızca sınavın türü
-                      <span className="exam-when">{EXAM_ROW_LABEL[x.kind]}</span>
-                    )}
-                    {x && e.teacherName ? ' · ' : ''}
-                    {e.teacherName}
-                  </span>
-                )}
+                {/* Sınav satırında da öğretmen adı tam görünür: sınavı SINAV etiketi ve satırın rengi söyler */}
+                {e.teacherName && <span className="lesson-teacher">{e.teacherName}</span>}
               </span>
               {x && <span className="exam-badge">Sınav</span>}
             </div>
