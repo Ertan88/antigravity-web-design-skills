@@ -353,12 +353,11 @@ function ExamRow({ exam: e, teacherId, first, sub }: { exam: ScheduledExam; teac
             {labelOf(e)}
           </T>
         )}
-        {/* Gözetmenler alt alta */}
+        {/* Gözetmenler alt alta; her satır "Gözetmen:" ile başlar, adlar aynı hizada */}
         {proctors.length ? (
-          proctors.map((p, i) => (
+          proctors.map((p) => (
             <T key={p.teacherId} size={12.5} color={colors.muted}>
-              {i === 0 ? 'Gözetmen: ' : '                  '}
-              {p.teacherId === teacherId ? <Me>{`${p.fullName} (siz)`}</Me> : p.fullName}
+              Gözetmen: {p.teacherId === teacherId ? <Me>{`${p.fullName} (siz)`}</Me> : p.fullName}
             </T>
           ))
         ) : (

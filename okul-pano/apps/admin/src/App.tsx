@@ -1,9 +1,9 @@
 import type { Permission } from '@okulpano/shared';
 import { ArrowRight, Loader2, Lock, SearchX } from './components/icons.tsx';
-import { lazy, type ComponentType, type ReactNode } from 'react';
+import { lazy, useState, type ComponentType, type ReactNode } from 'react';
 import { Link, Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout.tsx';
-import { EmptyState } from './components/ui.tsx';
+import { Button, EmptyState } from './components/ui.tsx';
 import { useAuth } from './lib/auth.tsx';
 import { Dashboard } from './pages/Dashboard.tsx';
 import { Login } from './pages/Login.tsx';
@@ -104,6 +104,9 @@ export function App() {
 
   return (
     <Routes>
+      {/* Davet ve doğrulama bağlantıları oturum açıkken de açılır: başka hesapla girilmişse önce çıkış önerilir */}
+      <Route path="davet" element={<SignedInLink kind="invite" />} />
+      <Route path="dogrula" element={<SignedInLink kind="verify" />} />
       <Route element={<Layout />}>
         <Route index element={needsSchool(<Dashboard />)} />
         <Route path="duyurular" element={needsSchool(<Guard permission="announcements.manage"><Announcements /></Guard>)} />
@@ -149,5 +152,39 @@ export function App() {
         />
       </Route>
     </Routes>
+  );
+}
+
+/**
+ * Oturum açıkken davet (ya da e-posta doğrulama) bağlantısı açıldı: bağlantı yeni bir hesap içindir. Çıkış yapılınca
+ * aynı adreste davet sayfası açılır (adres korunur).
+ */
+function SignedInLink({ kind }: { kind: 'invite' | 'verify' }) {
+  const { me, logout } = useAuth();
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="flex min-h-dvh items-center justify-center bg-slate-50 p-4">
+      <div className="w-full max-w-md rounded-3xl bg-surface p-7 text-center ring-1 ring-slate-200">
+        <h1 className="text-xl font-extrabold tracking-tight text-ink">{kind === 'invite' ? 'Davet bağlantısı' : 'E-posta doğrulama bağlantısı'}</h1>
+        <p className="mt-2 text-sm leading-relaxed text-slate-500">
+          Bu tarayıcıda şu an <strong className="text-ink">{me?.user.email}</strong> hesabıyla giriş yapılmış. Bağlantı başka bir hesap içinse önce çıkış yapın;
+          {kind === 'invite' ? ' ardından şifre belirleme sayfası açılır.' : ' ardından doğrulama tamamlanır.'}
+        </p>
+        <div className="mt-6 flex flex-col gap-2">
+          <Button
+            loading={busy}
+            onClick={async () => {
+              setBusy(true);
+              await logout();
+            }}
+          >
+            Çıkış yap ve bağlantıyı aç
+          </Button>
+          <Link to="/" className="text-sm font-semibold text-slate-500 hover:text-ink">
+            Vazgeç, panele dön
+          </Link>
+        </div>
+      </div>
+    </div>
   );
 }

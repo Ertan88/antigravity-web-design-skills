@@ -243,7 +243,7 @@ function ExamRow({ e, onOpen, sub }: { e: ScheduledExam; onOpen?: (e: ScheduledE
       <td className="px-3 py-2.5 text-slate-600">
         {e.proctors.length
           ? e.proctors.map((p) => (
-              <span key={p.teacherId} className={clsx('mr-2', p.onLeave && 'text-rose-600 line-through')}>
+              <span key={p.teacherId} className={clsx('block', p.onLeave && 'text-rose-600 line-through')}>
                 {p.fullName}
               </span>
             ))
@@ -967,7 +967,9 @@ function ExamImportDialog({ file, onClose }: { file: File | null; onClose: () =>
                       <td className="px-3 py-2">
                         <KindPill kind={r.kind} />
                       </td>
-                      <td className="px-3 py-2 text-slate-600">{r.proctors.join(', ') || '—'}</td>
+                      <td className="px-3 py-2 text-slate-600">
+                        {r.proctors.length ? r.proctors.map((p) => <span key={p} className="block">{p}</span>) : '—'}
+                      </td>
                       <td className="px-3 py-2 text-xs text-slate-500">
                         {r.exists && <Badge tone="blue">güncellenecek</Badge>} {r.messages.join(' · ')}
                       </td>

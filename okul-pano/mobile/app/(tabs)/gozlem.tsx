@@ -288,7 +288,7 @@ function ClassPicker({
       <T size={12.5} color={colors.faint}>
         Okuldaki her sınıfa puan verebilirsiniz (ör. nöbette koridorda gördüğünüz davranış).
       </T>
-      <ScrollView style={{ marginTop: 12 }} contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 8 }}>
+      <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 12 }} contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 8 }}>
         {classes.map((c) => {
           const on = c.id === current;
           return (
@@ -369,7 +369,7 @@ function EntrySheet({
           </Text>
         </View>
       </View>
-      <ScrollView style={{ marginTop: 6 }} keyboardShouldPersistTaps="handled">
+      <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 6 }} keyboardShouldPersistTaps="handled">
         {!criteria.length && <T color={colors.faint}>Bu sınıfın düzeyi için kriter tanımlanmamış. Okul yönetimi panelden Gözlem Kriterleri'ni eklemeli.</T>}
         {groups.map(({ g, items }) => (
           <View key={g}>

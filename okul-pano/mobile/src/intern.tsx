@@ -85,7 +85,7 @@ export const LEGEND_BAND: [string, string][] = [
 
 export function LegendBand() {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
+    <ScrollView showsVerticalScrollIndicator={false} horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
       {LEGEND_BAND.map(([k, text]) => {
         const t = TONE[k] ?? { bg: colors.primarySoft, fg: colors.ink };
         return (
@@ -309,7 +309,7 @@ export function SendSheet({ rows, onClose, onSent }: { rows: PendingMark[]; onCl
       <T size={12.5} color={colors.faint} style={{ marginTop: 4 }}>
         Kontrol edip göndermek istediklerinizi seçin; seçmedikleriniz sonra gönderilmek üzere bekler.
       </T>
-      <ScrollView style={{ maxHeight: 300, marginTop: 10 }}>
+      <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 300, marginTop: 10 }}>
         {groups.map((g) => {
           const r = g.list[0]!;
           const on = !off.has(g.key);
@@ -429,7 +429,7 @@ export function FillSheet({
           <T size={11.5} weight="800" color={colors.faint} style={{ marginTop: 12, marginBottom: 6 }}>
             HANGİ ÖĞRENCİLER
           </T>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+          <ScrollView showsVerticalScrollIndicator={false} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
             {[{ id: '', name: 'Bütün işletmelerim' }, ...businesses].map((b) => (
               <Pressable key={b.id || 'all'} accessibilityRole="radio" accessibilityState={{ selected: biz === b.id }} onPress={() => setBiz(b.id)} style={[opt(biz === b.id), { paddingVertical: 7 }]}>
                 <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.ink }}>{b.name}</Text>

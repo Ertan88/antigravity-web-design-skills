@@ -202,7 +202,7 @@ function InfoSheet({ business, onClose, onSaved }: { business: Business | null; 
           Alanı öğretmen kadrosundaki branşınızdan gelir; koordinatörü siz olursunuz. Öğrencileri yönetim panelinden seçebilirsiniz.
         </T>
       )}
-      <ScrollView style={{ maxHeight: 440 }} contentContainerStyle={{ gap: 10 }} keyboardShouldPersistTaps="handled">
+      <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 440 }} contentContainerStyle={{ gap: 10 }} keyboardShouldPersistTaps="handled">
         {INFO_FIELDS.map((f) => (
           <Field
             key={f.key}

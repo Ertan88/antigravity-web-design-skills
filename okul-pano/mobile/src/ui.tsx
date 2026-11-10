@@ -139,7 +139,7 @@ export function Screen({
       {/* Klavye açılınca içerik kısalır (Android kenardan kenara çizimde pencere küçülmez) ve odaktaki kutu görünür kalır */}
       <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }} enabled={Platform.OS !== 'web'}>
       {scroll ? (
-        <ScrollView
+        <ScrollView showsVerticalScrollIndicator={false}
           ref={scroller}
           style={{ flex: 1 }}
           scrollEventThrottle={100}

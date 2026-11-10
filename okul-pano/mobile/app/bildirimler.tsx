@@ -158,7 +158,7 @@ function Detail({ n, to, onClose, onUnread }: { n: InboxItem; to?: string; onClo
         </View>
         {n.resolvedAt && <Badge tone="success">Tamam</Badge>}
       </View>
-      <ScrollView style={{ maxHeight: 360, marginTop: 14 }}>
+      <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 360, marginTop: 14 }}>
         <Text selectable style={{ fontSize: 15, lineHeight: 22, color: colors.ink }}>
           {n.body}
         </Text>
