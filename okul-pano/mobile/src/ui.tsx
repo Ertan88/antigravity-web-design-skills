@@ -57,24 +57,30 @@ export function Screen({
   const scroller = useRef<ComponentRef<typeof ScrollView>>(null);
   const viewH = useRef(0);
   const contentH = useRef(0);
-  // Konum ancak içerik o konuma kaydırılabilecek kadar uzadığında geri yüklenir; daha önce kaydırılırsa
-  // ScrollView en alttaki uygun yere sıkıştırır ve ekran yukarı kaymış görünür
-  const tryRestore = () => {
-    if (!scrollRestore.has(path) || !viewH.current) return;
-    const y = scrollMemory.get(path) ?? 0;
-    if (contentH.current - viewH.current < y - 1) return;
+  // Tema değişince ekran yeniden kurulur ve saklı konuma dönülür. İçerik birkaç adımda yerine oturur (sonradan
+  // gelen veriler, üstteki kartlar); o yüzden kısa bir süre boyunca içerik her değiştiğinde konum yeniden uygulanır.
+  // Böylece ekran bırakıldığı yerde kalır. Kullanıcı bu sırada kendisi kaydırırsa geri yükleme hemen biter.
+  const settling = useRef(false);
+  const target = useRef(0);
+  if (scrollRestore.has(path) && !settling.current) {
+    settling.current = true;
+    target.current = scrollMemory.get(path) ?? 0;
     scrollRestore.delete(path);
-    scroller.current?.scrollTo({ y, animated: false });
+  }
+  const tryRestore = () => {
+    if (!settling.current || !viewH.current) return;
+    const max = Math.max(0, contentH.current - viewH.current);
+    scroller.current?.scrollTo({ y: Math.min(target.current, max), animated: false });
   };
   useEffect(() => {
-    // İçerik bir daha uzamazsa (ör. veri değişti) en geç bir saniye sonra elden gelen en yakın yere kaydırılır
-    if (!scrollRestore.has(path)) return;
+    if (!settling.current) return;
     const t = setTimeout(() => {
-      if (!scrollRestore.has(path)) return;
-      scrollRestore.delete(path);
-      scroller.current?.scrollTo({ y: scrollMemory.get(path) ?? 0, animated: false });
-    }, 1000);
+      tryRestore();
+      settling.current = false;
+      scrollMemory.set(path, Math.min(target.current, Math.max(0, contentH.current - viewH.current)));
+    }, 1500);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path]);
   // Klavye açılınca odaktaki yazı kutusu klavyenin üstünde kalacak şekilde kaydırılır
   useEffect(() => {
@@ -144,14 +150,18 @@ export function Screen({
           style={{ flex: 1 }}
           scrollEventThrottle={100}
           onScroll={(e) => {
-            // Geri yükleme beklenirken gelen kaydırma olayları (yeniden kurulumdaki 0 gibi) saklı konumu ezmesin
-            if (!scrollRestore.has(path)) scrollMemory.set(path, e.nativeEvent.contentOffset.y);
+            // Geri yükleme sürerken gelen kaydırma olayları (yeniden kurulumdaki 0 gibi) saklı konumu ezmesin
+            if (!settling.current) scrollMemory.set(path, e.nativeEvent.contentOffset.y);
+          }}
+          onScrollBeginDrag={() => {
+            // Kullanıcı kaydırmaya başladı: geri yükleme biter, artık onun konumu geçerli
+            settling.current = false;
           }}
           onMomentumScrollEnd={(e) => {
-            if (!scrollRestore.has(path)) scrollMemory.set(path, e.nativeEvent.contentOffset.y);
+            if (!settling.current) scrollMemory.set(path, e.nativeEvent.contentOffset.y);
           }}
           onScrollEndDrag={(e) => {
-            if (!scrollRestore.has(path)) scrollMemory.set(path, e.nativeEvent.contentOffset.y);
+            if (!settling.current) scrollMemory.set(path, e.nativeEvent.contentOffset.y);
           }}
           onLayout={(e) => {
             viewH.current = e.nativeEvent.layout.height;
