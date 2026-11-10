@@ -304,10 +304,26 @@ export async function enrollRoutes(app: FastifyInstance) {
 
   /** Kadroda e-postası olan öğretmene davet bağlantısı (şifresini kendisi belirler). E-posta başka okulda kayıtlıysa üyelik eklenir. */
   app.post(`${base}/invite`, manage, async (req) => {
-    const body = parse(z.object({ teacherId: z.uuid(), role: z.enum(['admin', 'teacher', 'counselor']).default('teacher') }), req.body);
+    const body = parse(
+      z.object({
+        teacherId: z.uuid(),
+        role: z.enum(['admin', 'teacher', 'counselor']).default('teacher'),
+        /** Kadroda e-posta yoksa ya da değiştirilecekse: davetle birlikte kadro kartına yazılır */
+        email: z.email('Geçerli bir e-posta girin').max(160).optional(),
+      }),
+      req.body,
+    );
     checkRole(req, body.role);
-    const [t] = await db.select().from(teachers).where(and(eq(teachers.id, body.teacherId), eq(teachers.schoolId, req.ctx.schoolId)));
-    if (!t) throw notFound('Öğretmen bulunamadı.');
+    const [found] = await db.select().from(teachers).where(and(eq(teachers.id, body.teacherId), eq(teachers.schoolId, req.ctx.schoolId)));
+    if (!found) throw notFound('Öğretmen bulunamadı.');
+    let t = found;
+    const typed = body.email?.trim().toLowerCase();
+    if (typed && typed !== t.email) {
+      if ((await linkedTeacherIds(req.ctx.schoolId)).has(t.id)) throw conflict(`${t.fullName} için zaten bir hesap var.`);
+      const [updated] = await db.update(teachers).set({ email: typed }).where(eq(teachers.id, t.id)).returning();
+      t = updated!;
+      await audit(req, 'update', 'Öğretmen', t.id, `${t.fullName} e-postası davetle kaydedildi`);
+    }
     if (!t.email) throw badRequest(`${t.fullName} için kadroda e-posta yok. Giriş kodu verin.`);
     if ((await linkedTeacherIds(req.ctx.schoolId)).has(t.id)) throw conflict(`${t.fullName} için zaten bir hesap var.`);
     const m = roleToMembership(body.role);

@@ -9,6 +9,7 @@ import { Alert, Badge, Button, Card, EmptyState, Input, Modal, Segmented, Select
 import { api } from '../../lib/api.ts';
 import { useAuth } from '../../lib/auth.tsx';
 import { useList, useSchool, useSchoolPath, type TeacherOption } from '../../lib/data.ts';
+import { RosterInviteDialog, type InviteRow } from './RosterInvite.tsx';
 
 interface RosterRow {
   teacherId: string;
@@ -87,6 +88,7 @@ export function RosterTab() {
   const [meeting, setMeeting] = useState<{ url: string; expiresAt: string } | null>(null);
   const [mapping, setMapping] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [inviting, setInviting] = useState<InviteRow[] | null>(null);
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: [schoolId, 'enrollments'] });
@@ -118,7 +120,7 @@ export function RosterTab() {
     return !needle || normalizeName(`${r.t.fullName} ${r.t.branch ?? ''} ${r.t.title ?? ''}`).includes(needle);
   });
   const chosen = rows.filter((r) => selected.has(r.t.id));
-  const invitable = chosen.filter((r) => (r.status === 'none' || r.status === 'code') && r.t.email);
+  const invitable = chosen.filter((r) => r.status === 'none' || r.status === 'code');
   const approvable = chosen.filter((r) => r.status === 'pending');
   const toggle = (id: string) => setSelected((s) => (s.has(id) ? new Set([...s].filter((x) => x !== id)) : new Set([...s, id])));
   const selectable = (r: (typeof rows)[number]) => r.status !== 'account' && r.status !== 'invited';
@@ -163,27 +165,17 @@ export function RosterTab() {
     refresh();
   };
 
-  /** Kadroda e-postası olanlara davet bağlantısı: öğretmen şifresini bağlantıdan kendisi belirler */
-  const invite = async () => {
-    if (!enroll.data?.mail) {
-      toast.error('Sunucuda e-posta gönderimi ayarlı değil. Giriş kodu ya da toplantı QR\'ı kullanın.');
-      return;
-    }
-    setBusy(true);
-    let ok = 0;
-    for (const r of invitable) {
-      try {
-        await api(`${enrollPath}/invite`, { method: 'POST', body: { teacherId: r.t.id, role: r.role } });
-        ok++;
-      } catch (err) {
-        toast.error(`${r.t.fullName}: ${errorText(err, 'gönderilemedi')}`);
-      }
-    }
-    setBusy(false);
-    setSelected(new Set());
-    refresh();
-    if (ok) toast.success(`${ok} öğretmene davet e-postası gönderildi`);
-  };
+  /** Davet penceresi: seçilenlerden hesabı olmayanlar (e-postası kadroda yoksa pencerede yazılır) */
+  const openInvite = () =>
+    setInviting(
+      invitable.map((r) => ({
+        teacherId: r.t.id,
+        fullName: r.t.fullName,
+        sub: [r.t.title, r.t.branch].filter(Boolean).join(' · ') || 'Ünvan girilmemiş',
+        email: r.t.email,
+        role: r.role,
+      })),
+    );
 
   if (enroll.isLoading) return <Spinner />;
 
@@ -285,17 +277,29 @@ export function RosterTab() {
                 Onayla ({approvable.length})
               </Button>
             )}
-            <Button size="sm" icon={<Mail className="size-4" />} loading={busy} disabled={!invitable.length} onClick={() => void invite()}>
+            <Button size="sm" icon={<Mail className="size-4" />} disabled={!invitable.length} onClick={openInvite}>
               Davet gönder ({invitable.length})
             </Button>
           </div>
         )}
       </Card>
       <p className="mt-3 text-xs text-slate-500">
-        Davet yalnızca kadroda e-postası olan öğretmene gider. E-postası olmayan öğretmene “Giriş kodu” verin ya da toplantıda “Toplantı QR'ı”nı gösterin: öğretmen
+        Davet için öğretmenleri seçip “Davet gönder”e basın; kadroda e-postası olmayanın e-postasını açılan pencerede yazabilirsiniz. E-postasını bilmediğiniz öğretmene “Giriş kodu” verin ya da toplantıda “Toplantı QR'ı”nı gösterin: öğretmen
         e-postasını doğrulayıp şifresini kendisi belirler, doğrulanan e-posta kadro kartına yazılır.
       </p>
 
+      <RosterInviteDialog
+        rows={inviting}
+        onClose={() => setInviting(null)}
+        onDone={() => {
+          setSelected(new Set());
+          refresh();
+        }}
+        enrollPath={enrollPath}
+        full={full}
+        isOwner={isOwner}
+        mail={Boolean(enroll.data?.mail)}
+      />
       <CodeDialog value={code} onClose={() => setCode(null)} />
       <MeetingDialog value={meeting} onClose={() => setMeeting(null)} onStop={() => void closeMeeting()} />
       <TitleRoleDialog

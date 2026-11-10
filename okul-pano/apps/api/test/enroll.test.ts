@@ -184,3 +184,20 @@ describe('dar yetki: Öğretmen hesabı açma', () => {
     expect((await me.get('/api/me')).json().schools[0]).toMatchObject({ role: 'editor', teacherId: ids.emre });
   });
 });
+
+describe('davet penceresi: kadroda e-postası olmayan öğretmen', () => {
+  it('davetle yazılan e-posta kadro kartına kaydedilir ve davet gider; hesabı olanın e-postası değiştirilemez', async () => {
+    const r = await owner.post(`${base}/teachers`, { fullName: 'Epostasız Öğretmen' });
+    expectStatus(r, 201);
+    const id = r.json().id as string;
+    expect((await owner.post(`${base}/enrollments/invite`, { teacherId: id })).statusCode).toBe(400);
+    expect((await owner.post(`${base}/enrollments/invite`, { teacherId: id, email: 'bozuk@' })).statusCode).toBe(400);
+    const inv = await owner.post(`${base}/enrollments/invite`, { teacherId: id, email: 'Yeni.Davet@Okul.test' });
+    expectStatus(inv, 200);
+    expect(inv.json().inviteUrl).toContain('/admin/davet?token=');
+    const list = (await owner.get(`${base}/teachers`)).json() as { id: string; email: string | null }[];
+    expect(list.find((x) => x.id === id)?.email).toBe('yeni.davet@okul.test');
+    expect([...mails].reverse().find((m) => m.to === 'yeni.davet@okul.test')).toBeTruthy();
+    expect((await owner.post(`${base}/enrollments/invite`, { teacherId: id, email: 'baska@okul.test' })).statusCode).toBe(409);
+  });
+});
