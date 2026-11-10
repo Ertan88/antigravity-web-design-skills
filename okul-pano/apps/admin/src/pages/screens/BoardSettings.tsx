@@ -228,6 +228,12 @@ export function Appearance({ editable }: { editable: boolean }) {
           description="Başarılar sayfasındaki kayıtlar, duyuru alanında fotoğraflı hazır şablonla ayrı slayt olarak da gösterilir."
         />
         <Toggle
+          checked={s.examSlide}
+          onChange={(x) => set('examSlide', x)}
+          label="Sınav olan günlerde duyurularda “Bugünkü sınavlar” slaytı"
+          description="Sınavlar her zaman “Şu an derste” kartında görünür. Açıkken o günün sınavları ders saatine göre duyuru alanında ayrı bir slayt olarak da döner; ortak sınav günleri için uygundur."
+        />
+        <Toggle
           checked={s.animations}
           onChange={(x) => set('animations', x)}
           label="Geçiş animasyonları"

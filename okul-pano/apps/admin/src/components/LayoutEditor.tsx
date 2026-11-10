@@ -1,4 +1,4 @@
-import { BOARD_MODULES, layoutModules, MODULE_LABELS, type BoardLayout, type BoardModule, type LayoutItem } from '@okulpano/shared';
+import { BOARD_MODULES, layoutModules, RETIRED_MODULES, MODULE_LABELS, type BoardLayout, type BoardModule, type LayoutItem } from '@okulpano/shared';
 import clsx from 'clsx';
 import {
   ArrowDown,
@@ -70,7 +70,7 @@ export function LayoutEditor({ value, onChange, disabled }: { value: BoardLayout
   const [dragging, setDragging] = useState<BoardModule | null>(null);
   const [over, setOver] = useState<{ col: Column; index: number } | null>(null);
   const used = layoutModules(value);
-  const hidden = BOARD_MODULES.filter((m) => !used.includes(m));
+  const hidden = BOARD_MODULES.filter((m) => !used.includes(m) && !RETIRED_MODULES.has(m));
 
   /** Kartı sütunda verilen öğenin önüne (index) tek kart olarak yerleştirir */
   const place = (m: BoardModule, col: Column, index: number) => {

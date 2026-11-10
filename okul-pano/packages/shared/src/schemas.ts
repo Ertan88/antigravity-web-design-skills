@@ -122,6 +122,8 @@ export const schoolSettingsSchema = z.object({
   requireApproval: z.boolean().default(false),
   /** Başarılar ve ayın öğrencisi duyuru alanında da hazır şablonlu slayt olarak döner */
   achievementSlides: z.boolean().default(true),
+  /** Sınav olan günlerde duyuru alanına "Bugünkü sınavlar" slaytı eklenir (sınavlar "Şu an derste" kartında hep görünür) */
+  examSlide: z.boolean().default(false),
   /** Kayan yazıya ek kaynaklar */
   tickerHistory: z.boolean().default(false),
   tickerQuote: z.boolean().default(false),

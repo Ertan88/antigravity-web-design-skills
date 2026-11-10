@@ -1,8 +1,8 @@
-import { examGroupClasses, examGroupPeriods, formatDuration, gradeHue, groupExams, periodLabel, type BellStatus, type DisplayState } from '@okulpano/shared/client';
+import { formatDuration, gradeHue, groupExams, periodLabel, type BellStatus, type DisplayState } from '@okulpano/shared/client';
 import type { CSSProperties } from 'react';
 import { AutoPager } from './AutoPager.tsx';
 import { useLabel } from './Labels.tsx';
-import { BellIcon, BellWatermarkIcon, BookIcon, ClipboardIcon, CoffeeIcon, UtensilsIcon } from './Icons.tsx';
+import { BellIcon, BellWatermarkIcon, BookIcon, CoffeeIcon, UtensilsIcon } from './Icons.tsx';
 
 /** Zil kartının gün bilgisi: tatil, arife (yarım gün) ve sonraki ders günü */
 export interface BellDayContext {
@@ -124,88 +124,101 @@ export function BellCard({ status, day }: { status: BellStatus; day?: BellDayCon
 }
 
 /** Şu an derste / sıradaki ders: sınıf etiketi, ders adı (gerekirse iki satır) ve altında öğretmen(ler) */
+type ScheduledExam = NonNullable<DisplayState['scheduledExams']>[number];
+const EXAM_ROW_LABEL: Record<ScheduledExam['kind'], string> = { written: 'Yazılı sınav', practical: 'Uygulama sınavı', common: 'Ortak sınav' };
+
+/**
+ * Şu an derste (teneffüste: sıradaki ders). Sınavı olan sınıfın satırı vurgulanır ("Yazılı sınav · öğretmen") ve
+ * listenin başına alınır; başlıkta kaç sınıfta sınav olduğu yazar. Altta, bugün daha sonraki sınavlar ders
+ * saatine göre tek satırlarda (aynı kademenin aynı sınavı "9. sınıflar Matematik" diye toplanır).
+ */
 export function LessonsCard({
   entries,
   heading,
   periodTitle,
-  examSlots,
+  examsBySlot,
+  laterExams = [],
+  nowClock,
 }: {
   entries: DisplayState['timetable'];
   heading: string;
   periodTitle: string;
-  /** Sınavı olan sınıf + ders saatleri ("<sınıf id>|<ders no>"): satırda SINAV etiketi */
-  examSlots?: ReadonlySet<string>;
+  /** Bugünün sınavları, "<sınıf id>|<ders no>" anahtarıyla */
+  examsBySlot?: ReadonlyMap<string, ScheduledExam>;
+  /** Kartın altında gösterilecek, daha sonraki sınavlar */
+  laterExams?: ScheduledExam[];
+  nowClock?: string;
 }) {
+  const examOf = (e: DisplayState['timetable'][number]) => (e.classId ? examsBySlot?.get(`${e.classId}|${e.periodNo}`) : undefined);
+  const examCount = entries.filter((e) => examOf(e)).length;
+  // Sınavı olan sınıflar başa (kendi aralarında ve diğerleri aynı sırada kalır)
+  const rows = examCount ? [...entries].sort((a, b) => Number(Boolean(examOf(b))) - Number(Boolean(examOf(a)))) : entries;
+  const later = [...new Set(laterExams.map((e) => e.periodNo))]
+    .sort((a, b) => a - b)
+    .map((periodNo) => {
+      const items = laterExams.filter((e) => e.periodNo === periodNo);
+      return { periodNo, start: items[0]!.start, groups: groupExams(items) };
+    });
   return (
     <section className="card list-card lessons-card">
       <div className="card-label">
         <BookIcon size={22} /> {heading}
-        <span className="card-label-aside">{periodTitle}</span>
+        <span className="card-label-aside">
+          {periodTitle}
+          {examCount > 0 && <span className="lessons-exam-count"> · {examCount} sınavda</span>}
+        </span>
       </div>
       <AutoPager
-        items={entries}
+        items={rows}
         // Ders adı iki satıra inebilir, öğretmen(ler) altında: satır yüksekliği buna göre
         rowHeight={88}
         intervalMs={8000}
         keyOf={(e) => `${e.className}-${e.periodNo}`}
         empty="Bu ders saati için program girilmemiş"
-        render={(e) => (
-          <div className="lesson-row">
-            <ClassBadge name={e.className} />
-            <span className="lesson-info">
-              <span className="lesson-subject">{e.subject}</span>
-              {e.teacherName && <span className="lesson-teacher">{e.teacherName}</span>}
-            </span>
-            {e.classId && examSlots?.has(`${e.classId}|${e.periodNo}`) && <span className="exam-badge">Sınav</span>}
-          </div>
-        )}
-      />
-    </section>
-  );
-}
-
-type ScheduledExam = NonNullable<DisplayState['scheduledExams']>[number];
-const EXAM_KIND_LABEL: Record<ScheduledExam['kind'], string> = { written: 'Yazılı', practical: 'Uygulama', common: 'Ortak' };
-
-/**
- * Bugünkü sınavlar: bitmemiş olanlar ders saati sırasıyla; saati gelen sınav vurgulanır (ŞİMDİ). Aynı kademenin
- * şubelerindeki aynı sınav tek satır olur: "9 · Matematik · 9. sınıflar (9-A, 9-B) · 2. ders".
- */
-export function TodayExamsCard({ exams, nowClock }: { exams: ScheduledExam[]; nowClock: string }) {
-  const groups = groupExams(exams);
-  return (
-    <section className="card list-card today-exams-card">
-      <div className="card-label">
-        <ClipboardIcon size={22} /> {useLabel('todayExams')}
-        <span className="card-label-aside">{groups.length} sınav</span>
-      </div>
-      <AutoPager
-        items={groups}
-        rowHeight={88}
-        intervalMs={8000}
-        keyOf={(g) => g.key}
-        empty="Bugün sınav yok"
-        render={(g) => {
-          const first = g.items[0]!;
-          const now = g.items.some((e) => Boolean(e.start && e.end && e.start <= nowClock && nowClock < e.end));
-          const multi = g.items.length > 1;
-          const start = g.samePeriod && new Set(g.items.map((e) => e.start)).size === 1 ? first.start : null;
+        render={(e) => {
+          const x = examOf(e);
+          const started = Boolean(x?.start && nowClock && x.start <= nowClock);
           return (
-            <div className={`lesson-row${now ? ' exam-now' : ''}`}>
-              <ClassBadge name={g.badge} />
+            <div className={`lesson-row${x ? ' exam-row' : ''}${started ? ' exam-now' : ''}`}>
+              <ClassBadge name={e.className} />
               <span className="lesson-info">
-                <span className="lesson-subject">{first.subject}</span>
-                <span className="lesson-teacher">
-                  {multi ? `${g.label} (${examGroupClasses(g)}) · ` : ''}
-                  {g.samePeriod ? `${first.periodNo}. ders` : examGroupPeriods(g)}
-                  {start ? ` · ${start}` : ''} · {EXAM_KIND_LABEL[first.kind]}
-                </span>
+                <span className="lesson-subject">{e.subject}</span>
+                {(x || e.teacherName) && (
+                  <span className="lesson-teacher">
+                    {x && (
+                      // Saat kartın başlığında ve zil kartında: satırda yalnızca sınavın türü
+                      <span className="exam-when">{EXAM_ROW_LABEL[x.kind]}</span>
+                    )}
+                    {x && e.teacherName ? ' · ' : ''}
+                    {e.teacherName}
+                  </span>
+                )}
               </span>
-              {now && <span className="exam-badge">Şimdi</span>}
+              {x && <span className="exam-badge">Sınav</span>}
             </div>
           );
         }}
       />
+      {later.length > 0 && (
+        <div className="exam-later">
+          <div className="exam-later-title">Bugün sonraki sınavlar</div>
+          {later.slice(0, 2).map((p) => (
+            <div key={p.periodNo} className="exam-later-row">
+              <span className="exam-later-time">
+                {p.periodNo}. ders{p.start ? ` ${p.start}` : ''}
+              </span>
+              <span className="exam-later-list">
+                {p.groups.map((g) => (
+                  <span key={g.key}>
+                    <b>{g.label}</b> {g.items[0]!.subject}
+                  </span>
+                ))}
+              </span>
+            </div>
+          ))}
+          {later.length > 2 && <div className="exam-later-more">ve {later.slice(2).reduce((n, p) => n + p.groups.length, 0)} sınav daha</div>}
+        </div>
+      )}
     </section>
   );
 }

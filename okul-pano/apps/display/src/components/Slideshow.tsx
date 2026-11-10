@@ -1,7 +1,45 @@
-import { isWithinWindow, parseYouTubeUrl, splitSchoolName, youTubeThumbnail, type DisplayAnnouncement } from '@okulpano/shared/client';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { gradeHue, isWithinWindow, parseYouTubeUrl, splitSchoolName, youTubeThumbnail, type DisplayAnnouncement, type ExamSlideRow } from '@okulpano/shared/client';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { DesignSlide } from '@okulpano/slides';
 import { MegaphoneIcon, SchoolIcon } from './Icons.tsx';
+
+/* ---------- Bugünkü sınavlar slaytı ---------- */
+
+const EXAM_KIND: Record<ExamSlideRow['groups'][number]['kind'], string> = { written: 'Yazılı', practical: 'Uygulama', common: 'Ortak' };
+
+/** Panonun kendi oluşturduğu slayt: ders saatleri alt alta, şu anki sınav saati vurgulu */
+function ExamSlide({ title, rows }: { title: string; rows: ExamSlideRow[] }) {
+  return (
+    <div className="exam-slide">
+      <div className="exam-slide-head">
+        <div className="exam-slide-kicker">Sınav takvimi</div>
+        <h2>{title}</h2>
+      </div>
+      <div className="exam-slide-rows">
+        {rows.map((r) => (
+          <div key={r.periodNo} className={`exam-slide-row${r.now ? ' is-now' : ''}`}>
+            <div className="exam-slide-period">
+              {r.periodNo}. ders
+              <small>{r.now ? `Şimdi${r.end ? ` · bitiş ${r.end}` : ''}` : r.start && r.end ? `${r.start} – ${r.end}` : ''}</small>
+            </div>
+            <div className="exam-slide-chips">
+              {r.groups.map((g) => (
+                <span key={g.key} className="exam-slide-chip" style={{ '--chip-hue': gradeHue(g.label) } as CSSProperties}>
+                  <i>{g.label}</i>
+                  {g.subject}
+                  <em>
+                    {EXAM_KIND[g.kind]}
+                    {g.classes ? ` · ${g.classes}` : ''}
+                  </em>
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /* ---------- YouTube IFrame API ---------- */
 
@@ -223,7 +261,9 @@ export function Slideshow({ announcements, now, defaultDurationSec, videoSound, 
   return (
     <section className={`card slideshow ${full ? 'slideshow-full' : ''}`}>
       <div className={`slide slide-${slide.kind}`} key={key}>
-        {slide.kind === 'design' && slide.design ? (
+        {slide.kind === 'exams' ? (
+          <ExamSlide title={slide.title} rows={slide.examRows ?? []} />
+        ) : slide.kind === 'design' && slide.design ? (
           <div className="slide-design">
             <DesignSlide design={slide.design} schoolName={schoolName} schoolType={schoolType} logoUrl={logoUrl} />
           </div>

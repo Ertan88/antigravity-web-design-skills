@@ -34,6 +34,9 @@ import {
   schoolFullName,
   splitSchoolName,
   type LabelKey,
+  examGroupClasses,
+  groupExams,
+  type ExamSlideRow,
 } from '@okulpano/shared/client';
 import type { CSSProperties, ReactNode } from 'react';
 import type { DisplayAuth } from './api.ts';
@@ -47,7 +50,7 @@ import { SpecialMark } from './components/SpecialMark.tsx';
 import { BookIcon, CakeIcon, CalendarIcon, CapIcon, LibraryIcon, MonitorIcon, ShieldIcon, TrophyIcon, UserMinusIcon, WifiOffIcon } from './components/Icons.tsx';
 import { AchievementsCard, BookCard, EventsCard } from './components/LifeCards.tsx';
 import { BirthdayCard, DutyCard, EmptyCard, ExamCard, LeaveCard } from './components/LeftColumn.tsx';
-import { BellCard, LessonsCard, TodayExamsCard } from './components/RightColumn.tsx';
+import { BellCard, LessonsCard } from './components/RightColumn.tsx';
 import { Screensaver } from './components/Screensaver.tsx';
 import { Slideshow } from './components/Slideshow.tsx';
 import { Stage, STAGE_H, STAGE_W } from './components/Stage.tsx';
@@ -231,7 +234,6 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         design: achievementDesign(a, monthName(a.startsAt ?? now.toISOString(), school.timezone)),
       }))
     : [];
-  const slides = [...onAir, ...achievementSlides];
 
   // Kayan yazı: okulun metinleri + hava durumu uyarısı, bugün tarihte, günün sözü, RSS başlıkları
   const quote = quoteOfDay(today.isoDate);
@@ -250,7 +252,49 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
     : (state.scheduledExams ?? [])
         .filter((e) => e.date === today.isoDate && (!screenClasses.size || screenClasses.has(e.classId)) && !(e.end && e.end <= nowClock))
         .sort((a, b) => a.periodNo - b.periodNo || compareClassNames(a.className, b.className));
-  const examSlots = new Set(todayExams.map((e) => `${e.classId}|${e.periodNo}`));
+  // Panoda kısa sınıf adıyla; "Şu an derste" kartında sınıf + ders saatine göre bulunur
+  const examsShown = todayExams.map((e) => ({ ...e, classLabel: shortClass(e.className) }));
+  const examsBySlot = new Map(examsShown.map((e) => [`${e.classId}|${e.periodNo}`, e]));
+  // Kartın altında: henüz başlamamış, kartta gösterilen ders saatinden sonraki sınavlar
+  const laterExams = examsShown.filter((e) => !(e.start && e.start <= nowClock) && e.periodNo !== lessonPeriod?.no);
+
+  // İsteğe bağlı "Bugünkü sınavlar" slaytı: ders saati satırları, her satırda aynı kademenin aynı sınavı tek çip
+  const examRows: ExamSlideRow[] = [...new Set(examsShown.map((e) => e.periodNo))]
+    .sort((a, b) => a - b)
+    .map((periodNo) => {
+      const items = examsShown.filter((e) => e.periodNo === periodNo);
+      return {
+        periodNo,
+        start: items[0]!.start,
+        end: items[0]!.end,
+        now: items.some((e) => Boolean(e.start && e.end && e.start <= nowClock && nowClock < e.end)),
+        groups: groupExams(items).map((g) => ({
+          key: g.key,
+          label: g.label,
+          subject: g.items[0]!.subject,
+          kind: g.items[0]!.kind,
+          classes: g.items.length > 1 ? examGroupClasses(g) : null,
+        })),
+      };
+    });
+  const examSlide: DisplayAnnouncement[] =
+    s.examSlide && examRows.length
+      ? [
+          {
+            id: 'exam-slide',
+            kind: 'exams',
+            title: labelOf(s.labels, 'todayExams'),
+            body: null,
+            imageUrl: null,
+            youtubeUrl: null,
+            durationSec: null,
+            startsAt: null,
+            endsAt: null,
+            examRows,
+          },
+        ]
+      : [];
+  const slides = [...onAir, ...examSlide, ...achievementSlides];
 
   // Kartlar panonun düzenine göre (panoya özel ya da okulun) sol / sağ sütuna yerleşir
   const layout = state.layout ?? resolveLayout(s);
@@ -302,7 +346,9 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
           <LessonsCard
             key={m}
             entries={lessons}
-            examSlots={examSlots}
+            examsBySlot={examsBySlot}
+            laterExams={laterExams}
+            nowClock={nowClock}
             heading={bell.kind === 'lesson' || !lessonPeriod ? 'Şu An Derste' : 'Sıradaki Ders'}
             periodTitle={
               !lessonPeriod ? 'Ek ders saati' : bell.kind === 'lesson' ? periodLabel(lessonPeriod) : `${periodLabel(lessonPeriod)} · ${lessonPeriod.start}`
@@ -314,8 +360,9 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         ) : (
           empty(m, <BookIcon size={22} />, 'Şu An Derste', 'Şu an ders yok', 'lessons-card')
         );
+      // Eski düzenlerde kalmış olabilir: sınavlar artık "Şu an derste" kartında (ve isteğe bağlı slaytta)
       case 'todayExams':
-        return todayExams.length ? <TodayExamsCard key={m} exams={todayExams} nowClock={nowClock} /> : null;
+        return null;
       case 'achievements':
         return achievementsNow.length ? (
           <AchievementsCard key={m} items={achievementsNow} />
@@ -361,7 +408,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
       case 'lessons':
         return Boolean(lessonPeriod) || lessons.length > 0 || nextLessons.length > 0;
       case 'todayExams':
-        return todayExams.length > 0;
+        return false;
       case 'achievements':
         return achievementsNow.length > 0;
       case 'events':

@@ -69,9 +69,22 @@ export interface DisplayState {
   dutySubstitutions?: { date: string; dutyId: string; teacherName: string }[];
 }
 
+/** Sınav slaytında bir ders saati: o saatin sınavları (aynı kademenin aynı sınavı tek satırda) */
+export interface ExamSlideRow {
+  periodNo: number;
+  start: string | null;
+  end: string | null;
+  /** Sınav şu an sürüyor */
+  now: boolean;
+  groups: { key: string; label: string; subject: string; kind: 'written' | 'practical' | 'common'; classes: string | null }[];
+}
+
 export interface DisplayAnnouncement {
   id: string;
-  kind: 'image' | 'video' | 'text' | 'design';
+  /** "exams": panonun kendi oluşturduğu "Bugünkü sınavlar" slaytı */
+  kind: 'image' | 'video' | 'text' | 'design' | 'exams';
+  /** Sınav slaytının satırları (yalnızca kind "exams") */
+  examRows?: ExamSlideRow[];
   title: string;
   /** Hazır şablonla hazırlanan duyuru */
   design?: AnnouncementDesign | null;

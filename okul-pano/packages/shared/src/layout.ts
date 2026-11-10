@@ -34,12 +34,19 @@ export const MODULE_LABELS: Record<BoardModule, string> = {
   book: 'Haftanın kitabı',
 };
 
-export const DEFAULT_LAYOUT: BoardLayout = { left: ['exams', 'duties', 'leaves', 'birthdays'], right: ['bell', 'lessons', 'todayExams'] };
+export const DEFAULT_LAYOUT: BoardLayout = { left: ['exams', 'duties', 'leaves', 'birthdays'], right: ['bell', 'lessons'] };
+
+/**
+ * Artık ayrı kart olarak gösterilmeyen kartlar: kayıtlı düzenlerde kalmış olsalar da ayıklanır.
+ * "Bugünkü sınavlar" "Şu an derste" kartına (ve isteğe bağlı sınav slaytına) taşındı.
+ */
+export const RETIRED_MODULES: ReadonlySet<BoardModule> = new Set<BoardModule>(['todayExams']);
 
 /** Tekrarlananları ve bilinmeyenleri ayıklar; tek kartı kalan birleşik kart düz karta döner */
 export function cleanLayout(layout: BoardLayout): BoardLayout {
   const seen = new Set<string>();
-  const ok = (m: string): m is BoardModule => (BOARD_MODULES as readonly string[]).includes(m) && !seen.has(m) && Boolean(seen.add(m));
+  const ok = (m: string): m is BoardModule =>
+    (BOARD_MODULES as readonly string[]).includes(m) && !RETIRED_MODULES.has(m as BoardModule) && !seen.has(m) && Boolean(seen.add(m));
   const keep = (list: readonly LayoutItem[]): LayoutItem[] =>
     list.flatMap((item): LayoutItem[] => {
       if (!Array.isArray(item)) return ok(item) ? [item] : [];
