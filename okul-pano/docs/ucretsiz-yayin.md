@@ -48,6 +48,8 @@ istediğiniz zaman silebilirsiniz. Örnek okul hiç kurulmasın isterseniz Rende
 
 - **TV:** tarayıcıda `https://...onrender.com/display/` adresini açın; ekranda çıkan 6 haneli kodu panelde
   **Panolar** › **Pano ekle** ile girin.
+  Android TV / Google TV'de önerilen yol **Okul Yayın Pano** uygulamasıdır (TV açılınca panoyu kendiliğinden açar,
+  kumandayla çıkılamaz): Downloader uygulamasına `...onrender.com/tv` yazın. Ayrıntı: [tv-uygulamasi.md](tv-uygulamasi.md).
 - **Android uygulama:** girişte sunucu adresine `https://...onrender.com` yazın.
 - **Uygulama kurmadan:** `https://...onrender.com/app/` telefonda tarayıcıdan açılır; "Ana ekrana ekle" ile
   uygulama gibi kullanılır.
