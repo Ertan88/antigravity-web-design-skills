@@ -309,6 +309,35 @@ export function Appearance({ editable }: { editable: boolean }) {
         />
       </Section>
 
+      <Section
+        title="TV uygulaması"
+        description="Okul Yayın Pano uygulaması TV açılınca panoyu kendiliğinden açar; kumandayla panodan çıkılamaz."
+      >
+        <Field
+          label="Gizli ayarlar şifresi"
+          help="TV’de OK tuşuna 5 saniye basılı tutunca (ya da Geri’ye art arda 5 kez basınca) bu şifre sorulur. Boş bırakılırsa ayarlar şifresiz açılır; öğrencilerin panodan çıkmaması için bir şifre belirleyin. Pano bir sonraki güncellemede şifreyi alır."
+        >
+          {(id) => (
+            <Input
+              id={id}
+              value={s.tvExitPin ?? ''}
+              disabled={!editable}
+              inputMode="numeric"
+              maxLength={8}
+              placeholder="4-8 rakam"
+              onChange={(e) => {
+                const v = e.target.value.replace(/\D/g, '').slice(0, 8);
+                set('tvExitPin', v || null);
+              }}
+              className="max-w-40 font-mono tracking-widest"
+            />
+          )}
+        </Field>
+        <p className="text-sm text-slate-500">
+          Kurulum: TV’de “Downloader” uygulamasına <span className="font-mono font-semibold text-ink">{location.origin}/tv</span> yazın, inen uygulamayı kurup açın ve ekrandaki kodla panoyu eşleştirin.
+        </p>
+      </Section>
+
       <SaveBar show={editable && dirty} saving={save.isPending} onSave={() => save.mutate(s)} onCancel={() => setS(school.data!.settings)} />
     </Card>
   );

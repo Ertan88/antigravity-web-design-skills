@@ -94,6 +94,17 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
   const [shown, setShown] = useState<{ index: number; count: number; title: string | null }>({ index: 0, count: 0, title: null });
   const onShow = useCallback((v: { index: number; count: number; title: string | null }) => setShown(v), []);
   const splash = useSplash(Boolean(state));
+  // Okul Yayın Pano TV uygulamasında: gizli ayarlar şifresi uygulamaya iletilir (tarayıcıda bu nesne yoktur)
+  const tvPin = state?.school.settings.tvExitPin ?? null;
+  const hasState = Boolean(state);
+  useEffect(() => {
+    if (!hasState || auth.preview) return;
+    try {
+      (window as { OkulYayinTV?: { setConfig(json: string): void } }).OkulYayinTV?.setConfig(JSON.stringify({ pin: tvPin }));
+    } catch {
+      /* eski uygulama sürümü */
+    }
+  }, [tvPin, hasState, auth.preview]);
 
   if (!state || splash.show) {
     return (

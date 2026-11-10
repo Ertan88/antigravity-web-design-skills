@@ -19,6 +19,8 @@ const schema = z.object({
   DISPLAY_DIST: z.string().default('../display/dist'),
   /** Mobil uygulamanın web sürümü (varsa): /app/ — uygulamayı yüklemeyen öğretmenler tarayıcıdan kullanır */
   MOBILE_DIST: z.string().default('../../mobile/dist'),
+  /** Okul Yayın Pano TV uygulamasının indirme adresi: TV'de kısa "/tv" adresi buraya yönlendirir */
+  TV_APK_URL: z.string().default('https://github.com/Ertan88/antigravity-web-design-skills/releases/download/okul-pano-tv/Okul-Yayin-Pano.apk'),
   /**
    * Web'den kayıt: 'open' e-posta doğrulanınca okul açılır, 'approval' doğrulama sonrası platform yöneticisinin
    * onayını bekler (okul askıda açılır), 'closed' kayıt kapalı (okulları yalnızca platform yöneticisi açar).

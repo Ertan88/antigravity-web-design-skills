@@ -124,6 +124,12 @@ export const schoolSettingsSchema = z.object({
   achievementSlides: z.boolean().default(true),
   /** Sınav olan günlerde duyuru alanına "Bugünkü sınavlar" slaytı eklenir (sınavlar "Şu an derste" kartında hep görünür) */
   examSlide: z.boolean().default(false),
+  /** Okul Yayın Pano TV uygulamasının gizli ayarlarını açan şifre (4-8 rakam); boşsa ayarlar şifresiz açılır */
+  tvExitPin: z
+    .string()
+    .regex(/^\d{4,8}$/, 'Şifre 4-8 rakam olmalı')
+    .nullable()
+    .default(null),
   /** Kayan yazıya ek kaynaklar */
   tickerHistory: z.boolean().default(false),
   tickerQuote: z.boolean().default(false),

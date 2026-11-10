@@ -1,7 +1,7 @@
 import { adminUpdateSchoolSchema, ownershipTransferSchema, schoolFullName, createSchoolSchema, labelsSchema, schoolSettingsSchema, updateSchoolSchema } from '@okulpano/shared';
 import { schoolOwners, transferOwnership } from '../lib/ownership.ts';
 import { and, count, desc, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { accessUser, audit, schoolGuard, UUID_RE } from '../context.ts';
 import { announcements, auditLogs, memberships, notifications, schools, screens, students, teachers, users } from '../db/schema.ts';
@@ -13,7 +13,12 @@ import { geocode } from '../lib/weather.ts';
 import { SAMPLE_TABLES, seedSchoolContent, type SampleData } from '../seed-data.ts';
 import { addDefaultTeacherOptions } from './teachers.ts';
 
-export function publicSchool(s: typeof schools.$inferSelect) {
+/**
+ * Okulun panelde görünen bilgileri. TV uygulamasının çıkış şifresi yalnızca ayar yetkisi olana gider (öğretmen
+ * okul bilgisini okusa da şifreyi görmez; pano şifreyi kendi verisinden alır).
+ */
+export function publicSchool(s: typeof schools.$inferSelect, withSecrets = false) {
+  const settings = schoolSettingsSchema.parse(s.settings ?? {});
   return {
     id: s.id,
     name: s.name,
@@ -23,7 +28,7 @@ export function publicSchool(s: typeof schools.$inferSelect) {
     city: s.city,
     latitude: s.latitude,
     longitude: s.longitude,
-    settings: schoolSettingsSchema.parse(s.settings ?? {}),
+    settings: withSecrets ? settings : { ...settings, tvExitPin: null },
     plan: s.plan,
     maxScreens: s.maxScreens,
     isActive: s.isActive,
@@ -37,8 +42,9 @@ export function publicSchool(s: typeof schools.$inferSelect) {
 export async function schoolRoutes(app: FastifyInstance) {
   const { db, bus, storage } = app.deps;
   const member = { preHandler: [app.authenticate, schoolGuard()] };
+  const secrets = (req: FastifyRequest) => Boolean(req.ctx?.permissions?.includes('settings.manage'));
 
-  app.get('/api/schools/:schoolId', member, async (req) => publicSchool(req.ctx.school));
+  app.get('/api/schools/:schoolId', member, async (req) => publicSchool(req.ctx.school, secrets(req)));
 
   app.patch('/api/schools/:schoolId', { preHandler: [app.authenticate, schoolGuard('settings.manage')] }, async (req) => {
     const body = parse(updateSchoolSchema, req.body);
@@ -55,7 +61,7 @@ export async function schoolRoutes(app: FastifyInstance) {
       .returning();
     await audit(req, 'update', 'Okul ayarları', req.ctx.schoolId, updated!.name);
     bus.contentChanged(req.ctx.schoolId);
-    return publicSchool(updated!);
+    return publicSchool(updated!, secrets(req));
   });
 
   /**
@@ -103,7 +109,7 @@ export async function schoolRoutes(app: FastifyInstance) {
       if (!until && admins.length) await db.delete(notifications).where(and(eq(notifications.schoolId, req.ctx.schoolId), inArray(notifications.userId, admins)));
       notifyUsers(app.deps, admins, { title: note.title, body: note.body });
     }
-    return publicSchool(updated!);
+    return publicSchool(updated!, secrets(req));
   });
 
   /** Kart ve sekme başlıkları: okul ayarlarından ayrı yetkiyle (Başlıkları düzenleme) */
@@ -115,7 +121,7 @@ export async function schoolRoutes(app: FastifyInstance) {
     const [updated] = await db.update(schools).set({ settings }).where(eq(schools.id, req.ctx.schoolId)).returning();
     await audit(req, 'update', 'Başlıklar', req.ctx.schoolId, Object.keys(clean).length ? `${Object.keys(clean).length} başlık özelleştirildi` : 'Başlıklar varsayılana döndü');
     bus.contentChanged(req.ctx.schoolId);
-    return publicSchool(updated!);
+    return publicSchool(updated!, secrets(req));
   });
 
   /** İlk giriş sorusu: örnek verilerle mi boş mu başlanacak */
@@ -129,13 +135,13 @@ export async function schoolRoutes(app: FastifyInstance) {
       .where(and(eq(schools.id, id), eq(schools.onboarding, 'pending')))
       .returning();
     if (!claimed) throw conflict('Bu soru zaten cevaplandı.');
-    if (!sample) return publicSchool(claimed);
+    if (!sample) return publicSchool(claimed, secrets(req));
     try {
       const { ids } = await seedSchoolContent(db, id, { storage, timezone: claimed.timezone });
       const [updated] = await db.update(schools).set({ sampleData: ids }).where(eq(schools.id, id)).returning();
       await audit(req, 'create', 'Örnek veriler', id, claimed.name);
       bus.contentChanged(id);
-      return publicSchool(updated!);
+      return publicSchool(updated!, secrets(req));
     } catch (err) {
       await db.update(schools).set({ onboarding: 'pending' }).where(eq(schools.id, id));
       throw err;
@@ -155,7 +161,7 @@ export async function schoolRoutes(app: FastifyInstance) {
     });
     await audit(req, 'delete', 'Örnek veriler', id, updated!.name);
     bus.contentChanged(id);
-    return publicSchool(updated!);
+    return publicSchool(updated!, secrets(req));
   });
 
   app.get('/api/schools/:schoolId/stats', member, async (req) => {
