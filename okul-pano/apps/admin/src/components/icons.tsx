@@ -20,6 +20,7 @@ export const AlertTriangle = wrap(T.IconAlertTriangle, 'AlertTriangle');
 export const TriangleAlert = AlertTriangle;
 export const ArrowDown = wrap(T.IconArrowDown, 'ArrowDown');
 export const ArrowLeft = wrap(T.IconArrowLeft, 'ArrowLeft');
+export const ArrowLeftRight = wrap(T.IconArrowsLeftRight, 'ArrowLeftRight');
 export const ArrowRight = wrap(T.IconArrowRight, 'ArrowRight');
 export const ArrowUp = wrap(T.IconArrowUp, 'ArrowUp');
 export const ArrowUpRight = wrap(T.IconArrowUpRight, 'ArrowUpRight');

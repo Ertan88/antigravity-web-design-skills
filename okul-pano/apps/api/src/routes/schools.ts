@@ -1,4 +1,5 @@
-import { adminUpdateSchoolSchema, schoolFullName, createSchoolSchema, labelsSchema, schoolSettingsSchema, updateSchoolSchema } from '@okulpano/shared';
+import { adminUpdateSchoolSchema, ownershipTransferSchema, schoolFullName, createSchoolSchema, labelsSchema, schoolSettingsSchema, updateSchoolSchema } from '@okulpano/shared';
+import { schoolOwners, transferOwnership } from '../lib/ownership.ts';
 import { and, count, desc, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -210,6 +211,13 @@ export async function schoolRoutes(app: FastifyInstance) {
   });
 
   /** Paneldeki canlı önizleme için 30 dakikalık, yalnızca okuma yapabilen pano anahtarı */
+  /** Okul müdürü müdürlüğü devreder (yeni müdür okuldaki bir kullanıcı ya da e-postayla davet edilen kişi) */
+  app.post('/api/schools/:schoolId/transfer-ownership', member, async (req) => {
+    if (req.ctx.isSupport || req.ctx.role !== 'owner') throw forbidden('Müdürlüğü yalnızca okul müdürü devredebilir.');
+    const input = parse(ownershipTransferSchema, req.body);
+    return transferOwnership(app.deps, { schoolId: req.ctx.schoolId, byUserId: req.ctx.userId, input });
+  });
+
   app.post('/api/schools/:schoolId/preview-token', member, async (req) => ({
     token: app.jwt.sign({ typ: 'preview', sch: req.ctx.schoolId }, { expiresIn: '30m' }),
   }));
@@ -258,9 +266,12 @@ export async function schoolRoutes(app: FastifyInstance) {
       .orderBy(desc(schools.createdAt));
     // Panelde açılabilen okullar: üyesi olunan ya da destek erişimi süren (KVKK)
     const own = new Set((await db.select({ id: memberships.schoolId }).from(memberships).where(eq(memberships.userId, accessUser(req).sub))).map((m) => m.id));
+    const owners = await schoolOwners(app.deps);
     const now = Date.now();
     return rows.map((r) => ({
       ...publicSchool(r.school),
+      // Okul müdürünün adı ve e-postası (müdürü değiştirmek için; okulun diğer verileri KVKK gereği kapalı)
+      owner: owners.get(r.school.id) ?? null,
       screenCount: r.screens,
       contactPhone: r.school.contactPhone,
       createdAt: r.school.createdAt,
@@ -300,6 +311,16 @@ export async function schoolRoutes(app: FastifyInstance) {
       return school!;
     });
     return reply.status(201).send(publicSchool(result));
+  });
+
+  /** Platform yöneticisi: okulun müdürünü değiştirir (müdür ayrılmış ve devretmemişse). Yeni müdür ad ve e-postayla. */
+  app.put('/api/platform/schools/:id/owner', platform, async (req) => {
+    const { id } = req.params as { id: string };
+    if (!UUID_RE.test(id)) throw notFound();
+    const input = parse(ownershipTransferSchema, req.body);
+    // Platform yöneticisi okulun kullanıcı listesini göremez: yalnızca ad ve e-posta ile
+    if (input.memberId) throw badRequest('Yeni müdürün adını ve e-postasını yazın.');
+    return transferOwnership(app.deps, { schoolId: id, byUserId: accessUser(req).sub, input });
   });
 
   app.patch('/api/platform/schools/:id', platform, async (req) => {

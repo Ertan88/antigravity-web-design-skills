@@ -1,7 +1,8 @@
 import { ADMIN_ONLY_PERMISSIONS, createMemberSchema, normalizeName, PERMISSION_KEYS, PERMISSIONS, updateMemberSchema, type Permission, type Role } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { KeyRound, Pencil, Plus, Send, UserCog } from '../components/icons.tsx';
+import { ArrowLeftRight, KeyRound, Pencil, Plus, Send, UserCog } from '../components/icons.tsx';
+import { OwnerTransferDialog, type TransferResult } from '../components/OwnerTransferDialog.tsx';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { RosterTab } from './users/Roster.tsx';
@@ -119,7 +120,7 @@ function RoleAndPermissions({ form }: { form: ReturnType<typeof useForm<Form>> }
 }
 
 export function Users() {
-  const { me, schoolId, school } = useAuth();
+  const { me, schoolId, school, reloadMe } = useAuth();
   const path = useSchoolPath('members');
   const qc = useQueryClient();
   const toast = useToast();
@@ -142,6 +143,7 @@ export function Users() {
   const [created, setCreated] = useState<Credentials | null>(null);
   const [invited, setInvited] = useState<InviteResult | null>(null);
   const [resetting, setResetting] = useState<Member | null>(null);
+  const [transferring, setTransferring] = useState(false);
   const form = useForm<Form>({ email: '', fullName: '', password: '', invite: true, role: 'editor', permissions: ['announcements.manage'], teacherId: '' });
   const refresh = () => void qc.invalidateQueries({ queryKey: [schoolId, 'members'] });
   // Seçilen öğretmen kadroda ve henüz hesabı yoksa hesabı Kadro sekmesinden (giriş kodu) açılmalı
@@ -285,6 +287,11 @@ export function Users() {
                   </Td>
                   <Td className="whitespace-nowrap text-slate-500">{m.invitePending ? <Badge tone="amber">Davet bekliyor</Badge> : timeAgo(m.lastLoginAt)}</Td>
                   <Td className="w-px text-right">
+                    {m.role === 'owner' && school?.role === 'owner' && m.userId === me?.user.id && (
+                      <Button size="sm" variant="secondary" className="whitespace-nowrap" icon={<ArrowLeftRight className="size-4" />} onClick={() => setTransferring(true)}>
+                        Müdürlüğü devret
+                      </Button>
+                    )}
                     {!locked && (
                       <div className="flex justify-end">
                         <IconButton label="Yetkileri düzenle" onClick={() => openEdit(m)}>
@@ -408,6 +415,23 @@ export function Users() {
         </form>
       </Modal>
 
+      <OwnerTransferDialog
+        open={transferring}
+        onClose={() => setTransferring(false)}
+        schoolName={school?.name ?? ''}
+        currentOwner={me ? { fullName: me.user.fullName, email: me.user.email } : null}
+        ownerIsMe
+        members={(list.data ?? []).filter((m) => m.role !== 'owner').map((m) => ({ id: m.id, fullName: m.fullName, email: m.email }))}
+        onSubmit={async (body) => {
+          const r = await api<TransferResult>(`${path.replace(/\/members$/, '')}/transfer-ownership`, { method: 'POST', body });
+          setTransferring(false);
+          toast.success(`Müdürlük ${r.newOwner.fullName} kişisine devredildi`);
+          if (r.invite) setInvited({ email: r.newOwner.email, fullName: r.newOwner.fullName, ...r.invite });
+          refresh();
+          await reloadMe();
+          return r;
+        }}
+      />
       <CredentialsDialog value={created} onClose={() => setCreated(null)} />
       <InviteDialog value={invited} onClose={() => setInvited(null)} />
       <ResetPasswordDialog

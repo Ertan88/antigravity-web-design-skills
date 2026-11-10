@@ -1,4 +1,4 @@
-import { SCHOOL_TYPES, SPECIAL_DAYS, specialDayFor, splitSchoolName, updateSchoolSchema, type SchoolSettings, errorText } from '@okulpano/shared';
+import { SCHOOL_TYPE_OPTIONS, SPECIAL_DAYS, specialDayFor, splitSchoolName, updateSchoolSchema, type SchoolSettings, errorText } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Download, ExternalLink, FileText, MapPin, Search } from '../components/icons.tsx';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -225,6 +225,42 @@ function InternshipManagerField({ value, onChange }: { value: string | null; onC
   );
 }
 
+const OTHER_TYPE = '__other';
+
+/** Okul türü: MEB türleri açılır kutuda; listede olmayan tür "Diğer (kendim yazayım)" ile elle yazılır (kayıtlı özel tür korunur) */
+function SchoolTypeField({ id, value, derived, onChange }: { id: string; value: string; derived: string | null; onChange: (v: string) => void }) {
+  const known = SCHOOL_TYPE_OPTIONS.includes(value.trim());
+  const [other, setOther] = useState(Boolean(value.trim()) && !known);
+  const custom = other || (Boolean(value.trim()) && !known);
+  return (
+    <div className="grid gap-2">
+      <Select
+        id={id}
+        value={custom ? OTHER_TYPE : value.trim()}
+        onChange={(e) => {
+          const next = e.target.value;
+          if (next === OTHER_TYPE) {
+            setOther(true);
+            if (known) onChange('');
+          } else {
+            setOther(false);
+            onChange(next);
+          }
+        }}
+      >
+        <option value="">{derived ? `Addan ayır (${derived})` : 'Seçin'}</option>
+        {SCHOOL_TYPE_OPTIONS.map((t) => (
+          <option key={t} value={t}>
+            {t}
+          </option>
+        ))}
+        <option value={OTHER_TYPE}>Diğer (kendim yazayım)</option>
+      </Select>
+      {custom && <Input aria-label="Okul türü" value={value} onChange={(e) => onChange(e.target.value)} placeholder="ör. Sağlık Meslek Lisesi" maxLength={80} autoFocus={!value} />}
+    </div>
+  );
+}
+
 export function Settings() {
   const { schoolId, reloadMe } = useAuth();
   const path = useSchoolPath();
@@ -293,27 +329,12 @@ export function Settings() {
             label="Okul türü (ikinci satır)"
             help={
               splitSchoolName(v.name).type
-                ? `Boş bırakılırsa addan ayrılır: "${splitSchoolName(v.name).type}". Yalnızca farklı göstermek isterseniz doldurun.`
-                : 'Yazmaya başlayınca öneriler çıkar (ör. "Mes" → Mesleki ve Teknik Anadolu Lisesi). Panonun üst barında, ekran koruyucuda ve hazır şablonlarda okul adının altında görünür.'
+                ? `Seçilmezse addan ayrılır: "${splitSchoolName(v.name).type}". Yalnızca farklı göstermek isterseniz seçin.`
+                : 'Panonun üst barında, ekran koruyucuda ve hazır şablonlarda okul adının altında görünür. Listede yoksa "Diğer (kendim yazayım)" seçin.'
             }
             error={!v.settings.schoolType?.trim() && !splitSchoolName(v.name).type ? 'Okul türü boş: panoda okul adının altı boş kalıyor.' : undefined}
           >
-            {(id) => (
-              <>
-                <Input
-                  id={id}
-                  list="school-types"
-                  value={v.settings.schoolType ?? ''}
-                  onChange={(e) => setting('schoolType', e.target.value)}
-                  placeholder={splitSchoolName(v.name).type ?? 'ör. Mesleki ve Teknik Anadolu Lisesi'}
-                />
-                <datalist id="school-types">
-                  {SCHOOL_TYPES.map((t) => (
-                    <option key={t} value={t} />
-                  ))}
-                </datalist>
-              </>
-            )}
+            {(id) => <SchoolTypeField id={id} value={v.settings.schoolType ?? ''} derived={splitSchoolName(v.name).type} onChange={(t) => setting('schoolType', t)} />}
           </Field>
           <Field label="Logo" help="Şeffaf arka planlı PNG önerilir.">
             {() => (

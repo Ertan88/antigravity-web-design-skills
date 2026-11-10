@@ -11,7 +11,14 @@ export const SCHOOL_TYPES = [
   'Mesleki Eğitim Merkezi',
   'İmam Hatip Ortaokulu',
   'Bilim ve Sanat Merkezi',
+  'Rehberlik ve Araştırma Merkezi',
+  'Halk Eğitim Merkezi',
+  'Olgunlaşma Enstitüsü',
+  'Özel Eğitim Uygulama Okulu',
+  'Özel Eğitim Meslek Okulu',
+  'Özel Eğitim Anaokulu',
   'Özel Eğitim Okulu',
+  'Açık Öğretim Lisesi',
   'Anadolu Lisesi',
   'Fen Lisesi',
   'Spor Lisesi',
@@ -20,6 +27,35 @@ export const SCHOOL_TYPES = [
   'Anaokulu',
   'Koleji',
   'Lisesi',
+];
+
+/**
+ * Ayarlarda ve kayıtta açılır kutuda gösterilen MEB kurum türleri (kademe sırasıyla). Listede olmayan tür
+ * "Diğer (kendim yazayım)" ile elle yazılır; addan tür ayırmada SCHOOL_TYPES (genel ekler dahil) kullanılır.
+ */
+export const SCHOOL_TYPE_OPTIONS = [
+  'Anaokulu',
+  'İlkokulu',
+  'Ortaokulu',
+  'İmam Hatip Ortaokulu',
+  'Anadolu Lisesi',
+  'Fen Lisesi',
+  'Sosyal Bilimler Lisesi',
+  'Anadolu İmam Hatip Lisesi',
+  'Mesleki ve Teknik Anadolu Lisesi',
+  'Çok Programlı Anadolu Lisesi',
+  'Güzel Sanatlar Lisesi',
+  'Spor Lisesi',
+  'Açık Öğretim Lisesi',
+  'Mesleki Eğitim Merkezi',
+  'Özel Eğitim Anaokulu',
+  'Özel Eğitim Uygulama Okulu',
+  'Özel Eğitim Meslek Okulu',
+  'Bilim ve Sanat Merkezi',
+  'Rehberlik ve Araştırma Merkezi',
+  'Halk Eğitim Merkezi',
+  'Olgunlaşma Enstitüsü',
+  'Koleji',
 ];
 
 /** Okul adlarında sık yazılan kısaltmalar: "… MTAL" -> Mesleki ve Teknik Anadolu Lisesi */
@@ -33,6 +69,8 @@ const ABBREVIATIONS: Record<string, string> = {
   mem: 'Mesleki Eğitim Merkezi',
   iho: 'İmam Hatip Ortaokulu',
   bilsem: 'Bilim ve Sanat Merkezi',
+  ram: 'Rehberlik ve Araştırma Merkezi',
+  hem: 'Halk Eğitim Merkezi',
   al: 'Anadolu Lisesi',
   fl: 'Fen Lisesi',
 };
@@ -80,6 +118,8 @@ const TYPE_ABBR: Record<string, string> = {
   'mesleki eğitim merkezi': 'MEM',
   'imam hatip ortaokulu': 'İHO',
   'bilim ve sanat merkezi': 'BİLSEM',
+  'rehberlik ve araştırma merkezi': 'RAM',
+  'halk eğitim merkezi': 'HEM',
   'anadolu lisesi': 'AL',
   'fen lisesi': 'FL',
   'spor lisesi': 'SL',

@@ -1,6 +1,8 @@
 import { createSchoolSchema, PLANS, trialStatus, type Plan, errorText } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Building2, Check, Download, Inbox, Lock, Plus, Trash2 } from '../components/icons.tsx';
+import { ArrowLeftRight, Building2, Check, Download, Inbox, Lock, Plus, Trash2 } from '../components/icons.tsx';
+import { OwnerTransferDialog, type TransferResult } from '../components/OwnerTransferDialog.tsx';
+import { InviteDialog, type InviteResult } from './users/Credentials.tsx';
 import { useState } from 'react';
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Badge, Button, Card, EmptyState, Field, IconButton, Input, Modal, PageHeader, Select, Spinner, Table, Td, Toggle } from '../components/ui.tsx';
@@ -20,6 +22,8 @@ type Row = School & {
   member: boolean;
   /** Okul verileri panelde açılabilir: üyelik ya da süreli destek erişimi (KVKK) */
   canOpen: boolean;
+  /** Okulun müdürü (ad ve e-posta; üye listesi platforma açık değil) */
+  owner: { fullName: string; email: string } | null;
 };
 
 interface Signup {
@@ -48,6 +52,8 @@ export function Platform() {
   const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState<Row | null>(null);
   const [confirmSlug, setConfirmSlug] = useState('');
+  const [ownerOf, setOwnerOf] = useState<Row | null>(null);
+  const [invited, setInvited] = useState<InviteResult | null>(null);
   const form = useForm<Form>(empty);
   const v = form.values;
 
@@ -194,6 +200,15 @@ export function Platform() {
                     {s.slug}
                     {s.contactPhone && ` · ${s.contactPhone}`}
                   </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs">
+                    <span className="text-slate-600">
+                      Müdür: {s.owner ? <span className="font-medium text-ink">{s.owner.fullName}</span> : <span className="text-amber-700">atanmamış</span>}
+                      {s.owner && <span className="text-slate-500"> · {s.owner.email}</span>}
+                    </span>
+                    <button type="button" className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline" onClick={() => setOwnerOf(s)}>
+                      <ArrowLeftRight className="size-3.5" /> Müdürü değiştir
+                    </button>
+                  </div>
                 </Td>
                 <Td>
                   <Select value={s.plan} onChange={(e) => patch.mutate({ id: s.id, body: { plan: e.target.value as Plan } })} className="h-9 w-36" aria-label="Paket">
@@ -267,6 +282,23 @@ export function Platform() {
           </Table>
         )}
       </Card>
+
+      <OwnerTransferDialog
+        open={ownerOf !== null}
+        onClose={() => setOwnerOf(null)}
+        schoolName={ownerOf?.name ?? ''}
+        currentOwner={ownerOf?.owner ?? null}
+        ownerIsMe={false}
+        onSubmit={async (body) => {
+          const r = await api<TransferResult>(`/api/platform/schools/${ownerOf!.id}/owner`, { method: 'PUT', body });
+          setOwnerOf(null);
+          toast.success(`${ownerOf!.name} okulunun müdürü artık ${r.newOwner.fullName}`);
+          if (r.invite) setInvited({ email: r.newOwner.email, fullName: r.newOwner.fullName, ...r.invite });
+          await Promise.all([qc.invalidateQueries({ queryKey: ['platform'] }), reloadMe()]);
+          return r;
+        }}
+      />
+      <InviteDialog value={invited} onClose={() => setInvited(null)} />
 
       <Modal
         open={deleting !== null}

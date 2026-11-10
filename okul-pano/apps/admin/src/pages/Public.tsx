@@ -1,4 +1,4 @@
-import { SCHOOL_TYPES, errorText } from '@okulpano/shared';
+import { SCHOOL_TYPE_OPTIONS, errorText } from '@okulpano/shared';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, CheckCircle2, MailCheck } from '../components/icons.tsx';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -158,7 +158,7 @@ export function Signup() {
                 <option value="" disabled>
                   Seçin
                 </option>
-                {SCHOOL_TYPES.map((t) => (
+                {SCHOOL_TYPE_OPTIONS.map((t) => (
                   <option key={t} value={t}>
                     {t}
                   </option>

@@ -814,3 +814,17 @@ export const enrollFinishSchema = z.object({
   existingPassword: z.string().max(200).optional(),
 });
 export const enrollApproveSchema = z.object({ role: z.enum(['admin', 'teacher', 'counselor']).optional() });
+
+/**
+ * Okul müdürlüğü devri: yeni müdür okuldaki bir kullanıcı (memberId) ya da e-postayla davet edilen kişi.
+ * Eski müdür yönetici olarak kalır (admin) ya da okuldan çıkar (leave).
+ */
+export const ownershipTransferSchema = z
+  .object({
+    memberId: z.uuid().optional(),
+    email: z.email('Geçerli bir e-posta girin').max(160).optional(),
+    fullName: z.string().trim().min(3, 'Ad soyad en az 3 karakter').max(80).optional(),
+    keep: z.enum(['admin', 'leave']).default('admin'),
+  })
+  .refine((v) => Boolean(v.memberId) || (Boolean(v.email) && Boolean(v.fullName)), { message: 'Yeni müdürü seçin ya da adını ve e-postasını yazın', path: ['email'] });
+export type OwnershipTransferInput = z.infer<typeof ownershipTransferSchema>;
