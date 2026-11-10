@@ -100,7 +100,7 @@ export default function Kisiler() {
         <Duties people={people} membersPath={membersPath} refresh={refresh} />
       ) : (
         <>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
             {(
               [
                 ['all', 'Tümü'],

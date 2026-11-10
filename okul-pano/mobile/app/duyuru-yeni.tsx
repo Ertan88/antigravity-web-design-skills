@@ -137,7 +137,7 @@ export default function DuyuruYeni() {
       />
 
       {kind === 'design' && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
           {ANNOUNCEMENT_TEMPLATES.map((x) => (
             <Chip key={x.id} label={x.name} selected={x.id === templateId} onPress={() => setTemplateId(x.id)} />
           ))}

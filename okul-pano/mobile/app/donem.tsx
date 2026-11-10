@@ -75,7 +75,7 @@ export default function Donem() {
           { value: 'mine', label: 'Yalnızca benim' },
         ]}
       />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
         {(classes.data ?? []).map((c) => {
           const on = c.id === active;
           return (
