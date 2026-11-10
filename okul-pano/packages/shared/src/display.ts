@@ -23,6 +23,8 @@ export interface DisplayState {
     logoUrl: string | null;
     timezone: string;
     city: string | null;
+    /** Okulun konumu (enlem/boylam) seçilmiş mi: seçilmemişse hava durumu gelmez, panoda bu söylenir */
+    hasLocation?: boolean;
     settings: SchoolSettings;
     /** Deneme süresi doldu: pano içerik yerine "abonelik sona erdi" ekranı gösterir */
     subscriptionEnded?: boolean;

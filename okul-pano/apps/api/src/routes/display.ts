@@ -271,6 +271,7 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
       logoUrl: school.logoUrl,
       timezone: tz,
       city: school.city,
+      hasLocation: school.latitude != null && school.longitude != null,
       settings,
       subscriptionEnded: Boolean(trialStatus(school)?.expired),
     },

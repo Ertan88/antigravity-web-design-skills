@@ -25,6 +25,8 @@ interface Props {
   now: Date;
   weather: WeatherNow | null;
   city: string | null;
+  /** Okulun konumu seçilmiş mi (seçilmemişse hava durumu yerine bu söylenir) */
+  hasLocation?: boolean;
   connection: Connection;
   lastUpdated: number | null;
   /** O günün özel teması (millî bayram, 10 Kasım…): üst barın ortasında filigran */
@@ -41,6 +43,7 @@ export function Header({
   now,
   weather,
   city,
+  hasLocation,
   connection,
   lastUpdated,
   specialId,
@@ -100,7 +103,7 @@ export function Header({
               </div>
             </div>
           ) : (
-            <div className="weather-cond muted">Hava durumu bekleniyor</div>
+            <div className="weather-cond muted">{hasLocation === false ? 'Konum seçilmemiş · Ayarlar → Konum' : 'Hava durumu bekleniyor'}</div>
           )}
         </div>
 

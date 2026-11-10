@@ -105,7 +105,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
                 <WifiOffIcon size={24} /> Sunucuya bağlanılamıyor, yeniden deneniyor…
               </>
             ) : connection === 'unauthorized' ? (
-              'Önizleme süresi doldu. Paneli yenileyin.'
+              'Önizleme süresi doldu. TV için panoyu eşleştirin.'
             ) : (
               'Yükleniyor…'
             )}
@@ -395,6 +395,8 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
     NATIONAL_DAYS.has(today.monthDay) ? 'day-national' : '',
     mourning ? 'day-mourning' : '',
     special?.decor === 'festive' ? 'day-festive' : '',
+    // Zeminde özel gün süslemesi var: kartlar opak olur, süsleme yalnızca kartların arasında görünür
+    special ? 'has-decor' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -527,6 +529,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         now={now}
         weather={weather}
         city={school.city}
+        hasLocation={school.hasLocation}
         connection={connection}
         lastUpdated={lastUpdated}
         specialId={special?.id}

@@ -1,10 +1,33 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { resolveAuth, saveDeviceToken, type DisplayAuth } from './api.ts';
 import { Board } from './Board.tsx';
+import { PreviewBadge } from './components/PreviewBadge.tsx';
 import { Pairing } from './Pairing.tsx';
+
+/** Fare 3 saniye kıpırdamazsa imleç gizlenir (TV'de ekranın ortasında kalmasın); oynayınca geri gelir */
+function useAutoHideCursor() {
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const hide = () => document.body.classList.add('cursor-hidden');
+    const show = () => {
+      document.body.classList.remove('cursor-hidden');
+      clearTimeout(timer);
+      timer = setTimeout(hide, 3000);
+    };
+    show();
+    window.addEventListener('mousemove', show);
+    window.addEventListener('mousedown', show);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('mousemove', show);
+      window.removeEventListener('mousedown', show);
+    };
+  }, []);
+}
 
 export function App() {
   const [auth, setAuth] = useState<DisplayAuth | null>(() => resolveAuth());
+  useAutoHideCursor();
 
   const onUnauthorized = useCallback(() => {
     if (auth?.preview) return;
@@ -19,5 +42,10 @@ export function App() {
   }, []);
 
   if (!auth) return <Pairing onPaired={onPaired} />;
-  return <Board key={auth.token} auth={auth} onUnauthorized={onUnauthorized} />;
+  return (
+    <>
+      <Board key={auth.token} auth={auth} onUnauthorized={onUnauthorized} />
+      {auth.preview && <PreviewBadge token={auth.token} />}
+    </>
+  );
 }

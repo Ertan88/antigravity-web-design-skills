@@ -1555,12 +1555,14 @@ p {
   border-color: color-mix(in srgb, var(--hue) 30%, transparent);
 }
 
-/* Zil sayacı: büyük rakamlar degrade */
+/* Zil sayacı: büyük rakamlar kartın vurgu renginde, düz renk (degrade TV'lerde rakamların altında koyu bir
+   şerit gibi görünüyordu) */
 .bell-countdown {
-  background: linear-gradient(180deg, var(--text) 30%, color-mix(in srgb, var(--hue) 70%, var(--text)));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: color-mix(in srgb, var(--hue, var(--primary)) 70%, white);
+}
+
+.theme-light .bell-countdown {
+  color: color-mix(in srgb, var(--hue, var(--primary)) 82%, black);
 }
 
 .bell-card.urgent .bell-countdown {
@@ -2485,6 +2487,12 @@ p {
   opacity: 0.1;
 }
 
+/* Süsleme kartların içinden görünmesin: koyu klasik temada yarı saydam kartların zemini, aynı görünümde opak
+   olur (açık tema ve Bento/Canlı kartları zaten opaktır) */
+.has-decor.theme-dark:not(.style-bento):not(.style-vivid):not(.contrast-high) .card {
+  background-color: color-mix(in srgb, white 4.5%, var(--bg));
+}
+
 .stage > .body,
 .stage > .footer {
   position: relative;
@@ -3274,4 +3282,60 @@ p {
   font-size: 14px;
   font-weight: 600;
   opacity: 0.72;
+}
+
+/* Fare kıpırdamayınca imleç gizlenir (App.tsx) */
+body.cursor-hidden,
+body.cursor-hidden * {
+  cursor: none !important;
+}
+
+/* Panelden açılan önizleme: üst ortada kalan süre rozeti ve süre dolunca uyarı (components/PreviewBadge.tsx) */
+.preview-badge {
+  position: fixed;
+  top: 1.2vh;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  padding: 0.9vh 1.6vh;
+  border-radius: 999px;
+  background: #fbbf24;
+  color: #1c1917;
+  font: 700 1.8vh/1 'Inter Variable', 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  box-shadow: 0 0.6vh 2vh rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.preview-expired {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4vh;
+  background: rgba(8, 14, 28, 0.88);
+  color: #f1f5f9;
+  font-family: 'Inter Variable', 'Inter', system-ui, sans-serif;
+}
+
+.preview-expired-box {
+  max-width: 120vh;
+  text-align: center;
+  font-size: 2.6vh;
+  line-height: 1.5;
+}
+
+.preview-expired-box b {
+  color: #fbbf24;
+  word-break: break-all;
+}
+
+.preview-expired-title {
+  font-size: 5vh;
+  font-weight: 800;
+  margin-bottom: 1.5vh;
+  color: #fbbf24;
 }
