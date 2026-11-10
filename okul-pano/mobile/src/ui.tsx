@@ -1,6 +1,6 @@
 import { errorText } from '@okulpano/shared';
 import { router, usePathname, useRoute } from 'expo-router';
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ComponentRef, type ReactNode } from 'react';
 import { ActivityIndicator, Animated, Easing, Keyboard, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, TextInput as NativeTextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 import { Text, TextInput } from './text.tsx';
 import { ICONS, type IconName } from './icons.tsx';
@@ -68,6 +68,84 @@ export function revealFocused(scroller: ComponentRef<typeof ScrollView> | null, 
 
 /** Yazı kutusu odaklanınca bulunduğu kaydırma alanına "beni göster" der (Screen ve SheetScroll sağlar) */
 export const FocusRevealContext = createContext<(() => void) | null>(null);
+
+type InputRef = ComponentRef<typeof NativeTextInput>;
+type ChainEntry = { ref: { current: InputRef | null }; y: number; seq: number; skip: boolean };
+
+/**
+ * Bir ekrandaki (ya da alttan açılan sayfadaki) yazı kutularının sırası: kutular ekrandaki yerlerine göre
+ * (yukarıdan aşağı) dizilir. Altında başka kutu olan kutunun klavye tuşu "İleri" olur ve sonrakine geçer;
+ * son kutununki "Tamam" olur ve klavyeyi kapatır.
+ */
+export class FieldChain {
+  private entries = new Map<number, ChainEntry>();
+  private listeners = new Set<() => void>();
+  private seq = 0;
+  private version = 0;
+  constructor(private getInner: () => unknown) {}
+
+  subscribe = (fn: () => void) => {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
+  };
+  snapshot = () => this.version;
+  private changed() {
+    this.version++;
+    for (const fn of this.listeners) fn();
+  }
+
+  register(ref: ChainEntry['ref'], skip: boolean): number {
+    const id = ++this.seq;
+    this.entries.set(id, { ref, y: Number.MAX_SAFE_INTEGER / 2 + id, seq: id, skip });
+    this.changed();
+    return id;
+  }
+  unregister(id: number) {
+    if (this.entries.delete(id)) this.changed();
+  }
+  setSkip(id: number, skip: boolean) {
+    const e = this.entries.get(id);
+    if (e && e.skip !== skip) {
+      e.skip = skip;
+      this.changed();
+    }
+  }
+  /** Kutunun ekrandaki yeri ölçülür (kaydırma alanının içine göre) */
+  measure(id: number) {
+    const e = this.entries.get(id);
+    const inner = this.getInner();
+    if (!e?.ref.current || !inner) return;
+    e.ref.current.measureLayout(
+      inner as never,
+      (_x, y) => {
+        if (Math.abs(e.y - y) > 0.5) {
+          e.y = y;
+          this.changed();
+        }
+      },
+      () => undefined,
+    );
+  }
+  private ordered() {
+    return [...this.entries.entries()].filter(([, e]) => !e.skip).sort((a, b) => a[1].y - b[1].y || a[1].seq - b[1].seq);
+  }
+  next(id: number): ChainEntry | null {
+    const list = this.ordered();
+    const i = list.findIndex(([k]) => k === id);
+    return i >= 0 ? (list[i + 1]?.[1] ?? null) : null;
+  }
+}
+
+export const FieldChainContext = createContext<FieldChain | null>(null);
+
+const noopSubscribe = () => () => undefined;
+const zero = () => 0;
+
+/** Ekran ya da sayfa kendi kutu sırasını tutar */
+export function useFieldChain(getInner: () => unknown): FieldChain {
+  const [chain] = useState(() => new FieldChain(getInner));
+  return chain;
+}
 
 export function Screen({
   title,
@@ -151,10 +229,13 @@ export function Screen({
     onRefresh?.();
     setTimeout(() => !sawRefresh.current && setPulled(false), 600);
   };
+  const chain = useFieldChain(() => scroller.current?.getInnerViewRef?.() ?? null);
   const body = (
-    <FocusRevealContext.Provider value={reveal}>
-      <View style={styles.body}>{children}</View>
-    </FocusRevealContext.Provider>
+    <FieldChainContext.Provider value={chain}>
+      <FocusRevealContext.Provider value={reveal}>
+        <View style={styles.body}>{children}</View>
+      </FocusRevealContext.Provider>
+    </FieldChainContext.Provider>
   );
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: bg }]} edges={['top', 'left', 'right']}>
@@ -380,21 +461,67 @@ export function Segmented<V extends string>({ options, value, onChange }: { opti
 
 export function Field({ label, error, help, ...input }: TextInputProps & { label: string; error?: string | null; help?: string }) {
   const reveal = useContext(FocusRevealContext);
+  const chain = useContext(FieldChainContext);
+  const ref = useRef<InputRef | null>(null);
+  const id = useRef(0);
+  const [focused, setFocused] = useState(false);
+  // Çok satırlı ve kapalı kutular sıraya girmez (Enter alt satıra geçer / yazılamaz)
+  const skip = Boolean(input.multiline) || input.editable === false;
+  useEffect(() => {
+    if (!chain) return;
+    id.current = chain.register(ref, skip);
+    return () => chain.unregister(id.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chain]);
+  useEffect(() => {
+    chain?.setSkip(id.current, skip);
+  }, [chain, skip]);
+  // Sıra değişince (kutu eklendi / kalktı / yer değiştirdi) klavye tuşu yeniden belirlenir
+  useSyncExternalStore(chain?.subscribe ?? noopSubscribe, chain?.snapshot ?? zero);
+  const next = chain && !skip ? chain.next(id.current) : null;
+  // Ekran kendi tuşunu belirlediyse (ör. giriş ekranında "Git") ona dokunulmaz
+  const own = input.returnKeyType !== undefined || input.onSubmitEditing !== undefined;
+  const chained = !own && !skip && chain !== null;
   return (
     <View style={{ gap: 6 }}>
       <Text style={styles.fieldLabel}>{label}</Text>
       {/* Kutu yuvarlak köşelerle kırpılır: sistemin doldurma / seçim zemini köşelerden taşmaz */}
       <View style={{ borderRadius: radius.md, overflow: 'hidden' }}>
         <TextInput
+          ref={ref}
           accessibilityLabel={label}
           placeholderTextColor={colors.subtle}
+          {...(chained ? { returnKeyType: next ? 'next' : 'done', submitBehavior: next ? 'submit' : 'blurAndSubmit' } : {})}
           {...input}
+          onLayout={(e) => {
+            input.onLayout?.(e);
+            chain?.measure(id.current);
+          }}
           onFocus={(e) => {
             input.onFocus?.(e);
+            setFocused(true);
+            chain?.measure(id.current);
             // "İleri" ile gelindiğinde klavye zaten açıktır: kutu klavyenin altında kalmasın
             reveal?.();
           }}
-          style={[styles.input, input.multiline && { height: undefined, minHeight: 92, paddingTop: 12, textAlignVertical: 'top' }, error ? { borderColor: colors.danger } : null, input.style]}
+          onBlur={(e) => {
+            input.onBlur?.(e);
+            setFocused(false);
+          }}
+          onSubmitEditing={(e) => {
+            input.onSubmitEditing?.(e);
+            if (chained && next) next.ref.current?.focus();
+          }}
+          style={[
+            styles.input,
+            input.multiline && { height: undefined, minHeight: 92, paddingTop: 12, textAlignVertical: 'top' },
+            // Yazılan kutu belli olsun: kalın, vurgu renginde çerçeve (kalınlık farkı iç boşluktan düşülür)
+            focused && { borderWidth: 2, borderColor: colors.info, paddingHorizontal: 15 },
+            // Web'de tarayıcının kendi odak çizgisi bu çerçevenin üstüne binmesin
+            Platform.OS === 'web' && ({ outlineStyle: 'none' } as object),
+            error ? { borderColor: colors.danger } : null,
+            input.style,
+          ]}
         />
       </View>
       {error ? <Text style={{ color: colors.danger, fontSize: 13 }}>{error}</Text> : help ? <Text style={{ color: colors.faint, fontSize: 12 }}>{help}</Text> : null}

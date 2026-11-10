@@ -2,11 +2,13 @@ import { useCallback, useEffect, useRef, type ComponentRef, type ReactNode } fro
 import { Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from './theme.ts';
-import { FocusRevealContext, revealFocused } from './ui.tsx';
+import { FieldChainContext, FocusRevealContext, revealFocused, useFieldChain } from './ui.tsx';
 
 /** Alttan açılan sayfa (klavye açılınca yukarı kalkar) */
 export function Sheet({ open, onClose, children }: { open: boolean; onClose: () => void; children: ReactNode }) {
   const insets = useSafeAreaInsets();
+  // Sayfanın kutuları arkadaki ekranın sırasına karışmaz: "İleri" sayfanın içinde kalır
+  const chain = useFieldChain(() => null);
   return (
     <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
       {/* Android'de de: kenardan kenara çizimde pencere klavyeyle küçülmez, sayfa klavyenin üstüne kendisi kalkar */}
@@ -44,7 +46,9 @@ export function Sheet({ open, onClose, children }: { open: boolean; onClose: () 
               marginBottom: 10,
             }}
           />
-          {children}
+          <FieldChainContext.Provider value={chain}>
+            <FocusRevealContext.Provider value={null}>{children}</FocusRevealContext.Provider>
+          </FieldChainContext.Provider>
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -66,7 +70,10 @@ export function SheetScroll({ children, style, contentContainerStyle }: { childr
     const sub = Keyboard.addListener('keyboardDidShow', reveal);
     return () => sub.remove();
   }, [reveal]);
+  // Sayfadaki kutuların kendi sırası ("İleri" / "Tamam")
+  const chain = useFieldChain(() => ref.current?.getInnerViewRef?.() ?? null);
   return (
+    <FieldChainContext.Provider value={chain}>
     <FocusRevealContext.Provider value={reveal}>
       <ScrollView
         ref={ref}
@@ -81,5 +88,6 @@ export function SheetScroll({ children, style, contentContainerStyle }: { childr
         {children}
       </ScrollView>
     </FocusRevealContext.Provider>
+    </FieldChainContext.Provider>
   );
 }
