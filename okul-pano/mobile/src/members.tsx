@@ -50,7 +50,7 @@ export function TeacherPicker({ value, teachers, onChange, disabled }: { value: 
           placeholderTextColor={colors.subtle}
           style={{ marginTop: 10, height: 46, flexShrink: 0, borderRadius: radius.md, borderWidth: 1, borderColor: colors.borderStrong, paddingHorizontal: 14, fontSize: 15, color: colors.ink, backgroundColor: colors.card }}
         />
-        <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 8 }} keyboardShouldPersistTaps="handled">
+        <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 8, flexShrink: 1 }} keyboardShouldPersistTaps="handled">
           {[{ id: null as string | null, fullName: 'Öğretmen değil' }, ...list].map((t) => {
             const on = t.id === value;
             return (

@@ -1,6 +1,6 @@
 import { errorText } from '@okulpano/shared';
 import { router, usePathname, useRoute } from 'expo-router';
-import { useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { ActivityIndicator, Animated, Easing, Keyboard, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, TextInput as NativeTextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 import { Text, TextInput } from './text.tsx';
 import { ICONS, type IconName } from './icons.tsx';
@@ -43,6 +43,31 @@ function useScrollKey(): string {
     return pathname;
   }
 }
+
+/**
+ * Odaktaki yazı kutusunu, içinde bulunduğu kaydırma alanında klavyenin üstünde görünür kılar. Klavye ilk
+ * açıldığında da, klavyedeki "İleri" ile sonraki kutuya geçildiğinde de (klavye zaten açıkken) çağrılır.
+ */
+export function revealFocused(scroller: ComponentRef<typeof ScrollView> | null, viewHeight: number, offset: number, below = 96) {
+  // Web'de tarayıcı odaktaki kutuyu kendisi gösterir (bu işlev orada yoktur)
+  if (Platform.OS === 'web' || typeof NativeTextInput.State?.currentlyFocusedInput !== 'function') return;
+  const input = NativeTextInput.State.currentlyFocusedInput();
+  const inner = scroller?.getInnerViewRef?.();
+  if (!input || !inner || !viewHeight) return;
+  input.measureLayout(
+    inner as never,
+    (_x, y, _w, h) => {
+      const top = y - 24;
+      const bottom = y + h + below;
+      if (top < offset) scroller?.scrollTo({ y: Math.max(0, top), animated: true });
+      else if (bottom > offset + viewHeight) scroller?.scrollTo({ y: bottom - viewHeight, animated: true });
+    },
+    () => undefined,
+  );
+}
+
+/** Yazı kutusu odaklanınca bulunduğu kaydırma alanına "beni göster" der (Screen ve SheetScroll sağlar) */
+export const FocusRevealContext = createContext<(() => void) | null>(null);
 
 export function Screen({
   title,
@@ -98,28 +123,17 @@ export function Screen({
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path]);
-  // Klavye açılınca odaktaki yazı kutusu klavyenin üstünde kalacak şekilde kaydırılır
+  // Odaktaki yazı kutusu klavyenin üstünde kalacak şekilde kaydırılır: klavye açılınca ve kutudan kutuya geçince.
+  // İçerik kısaldıktan sonra ölçülür (görünen yükseklik güncellensin)
+  const reveal = useCallback(() => {
+    if (!scroll) return;
+    setTimeout(() => revealFocused(scroller.current, viewH.current, scrollMemory.get(path) ?? 0), 120);
+  }, [scroll, path]);
   useEffect(() => {
     if (!scroll) return;
-    // İçerik kısaldıktan sonra ölçülür (görünen yükseklik güncellensin)
-    const sub = Keyboard.addListener('keyboardDidShow', () => setTimeout(() => {
-      const input = NativeTextInput.State.currentlyFocusedInput();
-      const inner = scroller.current?.getInnerViewRef?.();
-      if (!input || !inner) return;
-      input.measureLayout(
-        inner as never,
-        (_x, y, _w, h) => {
-          const top = y - 24;
-          const bottom = y + h + 96;
-          const current = scrollMemory.get(path) ?? 0;
-          if (top < current) scroller.current?.scrollTo({ y: Math.max(0, top), animated: true });
-          else if (bottom > current + viewH.current) scroller.current?.scrollTo({ y: bottom - viewH.current, animated: true });
-        },
-        () => undefined,
-      );
-    }, 80));
+    const sub = Keyboard.addListener('keyboardDidShow', reveal);
     return () => sub.remove();
-  }, [scroll, path]);
+  }, [scroll, reveal]);
   // Yenileme simgesi yalnızca kullanıcı aşağı çekince görünür; ekran açılırken arkada yapılan tazelemede görünmez
   const [pulled, setPulled] = useState(false);
   const sawRefresh = useRef(false);
@@ -137,7 +151,11 @@ export function Screen({
     onRefresh?.();
     setTimeout(() => !sawRefresh.current && setPulled(false), 600);
   };
-  const body = <View style={styles.body}>{children}</View>;
+  const body = (
+    <FocusRevealContext.Provider value={reveal}>
+      <View style={styles.body}>{children}</View>
+    </FocusRevealContext.Provider>
+  );
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: bg }]} edges={['top', 'left', 'right']}>
       {(title || back) && (
@@ -361,6 +379,7 @@ export function Segmented<V extends string>({ options, value, onChange }: { opti
 }
 
 export function Field({ label, error, help, ...input }: TextInputProps & { label: string; error?: string | null; help?: string }) {
+  const reveal = useContext(FocusRevealContext);
   return (
     <View style={{ gap: 6 }}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -370,6 +389,11 @@ export function Field({ label, error, help, ...input }: TextInputProps & { label
           accessibilityLabel={label}
           placeholderTextColor={colors.subtle}
           {...input}
+          onFocus={(e) => {
+            input.onFocus?.(e);
+            // "İleri" ile gelindiğinde klavye zaten açıktır: kutu klavyenin altında kalmasın
+            reveal?.();
+          }}
           style={[styles.input, input.multiline && { height: undefined, minHeight: 92, paddingTop: 12, textAlignVertical: 'top' }, error ? { borderColor: colors.danger } : null, input.style]}
         />
       </View>

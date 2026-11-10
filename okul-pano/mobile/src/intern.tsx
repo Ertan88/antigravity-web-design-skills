@@ -309,7 +309,7 @@ export function SendSheet({ rows, onClose, onSent }: { rows: PendingMark[]; onCl
       <T size={12.5} color={colors.faint} style={{ marginTop: 4 }}>
         Kontrol edip göndermek istediklerinizi seçin; seçmedikleriniz sonra gönderilmek üzere bekler.
       </T>
-      <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 300, marginTop: 10 }}>
+      <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 300, marginTop: 10, flexShrink: 1 }}>
         {groups.map((g) => {
           const r = g.list[0]!;
           const on = !off.has(g.key);

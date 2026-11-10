@@ -326,7 +326,7 @@ export default function HesapAc() {
             </Button>
           </View>
         )}
-        <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 4, maxHeight: 420 }} keyboardShouldPersistTaps="handled">
+        <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 4, maxHeight: 420, flexShrink: 1 }} keyboardShouldPersistTaps="handled">
           {listed.map((p) => {
             const on = isPicked(p.key);
             return (

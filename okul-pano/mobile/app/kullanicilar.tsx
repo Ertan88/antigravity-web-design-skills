@@ -300,7 +300,7 @@ function Duties({ people, membersPath, refresh }: { people: Person[]; membersPat
           </T>
         )}
         <Field label="Ara" value={q} onChangeText={setQ} placeholder="Ad ya da branş" />
-        <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 4, maxHeight: 380 }} keyboardShouldPersistTaps="handled">
+        <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 4, maxHeight: 380, flexShrink: 1 }} keyboardShouldPersistTaps="handled">
           {picking &&
             candidates(picking).map((p) => (
               <Pressable key={p.key} accessibilityRole="button" onPress={() => void add(picking, p)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: colors.divider }}>

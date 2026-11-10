@@ -1,11 +1,11 @@
 import { errorText } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Linking, Pressable, ScrollView, View } from 'react-native';
+import { Linking, Pressable, View } from 'react-native';
 import { api } from '../src/api.ts';
 import { useAuth, useSchoolPath } from '../src/auth.tsx';
 import { useInternshipAccess, useSchoolQuery } from '../src/data.ts';
-import { Sheet } from '../src/sheet.tsx';
+import { Sheet, SheetScroll } from '../src/sheet.tsx';
 import { Text } from '../src/text.tsx';
 import { colors } from '../src/theme.ts';
 import { Icon, Button, Card, confirm, Empty, ErrorNote, Field, Loading, Screen, T } from '../src/ui.tsx';
@@ -202,7 +202,7 @@ function InfoSheet({ business, onClose, onSaved }: { business: Business | null; 
           Alanı öğretmen kadrosundaki branşınızdan gelir; koordinatörü siz olursunuz. Öğrencileri yönetim panelinden seçebilirsiniz.
         </T>
       )}
-      <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 440 }} contentContainerStyle={{ gap: 10 }} keyboardShouldPersistTaps="handled">
+      <SheetScroll style={{ maxHeight: 440 }} contentContainerStyle={{ gap: 10 }}>
         {INFO_FIELDS.map((f) => (
           <Field
             key={f.key}
@@ -214,7 +214,7 @@ function InfoSheet({ business, onClose, onSaved }: { business: Business | null; 
             autoCapitalize={f.keyboard === 'email-address' ? 'none' : 'sentences'}
           />
         ))}
-      </ScrollView>
+      </SheetScroll>
       {error && (
         <T size={13} color={colors.danger} style={{ marginTop: 8 }}>
           {error}

@@ -5,7 +5,7 @@ import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { api } from '../src/api.ts';
 import { useAuth, useSchoolPath } from '../src/auth.tsx';
 import { useSchoolQuery } from '../src/data.ts';
-import { Sheet } from '../src/sheet.tsx';
+import { Sheet, SheetScroll } from '../src/sheet.tsx';
 import { Text } from '../src/text.tsx';
 import { colors, radius } from '../src/theme.ts';
 import { Avatar, Badge, Button, Card, Chip, confirm, Empty, ErrorNote, Field, Icon, Loading, Screen, T, ToggleRow } from '../src/ui.tsx';
@@ -201,14 +201,14 @@ function EditSheet({ teacher, branches, titles, onClose }: { teacher: Teacher | 
       <T size={12.5} color={colors.faint} style={{ marginBottom: 8 }}>
         {teacher ? 'Kadro bilgilerini düzenle' : 'Kadroya yeni öğretmen'}
       </T>
-      <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 470 }} contentContainerStyle={{ gap: 10 }} keyboardShouldPersistTaps="handled">
+      <SheetScroll style={{ maxHeight: 470 }} contentContainerStyle={{ gap: 10 }}>
         <Field label="Ad soyad" value={form.fullName} onChangeText={(v) => set('fullName', v)} autoCapitalize="words" />
         <OptionPicker label="Branş" empty="Branş yok" value={form.branchId} options={branches} onChange={(v) => set('branchId', v)} />
         <OptionPicker label="Ünvan" empty="Ünvan yok" value={form.titleId} options={titles} onChange={(v) => set('titleId', v)} />
         <Field label="E-posta (isteğe bağlı)" value={form.email} onChangeText={(v) => set('email', v)} keyboardType="email-address" autoCapitalize="none" />
         <Field label="Telefon (isteğe bağlı)" value={form.phone} onChangeText={(v) => set('phone', v)} keyboardType="phone-pad" />
         <ToggleRow label="Aktif" description="Pasif öğretmen nöbet, ders programı ve hesap açmada seçilmez." value={form.isActive} onChange={(v) => set('isActive', v)} />
-      </ScrollView>
+      </SheetScroll>
       {error && (
         <T size={13} color={colors.danger} style={{ marginTop: 8 }}>
           {error}

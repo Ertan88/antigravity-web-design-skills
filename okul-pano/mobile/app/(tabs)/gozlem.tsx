@@ -369,7 +369,7 @@ function EntrySheet({
           </Text>
         </View>
       </View>
-      <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 6 }} keyboardShouldPersistTaps="handled">
+      <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 6, flexShrink: 1 }} keyboardShouldPersistTaps="handled">
         {!criteria.length && <T color={colors.faint}>Bu sınıfın düzeyi için kriter tanımlanmamış. Okul yönetimi panelden Gözlem Kriterleri'ni eklemeli.</T>}
         {groups.map(({ g, items }) => (
           <View key={g}>
