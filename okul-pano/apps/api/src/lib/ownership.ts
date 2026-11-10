@@ -1,5 +1,5 @@
 import type { OwnershipTransferInput } from '@okulpano/shared';
-import { and, count, eq } from 'drizzle-orm';
+import { and, count, eq, ne } from 'drizzle-orm';
 import type { AppDeps } from '../context.ts';
 import { auditLogs, memberships, schools, users } from '../db/schema.ts';
 import { badRequest, conflict, notFound } from './errors.ts';
@@ -47,6 +47,8 @@ export async function transferOwnership(
       else await tx.update(memberships).set({ role: 'admin', permissions: [] }).where(eq(memberships.id, current.id));
     }
     await tx.update(memberships).set({ role: 'owner', permissions: [] }).where(eq(memberships.id, target!.id));
+    // Eski kayıtlardan kalan fazladan müdür kayıtları yöneticiye iner: okulda tek müdür kalır
+    await tx.update(memberships).set({ role: 'admin', permissions: [] }).where(and(eq(memberships.schoolId, schoolId), eq(memberships.role, 'owner'), ne(memberships.id, target!.id)));
   });
 
   // Eski müdür okuldan çıktıysa ve başka okulda kaydı yoksa hesabı da silinir (platform yöneticisi hariç)

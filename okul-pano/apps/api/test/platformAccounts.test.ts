@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { eq } from 'drizzle-orm';
+import { memberships, users } from '../src/db/schema.ts';
 import { client, createTestApp, expectStatus, login, SUPER, type TestCtx } from './helpers.ts';
 
 /* Platform: hesabı tam e-postayla bul, müdür olmayan hesabı sil, yeni şifre ver */
@@ -56,5 +58,21 @@ describe('platform hesap bul', () => {
     const ownerC = client(t.app, (await login(t.app, 'mudur@hesap.test', 'MudurSifre42')).token);
     const list = (await ownerC.get(`/api/schools/${schoolId}/members`)).json() as { email: string }[];
     expect(list.map((m) => m.email)).not.toContain('yardimci@hesap.test');
+  });
+
+  it('eski kayıtlardan kalan ikinci müdür kaydı silinebilir (okulun başka müdürü var)', async () => {
+    const owner = client(t.app, (await login(t.app, 'mudur@hesap.test', 'MudurSifre42')).token);
+    expectStatus(await owner.post(`/api/schools/${schoolId}/members`, { email: 'eskimudur@hesap.test', fullName: 'Eski Kayıt Müdür', password: 'EskiSifre4242', role: 'admin', permissions: [] }), 201);
+    const db = t.app.deps.db;
+    const [u] = await db.select().from(users).where(eq(users.email, 'eskimudur@hesap.test'));
+    await db.update(memberships).set({ role: 'owner' }).where(eq(memberships.userId, u!.id));
+    const acc = (await find('eskimudur@hesap.test')).json();
+    expect(acc.memberships[0]).toMatchObject({ role: 'owner', soleOwner: false });
+    expect((await find('mudur@hesap.test')).json().memberships[0].soleOwner).toBe(false);
+    expectStatus(await root.del(`/api/platform/accounts/${acc.id}`), 204);
+    // Artık tek müdür kalan hesap silinemez
+    const left = (await find('mudur@hesap.test')).json();
+    expect(left.memberships[0].soleOwner).toBe(true);
+    expect((await root.del(`/api/platform/accounts/${left.id}`)).statusCode).toBe(409);
   });
 });

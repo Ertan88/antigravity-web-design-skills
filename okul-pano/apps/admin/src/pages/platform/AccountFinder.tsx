@@ -16,7 +16,8 @@ interface Account {
   invitePending: boolean;
   lastLoginAt: string | null;
   createdAt: string;
-  memberships: { schoolId: string; schoolName: string; role: 'owner' | 'admin' | 'editor' }[];
+  /** soleOwner: okulun tek müdürü (silinirse okul müdürsüz kalır) */
+  memberships: { schoolId: string; schoolName: string; role: 'owner' | 'admin' | 'editor'; soleOwner: boolean }[];
 }
 
 const ROLE: Record<Account['memberships'][number]['role'], string> = { owner: 'Okul müdürü', admin: 'Yönetici', editor: 'Editör' };
@@ -61,7 +62,7 @@ export function AccountFinderDialog({ open, onClose, onChanged }: { open: boolea
     }
   };
 
-  const owned = account?.memberships.filter((m) => m.role === 'owner') ?? [];
+  const owned = account?.memberships.filter((m) => m.soleOwner) ?? [];
   const blocked = !account || account.isSuperAdmin || owned.length > 0;
 
   const remove = async () => {
@@ -164,7 +165,9 @@ export function AccountFinderDialog({ open, onClose, onChanged }: { open: boolea
                   <div key={m.schoolId} className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3 ring-1 ring-slate-200">
                     <div className="min-w-0">
                       <div className="text-sm font-semibold text-ink">{m.schoolName}</div>
-                      {m.role === 'owner' && <div className="text-xs text-slate-500">Müdür olduğu için önce müdürlük devredilmeli</div>}
+                      {m.role === 'owner' && (
+                        <div className="text-xs text-slate-500">{m.soleOwner ? 'Okulun tek müdürü: önce müdürlük devredilmeli' : 'Okulda başka bir müdür kaydı da var; bu hesap silinebilir'}</div>
+                      )}
                     </div>
                     <span className={clsx('shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold', m.role === 'owner' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700')}>{ROLE[m.role]}</span>
                   </div>

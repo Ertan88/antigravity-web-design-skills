@@ -1,4 +1,4 @@
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, count, eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { accessUser } from '../context.ts';
@@ -35,7 +35,15 @@ export async function platformAccountsRoutes(app: FastifyInstance) {
       .innerJoin(schools, eq(schools.id, memberships.schoolId))
       .where(eq(memberships.userId, id))
       .orderBy(asc(schools.name));
-    return { user, schoolsOf };
+    // Eski kayıtlarda bir okulda birden fazla müdür olabilir: hesap okulun tek müdürü değilse silinebilir
+    const withOwners = await Promise.all(
+      schoolsOf.map(async (m) => {
+        if (m.role !== 'owner') return { ...m, soleOwner: false };
+        const [{ n }] = (await db.select({ n: count() }).from(memberships).where(and(eq(memberships.schoolId, m.schoolId), eq(memberships.role, 'owner')))) as [{ n: number }];
+        return { ...m, soleOwner: Number(n) <= 1 };
+      }),
+    );
+    return { user, schoolsOf: withOwners };
   };
 
   const view = ({ user, schoolsOf }: Awaited<ReturnType<typeof load>>) => ({
@@ -64,7 +72,7 @@ export async function platformAccountsRoutes(app: FastifyInstance) {
     const a = await load((req.params as { id: string }).id);
     if (a.user.id === accessUser(req).sub) throw badRequest('Kendi hesabınızı buradan silemezsiniz.');
     if (a.user.isSuperAdmin) throw badRequest('Platform yöneticisi hesabı silinemez.');
-    const owned = a.schoolsOf.filter((m) => m.role === 'owner');
+    const owned = a.schoolsOf.filter((m) => m.soleOwner);
     if (owned.length) throw conflict(`Bu kişi ${owned.map((m) => m.schoolName).join(', ')} okulunun müdürü. Önce okul listesinden "Müdürü değiştir" ile müdürlüğü devredin.`);
     await log(accessUser(req).sub, a.schoolsOf.map((m) => m.schoolId), 'delete', `Platform yöneticisi ${a.user.fullName} (${a.user.email}) hesabını sildi`);
     await db.delete(users).where(eq(users.id, a.user.id));
