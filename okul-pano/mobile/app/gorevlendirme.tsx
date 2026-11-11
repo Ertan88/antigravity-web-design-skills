@@ -12,7 +12,8 @@ import { Badge, Button, Card, confirm, DeleteIconButton, Empty, ErrorNote, Loadi
 /*
  * İzinli öğretmen yerine görevlendirme (yönetim): günün boş dersleri ve nöbet yerleri. Her satırda o gün okulda olup
  * o saatte boş olan öğretmenler önerilir: nöbetçiler önce ("NÖBETÇİ"), sonra o saatte dersi olmayanlar ("DERSİ YOK").
- * Öğretmene dokunulunca görevlendirilir ve öğretmene bildirim gider.
+ * Nöbet yerine yalnızca o günün nöbetçileri önerilir. Öğretmenin adına dokunulunca görevlendirme yapılır ve öğretmene
+ * bildirim gider.
  */
 
 type Candidate = { teacherId: string; fullName: string; onDuty: boolean; monthCount: number };
@@ -38,7 +39,12 @@ const tagStyle = { fontSize: 10, fontWeight: '800', borderRadius: 6, paddingHori
 /** Aday çipleri: nöbetçi "NÖBETÇİ"; ders satırında diğerleri "DERSİ YOK" (o gün dersi olan, o saatte boş) */
 function Candidates({ list, busy, onPick, freeTag = false }: { list: Candidate[]; busy: boolean; onPick: (id: string) => void; freeTag?: boolean }) {
   const [all, setAll] = useState(false);
-  if (!list.length) return <T size={13} color={colors.danger} weight="700">Okulda olup bu saatte boş olan öğretmen yok.</T>;
+  if (!list.length)
+    return (
+      <T size={13} color={colors.danger} weight="700">
+        {freeTag ? 'Okulda olup bu saatte boş olan öğretmen yok.' : 'Görevlendirilebilecek başka nöbetçi yok.'}
+      </T>
+    );
   const shown = all ? list : list.slice(0, 6);
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -142,7 +148,7 @@ export default function Gorevlendirme() {
               {open > 0 ? <Badge tone="danger">{`${open} boş`}</Badge> : <Badge tone="success">hepsi atandı</Badge>}
             </View>
             <T size={13} color={colors.muted}>
-              İzinli: {d.absent.map((a) => a.fullName).join(', ')}. O gün okulda olup o saatte boş olan öğretmenler önerilir; nöbetçiler öndedir.
+              İzinli: {d.absent.map((a) => a.fullName).join(', ')}. Derse o gün okulda olup o saatte boş olan öğretmenler önerilir; nöbetçiler öndedir. Nöbet yerine yalnızca o günün nöbetçileri önerilir.
             </T>
           </Card>
           {d.lessons.map((l) => (

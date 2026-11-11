@@ -42,7 +42,8 @@ interface CoverDay {
 function CandidateChips({ list, busy, onPick, freeTag = false }: { list: Candidate[]; busy: boolean; onPick: (teacherId: string) => void; freeTag?: boolean }) {
   const shown = list.slice(0, 6);
   const rest = list.slice(6);
-  if (!list.length) return <p className="mt-2 text-xs font-semibold text-rose-700">Okulda olup bu saatte boş olan öğretmen yok.</p>;
+  if (!list.length)
+    return <p className="mt-2 text-xs font-semibold text-rose-700">{freeTag ? 'Okulda olup bu saatte boş olan öğretmen yok.' : 'Görevlendirilebilecek başka nöbetçi yok.'}</p>;
   return (
     <div className="mt-2 flex flex-wrap items-center gap-1.5">
       {shown.map((c) => (
@@ -151,7 +152,7 @@ function CoverDayList({ date }: { date?: string }) {
     <div className="grid gap-2">
       <div className="mb-1 flex flex-wrap items-center gap-2">
         {open > 0 ? <Badge tone="red">{open} boş</Badge> : <Badge tone="green">hepsi atandı</Badge>}
-        <span className="text-sm text-slate-500">İzinli: {d.absent.map((a) => a.fullName).join(', ')}. O gün okulda olup o saatte boş olan öğretmenler önerilir; nöbetçiler öndedir.</span>
+        <span className="text-sm text-slate-500">İzinli: {d.absent.map((a) => a.fullName).join(', ')}. Derse o gün okulda olup o saatte boş olan öğretmenler önerilir; nöbetçiler öndedir. Nöbet yerine yalnızca o günün nöbetçileri önerilir.</span>
       </div>
       {d.lessons.map((l) => (
         <div key={`${l.periodNo}-${l.classGroupId}`} className={clsx('rounded-2xl p-3 ring-1', l.cover ? 'ring-slate-200' : 'bg-rose-50/60 ring-rose-200')}>

@@ -423,7 +423,7 @@ function GapCard({ day, gap, canAssign }: { day: DutyDay; gap: DutyDay['entries'
       {canAssign ? (
         <>
           <T size={13} weight="700">
-            Önerilenler · o gün nöbeti olmayan, bu ay en az nöbet tutanlar
+            Önerilenler: o günün nöbetçileri. Bu ay en az nöbet tutan öndedir.
           </T>
           {day.candidates.slice(0, 4).map((c) => (
             <View key={c.teacherId} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12, backgroundColor: colors.primarySoft }}>
@@ -447,7 +447,7 @@ function GapCard({ day, gap, canAssign }: { day: DutyDay; gap: DutyDay['entries'
               </Button>
             </View>
           ))}
-          {!day.candidates.length && <T color={colors.muted}>Uygun öğretmen bulunamadı.</T>}
+          {!day.candidates.length && <T color={colors.muted}>O gün görevlendirilebilecek başka nöbetçi yok.</T>}
           {error && <T color={colors.danger}>{error}</T>}
           <T size={12} color={colors.muted}>
             Atanan öğretmene bildirim gider, pano hemen güncellenir.

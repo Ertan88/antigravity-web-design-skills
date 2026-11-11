@@ -109,8 +109,9 @@ export interface SubstituteCandidate {
 }
 
 /**
- * Yerine görevlendirme önerileri: o gün izinli olmayan ve o gün zaten nöbeti olmayan etkin öğretmenler,
- * bu ay en az nöbet tutan önce. Okuldan okula değişen bir kural koda gömülmez; sıralama yalnızca adalet içindir.
+ * Boş nöbet yerine görevlendirme önerileri: yalnızca o günün nöbetçileri (izinli ya da izin talebi bekleyen değil,
+ * başka bir boş yere zaten görevlendirilmemiş), bu ay en az nöbet tutan önce. O gün nöbeti olmayan öğretmen, dersi
+ * boş olsa da önerilmez. Okuldan okula değişen bir kural koda gömülmez; sıralama yalnızca adalet içindir.
  */
 export async function substituteCandidates(db: DB, schoolId: string, day: DutyDay, limit = 8): Promise<SubstituteCandidate[]> {
   const month = day.date.slice(0, 7);
@@ -138,17 +139,14 @@ export async function substituteCandidates(db: DB, schoolId: string, day: DutyDa
         gte(teacherLeaves.endDate, day.date),
       ),
     );
-  const busy = new Set([
-    ...day.entries.map((e) => e.teacherId),
-    ...day.entries.flatMap((e) => (e.substitute ? [e.substitute.teacherId] : [])),
-    ...onLeave.map((l) => l.teacherId),
-  ]);
+  const busy = new Set([...day.entries.flatMap((e) => (e.substitute ? [e.substitute.teacherId] : [])), ...onLeave.map((l) => l.teacherId)]);
+  const onDutyToday = new Set(day.entries.filter((e) => !e.onLeave && !e.leavePending).map((e) => e.teacherId));
   // Haftalık çizelgedeki bir satır ayda yaklaşık 4 nöbet demektir
   const count = new Map<string, number>();
   for (const d of monthDuties) count.set(d.teacherId, (count.get(d.teacherId) ?? 0) + d.n * 4);
   for (const s of monthSubs) count.set(s.teacherId, (count.get(s.teacherId) ?? 0) + s.n);
   return all
-    .filter((t) => !busy.has(t.id))
+    .filter((t) => onDutyToday.has(t.id) && !busy.has(t.id))
     .map((t) => ({ teacherId: t.id, fullName: t.fullName, monthCount: count.get(t.id) ?? 0 }))
     .sort((a, b) => a.monthCount - b.monthCount || trCompare(a.fullName, b.fullName))
     .slice(0, limit);

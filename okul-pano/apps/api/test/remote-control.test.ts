@@ -104,8 +104,8 @@ describe.skipIf(holidayToday)('izin bildirimi ve boş nöbet', () => {
     const day = (await owner.get(path('duty-day'))).json();
     expect(day.gaps).toEqual([dutyId]);
     const names = (day.candidates as { fullName: string }[]).map((c) => c.fullName);
-    // Nöbeti olan ve izinli olan önerilmez
-    expect(names).toEqual(['Ali Can', 'Selin Ak']);
+    // Yalnızca o günün nöbetçisi önerilir; izinli ve o gün nöbeti olmayanlar önerilmez
+    expect(names).toEqual(['Mehmet Kaya']);
 
     const center = (await owner.get(path('control-center'))).json();
     expect(center.dutyGaps).toEqual([{ dutyId, area: 'Bahçe', teacherName: 'Ayşe Demir' }]);

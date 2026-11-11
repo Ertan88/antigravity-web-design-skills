@@ -64,10 +64,9 @@ describe('izinli öğretmen yerine görevlendirme', () => {
     // Fatma'nın o gün dersi yok, Ayşe izinli.
     expect(d.lessons[0]!.candidates.map((c) => `${c.fullName}|${c.onDuty}`)).toEqual(['Burak Demir|true', 'Deniz Ak|false']);
     expect(d.lessons[1]!.candidates.map((c) => c.fullName)).toEqual(['Burak Demir', 'Deniz Ak']);
-    // İzinli öğretmenin nöbet yeri: o günün nöbetçisi önce, sonra o gün dersi olan (okulda) öğretmenler; Fatma yok
+    // İzinli öğretmenin nöbet yeri: yalnızca o günün nöbetçileri; dersi boş olan Deniz önerilmez
     expect(d.duties.map((x) => x.area)).toEqual(['Bahçe']);
-    expect(d.duties[0]!.candidates[0]).toMatchObject({ fullName: 'Burak Demir', onDuty: true });
-    expect(d.duties[0]!.candidates.map((c) => c.fullName).sort()).toEqual(['Burak Demir', 'Cem Kaya', 'Deniz Ak', 'Emre Su']);
+    expect(d.duties[0]!.candidates.map((c) => `${c.fullName}|${c.onDuty}`)).toEqual(['Burak Demir|true']);
   });
 
   it('dersi olan öğretmen gönderilemez; boş öğretmen atanır ve bildirim alır', async () => {

@@ -127,17 +127,12 @@ async function coverDay(deps: AppDeps, school: School, date: string) {
     })
     .sort((a, b) => a.periodNo - b.periodNo || trCompare(a.className, b.className));
 
-  // Boş nöbet yerleri: o günün nöbetçileri önce ("Nöbetçi"), sonra o gün nöbeti olmayan ama dersi olan (okulda) öğretmenler
+  // Boş nöbet yerleri: yalnızca o günün nöbetçileri önerilir (bu ay en az nöbet tutan önce); dersi boş olsa da
+  // o gün nöbeti olmayan öğretmen önerilmez
   const dutyGaps = day.holiday ? [] : day.entries.filter((e) => e.onLeave);
-  const others = dutyGaps.some((g) => !g.substitute) ? await substituteCandidates(db, school.id, day, 200) : [];
-  const busySubs = new Set(day.entries.flatMap((e) => (e.substitute ? [e.substitute.teacherId] : [])));
-  const dutyCands: CoverCandidate[] = [
-    ...day.entries
-      .filter((e) => !e.onLeave && !unavailable.has(e.teacherId) && !busySubs.has(e.teacherId))
-      .filter((e, i, all) => all.findIndex((x) => x.teacherId === e.teacherId) === i)
-      .map((e) => ({ teacherId: e.teacherId, fullName: e.teacherName, onDuty: true, monthCount: monthCount.get(e.teacherId) ?? 0 })),
-    ...others.filter((o) => !unavailable.has(o.teacherId) && windows.has(o.teacherId)).map((o) => ({ teacherId: o.teacherId, fullName: o.fullName, onDuty: false, monthCount: o.monthCount })),
-  ];
+  const dutyCands: CoverCandidate[] = dutyGaps.some((g) => !g.substitute)
+    ? (await substituteCandidates(db, school.id, day, 200)).map((o) => ({ teacherId: o.teacherId, fullName: o.fullName, onDuty: true, monthCount: o.monthCount }))
+    : [];
 
   return {
     date,
