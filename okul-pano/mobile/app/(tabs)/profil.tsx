@@ -238,7 +238,7 @@ export default function Menu() {
     const counsel = can('conduct.counsel') || can('conduct.manage');
     const content = role === 'teacher' ? [] : CONTENT.filter((c) => can(c.permission)).map((c): Item => ({ title: c.title, subtitle: c.subtitle, icon: c.icon, to: `/icerik/${c.tur}` }));
     add('Pano', [
-      role !== 'teacher' && can('announcements.manage') && { title: 'Duyurular ve yayın akışı', subtitle: 'Yeni duyuru, yayındakiler', icon: 'megaphone-outline', to: '/yayin-akisi' },
+      role !== 'teacher' && can('announcements.manage') && { title: 'Duyurular', subtitle: 'Yayındakiler, onay bekleyenler, taslaklar', icon: 'megaphone-outline', to: '/duyurular' },
       ...content,
     ]);
     add('Takvim ve Ders', [

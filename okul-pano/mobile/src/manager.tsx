@@ -89,7 +89,7 @@ export function ManagerHome() {
                 tone: 'primary' as const,
                 title: `${c.endingToday.length} duyurunun süresi bugün bitiyor`,
                 subtitle: c.endingToday.map((a) => a.title).slice(0, 2).join(' · '),
-                to: '/yayin-akisi',
+                to: '/duyurular',
               },
             ]
           : []),
@@ -138,7 +138,7 @@ export function ManagerHome() {
                 onPress={() => router.push('/onaylar')}
                 style={{ flex: 1 }}
               />
-              <Tile tone="mint" icon="radio-outline" label="Yayında" value={c.onAir} caption="içerik" onPress={() => router.push('/yayin-akisi')} style={{ flex: 1 }} />
+              <Tile tone="mint" icon="radio-outline" label="Yayında" value={c.onAir} caption="içerik" onPress={() => router.push('/duyurular')} style={{ flex: 1 }} />
             </View>
           </BentoRow>
 

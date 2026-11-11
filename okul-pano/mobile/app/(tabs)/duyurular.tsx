@@ -287,6 +287,8 @@ export default function Duyurular() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>('all');
   const [showExpired, setShowExpired] = useState(false);
+  // Panodaki sıra: "Sırala" ile yayındaki duyurular yukarı / aşağı taşınır (sıra bütün listeye aittir)
+  const [sorting, setSorting] = useState(false);
   const [selected, setSelected] = useState<Announcement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const now = Date.now();
@@ -319,6 +321,21 @@ export default function Duyurular() {
     });
 
   const all = list.data ?? [];
+  const move = async (live: Announcement[], index: number, dir: -1 | 1) => {
+    const other = live[index + dir];
+    if (!other) return;
+    const ids = all.map((a) => a.id);
+    const i = ids.indexOf(live[index]!.id);
+    const j = ids.indexOf(other.id);
+    [ids[i], ids[j]] = [ids[j]!, ids[i]!];
+    setError(null);
+    try {
+      await api(`${path}/reorder`, { method: 'POST', body: { ids } });
+    } catch {
+      setError('Sıra değiştirilemedi.');
+    }
+    await refresh();
+  };
   const rows = tab === 'mine' ? all.filter((a) => a.createdBy === myId) : all;
   const byPhase = (p: Phase) => rows.filter((a) => phaseOf(a, now) === p);
   // İlgilenmeniz gerekenler: kendi onay bekleyen / düzeltme istenen duyurularınız; başkalarınınki onaylayıcıya
@@ -335,6 +352,8 @@ export default function Duyurular() {
   return (
     <Screen
       title="Duyurular"
+      // Alt menüde Duyurular sekmesi yalnızca editörde var; ötekiler buraya Menü'den ya da ana ekrandan gelir
+      back={!(role === 'editor' && canRaw('announcements.manage'))}
       refreshing={list.isRefetching}
       onRefresh={() => void Promise.all([list.refetch(), manages ? drafts.refetch() : null])}
       right={
@@ -398,8 +417,42 @@ export default function Duyurular() {
             </Section>
           )}
           {byPhase('live').length > 0 && (
-            <Section title="Panolarda şu an" count={byPhase('live').length}>
-              {byPhase('live').map((a) => (
+            <Section
+              title="Panolarda şu an"
+              count={byPhase('live').length}
+              right={
+                byPhase('live').length > 1 ? (
+                  <Pressable accessibilityRole="button" onPress={() => setSorting((x) => !x)} hitSlop={8}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: colors.brand }}>{sorting ? 'Bitti' : 'Sırala'}</Text>
+                  </Pressable>
+                ) : undefined
+              }
+            >
+              {sorting &&
+                byPhase('live').map((a, i, live) => (
+                  <Card key={a.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10 }}>
+                    <Thumb a={a} />
+                    <T weight="700" lines={2} style={{ flex: 1 }}>
+                      {titleOf(a)}
+                    </T>
+                    {(['up', 'down'] as const).map((d) => {
+                      const off = d === 'up' ? i === 0 : i === live.length - 1;
+                      return (
+                        <Pressable
+                          key={d}
+                          accessibilityRole="button"
+                          accessibilityLabel={d === 'up' ? 'Yukarı taşı' : 'Aşağı taşı'}
+                          disabled={off}
+                          onPress={() => void move(live, i, d === 'up' ? -1 : 1)}
+                          style={{ width: 38, height: 38, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', opacity: off ? 0.35 : 1 }}
+                        >
+                          <Icon name={d === 'up' ? 'chevron-up' : 'chevron-down'} size={18} color={colors.ink} />
+                        </Pressable>
+                      );
+                    })}
+                  </Card>
+                ))}
+              {!sorting && byPhase('live').map((a) => (
                 <Card key={a.id} style={{ padding: 0, gap: 0, overflow: 'hidden' }}>
                   <Pressable accessibilityRole="button" accessibilityLabel={`${titleOf(a)}: işlemler`} onPress={() => setSelected(a)}>
                     <AnnouncementPreview kind={a.kind} title={a.title} body={a.body} imageUrl={a.imageUrl} design={a.design} youtubeUrl={a.youtubeUrl} height={110} />
