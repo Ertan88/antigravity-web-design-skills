@@ -32,6 +32,11 @@ Böyle bir durum varsa kullanıcı **onaylanmaz**. Yanlış açıkça söylenir;
     `<IconButton tone="delete">`, özel düğmede `DELETE_TONE` sınıfları (`apps/admin/src/components/ui.tsx`).
   - Mobil: yazılı düğme `<Button variant="delete">`, çöp kutusu simgesi `DeleteIconButton` (`mobile/src/ui.tsx`).
   - Dolu kırmızı (`variant="danger"`) yalnızca onay penceresindeki son adım gibi kesin işlem düğmesindir.
+- **Panonun genel düzeni bozulamaz.** Üst bar (okul adı, saat, hava), sol ve sağ sütundaki kartlar ve alttaki
+  kayan yazı her zaman yerinde kalır. Hiçbir özellik, slayt ya da değişiklik bunları gizleyemez, küçültemez ya da
+  kaplayamaz; böyle bir seçenek önerilmez bile. Slaytlar (duyurular, "Bugünkü sınavlar" vb.) yalnızca ortadaki
+  duyuru alanının içinde tasarlanır. (Acil durum ekranı ve panelden seçilen "Yalnızca duyurular / Tam ekran saat"
+  biçimleri okulun kendi seçimidir, bu kuralın dışındadır.)
 
 ## 5. KVKK
 
