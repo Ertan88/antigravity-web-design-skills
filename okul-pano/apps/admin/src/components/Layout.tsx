@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth.tsx';
 import { useInternshipAccess, useSchool } from '../lib/data.ts';
+import { openCount, useCoverDay } from '../pages/covers/Covers.tsx';
 import { findNav, NAV } from '../lib/nav.ts';
 import { useTheme } from '../lib/theme.ts';
 import { BrandMark, BrandName } from './Brand.tsx';
@@ -85,6 +86,9 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const settings = school.data?.settings;
   // Mesleki eğitim menüsü: kimin göreceğine sunucu karar verir (yönetim, işaretli koordinatör, alan şefi)
   const internship = useInternshipAccess(Boolean(settings?.internshipEnabled));
+  // Menü rozetleri: atanmamış boş ders ve nöbet yeri sayısı (nöbet yetkisi olana)
+  const coverDay = useCoverDay();
+  const badges = { coverOpen: openCount(coverDay.data) };
   const who = {
     userId: me?.user.id ?? null,
     teacherId: access?.teacherId ?? null,
@@ -135,6 +139,9 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                     <>
                       <item.icon className={clsx('size-[18px] shrink-0 transition-colors', isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-600')} />
                       <span className="truncate">{item.label}</span>
+                      {item.badge && badges[item.badge] > 0 && (
+                        <span className="ml-auto rounded-full bg-rose-600 px-1.5 py-px text-[11px] font-extrabold text-white tabular-nums">{badges[item.badge]}</span>
+                      )}
                     </>
                   )}
                 </NavLink>

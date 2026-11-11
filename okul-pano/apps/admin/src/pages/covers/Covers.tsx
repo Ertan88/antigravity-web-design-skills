@@ -2,18 +2,18 @@ import { errorText } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { useState } from 'react';
-import { Bus, CalendarCheck2, History, ShieldCheck } from '../../components/icons.tsx';
+import { Link, useSearchParams } from 'react-router-dom';
+import { AlertTriangle, ArrowRight, Bus, CalendarCheck2, History, ShieldCheck } from '../../components/icons.tsx';
 import { useToast } from '../../components/Toast.tsx';
-import { Badge, Button, Card, DeleteButton, EmptyState, Modal, PageHeader, Select, Spinner, Table, Td } from '../../components/ui.tsx';
+import { Badge, Button, Card, DeleteButton, EmptyState, Modal, PageHeader, Segmented, Select, Spinner, Table, Td } from '../../components/ui.tsx';
 import { api } from '../../lib/api.ts';
 import { useAuth } from '../../lib/auth.tsx';
 import { useSchoolPath } from '../../lib/data.ts';
 import { currentMonth, MonthNav, monthLabel } from '../duties/calendar.tsx';
 
 /*
- * İzinli öğretmen yerine görevlendirme (A): Genel Bakış'ta günün boş dersleri ve nöbet yerleri, her satırda o saatte
- * boş olan öğretmenler (nöbetçiler önce, "Nöbetçi" etiketiyle) ve tek dokunuşla atama. Nöbet Çizelgesi'nde ay ve
- * toplam istatistik, sınıf geçmişi ayrı pencerede. Öğretmen kendi görevlerini "Görevlerim"de görür.
+ * İzinli öğretmen yerine görevlendirme: Genel Bakış'ta yalnızca tek satırlık uyarı bandı; atama, istatistik ve sınıf
+ * geçmişi Personel › Görevlendirme sayfasında (menüde boş sayısı rozetli). Öğretmen kendi görevlerini "Görevlerim"de görür.
  */
 
 type Candidate = { teacherId: string; fullName: string; onDuty: boolean; monthCount: number };
@@ -75,79 +75,178 @@ function CandidateChips({ list, busy, onPick }: { list: Candidate[]; busy: boole
   );
 }
 
-/** Genel Bakış: bugün boş kalan dersler ve nöbet yerleri (nöbet yetkisi olana) */
-export function CoverDayCard() {
+/** Günün boş dersleri ve nöbet yerleri (bant, menü rozeti ve Görevlendirme sayfası aynı veriyi paylaşır) */
+export function useCoverDay(date?: string) {
   const { can, schoolId } = useAuth();
-  const allowed = can('duties.manage');
-  const path = useSchoolPath('cover-day');
+  const path = useSchoolPath(`cover-day${date ? `?date=${date}` : ''}`);
+  return useQuery({
+    queryKey: [schoolId, 'cover-day', date ?? 'today'],
+    queryFn: () => api<CoverDay>(path),
+    enabled: Boolean(schoolId) && can('duties.manage'),
+    refetchInterval: 60_000,
+  });
+}
+
+/** Atanmamış boşluk sayısı */
+export const openCount = (d: CoverDay | undefined) => (d && !d.holiday ? d.lessons.filter((l) => !l.cover).length + d.duties.filter((x) => !x.substitute).length : 0);
+
+/** Genel Bakış: yalnızca atanmamış boşluk varken tek satırlık uyarı bandı; atama Görevlendirme sayfasında */
+export function CoverBand() {
+  const d = useCoverDay().data;
+  const open = openCount(d);
+  if (!d || !open) return null;
+  const lessons = d.lessons.filter((l) => !l.cover).length;
+  const duties = d.duties.filter((x) => !x.substitute).length;
+  const parts = [lessons ? `${lessons} ders` : '', duties ? `${duties} nöbet yeri` : ''].filter(Boolean).join(', ');
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-amber-50 px-4 py-3 ring-1 ring-amber-200">
+      <AlertTriangle className="size-5 shrink-0 text-amber-600" />
+      <p className="min-w-0 flex-1 text-sm text-slate-700">
+        <b className="text-amber-800">Bugün {open} boş:</b> {parts} · {d.absent.map((a) => a.fullName).join(', ')} izinli
+      </p>
+      <Link to="/gorevlendirme" className="inline-flex items-center gap-1.5 rounded-full bg-ink px-4 py-1.5 text-sm font-bold whitespace-nowrap text-surface hover:opacity-90">
+        Görevlendir <ArrowRight className="size-4" />
+      </Link>
+    </div>
+  );
+}
+
+const shiftDay = (iso: string, by: number) => new Date(Date.parse(`${iso}T12:00:00Z`) + by * 86400_000).toISOString().slice(0, 10);
+const dayText = (iso: string) => new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', weekday: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));
+
+/** Bir günün boş dersleri ve nöbet yerleri; her satırda o saatte boş öğretmenler (nöbetçiler önce) */
+function CoverDayList({ date }: { date?: string }) {
+  const { schoolId } = useAuth();
   const coversPath = useSchoolPath('covers');
   const subsPath = useSchoolPath('duty-substitutions');
   const qc = useQueryClient();
   const toast = useToast();
-  const q = useQuery({ queryKey: [schoolId, 'cover-day'], queryFn: () => api<CoverDay>(path), enabled: allowed, refetchInterval: 60_000 });
-  const refresh = () => qc.invalidateQueries({ queryKey: [schoolId, 'cover-day'] });
+  const q = useCoverDay(date);
   const act = useMutation({
     mutationFn: (fn: () => Promise<unknown>) => fn(),
-    onSuccess: refresh,
+    onSuccess: () => qc.invalidateQueries({ queryKey: [schoolId, 'cover-day'] }),
     onError: (err) => toast.error(errorText(err, 'Kaydedilemedi')),
   });
   const d = q.data;
-  if (!allowed || !d || d.holiday || (!d.lessons.length && !d.duties.length)) return null;
-  const open = d.lessons.filter((l) => !l.cover).length + d.duties.filter((x) => !x.substitute).length;
+  if (q.isLoading || !d)
+    return (
+      <div className="flex justify-center py-10">
+        <Spinner />
+      </div>
+    );
+  if (d.holiday) return <EmptyState icon={<CalendarCheck2 className="size-7" />} title={d.holiday} description="Tatil: görevlendirme yok." />;
+  if (!d.lessons.length && !d.duties.length)
+    return <EmptyState icon={<ShieldCheck className="size-7" />} title="Boş ders yok" description="Bu gün izinli öğretmen yok ya da izinli öğretmenin dersi ve nöbeti yok." />;
+  const open = openCount(d);
   return (
-    <Card className="p-5 sm:p-6">
+    <div className="grid gap-2">
       <div className="mb-1 flex flex-wrap items-center gap-2">
-        <h2 className="text-lg font-extrabold tracking-tight">Bugün boş kalanlar</h2>
         {open > 0 ? <Badge tone="red">{open} boş</Badge> : <Badge tone="green">hepsi atandı</Badge>}
+        <span className="text-sm text-slate-500">İzinli: {d.absent.map((a) => a.fullName).join(', ')}. Önerilenler o saatte dersi olmayan öğretmenler; nöbetçiler önce.</span>
       </div>
-      <p className="mb-4 text-sm text-slate-500">İzinli: {d.absent.map((a) => a.fullName).join(', ')}. Önerilenler o saatte dersi olmayan öğretmenler; nöbetçiler önce.</p>
-      <div className="grid gap-2">
-        {d.lessons.map((l) => (
-          <div key={`${l.periodNo}-${l.classGroupId}`} className={clsx('rounded-2xl p-3 ring-1', l.cover ? 'ring-slate-200' : 'bg-rose-50/60 ring-rose-200')}>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="font-bold text-ink">
-                {l.periodNo}. ders{l.start ? ` · ${l.start}` : ''} · {l.className} {l.subject}
+      {d.lessons.map((l) => (
+        <div key={`${l.periodNo}-${l.classGroupId}`} className={clsx('rounded-2xl p-3 ring-1', l.cover ? 'ring-slate-200' : 'bg-rose-50/60 ring-rose-200')}>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="font-bold text-ink">
+              {l.periodNo}. ders{l.start ? ` · ${l.start}` : ''} · {l.className} {l.subject}
+            </span>
+            <span className="text-xs text-slate-500">{l.absentName} yerine</span>
+            {l.cover && (
+              <span className="ml-auto flex items-center gap-2">
+                <span className="text-sm font-bold text-emerald-700">✓ {l.cover.fullName} girecek</span>
+                <DeleteButton label="Görevlendirmeyi kaldır" what="Bu görevlendirme" onConfirm={() => act.mutate(() => api(`${coversPath}/${l.cover!.id}`, { method: 'DELETE' }))} />
               </span>
-              <span className="text-xs text-slate-500">{l.absentName} yerine</span>
-              {l.cover && (
-                <span className="ml-auto flex items-center gap-2">
-                  <span className="text-sm font-bold text-emerald-700">✓ {l.cover.fullName} girecek</span>
-                  <DeleteButton label="Görevlendirmeyi kaldır" what="Bu görevlendirme" onConfirm={() => act.mutate(() => api(`${coversPath}/${l.cover!.id}`, { method: 'DELETE' }))} />
-                </span>
-              )}
-            </div>
-            {!l.cover && (
-              <CandidateChips
-                list={l.candidates}
-                busy={act.isPending}
-                onPick={(teacherId) => act.mutate(() => api(coversPath, { method: 'POST', body: { date: d.date, periodNo: l.periodNo, classGroupId: l.classGroupId, teacherId } }))}
-              />
             )}
           </div>
-        ))}
-        {d.duties.map((x) => (
-          <div key={x.dutyId} className={clsx('rounded-2xl p-3 ring-1', x.substitute ? 'ring-slate-200' : 'bg-rose-50/60 ring-rose-200')}>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="font-bold text-ink">Nöbet yeri · {x.area}</span>
-              <span className="text-xs text-slate-500">{x.absentName} yerine</span>
-              {x.substitute && (
-                <span className="ml-auto flex items-center gap-2">
-                  <span className="text-sm font-bold text-emerald-700">✓ {x.substitute.teacherName}</span>
-                  <DeleteButton label="Görevlendirmeyi kaldır" what="Bu görevlendirme" onConfirm={() => act.mutate(() => api(`${subsPath}/${x.substitute!.id}`, { method: 'DELETE' }))} />
-                </span>
-              )}
-            </div>
-            {!x.substitute && (
-              <CandidateChips
-                list={x.candidates}
-                busy={act.isPending}
-                onPick={(teacherId) => act.mutate(() => api(subsPath, { method: 'POST', body: { date: d.date, dutyId: x.dutyId, teacherId } }))}
-              />
+          {!l.cover && (
+            <CandidateChips
+              list={l.candidates}
+              busy={act.isPending}
+              onPick={(teacherId) => act.mutate(() => api(coversPath, { method: 'POST', body: { date: d.date, periodNo: l.periodNo, classGroupId: l.classGroupId, teacherId } }))}
+            />
+          )}
+        </div>
+      ))}
+      {d.duties.map((x) => (
+        <div key={x.dutyId} className={clsx('rounded-2xl p-3 ring-1', x.substitute ? 'ring-slate-200' : 'bg-rose-50/60 ring-rose-200')}>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="font-bold text-ink">Nöbet yeri · {x.area}</span>
+            <span className="text-xs text-slate-500">{x.absentName} yerine</span>
+            {x.substitute && (
+              <span className="ml-auto flex items-center gap-2">
+                <span className="text-sm font-bold text-emerald-700">✓ {x.substitute.teacherName}</span>
+                <DeleteButton label="Görevlendirmeyi kaldır" what="Bu görevlendirme" onConfirm={() => act.mutate(() => api(`${subsPath}/${x.substitute!.id}`, { method: 'DELETE' }))} />
+              </span>
             )}
           </div>
-        ))}
+          {!x.substitute && (
+            <CandidateChips list={x.candidates} busy={act.isPending} onPick={(teacherId) => act.mutate(() => api(subsPath, { method: 'POST', body: { date: d.date, dutyId: x.dutyId, teacherId } }))} />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+type AssignTab = 'today' | 'stats';
+
+/** Görevlendirme sayfası: "Bugün" (izinli öğretmenin dersleri ve nöbet yeri, atama) ve "İstatistik ve sınıf geçmişi" */
+export function AssignmentsPage() {
+  const [params, setParams] = useSearchParams();
+  const tab: AssignTab = params.get('bolum') === 'istatistik' ? 'stats' : 'today';
+  const setTab = (t: AssignTab) => setParams(t === 'stats' ? { bolum: 'istatistik' } : {}, { replace: true });
+  const today = useCoverDay().data?.date;
+  const [date, setDate] = useState<string | null>(null);
+  const shown = date ?? today ?? null;
+  const [month, setMonth] = useState(currentMonth);
+  const open = openCount(useCoverDay().data);
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        title="Görevlendirme"
+        description="İzinli öğretmenin boş kalan dersleri ve nöbet yeri: o saatte boş öğretmenler (nöbetçiler önce) önerilir, dokununca görevlendirilir ve öğretmene bildirim gider."
+      />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Segmented
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'today', label: open ? `Bugün · ${open} boş` : 'Günlük' },
+            { value: 'stats', label: 'İstatistik ve sınıf geçmişi' },
+          ]}
+        />
+        {tab === 'stats' ? (
+          <MonthNav month={month} onMonth={setMonth} />
+        ) : (
+          shown && (
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="secondary" onClick={() => setDate(shiftDay(shown, -1))} aria-label="Önceki gün">
+                ‹
+              </Button>
+              <span className="min-w-52 text-center text-sm font-bold text-ink">
+                {shown === today ? 'Bugün · ' : ''}
+                {dayText(shown)}
+              </span>
+              <Button size="sm" variant="secondary" onClick={() => setDate(shiftDay(shown, 1))} aria-label="Sonraki gün">
+                ›
+              </Button>
+              {shown !== today && (
+                <Button size="sm" variant="ghost" onClick={() => setDate(null)}>
+                  Bugün
+                </Button>
+              )}
+            </div>
+          )
+        )}
       </div>
-    </Card>
+      {tab === 'stats' ? (
+        <CoverStatsView month={month} />
+      ) : (
+        <Card className="p-5 sm:p-6">
+          <CoverDayList date={date ?? undefined} />
+        </Card>
+      )}
+    </div>
   );
 }
 

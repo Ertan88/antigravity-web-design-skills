@@ -37,6 +37,8 @@ export interface NavItem {
   icon: LucideIcon;
   /** Menüde görünmesi için gereken yetki (yoksa tüm üyeler görür) */
   permission?: Permission;
+  /** Menüde sayı rozeti (ör. atanmamış boşluk sayısı); Layout hesaplar */
+  badge?: 'coverOpen';
   /** Okul ayarına bağlı modüller (ör. taşımalı eğitim yalnızca açıksa görünür) */
   when?: (
     settings: SchoolSettings | undefined,
@@ -101,6 +103,8 @@ export const NAV: NavGroup[] = [
       { to: '/ogretmenler', label: 'Öğretmen Kadrosu', icon: Users, permission: 'directory.manage' },
       { to: '/nobet', label: 'Nöbet Çizelgesi', icon: ShieldCheck, permission: 'duties.manage' },
       { to: '/izinler', label: 'İzinli Öğretmenler', icon: UserMinus, permission: 'leaves.manage' },
+      // İzinli öğretmenin boş dersleri ve nöbet yeri: atama, istatistik, sınıf geçmişi (boş sayısı rozetli)
+      { to: '/gorevlendirme', label: 'Görevlendirme', icon: CalendarCheck2, permission: 'duties.manage', badge: 'coverOpen' },
       // Öğretmen kaydına bağlı herkes: izinli yerine girdiği dersler ve taşımalı görevleri
       { to: '/gorevlerim', label: 'Görevlerim', icon: CalendarCheck2, when: (_s, who) => Boolean(who.teacherId) },
     ],

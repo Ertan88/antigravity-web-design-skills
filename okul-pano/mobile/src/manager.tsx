@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import { Text } from './text.tsx';
 import { membershipLabel, useAuth } from './auth.tsx';
-import { useControlCenter, useMeToday, type ControlCenter } from './data.ts';
+import { useControlCenter, useMeToday, useSchoolQuery, type ControlCenter } from './data.ts';
 import { clock, timeAgo } from './day.ts';
 import { LiveLesson } from './lesson.tsx';
 import { MenuButton, QuickAdd } from './quick.tsx';
@@ -45,9 +45,21 @@ function Row({ dot, name, when }: { dot: string; name: string; when?: string }) 
 }
 
 /** Yöneticinin ana ekranı: bento kontrol merkezi */
+/** Günün boşlukları (yalnızca bant için gereken alanlar) */
+interface CoverSummary {
+  holiday: string | null;
+  absent: { fullName: string }[];
+  lessons: { cover: unknown }[];
+  duties: { substitute: unknown }[];
+}
+
 export function ManagerHome() {
-  const { me: account, school, role, isTeacher } = useAuth();
+  const { me: account, school, role, isTeacher, can } = useAuth();
   const center = useControlCenter();
+  // İzinli öğretmenin boş dersleri ve nöbet yeri: tek satır uyarı; atama Ders görevlendirme ekranında
+  const cover = useSchoolQuery<CoverSummary>('cover-day', { enabled: can('duties.manage'), refetchInterval: 60_000 });
+  const openLessons = cover.data && !cover.data.holiday ? cover.data.lessons.filter((l) => !l.cover).length : 0;
+  const openDuties = cover.data && !cover.data.holiday ? cover.data.duties.filter((d) => !d.substitute).length : 0;
   const me = useMeToday();
   const c = center.data;
   const pending = c ? c.pending.announcements + c.pending.leaves : 0;
@@ -55,14 +67,17 @@ export function ManagerHome() {
   // Pano ve onay durumu kutularda; listede yalnızca kutulara sığmayan işler kalır
   const attention = c
     ? [
-        ...c.dutyGaps.map((g) => ({
-          key: `gap-${g.dutyId}`,
-          icon: 'shield-checkmark-outline' as const,
-          tone: 'warning' as const,
-          title: `${g.area} nöbeti boş`,
-          subtitle: `${g.teacherName} bugün izinli · yerine atayın`,
-          to: '/nobet',
-        })),
+        // Boş nöbet yerleri üstteki uyarı bandında (nöbet yetkisi olana); yetkisi yoksa burada bilgi olarak
+        ...(can('duties.manage')
+          ? []
+          : c.dutyGaps.map((g) => ({
+              key: `gap-${g.dutyId}`,
+              icon: 'shield-checkmark-outline' as const,
+              tone: 'warning' as const,
+              title: `${g.area} nöbeti boş`,
+              subtitle: `${g.teacherName} bugün izinli`,
+              to: '/nobet',
+            }))),
         ...(c.endingToday.length
           ? [
               {
@@ -92,6 +107,16 @@ export function ManagerHome() {
           {c.emergency && (
             <Pressable accessibilityRole="button" onPress={() => router.push('/acil')}>
               <Banner tone="danger" icon="warning" title={`Acil durum sürüyor: ${EMERGENCY_INFO[c.emergency.type].label}`} text={[clock(c.emergency.startedAt), c.emergency.startedBy].filter(Boolean).join(' · ')} />
+            </Pressable>
+          )}
+          {openLessons + openDuties > 0 && (
+            <Pressable accessibilityRole="button" accessibilityLabel="Ders görevlendirmeyi aç" onPress={() => router.push('/gorevlendirme')}>
+              <Banner
+                tone="warning"
+                icon="people-outline"
+                title={`Bugün ${openLessons + openDuties} boş · görevlendir`}
+                text={[[openLessons ? `${openLessons} ders` : '', openDuties ? `${openDuties} nöbet yeri` : ''].filter(Boolean).join(', '), `${cover.data!.absent.map((a) => a.fullName).join(', ')} izinli`].join(' · ')}
+              />
             </Pressable>
           )}
           {me.data ? <DayBanner data={me.data} /> : c.holiday ? <Banner icon="sunny" title="Bugün tatil" text={`${c.holiday} · zil çalmıyor`} /> : null}

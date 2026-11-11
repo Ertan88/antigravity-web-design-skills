@@ -11,7 +11,7 @@ import { useAuth } from '../lib/auth.tsx';
 import { useList, useSchoolPath, type Announcement, type Screen } from '../lib/data.ts';
 import { timeAgo } from '../lib/format.ts';
 import { TodaySummary } from './dashboard/Today.tsx';
-import { CoverDayCard } from './covers/Covers.tsx';
+import { CoverBand } from './covers/Covers.tsx';
 
 interface Stats {
   activeAnnouncements: number;
@@ -136,6 +136,9 @@ export function Dashboard() {
         <p className="mt-2 text-sm font-medium text-slate-500">{school?.name} panosunun anlık durumu.</p>
       </div>
 
+      {/* İzinli öğretmenin boş kalan dersleri ve nöbet yeri: tek satır uyarı, atama Görevlendirme sayfasında */}
+      <CoverBand />
+
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat
           tone="dark"
@@ -161,8 +164,6 @@ export function Dashboard() {
 
       <PendingApprovals />
 
-      {/* İzinli öğretmenlerin boş kalan dersleri ve nöbet yerleri: tek dokunuşla görevlendirme */}
-      <CoverDayCard />
 
       <TodaySummary />
 

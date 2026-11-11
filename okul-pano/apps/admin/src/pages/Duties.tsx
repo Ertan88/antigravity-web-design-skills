@@ -1,6 +1,6 @@
 import { dutySchema, holidayFullName, labelOf, WEEKDAY_NAMES, WEEKDAY_SHORT, type Labels, errorText } from '@okulpano/shared';
 import clsx from 'clsx';
-import { Bus, CalendarCheck2, CalendarDays, CopyPlus, ShieldCheck, UserCog } from '../components/icons.tsx';
+import { Bus, CalendarDays, CopyPlus, ShieldCheck, UserCog } from '../components/icons.tsx';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -13,7 +13,6 @@ import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { nameMap, useList, useSchool, useSchoolPath, type Duty, type Teacher } from '../lib/data.ts';
 import { TransportImport, TransportView, useTransportMonth } from './Transport.tsx';
-import { CoverStatsView } from './covers/Covers.tsx';
 import { ClearMonthButton, currentMonth, filledCount, MonthNav, monthLabel, SupervisorCalendar, type DutySupervisor } from './duties/calendar.tsx';
 import { MonthChoice, type MonthResolution } from './duties/MonthChoice.tsx';
 
@@ -68,9 +67,9 @@ function DayBar({ value, onChange, counts }: { value: number; onChange: (d: numb
   );
 }
 
-type View = 'duties' | 'supervisor' | 'transport' | 'covers';
+type View = 'duties' | 'supervisor' | 'transport';
 /** Adresteki ?bolum= ile açılacak sekme (eski /tasimali adresi buraya yönlenir) */
-const VIEW_PARAM: Record<string, View> = { mudur: 'supervisor', tasimali: 'transport', gorevlendirme: 'covers' };
+const VIEW_PARAM: Record<string, View> = { mudur: 'supervisor', tasimali: 'transport' };
 
 function ViewTabs({
   view,
@@ -81,13 +80,12 @@ function ViewTabs({
   labels: Labels | undefined;
   view: View;
   onView: (v: View) => void;
-  counts: { duties: number; supervisor: string; transport: string | null; covers: string | null };
+  counts: { duties: number; supervisor: string; transport: string | null };
 }) {
   const tabs: { value: View; label: string; hint: string; icon: typeof ShieldCheck }[] = [
     { value: 'duties', label: labelOf(labels, 'dutyPlaces'), hint: `${counts.duties} nöbet`, icon: ShieldCheck },
     { value: 'supervisor', label: labelOf(labels, 'supervisor'), hint: counts.supervisor, icon: UserCog },
     ...(counts.transport !== null ? [{ value: 'transport' as const, label: labelOf(labels, 'transport'), hint: counts.transport, icon: Bus }] : []),
-    ...(counts.covers !== null ? [{ value: 'covers' as const, label: 'Ders Görevlendirmeleri', hint: counts.covers, icon: CalendarCheck2 }] : []),
   ];
   return (
     <div className="inline-flex w-full flex-wrap gap-1 rounded-2xl bg-surface p-1 shadow-[0_1px_2px_rgba(15,23,42,0.05)] ring-1 ring-slate-200 sm:w-auto">
@@ -281,7 +279,7 @@ export function Duties() {
   const [view, setViewState] = useState<View>(() => VIEW_PARAM[params.get('bolum') ?? ''] ?? 'duties');
   const setView = (v: View) => {
     setViewState(v);
-    setParams(v === 'duties' ? {} : { bolum: v === 'supervisor' ? 'mudur' : v === 'covers' ? 'gorevlendirme' : 'tasimali' }, { replace: true });
+    setParams(v === 'duties' ? {} : { bolum: v === 'supervisor' ? 'mudur' : 'tasimali' }, { replace: true });
   };
   const [transportFile, setTransportFile] = useState<File | null>(null);
   const { can, schoolId } = useAuth();
@@ -342,17 +340,13 @@ export function Duties() {
                   : hasTransport
                     ? `${monthLabel(month)} · ${filledCount(month, (transport.data ?? []).map((x) => x.date))} gün dolu`
                     : 'Kapalı',
-                // İzinli yerine ders görevlendirmesi istatistiği: nöbet yetkisi olana
-                covers: can('duties.manage') ? 'ay ve toplam' : null,
               }}
             />
             <MonthNav month={month} onMonth={setMonth} />
           </div>
         }
         replaceContent={
-          view === 'covers' && can('duties.manage') ? (
-            <CoverStatsView month={month} />
-          ) : view === 'transport' && showTransport ? (
+          view === 'transport' && showTransport ? (
             <TransportView month={month} />
           ) : view === 'supervisor' ? (
             <Card className="overflow-hidden">
@@ -393,7 +387,7 @@ export function Duties() {
         addLabel="Nöbet ekle"
         reorderable
         headerActions={
-          view === 'covers' ? undefined : view === 'transport' && showTransport ? (
+          view === 'transport' && showTransport ? (
             hasTransport && (
               <ExcelButtons
                 basePath={transportPath}
