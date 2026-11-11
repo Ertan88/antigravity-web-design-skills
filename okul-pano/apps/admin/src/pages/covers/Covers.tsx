@@ -214,7 +214,7 @@ export function AssignmentsPage() {
     <div className="space-y-5">
       <PageHeader
         title="Görevlendirme"
-        description="İzinli öğretmenin boş kalan dersleri ve nöbet yeri burada listelenir. O gün okulda olup o saatte boş olan öğretmenler önerilir. Öğretmene dokunulunca görevlendirilir ve öğretmene bildirim gider."
+        description="İzinli öğretmenin boş kalan dersleri ve nöbet yeri burada listelenir. O gün okulda olup o saatte boş olan öğretmenler önerilir. Öğretmenin adına dokunulunca görevlendirme yapılır ve öğretmene bildirim gider."
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Segmented
