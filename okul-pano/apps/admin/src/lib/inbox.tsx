@@ -1,13 +1,19 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AlertTriangle,
   Bell,
+  BellRing,
+  CalendarClock,
   CalendarDays,
   CalendarX2,
   CheckCircle2,
   ClipboardCheck,
+  HeartHandshake,
   KeyRound,
   LockKeyhole,
+  MonitorSmartphone,
   ShieldAlert,
+  ShieldCheck,
   Star,
   TimerOff,
   Undo2,
@@ -54,6 +60,12 @@ export const KIND_STYLE: Record<string, { icon: LucideIcon; tone: string }> = {
   'support-expired': { icon: TimerOff, tone: 'bg-slate-200 text-slate-700' },
   'bridge-day': { icon: CalendarDays, tone: 'bg-amber-100 text-amber-700' },
   'meb-calendar': { icon: CalendarDays, tone: 'bg-emerald-100 text-emerald-700' },
+  exam: { icon: CalendarClock, tone: 'bg-brand-100 text-brand-700' },
+  bell: { icon: BellRing, tone: 'bg-amber-100 text-amber-700' },
+  conduct: { icon: HeartHandshake, tone: 'bg-amber-100 text-amber-700' },
+  'duty-assign': { icon: ShieldCheck, tone: 'bg-brand-100 text-brand-700' },
+  emergency: { icon: AlertTriangle, tone: 'bg-red-100 text-red-700' },
+  'screen-security': { icon: MonitorSmartphone, tone: 'bg-amber-100 text-amber-700' },
 };
 export const kindStyle = (kind: string) => KIND_STYLE[kind] ?? { icon: Bell, tone: 'bg-slate-100 text-slate-600' };
 

@@ -34,7 +34,7 @@ import { audit, schoolGuard, UUID_RE, type AppDeps } from '../context.ts';
 import { academicCalendars, achievements, classGroups, conductAlerts, conductAwards, conductCriteria, conductEntries, memberships, schools, students, users } from '../db/schema.ts';
 import { badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 import { newWorkbook, sendXlsx, styleHeader, toBuffer, exportFileName } from '../lib/excel.ts';
-import { notifyUsers, usersWithPermission } from '../lib/push.ts';
+import { tell, usersWithPermission } from '../lib/push.ts';
 
 /*
  * Gözlem: öğretmenler öğrencilere kriterlere göre artı / eksi verir. Okuldaki bütün öğretmenler (öğretmen kaydına
@@ -146,9 +146,11 @@ export async function checkConductAlerts(deps: AppDeps, school: { id: string; se
     await deps.db.insert(conductAlerts).values({ schoolId: school.id, studentId, minusCount: count, windowDays: rule.days, summary });
   }
   // Bildirim kilit ekranında görünür: öğrencinin adı ve ayrıntılar yazılmaz, yalnızca uygulamada görülür
-  notifyUsers(deps, recipients, {
+  await tell(deps, school.id, recipients, {
+    kind: 'conduct',
     title: 'Rehberlik uyarısı',
     body: hit.length > 1 ? `${hit.length} yeni rehberlik uyarısı var.` : 'Yeni rehberlik uyarısı var.',
+    to: '/rehberlik',
     url: '/rehberlik',
   });
   return hit.length;

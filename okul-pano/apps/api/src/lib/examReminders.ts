@@ -4,6 +4,7 @@ import type { AppDeps } from '../context.ts';
 import { examReminderAcks, examRemindersSent, examSchedule, memberships, pushTokens, schools } from '../db/schema.ts';
 import { examTeacherIds, listExams } from './examSchedule.ts';
 import { sendToTokens } from './push.ts';
+import { addToInbox } from '../routes/notifications.ts';
 
 /** Sunucu uyuyup geç uyanırsa en fazla bu kadar gecikmeyle gönderilir; daha geç gönderilmez */
 const LATE_MS = 10 * 60_000;
@@ -60,6 +61,8 @@ async function remind(deps: Pick<AppDeps, 'db' | 'env'>, schoolId: string, exam:
     if (!tokens.length) continue;
     const text = examReminderText(exam, examRoles(exam, u.teacherId));
     await sendToTokens(deps, tokens, { ...text, url: `/sinav-takvimi?gun=${exam.date}` });
+    // Bildirim kutusuna da düşer (telefonda kurulu hatırlatması olsa da olmasa da okunabilir)
+    await addToInbox(deps.db, [u.userId], { key: `exam-reminder:${exam.id}:${notifyAt.getTime()}`, kind: 'exam', title: text.title, body: text.body, to: `/sinav-takvimi?gun=${exam.date}`, schoolId });
     count += tokens.length;
   }
   return count;

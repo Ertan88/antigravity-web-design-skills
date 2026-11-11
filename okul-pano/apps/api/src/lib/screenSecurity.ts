@@ -23,7 +23,7 @@ const ALERT_EVERY_MS = 24 * 3600_000;
 export async function tellScreenAdmins(deps: AppDeps, schoolId: string, n: { title: string; body: string; push: string }) {
   const userIds = await usersWithPermission(deps, schoolId, 'screens.manage');
   if (!userIds.length) return;
-  await addToInbox(deps.db, userIds, { key: `screen-security:${randomUUID()}`, kind: 'screen-security', title: n.title, body: n.body, to: '/panolar', schoolId });
+  await addToInbox(deps.db, userIds, { key: `screen-security:${randomUUID()}`, kind: 'screen-security', title: n.title, body: n.body, to: '/ekranlar', schoolId });
   notifyUsers(deps, userIds, { title: n.title, body: n.push, url: '/panolar' });
 }
 

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { AppDeps } from '../context.ts';
 import { memberships, pushTokens } from '../db/schema.ts';
@@ -8,6 +9,24 @@ export interface PushMessage {
   body: string;
   /** Uygulamada dokununca açılacak ekran (ör. "/onaylar") */
   url?: string;
+}
+
+/**
+ * Projedeki bildirimlerin ortak yolu: bildirim kutusuna yazılır (web ve mobil; detay okunur, dokununca ilgili sayfa
+ * açılır) ve telefona gönderilir. Yeni eklenen her bildirim bunu kullanır.
+ * `to`: panel adresi (web), `url`: uygulama ekranı (mobil); mobil ayrıca türe göre ekranı bulur.
+ */
+export async function tell(
+  deps: AppDeps,
+  schoolId: string,
+  userIds: readonly string[],
+  n: { kind: string; title: string; body: string; to: string; url: string; key?: string },
+): Promise<void> {
+  const ids = [...new Set(userIds)];
+  if (!ids.length) return;
+  const { addToInbox } = await import('../routes/notifications.ts');
+  await addToInbox(deps.db, ids, { key: n.key ?? `${n.kind}:${randomUUID()}`, kind: n.kind, title: n.title, body: n.body, to: n.to, schoolId });
+  notifyUsers(deps, ids, { title: n.title, body: n.body, url: n.url });
 }
 
 /** 'memory' modunda gönderilen bildirimler (testler) */

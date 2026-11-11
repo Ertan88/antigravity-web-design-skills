@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { audit, schoolGuard, UUID_RE } from '../context.ts';
 import { bellOverrides, bellSchedules, users } from '../db/schema.ts';
 import { badRequest, notFound, parse } from '../lib/errors.ts';
-import { notifyUsers, schoolMembers } from '../lib/push.ts';
+import { schoolMembers, tell } from '../lib/push.ts';
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 const addDays = (iso: string, n: number) => new Date(Date.parse(`${iso}T12:00:00Z`) + n * 86400_000).toISOString().slice(0, 10);
@@ -69,9 +69,11 @@ export async function bellOverrideRoutes(app: FastifyInstance) {
     bus.contentChanged(schoolId);
     if (input.notify) {
       const members = (await schoolMembers(app.deps, schoolId)).filter((id) => id !== req.ctx.userId);
-      notifyUsers(app.deps, members, {
+      await tell(app.deps, req.ctx.schoolId, members, {
+        kind: 'bell',
         title: 'Zil saatleri değişti',
         body: `${trDay(input.date)}${input.note ? `: ${input.note}` : ''}. Yeni saatler programınızda.`,
+        to: '/',
         url: '/programim',
       });
     }

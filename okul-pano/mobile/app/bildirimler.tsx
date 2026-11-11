@@ -22,6 +22,12 @@ const ROUTES: Record<string, string> = {
   'meb-calendar': '/takvim',
   internship: '/isletme-devam',
   enroll: '/kullanicilar?filtre=onay',
+  exam: '/sinav-takvimi',
+  bell: '/programim',
+  conduct: '/rehberlik',
+  'duty-assign': '/nobet',
+  emergency: '/acil',
+  'screen-security': '/panolar',
 };
 const ICONS: Record<string, { icon: IconName; tone: 'primary' | 'warning' | 'danger' | 'gold' | 'muted' }> = {
   approval: { icon: 'checkmark-done-outline', tone: 'primary' },
@@ -40,8 +46,12 @@ const ICONS: Record<string, { icon: IconName; tone: 'primary' | 'warning' | 'dan
   issue: { icon: 'alert-triangle', tone: 'warning' },
   'support-reply': { icon: 'lifebuoy', tone: 'primary' },
   'support-ticket': { icon: 'lifebuoy', tone: 'gold' },
+  bell: { icon: 'notifications-outline', tone: 'warning' },
+  conduct: { icon: 'heart-outline', tone: 'warning' },
+  'duty-assign': { icon: 'shield-checkmark-outline', tone: 'primary' },
+  emergency: { icon: 'alert-triangle', tone: 'danger' },
+  'screen-security': { icon: 'tv-outline', tone: 'warning' },
   enroll: { icon: 'people-outline', tone: 'primary' },
-  'screen-security': { icon: 'shield-outline', tone: 'warning' },
 };
 const FALLBACK = { icon: 'notifications-outline' as IconName, tone: 'muted' as const };
 
@@ -73,6 +83,8 @@ export function InboxScreen({ back }: { back?: boolean }) {
     if (n.kind === 'issue') return id ? `/sorun/${id}` : '/sorunlar';
     if (n.kind === 'support-reply') return id ? `/talep/${id}` : '/platforma-yaz';
     if (n.kind === 'support-ticket') return id ? `/talep/${id}?p=1` : '/platform/destek';
+    const day = n.kind === 'exam' ? /[?&]gun=(\d{4}-\d{2}-\d{2})/.exec(n.to)?.[1] : null;
+    if (day) return `/sinav-takvimi?gun=${day}`;
     const month = n.kind === 'internship' ? /[?&]gun=(\d{4}-\d{2})-\d{2}/.exec(n.to)?.[1] : null;
     return month ? `/isletme-devam?ay=${month}` : ROUTES[n.kind];
   };

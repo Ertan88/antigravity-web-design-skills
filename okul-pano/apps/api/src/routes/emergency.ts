@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { audit, schoolGuard } from '../context.ts';
 import { schools, users } from '../db/schema.ts';
 import { parse } from '../lib/errors.ts';
-import { notifyUsers, schoolMembers } from '../lib/push.ts';
+import { schoolMembers, tell } from '../lib/push.ts';
 
 /**
  * Acil durum modu: başlatılınca okulun bütün panoları anında (SSE) tam ekran kırmızı uyarıya geçer,
@@ -31,9 +31,11 @@ export async function emergencyRoutes(app: FastifyInstance) {
     await audit(req, 'publish', 'Acil durum', req.ctx.schoolId, EMERGENCY_INFO[body.type].label);
     bus.contentChanged(req.ctx.schoolId);
     // Okuldaki herkesin telefonuna: uyarıyı başlatan hariç
-    notifyUsers(app.deps, (await schoolMembers(app.deps, req.ctx.schoolId)).filter((id) => id !== req.ctx.userId), {
+    await tell(app.deps, req.ctx.schoolId, (await schoolMembers(app.deps, req.ctx.schoolId)).filter((id) => id !== req.ctx.userId), {
+      kind: 'emergency',
       title: `ACİL DURUM: ${EMERGENCY_INFO[body.type].label}`,
       body: emergency.message ?? `${schoolFullName(req.ctx.school.name, req.ctx.school.settings?.schoolType)} panolarında acil durum uyarısı başlatıldı.`,
+      to: '/',
       url: '/acil',
     });
     return emergency;

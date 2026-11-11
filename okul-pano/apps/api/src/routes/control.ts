@@ -6,7 +6,7 @@ import { audit, schoolGuard, UUID_RE } from '../context.ts';
 import { announcements, duties, dutySubstitutions, screens, teacherLeaves, teachers, users } from '../db/schema.ts';
 import { addDays, dutyDay, dutyGaps, dutyScheduleStatus, substituteCandidates, weekdayOf } from '../lib/dayinfo.ts';
 import { badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
-import { notifyUsers, usersForTeacher } from '../lib/push.ts';
+import { tell, usersForTeacher } from '../lib/push.ts';
 
 const dateQuery = z.object({ date: z.iso.date().optional() });
 
@@ -81,9 +81,11 @@ export async function controlRoutes(app: FastifyInstance) {
       .returning();
     await audit(req, 'create', 'Nöbet görevlendirme', row!.id, `${body.date} · ${duty.area} · ${teacher.fullName}`);
     bus.contentChanged(req.ctx.schoolId);
-    notifyUsers(app.deps, await usersForTeacher(app.deps, req.ctx.schoolId, teacher.id), {
+    await tell(app.deps, req.ctx.schoolId, await usersForTeacher(app.deps, req.ctx.schoolId, teacher.id), {
+      kind: 'duty-assign',
       title: 'Nöbet görevlendirmesi',
       body: `${trDay(body.date)} ${duty.area} nöbetine görevlendirildiniz.`,
+      to: '/',
       url: '/nobet',
     });
     return reply.status(201).send(row);
