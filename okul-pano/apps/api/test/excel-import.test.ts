@@ -191,6 +191,31 @@ describe('nöbet çizelgesi Excel', () => {
     expect(list).toHaveLength(5);
   });
 
+  it('her günün yer sırası dosyadaki o günün satır sırasıdır (günler farklı sıra taşıyabilir)', async () => {
+    // Pazartesi: A, B, C, D; Salı: A, B, "C ve D" (birleşik yer), Spor. Salı'da birleşik yer Spor'dan önce gelir.
+    const rows = [
+      { weekday: 1, area: 'Atölye Önü', teacherName: 'Ayşe Demir' },
+      { weekday: 1, area: 'Ek Bina', teacherName: 'Ali Kaya' },
+      { weekday: 1, area: 'Ana Bina Kat 1', teacherName: 'Fatma Aydın' },
+      { weekday: 1, area: 'Spor Sahası', teacherName: 'Mehmet Öztürk' },
+      { weekday: 2, area: 'Atölye Önü', teacherName: 'Ali Kaya' },
+      { weekday: 2, area: 'Ek Bina', teacherName: 'Ayşe Demir' },
+      { weekday: 2, area: 'Ana Bina Kat 1-2', teacherName: 'Mehmet Öztürk' },
+      { weekday: 2, area: 'Spor Sahası', teacherName: 'Fatma Aydın' },
+    ];
+    expectStatus(await owner.post(path('duties/import'), { month: '2026-12', mode: 'replace', weekdays: [1, 2], rows }), 200);
+    const order = async (weekday: number) =>
+      ((await owner.get(path('duties'))).json() as { month: string; weekday: number; area: string }[]).filter((d) => d.month === '2026-12' && d.weekday === weekday).map((d) => d.area);
+    expect(await order(1)).toEqual(['Atölye Önü', 'Ek Bina', 'Ana Bina Kat 1', 'Spor Sahası']);
+    expect(await order(2)).toEqual(['Atölye Önü', 'Ek Bina', 'Ana Bina Kat 1-2', 'Spor Sahası']);
+
+    // Aynı dosya sırası değiştirilip "ekle" ile yüklenince var olan kayıtların sırası da dosyaya uyar
+    const swapped = [rows[7]!, rows[4]!, rows[5]!, rows[6]!];
+    const merged = await owner.post(path('duties/import'), { month: '2026-12', mode: 'merge', weekdays: [2], rows: swapped });
+    expect(merged.json()).toMatchObject({ created: 0, unchanged: 4 });
+    expect(await order(2)).toEqual(['Spor Sahası', 'Atölye Önü', 'Ek Bina', 'Ana Bina Kat 1-2']);
+  });
+
   it('dışa aktarma okulun aylık çizelge düzenindedir, yalnızca hafta içini içerir ve geri yüklenince değişiklik çıkmaz', async () => {
     const res = await owner.get(path('duties/export?month=2026-09'));
     expectStatus(res, 200);

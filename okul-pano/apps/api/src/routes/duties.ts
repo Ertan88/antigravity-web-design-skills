@@ -262,13 +262,15 @@ export async function dutyRoutes(app: FastifyInstance) {
         removed = del.length;
       }
       const existing = await tx
-        .select({ weekday: duties.weekday, area: duties.area, teacherId: duties.teacherId })
+        .select({ id: duties.id, weekday: duties.weekday, area: duties.area, teacherId: duties.teacherId, sortOrder: duties.sortOrder })
         .from(duties)
         .where(and(eq(duties.schoolId, schoolId), eq(duties.month, body.month)));
-      const keys = new Set(existing.map((d) => dutyKey(d.weekday, d.area, d.teacherId)));
+      const keys = new Map(existing.map((d) => [dutyKey(d.weekday, d.area, d.teacherId), d]));
       // Aynı yerin farklı yazımları ("bahçe" / "Bahçe") tek yazıma indirgenir
       const spelling = new Map(existing.map((d) => [normalizeName(d.area), d.area]));
-      const areaIndex = new Map<string, number>();
+      // Sıra, her günün Excel'deki satır sırasıdır (S.No): günler farklı yer sırası taşıyabilir
+      // (ör. bir gün "Ana Bina Kat 1-2" tek satır). Panelde, mobilde ve panoda aynı sırayla görünür.
+      const dayPosition = new Map<number, number>();
 
       const inserts: (typeof duties.$inferInsert)[] = [];
       let skipped = 0;
@@ -281,15 +283,19 @@ export async function dutyRoutes(app: FastifyInstance) {
         }
         const areaKey = normalizeName(r.area);
         if (!spelling.has(areaKey)) spelling.set(areaKey, tidyName(r.area));
-        if (!areaIndex.has(areaKey)) areaIndex.set(areaKey, areaIndex.size);
+        const sortOrder = dayPosition.get(r.weekday) ?? 0;
+        dayPosition.set(r.weekday, sortOrder + 1);
         const area = spelling.get(areaKey)!;
         const key = dutyKey(r.weekday, area, teacher.id);
-        if (keys.has(key)) {
+        const same = keys.get(key);
+        if (same) {
+          // Kayıt zaten var: yalnızca sırası dosyadakine getirilir
+          if (same.id && same.sortOrder !== sortOrder) await tx.update(duties).set({ sortOrder }).where(eq(duties.id, same.id));
           unchanged++;
           continue;
         }
-        keys.add(key);
-        inserts.push({ schoolId, month: body.month, weekday: r.weekday, area, teacherId: teacher.id, sortOrder: areaIndex.get(areaKey)! });
+        keys.set(key, { id: '', weekday: r.weekday, area, teacherId: teacher.id, sortOrder });
+        inserts.push({ schoolId, month: body.month, weekday: r.weekday, area, teacherId: teacher.id, sortOrder });
       }
       if (inserts.length) await tx.insert(duties).values(inserts);
 

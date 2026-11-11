@@ -344,11 +344,14 @@ export function Slideshow({ announcements, now, defaultDurationSec, videoSound, 
   // geri sayım sıfırlanmaz, slayt süresi dolunca sıradakine geçilir
   const slideId = slide?.id ?? null;
   const isVideo = slide?.kind === 'video';
+  // Tek duyuru varsa geçilecek başka slayt yoktur: süre sayılmaz, ilerleme çubuğu ve geçiş efekti olmaz (duyuru
+  // ekranda durur). Tek video ise bitince baştan oynar.
+  const single = count <= 1;
   useEffect(() => {
-    if (!slideId || isVideo || paused) return;
+    if (!slideId || isVideo || paused || single) return;
     const t = setTimeout(next, duration * 1000);
     return () => clearTimeout(t);
-  }, [slideId, isVideo, cursor.round, duration, next, paused]);
+  }, [slideId, isVideo, cursor.round, duration, next, paused, single]);
 
   // Sıradaki görseli önceden yükle: geçişte boş kare görünmesin
   useEffect(() => {
@@ -411,7 +414,7 @@ export function Slideshow({ announcements, now, defaultDurationSec, videoSound, 
           ))}
         </div>
       )}
-      {slide.kind !== 'video' && !paused && (
+      {slide.kind !== 'video' && !paused && !single && (
         <div className="slide-progress" aria-hidden="true">
           <div key={key} style={{ animationDuration: `${duration}s` }} />
         </div>
