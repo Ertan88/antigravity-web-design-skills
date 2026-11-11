@@ -3,8 +3,8 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Text } from '../src/text.tsx';
 import { useMeToday, useNow } from '../src/data.ts';
-import { classLabel, dateOfWeekday, teacherDay, WEEKDAY_LONG, WEEKDAY_SHORT } from '../src/day.ts';
-import { ACCENT, classTones, daySlots, LiveLesson, toMin, type Lesson } from '../src/lesson.tsx';
+import { classLabel, dateOfWeekday, lessonsOn, teacherDay, WEEKDAY_LONG, WEEKDAY_SHORT } from '../src/day.ts';
+import { ACCENT, classTones, CoverTag, daySlots, LiveLesson, toMin, type Lesson } from '../src/lesson.tsx';
 import { colors } from '../src/theme.ts';
 import { Card, Empty, ErrorNote, HolidayCard, Icon, Loading, Screen, T } from '../src/ui.tsx';
 
@@ -93,7 +93,8 @@ export function ProgramimScreen({ back }: { back?: boolean }) {
       <View style={{ flexDirection: 'row', gap: 6 }}>
         {days.map((d) => {
           const on = d === day;
-          const n = lessons.filter((l) => l.weekday === d).length;
+          // Haftalık dersler ve bu haftaki o güne verilen görev dersleri
+          const n = today ? lessonsOn(data, dateOfWeekday(today.now.isoDate, d), d).length : lessons.filter((l) => l.weekday === d).length;
           return (
             <Pressable
               key={d}
@@ -195,15 +196,38 @@ function ItemRow({ it, first, past, tone }: { it: Item; first: boolean; past?: b
       </View>
     );
   const { period, lesson } = it;
+  // İzinli öğretmen yerine girilen ders: turuncu zemin, "GÖREV" etiketi ve kimin yerine
+  const cover = lesson?.coverFor;
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: lesson ? 12 : 9, paddingHorizontal: 16, opacity: past ? 0.55 : 1, ...border }}>
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        paddingVertical: lesson ? 12 : 9,
+        paddingHorizontal: 16,
+        opacity: past ? 0.55 : 1,
+        backgroundColor: cover ? colors.warningSoft : undefined,
+        ...border,
+      }}
+    >
       <View style={{ width: 96 }}>
         <Text style={{ fontSize: 12.5, fontWeight: '800', color: colors.muted }}>{period.no}. Ders</Text>
         <Text style={{ fontSize: 13, fontWeight: '600', color: colors.faint, fontVariant: ['tabular-nums'] }}>
           {period.start} – {period.end}
         </Text>
       </View>
-      {lesson ? (
+      {lesson && cover ? (
+        <View style={{ flex: 1, gap: 2 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.ink, lineHeight: 20 }}>
+              {classLabel(lesson.className)} · {lesson.subject}
+            </Text>
+            <CoverTag />
+          </View>
+          <Text style={{ fontSize: 12.5, fontWeight: '600', color: colors.muted }}>{cover} yerine</Text>
+        </View>
+      ) : lesson ? (
         <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: colors.ink, lineHeight: 20 }}>
           {classLabel(lesson.className)} · {lesson.subject}
         </Text>

@@ -40,7 +40,12 @@ export interface MeToday {
   bellClasses?: BellClass[] | null;
   /** Zil saatlerine elle müdahaleler (tarih ve zile göre) */
   bellOverrides?: BellOverrideLike[];
-  lessons: { weekday: number; periodNo: number; className: string; classId?: string; shift?: 'morning' | 'afternoon' | null; subject: string }[];
+  /** Haftalık dersler; o güne eklenen görev derslerinde `coverFor` izinli öğretmenin adıdır */
+  lessons: { weekday: number; periodNo: number; className: string; classId?: string; shift?: 'morning' | 'afternoon' | null; subject: string; coverFor?: string }[];
+  /** İzinli öğretmen yerine girilecek dersler (tarihe bağlı, bugünden bir hafta) */
+  covers?: { date: string; periodNo: number; classId: string; className: string; shift: 'morning' | 'afternoon' | null; subject: string; absentName: string }[];
+  /** Sonraki okul günü: gün bitince "Yarın" bilgisi için */
+  nextSchoolDay?: string | null;
   leaves: { id: string; startDate: string; endDate: string; note: string | null; status: 'approved' | 'pending' | 'rejected' }[];
   week: {
     date: string;

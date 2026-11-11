@@ -1,10 +1,10 @@
-import { classBell, dayBells, isInternshipSubject, monthSchema, trCompare, zonedParts } from '@okulpano/shared';
+import { classBell, dayBells, isInternshipSubject, monthSchema, nextSchoolDay, trCompare, zonedParts } from '@okulpano/shared';
 import { and, asc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { audit, schoolGuard, UUID_RE, type AppDeps } from '../context.ts';
-import { classGroups, lessonCovers, schools, teacherLeaves, teachers, transportDuties } from '../db/schema.ts';
-import { dutyDay, monthEnd, substituteCandidates, weekdayOf } from '../lib/dayinfo.ts';
+import { classGroups, dutySubstitutions, duties, lessonCovers, schools, teacherLeaves, teachers, transportDuties } from '../db/schema.ts';
+import { addDays, dutyDay, monthEnd, substituteCandidates, weekdayOf } from '../lib/dayinfo.ts';
 import { badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 import { loadExamContext } from '../lib/examSchedule.ts';
 import { tell, usersForTeacher } from '../lib/push.ts';
@@ -31,8 +31,46 @@ export interface CoverCandidate {
   monthCount: number;
 }
 
+type DB = AppDeps['db'];
+
+/**
+ * Görevlendirme bilgisinin gösterildiği gün: okulun o günkü son zili çalmadıysa bugün; çaldıysa (ya da bugün tatil,
+ * hafta sonuysa) sonraki okul günü. Gün sonunda bugünün boşlukları ve görevleri artık gösterilmez.
+ */
+export async function activeCoverDate(db: DB, school: School, now = new Date()) {
+  const p = zonedParts(now, school.timezone);
+  const today = p.isoDate;
+  const ctx = await loadExamContext(db, school, today, addDays(today, 21));
+  const ends = dayBells(today, ctx.cal).flatMap((b) => b.periods.map((x) => x.end));
+  const end = ends.length ? ends.reduce((a, b) => (b > a ? b : a)) : null;
+  const nowSec = p.secondsOfDay;
+  if (end && nowSec < Number(end.slice(0, 2)) * 3600 + Number(end.slice(3, 5)) * 60) return { today, date: today };
+  return { today, date: nextSchoolDay(today, ctx.cal, 21)?.date ?? today };
+}
+
+/** Öğretmenin tarih aralığındaki ders görevlendirmeleri (sınıf, ders, kimin yerine) */
+export async function teacherCovers(db: DB, schoolId: string, teacherId: string, from: string, to: string) {
+  const rows = await db
+    .select({
+      date: lessonCovers.date,
+      periodNo: lessonCovers.periodNo,
+      classId: lessonCovers.classGroupId,
+      className: classGroups.name,
+      shift: classGroups.shift,
+      subject: lessonCovers.subject,
+      absentTeacherId: lessonCovers.absentTeacherId,
+    })
+    .from(lessonCovers)
+    .innerJoin(classGroups, eq(classGroups.id, lessonCovers.classGroupId))
+    .where(and(eq(lessonCovers.schoolId, schoolId), eq(lessonCovers.teacherId, teacherId), gte(lessonCovers.date, from), lte(lessonCovers.date, to)))
+    .orderBy(asc(lessonCovers.date), asc(lessonCovers.periodNo));
+  const ids = [...new Set(rows.map((r) => r.absentTeacherId).filter((x): x is string => Boolean(x)))];
+  const names = new Map((ids.length ? await db.select({ id: teachers.id, fullName: teachers.fullName }).from(teachers).where(inArray(teachers.id, ids)) : []).map((t) => [t.id, t.fullName]));
+  return rows.map(({ absentTeacherId, ...r }) => ({ ...r, absentName: absentTeacherId ? (names.get(absentTeacherId) ?? '') : '' }));
+}
+
 /** Bir günün boş dersleri: onaylı izindeki öğretmenlerin o günkü dersleri (işletmede mesleki eğitim dersi hariç) */
-async function coverDay(deps: AppDeps, school: School, date: string) {
+async function coverDay(deps: AppDeps, school: School, date: string, today = date) {
   const { db } = deps;
   const ctx = await loadExamContext(db, school, date, date);
   const weekday = weekdayOf(date);
@@ -136,6 +174,8 @@ async function coverDay(deps: AppDeps, school: School, date: string) {
 
   return {
     date,
+    /** Okulun bugünü: istemci "Bugün", "Yarın" ya da gün adını buna göre yazar */
+    today,
     weekday,
     holiday,
     absent: [...absent].map((id) => ({ teacherId: id, fullName: nameOf(id) })).sort((a, b) => trCompare(a.fullName, b.fullName)),
@@ -158,10 +198,46 @@ export async function coverRoutes(app: FastifyInstance) {
   const manage = { preHandler: [app.authenticate, schoolGuard('duties.manage')] };
   const todayOf = (req: FastifyRequest) => zonedParts(new Date(), req.ctx.school.timezone).isoDate;
 
-  /** Günün boş dersleri ve nöbet yerleri, adaylar (Genel Bakış kartı, mobil) */
+  /**
+   * Günün boş dersleri ve nöbet yerleri, adaylar (Genel Bakış bandı, Görevlendirme, mobil). Tarih verilmezse gösterilen
+   * gün: okul günü bitmediyse bugün, bittiyse sonraki okul günü.
+   */
   app.get(`${base}/cover-day`, manage, async (req) => {
     const { date } = parse(dateQuery, req.query);
-    return coverDay(deps, req.ctx.school, date ?? todayOf(req));
+    if (date) return coverDay(deps, req.ctx.school, date, todayOf(req));
+    const active = await activeCoverDate(db, req.ctx.school);
+    return coverDay(deps, req.ctx.school, active.date, active.today);
+  });
+
+  /**
+   * Öğretmenin gösterilen gündeki görevleri (web Genel Bakış kartı): izinli yerine girdiği dersler ve tuttuğu nöbet
+   * yerleri. Gün bitince sonraki okul gününün görevleri gelir.
+   */
+  app.get(`${base}/my-assignments`, member, async (req) => {
+    const teacherId = req.ctx.teacherId;
+    if (!teacherId) return { today: todayOf(req), date: todayOf(req), lessons: [], duties: [] };
+    const { today, date } = await activeCoverDate(db, req.ctx.school);
+    const [lessons, subs, ctx] = await Promise.all([
+      teacherCovers(db, req.ctx.schoolId, teacherId, date, date),
+      db
+        .select({ area: duties.area, absentId: duties.teacherId })
+        .from(dutySubstitutions)
+        .innerJoin(duties, eq(duties.id, dutySubstitutions.dutyId))
+        .where(and(eq(dutySubstitutions.schoolId, req.ctx.schoolId), eq(dutySubstitutions.date, date), eq(dutySubstitutions.teacherId, teacherId))),
+      loadExamContext(db, req.ctx.school, date, date),
+    ]);
+    const bells = dayBells(date, ctx.cal);
+    const nameOf = (id: string) => ctx.staff.find((t) => t.id === id)?.fullName ?? '';
+    return {
+      today,
+      date,
+      lessons: lessons.map((l) => {
+        const shift = ctx.settings.dualShift && l.shift === 'afternoon' ? 'afternoon' : 'morning';
+        const period = classBell(bells, l.classId, shift)?.periods.find((p) => p.no === l.periodNo);
+        return { periodNo: l.periodNo, start: period?.start ?? null, end: period?.end ?? null, className: l.className, subject: l.subject, absentName: l.absentName };
+      }),
+      duties: subs.map((s) => ({ area: s.area, absentName: nameOf(s.absentId) })),
+    };
   });
 
   /** Boş derse öğretmen gönder: o saatte boş olmalı; görevli öğretmene bildirim gider */
@@ -196,8 +272,8 @@ export async function coverRoutes(app: FastifyInstance) {
       kind: 'lesson-cover',
       title: 'Derse görevlendirildiniz',
       body: `${trDay(body.date)} ${body.periodNo}. ders${slot.start ? ` (${slot.start})` : ''} · ${slot.className} ${slot.subject} · ${slot.absentName} yerine`,
-      to: '/gorevlerim',
-      url: '/gorevlerim',
+      to: '/',
+      url: '/',
     });
     return reply.status(201).send(row);
 
@@ -274,7 +350,7 @@ export async function coverRoutes(app: FastifyInstance) {
     };
   });
 
-  /** Öğretmenin kendi görevleri: ayın ders görevlendirmeleri, ay / toplam ders saati, taşımalı sayıları */
+  /** Öğretmenin sayıları (mobil Nöbetlerim özeti): ayın ders görevlendirmeleri, ay / toplam ders saati, taşımalı sayıları */
   app.get(`${base}/my-covers`, member, async (req) => {
     const { month } = parse(z.object({ month: monthSchema.optional() }), req.query);
     const teacherId = req.ctx.teacherId;

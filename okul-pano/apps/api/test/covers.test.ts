@@ -1,5 +1,8 @@
+import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { schools } from '../src/db/schema.ts';
 import { sentPushes } from '../src/lib/push.ts';
+import { activeCoverDate, teacherCovers } from '../src/routes/covers.ts';
 import { client, createTestApp, expectStatus, login, SUPER, type TestCtx } from './helpers.ts';
 
 /*
@@ -96,6 +99,18 @@ describe('izinli öğretmen yerine görevlendirme', () => {
     // Yetkisi olmayan öğretmen günü ve istatistiği göremez
     expect((await burak.get(path(`cover-day?date=${DATE}`))).statusCode).toBe(403);
     expect((await burak.get(path('cover-stats'))).statusCode).toBe(403);
+  });
+
+  it('gün sonu: son zilden sonra sonraki okul günü; öğretmenin görev dersleri tarihleriyle', async () => {
+    const [school] = await t.database.db.select().from(schools).where(eq(schools.id, schoolId));
+    // Son ders (6.) 14:10'da biter; İstanbul saati UTC+3
+    expect(await activeCoverDate(t.database.db, school!, new Date('2026-12-02T10:00:00Z'))).toEqual({ today: DATE, date: DATE });
+    expect(await activeCoverDate(t.database.db, school!, new Date('2026-12-02T11:30:00Z'))).toEqual({ today: DATE, date: '2026-12-03' });
+    // Cuma akşamı ve hafta sonu: Pazartesi
+    expect((await activeCoverDate(t.database.db, school!, new Date('2026-12-04T15:00:00Z'))).date).toBe('2026-12-07');
+    expect((await activeCoverDate(t.database.db, school!, new Date('2026-12-05T08:00:00Z'))).date).toBe('2026-12-07');
+    const mine = await teacherCovers(t.database.db, schoolId, T.Burak!, DATE, DATE);
+    expect(mine.map((c) => `${c.date}|${c.periodNo}|${c.className}|${c.subject}|${c.absentName}`)).toEqual([`${DATE}|2|10-A|Matematik|Ayşe Yılmaz`, `${DATE}|3|10-A|Matematik|Ayşe Yılmaz`]);
   });
 
   it('görevli değiştirilir ve silinir', async () => {

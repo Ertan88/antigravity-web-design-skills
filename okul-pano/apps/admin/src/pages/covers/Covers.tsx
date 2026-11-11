@@ -1,9 +1,9 @@
-import { coverBandText, errorText } from '@okulpano/shared';
+import { coverBandText, errorText, relativeDayWord } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ArrowRight, Bus, CalendarCheck2, History, ShieldCheck } from '../../components/icons.tsx';
+import { AlertTriangle, ArrowRight, CalendarCheck2, History, ShieldCheck } from '../../components/icons.tsx';
 import { useToast } from '../../components/Toast.tsx';
 import { Badge, Button, Card, DeleteButton, EmptyState, Modal, PageHeader, Segmented, Select, Spinner, Table, Td } from '../../components/ui.tsx';
 import { api } from '../../lib/api.ts';
@@ -13,12 +13,15 @@ import { currentMonth, MonthNav, monthLabel } from '../duties/calendar.tsx';
 
 /*
  * İzinli öğretmen yerine görevlendirme: Genel Bakış'ta yalnızca tek satırlık uyarı bandı; atama, istatistik ve sınıf
- * geçmişi Personel › Görevlendirme sayfasında (menüde boş sayısı rozetli). Öğretmen kendi görevlerini "Görevlerim"de görür.
+ * geçmişi Personel › Görevlendirme sayfasında (menüde boş sayısı rozetli). Okul günü bitince sonraki okul günü
+ * gösterilir. Öğretmen kendi görevini Genel Bakış'taki kartta görür (mobilde ders listesinde "GÖREV" etiketiyle).
  */
 
 type Candidate = { teacherId: string; fullName: string; onDuty: boolean; monthCount: number };
 interface CoverDay {
   date: string;
+  /** Okulun bugünü; gün bitince `date` sonraki okul günüdür */
+  today: string;
   holiday: string | null;
   absent: { teacherId: string; fullName: string }[];
   lessons: {
@@ -98,7 +101,7 @@ export function useCoverDay(date?: string) {
 /** Atanmamış boşluk sayısı */
 export const openCount = (d: CoverDay | undefined) => (d && !d.holiday ? d.lessons.filter((l) => !l.cover).length + d.duties.filter((x) => !x.substitute).length : 0);
 
-/** Genel Bakış: yalnızca atanmamış boşluk varken tek satırlık uyarı bandı; atama Görevlendirme sayfasında */
+/** Genel Bakış: yalnızca atanmamış boşluk varken tek satırlık uyarı bandı ("Bugün:", gün bitince "Yarın:"); atama Görevlendirme sayfasında */
 export function CoverBand() {
   const d = useCoverDay().data;
   const open = openCount(d);
@@ -107,6 +110,7 @@ export function CoverBand() {
     d.absent.map((a) => a.fullName),
     d.lessons.filter((l) => !l.cover).length,
     d.duties.filter((x) => !x.substitute).length,
+    relativeDayWord(d.date, d.today),
   );
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-amber-50 px-4 py-3 ring-1 ring-amber-200">
@@ -206,11 +210,15 @@ export function AssignmentsPage() {
   const [params, setParams] = useSearchParams();
   const tab: AssignTab = params.get('bolum') === 'istatistik' ? 'stats' : 'today';
   const setTab = (t: AssignTab) => setParams(t === 'stats' ? { bolum: 'istatistik' } : {}, { replace: true });
-  const today = useCoverDay().data?.date;
+  const base = useCoverDay().data;
+  // Varsayılan gün: okul günü bitmediyse bugün, bittiyse sonraki okul günü
+  const today = base?.today;
+  const defaultDate = base?.date;
+  const word = base ? relativeDayWord(base.date, base.today) : 'Bugün';
   const [date, setDate] = useState<string | null>(null);
-  const shown = date ?? today ?? null;
+  const shown = date ?? defaultDate ?? null;
   const [month, setMonth] = useState(currentMonth);
-  const open = openCount(useCoverDay().data);
+  const open = openCount(base);
   return (
     <div className="space-y-5">
       <PageHeader
@@ -222,7 +230,7 @@ export function AssignmentsPage() {
           value={tab}
           onChange={setTab}
           options={[
-            { value: 'today', label: open ? `Bugün · ${open} boş` : 'Günlük' },
+            { value: 'today', label: open ? `${word} · ${open} boş` : 'Günlük' },
             { value: 'stats', label: 'İstatistik ve sınıf geçmişi' },
           ]}
         />
@@ -235,15 +243,15 @@ export function AssignmentsPage() {
                 ‹
               </Button>
               <span className="min-w-52 text-center text-sm font-bold text-ink">
-                {shown === today ? 'Bugün · ' : ''}
+                {shown && today ? (shown === today || shown === defaultDate ? `${relativeDayWord(shown, today)} · ` : '') : ''}
                 {dayText(shown)}
               </span>
               <Button size="sm" variant="secondary" onClick={() => setDate(shiftDay(shown, 1))} aria-label="Sonraki gün">
                 ›
               </Button>
-              {shown !== today && (
+              {shown !== defaultDate && (
                 <Button size="sm" variant="ghost" onClick={() => setDate(null)}>
-                  Bugün
+                  {word}
                 </Button>
               )}
             </div>
@@ -356,69 +364,36 @@ function ClassHistory({ open, onClose }: { open: boolean; onClose: () => void })
   );
 }
 
-/** Öğretmenin kendi görevleri: ayın ders görevlendirmeleri, ay / toplam ders, taşımalı sayıları */
-export function MyCoversPage() {
+/**
+ * Öğretmenin Genel Bakış kartı: gösterilen gündeki (gün bitince sonraki okul günündeki) görevleri. Görev yoksa görünmez.
+ * Örnek: "Bugün: 3. ders (10:10) 10-A Matematik, Ayşe Yılmaz yerine."
+ */
+export function MyAssignmentsCard() {
   const { schoolId, school } = useAuth();
-  const [month, setMonth] = useState(currentMonth);
-  const path = useSchoolPath('my-covers');
+  const path = useSchoolPath('my-assignments');
   const q = useQuery({
-    queryKey: [schoolId, 'my-covers', month],
+    queryKey: [schoolId, 'my-assignments'],
     queryFn: () =>
-      api<{ today: string; monthCount: number; total: number; transportMonth: number; transportTotal: number; items: { id: string; date: string; periodNo: number; subject: string; className: string; absentName: string }[] }>(`${path}?month=${month}`),
+      api<{ today: string; date: string; lessons: { periodNo: number; start: string | null; className: string; subject: string; absentName: string }[]; duties: { area: string; absentName: string }[] }>(path),
     enabled: Boolean(school?.teacherId),
+    refetchInterval: 5 * 60_000,
   });
   const d = q.data;
+  if (!d || (!d.lessons.length && !d.duties.length)) return null;
+  const word = relativeDayWord(d.date, d.today);
+  const instead = (name: string) => (name ? `, ${name} yerine` : '');
+  const rows = [
+    ...d.lessons.map((l) => `${l.periodNo}. ders${l.start ? ` (${l.start})` : ''} ${l.className} ${l.subject}${instead(l.absentName)}.`),
+    ...d.duties.map((x) => `${x.area} nöbeti${instead(x.absentName)}.`),
+  ];
   return (
-    <div className="space-y-6">
-      <PageHeader title="Görevlerim" description="İzinli öğretmen yerine girdiğiniz dersler ve taşımalı görevleriniz. Görevlendirildiğinizde bildirim de gelir." actions={<MonthNav month={month} onMonth={setMonth} />} />
-      {!school?.teacherId ? (
-        <Card className="p-6 text-sm text-slate-500">Hesabınız bir öğretmen kaydına bağlı değil.</Card>
-      ) : !d ? (
-        <div className="flex justify-center py-10">
-          <Spinner />
-        </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Tile tone="bg-tile-sky text-tile-sky-ink" label={`${monthLabel(month).split(' ')[0]} · derse girdiğim`} value={`${d.monthCount} saat`} />
-            <Tile tone="bg-tile-mint text-tile-mint-ink" label="Toplam derse girdiğim" value={`${d.total} saat`} />
-            <Tile tone="bg-tile-lilac text-tile-lilac-ink" label={`${monthLabel(month).split(' ')[0]} · taşımalı`} value={`${d.transportMonth} gün`} icon />
-            <Tile tone="bg-tile-dark text-white" label="Toplam taşımalı" value={`${d.transportTotal} gün`} icon />
-          </div>
-          <Card className="p-5">
-            <h2 className="mb-3 font-bold text-ink">{monthLabel(month)} · ders görevlendirmeleri</h2>
-            {!d.items.length ? (
-              <p className="text-sm text-slate-500">Bu ay görevlendirme yok.</p>
-            ) : (
-              <div className="grid gap-2">
-                {d.items.map((i) => (
-                  <div key={i.id} className={clsx('rounded-xl px-3 py-2 ring-1', i.date === d.today ? 'bg-brand-50 ring-brand-200' : 'ring-slate-200')}>
-                    <div className="font-semibold text-ink">
-                      {i.date === d.today ? 'Bugün' : new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', weekday: 'long', timeZone: 'UTC' }).format(new Date(`${i.date}T12:00:00Z`))} · {i.periodNo}. ders · {i.className}
-                    </div>
-                    <div className="text-xs text-slate-500">
-                      {i.subject}
-                      {i.absentName ? ` · ${i.absentName} yerine` : ''}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-        </>
-      )}
-    </div>
-  );
-}
-
-function Tile({ tone, label, value, icon }: { tone: string; label: string; value: string; icon?: boolean }) {
-  return (
-    <div className={clsx('rounded-3xl p-5', tone)}>
-      <div className="flex items-center gap-1.5 text-[13px] font-bold opacity-75">
-        {icon ? <Bus className="size-4" /> : <CalendarCheck2 className="size-4" />}
-        {label}
-      </div>
-      <div className="mt-3 text-3xl font-extrabold tracking-tight">{value}</div>
+    <div className="grid gap-1.5 rounded-2xl bg-amber-50 px-4 py-3 ring-1 ring-amber-200">
+      {rows.map((r) => (
+        <p key={r} className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
+          <span className="rounded-md bg-amber-500 px-1.5 py-px text-[10px] font-extrabold tracking-wide text-slate-900">GÖREV</span>
+          <b className="text-amber-800">{word}:</b> {r}
+        </p>
+      ))}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { coverBandText, trNameList } from './coverText.ts';
+import { coverBandText, relativeDayWord, trNameList } from './coverText.ts';
 
 describe('izinli öğretmen bandı (devrik cümle yok)', () => {
   it('ders ve nöbet yeri', () => {
@@ -14,5 +14,14 @@ describe('izinli öğretmen bandı (devrik cümle yok)', () => {
     expect(trNameList(['A', 'B', 'C'])).toBe('A, B ve C');
     expect(trNameList(['A', 'B', 'C', 'D', 'E'])).toBe('A, B ve 3 kişi daha');
     expect(coverBandText(['A', 'B'], 3, 1).title).toBe('Bugün: A ve B izinli.');
+  });
+});
+
+describe('gösterilen günün adı', () => {
+  it('bugün, yarın, gün adı', () => {
+    expect(relativeDayWord('2026-12-02', '2026-12-02')).toBe('Bugün');
+    expect(relativeDayWord('2026-12-03', '2026-12-02')).toBe('Yarın');
+    expect(relativeDayWord('2026-12-07', '2026-12-04')).toBe('Pazartesi');
+    expect(coverBandText(['Ayşe Yılmaz'], 2, 1, 'Yarın').title).toBe('Yarın: Ayşe Yılmaz izinli.');
   });
 });

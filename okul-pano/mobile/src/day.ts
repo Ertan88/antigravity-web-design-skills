@@ -14,8 +14,8 @@ export interface TeacherDay {
   /** Arife (yarım gün): dersler `endsAt` saatinde biter */
   halfDay: string | null;
   endsAt: string | null;
-  /** Bugünkü dersleri: saat, sınıf, ders; şu anki işaretli */
-  lessons: { period: Period; className: string; subject: string; state: 'past' | 'now' | 'next' | 'later' }[];
+  /** Bugünkü dersleri: saat, sınıf, ders; şu anki işaretli; görev dersinde `coverFor` izinli öğretmenin adı */
+  lessons: { period: Period; className: string; subject: string; coverFor?: string; state: 'past' | 'now' | 'next' | 'later' }[];
 }
 
 /** Panoyla aynı zil takvimi: düzenler, tatiller, sınıfa özel ziller ve elle müdahaleler */
@@ -31,6 +31,26 @@ export function bellCalendar(data: MeToday, opts: { holidays?: boolean } = {}): 
     overrides: data.bellOverrides ?? [],
     dualShift: Boolean(data.dualShift),
   };
+}
+
+/**
+ * Bir tarihin dersleri: haftalık programdaki o günün dersleri ve o tarihe verilen görev dersleri ("GÖREV"; izinli
+ * öğretmenin adı `coverFor`). Görev dersi programdaki boş saate gelir.
+ */
+export function lessonsOn(data: MeToday, date: string, weekday = isoWeekday(date)): MeToday['lessons'] {
+  const covers = (data.covers ?? [])
+    .filter((c) => c.date === date)
+    .map((c) => ({ weekday, periodNo: c.periodNo, className: c.className, classId: c.classId, shift: c.shift, subject: c.subject, coverFor: c.absentName || 'İzinli öğretmen' }));
+  return [...data.lessons.filter((l) => l.weekday === weekday), ...covers];
+}
+
+/** Okul günü bitti mi: tatil, hafta sonu ya da okulun o günkü son zilinden sonra */
+export function schoolDayEnded(data: MeToday, date: Date): boolean {
+  const now = zonedParts(date, data.timezone);
+  const ends = dayBells(now.isoDate, bellCalendar(data)).flatMap((b) => b.periods.map((p) => p.end));
+  if (!ends.length) return true;
+  const end = ends.reduce((a, b) => (b > a ? b : a));
+  return now.secondsOfDay >= toSec(end);
 }
 
 /** Bu haftanın (bugünün haftası) o gününün tarihi */
@@ -60,7 +80,7 @@ export function teacherDay(data: MeToday, date: Date): TeacherDay {
   const cal = bellCalendar(data);
   const dual = Boolean(data.dualShift);
   const shiftOf = (l: { shift?: Shift | null }): Shift => (dual && l.shift === 'afternoon' ? 'afternoon' : 'morning');
-  const todays = data.lessons.filter((l) => l.weekday === now.weekday);
+  const todays = lessonsOn(data, now.isoDate, now.weekday);
   const bells = dayBells(now.isoDate, cal);
   const school = schoolDay(now.isoDate, cal, 'morning');
   const { holiday, halfDay, endsAt } = school;
@@ -79,7 +99,7 @@ export function teacherDay(data: MeToday, date: Date): TeacherDay {
         state = 'next';
         seenNext = true;
       }
-      return { period, className: l.className, classId: l.classId, shift: shiftOf(l), subject: l.subject, state };
+      return { period, className: l.className, classId: l.classId, shift: shiftOf(l), subject: l.subject, coverFor: l.coverFor, state };
     });
   // Zil kartı: şu anki ya da sıradaki dersin zili (ör. 12. sınıfa giren öğretmen 12'lerin zilini görür); dersi yoksa
   // vardiyasının okul geneli zili

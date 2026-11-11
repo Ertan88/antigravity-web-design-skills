@@ -11,7 +11,7 @@ import { useAuth } from '../lib/auth.tsx';
 import { useList, useSchoolPath, type Announcement, type Screen } from '../lib/data.ts';
 import { timeAgo } from '../lib/format.ts';
 import { TodaySummary } from './dashboard/Today.tsx';
-import { CoverBand } from './covers/Covers.tsx';
+import { CoverBand, MyAssignmentsCard } from './covers/Covers.tsx';
 
 interface Stats {
   activeAnnouncements: number;
@@ -138,6 +138,8 @@ export function Dashboard() {
 
       {/* İzinli öğretmenin boş kalan dersleri ve nöbet yeri: tek satır uyarı, atama Görevlendirme sayfasında */}
       <CoverBand />
+      {/* Öğretmenin izinli yerine görevi (ders ya da nöbet yeri); gün bitince sonraki okul günü */}
+      <MyAssignmentsCard />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat

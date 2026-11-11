@@ -28,7 +28,8 @@ const ROUTES: Record<string, string> = {
   'duty-assign': '/nobet',
   emergency: '/acil',
   'screen-security': '/panolar',
-  'lesson-cover': '/gorevlerim',
+  // Görev dersi ana ekranda ve ders programında "GÖREV" etiketiyle görünür
+  'lesson-cover': '/',
 };
 const ICONS: Record<string, { icon: IconName; tone: 'primary' | 'warning' | 'danger' | 'gold' | 'muted' }> = {
   approval: { icon: 'checkmark-done-outline', tone: 'primary' },

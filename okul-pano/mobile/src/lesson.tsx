@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Animated, Easing, Pressable, View } from 'react-native';
 import { useNow, type MeToday } from './data.ts';
-import { classDayPeriods, classLabel, dateOfWeekday, dayBellPeriods, greeting, teacherDay } from './day.ts';
+import { classDayPeriods, classLabel, dateOfWeekday, dayBellPeriods, greeting, lessonsOn, teacherDay } from './day.ts';
 import { Text } from './text.tsx';
 import { colors, tiles, type TileTone } from './theme.ts';
 import { Card, Icon } from './ui.tsx';
@@ -37,7 +37,8 @@ export const shiftOf = (data: Pick<MeToday, 'dualShift'>, l: Lesson): Shift => (
  */
 export function daySlots(data: MeToday, weekday: number, endsAt?: string | null, date?: string) {
   const day = date ?? dateOfWeekday(data.today, weekday);
-  const lessons = data.lessons.filter((l) => l.weekday === weekday);
+  // Haftalık dersler ve o tarihe verilen görev dersleri ("GÖREV")
+  const lessons = lessonsOn(data, day, weekday);
   const shifts: Shift[] = data.dualShift ? [...new Set(lessons.map((l) => shiftOf(data, l)))].sort() : ['morning'];
   return shifts.map((shift) => {
     const school = dayBellPeriods(data, weekday, shift, day);
@@ -78,7 +79,7 @@ export function liveLesson(data: MeToday, now: Date) {
   if (today.holiday || today.now.weekday > 7) return null;
   const nowMin = Math.floor(today.now.secondsOfDay / 60);
   const slots = daySlots(data, today.now.weekday, today.endsAt, today.now.isoDate).flatMap((s) => s.slots.filter((x): x is Slot => Boolean(x.lesson)));
-  const same = (a: Slot, b: Slot) => a.lesson.className === b.lesson.className && a.lesson.subject === b.lesson.subject;
+  const same = (a: Slot, b: Slot) => a.lesson.className === b.lesson.className && a.lesson.subject === b.lesson.subject && a.lesson.coverFor === b.lesson.coverFor;
   const i = slots.findIndex((s) => toMin(s.period.start) <= nowMin && nowMin < toMin(s.period.end));
   const current = i >= 0 ? slots[i]! : null;
   let run: { index: number; total: number } | null = null;
@@ -113,9 +114,10 @@ export function LiveLesson({ data, link }: { data: MeToday; link?: boolean }) {
       <BigCard
         tone={toneOf(lesson.className)}
         kicker={`ŞU AN · ${period.no}. DERS`}
+        tag={lesson.coverFor ? 'GÖREV' : undefined}
         badge="Derste"
         title={lesson.subject}
-        subtitle={`${classLabel(lesson.className)}${live.run!.total > 1 ? ` · ${live.run!.total} saatlik dersin ${live.run!.index}. saati` : ''}`}
+        subtitle={`${classLabel(lesson.className)}${lesson.coverFor ? ` · ${lesson.coverFor} yerine` : live.run!.total > 1 ? ` · ${live.run!.total} saatlik dersin ${live.run!.index}. saati` : ''}`}
         left={toMin(period.end) - nowMin}
         caption="dk kaldı"
         from={period.start}
@@ -183,6 +185,8 @@ export function LiveLesson({ data, link }: { data: MeToday; link?: boolean }) {
 function BigCard(p: {
   tone: TileTone;
   kicker: string;
+  /** Üst etiketin yanında küçük etiket (ör. izinli yerine girilen derste "GÖREV") */
+  tag?: string;
   badge?: string;
   title: string;
   subtitle: string;
@@ -204,7 +208,10 @@ function BigCard(p: {
   return (
     <View style={{ backgroundColor: t.bg, borderRadius: 26, padding: 18, gap: 4, borderWidth: paper ? 1 : 0, borderColor: colors.border }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={{ fontSize: 12.5, fontWeight: '800', color: t.sub, letterSpacing: 0.4 }}>{p.kicker}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={{ fontSize: 12.5, fontWeight: '800', color: t.sub, letterSpacing: 0.4 }}>{p.kicker}</Text>
+          {p.tag && <CoverTag />}
+        </View>
         {p.badge && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.danger, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 }}>
             <PulseDot />
@@ -244,13 +251,28 @@ function NextCard({ slot, nowMin, soon, tone }: { slot: Slot; nowMin: number; so
         <Icon name="arrow-forward" size={18} color={tiles[tone].fg} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 12, fontWeight: '800', color: colors.faint, letterSpacing: 0.3 }}>
-          SIRADAKİ DERS · {period.no}. ders · {duration(inMin)} sonra
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={{ fontSize: 12, fontWeight: '800', color: colors.faint, letterSpacing: 0.3 }}>
+            SIRADAKİ DERS · {period.no}. ders · {duration(inMin)} sonra
+          </Text>
+          {lesson.coverFor && <CoverTag />}
+        </View>
         <Text style={{ fontSize: soon ? 17 : 15.5, fontWeight: '800', color: colors.ink }} numberOfLines={2}>
           {classLabel(lesson.className)} · {lesson.subject}
         </Text>
+        {lesson.coverFor && (
+          <Text style={{ fontSize: 13, fontWeight: '600', color: colors.muted }}>{lesson.coverFor} yerine</Text>
+        )}
       </View>
     </Card>
+  );
+}
+
+/** İzinli öğretmen yerine girilen dersin etiketi (ders listesi, şu an ve sıradaki ders kartları) */
+export function CoverTag() {
+  return (
+    <Text style={{ fontSize: 10, fontWeight: '800', color: '#1c1917', backgroundColor: '#f59e0b', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden', letterSpacing: 0.3 }}>
+      GÖREV
+    </Text>
   );
 }

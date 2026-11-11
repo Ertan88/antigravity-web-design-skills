@@ -106,7 +106,6 @@ export const NAV: NavGroup[] = [
       // İzinli öğretmenin boş dersleri ve nöbet yeri: atama, istatistik, sınıf geçmişi (boş sayısı rozetli)
       { to: '/gorevlendirme', label: 'Görevlendirme', icon: CalendarCheck2, permission: 'duties.manage', badge: 'coverOpen' },
       // Öğretmen kaydına bağlı herkes: izinli yerine girdiği dersler ve taşımalı görevleri
-      { to: '/gorevlerim', label: 'Görevlerim', icon: CalendarCheck2, when: (_s, who) => Boolean(who.teacherId) },
     ],
   },
   {

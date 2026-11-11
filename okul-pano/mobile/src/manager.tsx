@@ -1,4 +1,4 @@
-import { coverBandText } from '@okulpano/shared/coverText';
+import { coverBandText, relativeDayWord } from '@okulpano/shared/coverText';
 import { EMERGENCY_INFO } from '@okulpano/shared/emergency';
 import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
@@ -8,7 +8,7 @@ import { useControlCenter, useMeToday, useSchoolQuery, type ControlCenter } from
 import { clock, timeAgo } from './day.ts';
 import { LiveLesson } from './lesson.tsx';
 import { MenuButton, QuickAdd } from './quick.tsx';
-import { DayBanner, MyDayCard, NotificationsButton } from './teacher.tsx';
+import { AssignmentNotice, DayBanner, MyDayCard, NotificationsButton } from './teacher.tsx';
 import { tiles } from './theme.ts';
 import { Banner, BentoRow, Card, ErrorNote, HomeHeader, ListRow, Loading, Screen, SectionTitle, Tile } from './ui.tsx';
 
@@ -46,8 +46,10 @@ function Row({ dot, name, when }: { dot: string; name: string; when?: string }) 
 }
 
 /** Yöneticinin ana ekranı: bento kontrol merkezi */
-/** Günün boşlukları (yalnızca bant için gereken alanlar) */
+/** Gösterilen günün boşlukları (yalnızca bant için gereken alanlar); gün bitince sonraki okul günü */
 interface CoverSummary {
+  date: string;
+  today: string;
   holiday: string | null;
   absent: { fullName: string }[];
   lessons: { cover: unknown }[];
@@ -115,13 +117,14 @@ export function ManagerHome() {
               <Banner
                 tone="warning"
                 icon="people-outline"
-                title={coverBandText(cover.data!.absent.map((a) => a.fullName), openLessons, openDuties).title}
+                title={coverBandText(cover.data!.absent.map((a) => a.fullName), openLessons, openDuties, relativeDayWord(cover.data!.date, cover.data!.today)).title}
                 text={`${coverBandText(cover.data!.absent.map((a) => a.fullName), openLessons, openDuties).detail} Görevlendirmek için dokunun.`}
               />
             </Pressable>
           )}
           {me.data ? <DayBanner data={me.data} /> : c.holiday ? <Banner icon="sunny" title="Bugün tatil" text={`${c.holiday} · zil çalmıyor`} /> : null}
           {me.data && <LiveLesson data={me.data} link />}
+          {me.data && <AssignmentNotice data={me.data} />}
 
           <BentoRow>
             <ScreensTile screens={c.screens} />

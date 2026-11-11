@@ -7,7 +7,8 @@ import { Pressable, View } from 'react-native';
 import { Text } from '../../src/text.tsx';
 import { api } from '../../src/api.ts';
 import { useAuth, useSchoolPath } from '../../src/auth.tsx';
-import { useDutyWeek, useMeToday, useMyDuties, type DutyDay, type MyDuties, type ScheduleStatus } from '../../src/data.ts';
+import { useDutyWeek, useMeToday, useMyDuties, useSchoolQuery, type DutyDay, type MyDuties, type ScheduleStatus } from '../../src/data.ts';
+import { CoverTag } from '../../src/lesson.tsx';
 import { addDays, dayTitle } from '../../src/day.ts';
 import { colors, tiles } from '../../src/theme.ts';
 import { Badge, Banner, Button, Card, Empty, ErrorNote, HolidayCard, Icon, Label, Loading, Screen, Segmented, T } from '../../src/ui.tsx';
@@ -69,6 +70,7 @@ function MyDuties() {
       {!showingNext && d.nextMonth.soon && !d.nextMonth.entered && (
         <Banner icon="calendar-outline" tone="primary" title={`${monthName(d.nextMonth.month)} nöbet çizelgesi henüz girilmedi`} text="Girildiğinde nöbetleriniz burada görünür." />
       )}
+      {d.teacher && <CoverCounts transport={d.hasTransport} />}
       <MonthStrip data={d} />
       {!d.teacher ? (
         <Card>
@@ -89,6 +91,32 @@ function MyDuties() {
         Nöbet günlerinizde ilk dersten 15 dakika önce telefonunuza hatırlatma gelir.
       </T>
     </>
+  );
+}
+
+/**
+ * Tek satırlık özet: izinli yerine girilen dersler (bu ay ve toplam) ve taşımalı günleri (bu ay ve toplam).
+ * Hiç kaydı olmayan satır yazılmaz.
+ */
+function CoverCounts({ transport }: { transport: boolean }) {
+  const q = useSchoolQuery<{ month: string; monthCount: number; total: number; transportMonth: number; transportTotal: number }>('my-covers', { refetchInterval: 10 * 60_000 });
+  const c = q.data;
+  if (!c) return null;
+  const showTransport = transport || c.transportTotal > 0;
+  if (!c.total && !(showTransport && c.transportTotal)) return null;
+  return (
+    <Card style={{ gap: 2, paddingVertical: 12 }}>
+      {c.total > 0 && (
+        <T size={13.5}>
+          <Text style={{ fontWeight: '800', color: colors.ink }}>{monthName(c.month)}:</Text> izinli yerine {c.monthCount} ders, toplam {c.total} ders.
+        </T>
+      )}
+      {showTransport && c.transportTotal > 0 && (
+        <T size={13.5}>
+          <Text style={{ fontWeight: '800', color: colors.ink }}>Taşımalı:</Text> bu ay {c.transportMonth} gün, toplam {c.transportTotal} gün.
+        </T>
+      )}
+    </Card>
   );
 }
 
@@ -197,6 +225,7 @@ function MyDutyCard({ day, today, teacherName }: { day: MyDuties['days'][number]
             <T size={18} weight="800" style={{ flex: 1 }}>
               {x.area}
             </T>
+            {x.substituteFor && <CoverTag />}
           </View>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
             {x.partners.length > 0 && <Pill>Birlikte: {x.partners.join(', ')}</Pill>}

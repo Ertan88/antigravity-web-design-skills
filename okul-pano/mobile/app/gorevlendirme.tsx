@@ -1,10 +1,11 @@
 import { errorText } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { relativeDayWord } from '@okulpano/shared/coverText';
 import { Pressable, View } from 'react-native';
 import { api } from '../src/api.ts';
 import { useAuth, useSchoolPath } from '../src/auth.tsx';
-import { addDays, dayTitle, localIso } from '../src/day.ts';
+import { addDays, dayTitle } from '../src/day.ts';
 import { colors } from '../src/theme.ts';
 import { Text } from '../src/text.tsx';
 import { Badge, Button, Card, confirm, DeleteIconButton, Empty, ErrorNote, Loading, Screen, T } from '../src/ui.tsx';
@@ -19,6 +20,7 @@ import { Badge, Button, Card, confirm, DeleteIconButton, Empty, ErrorNote, Loadi
 type Candidate = { teacherId: string; fullName: string; onDuty: boolean; monthCount: number };
 interface CoverDay {
   date: string;
+  today: string;
   holiday: string | null;
   absent: { teacherId: string; fullName: string }[];
   lessons: {
@@ -87,12 +89,13 @@ function Candidates({ list, busy, onPick, freeTag = false }: { list: Candidate[]
 
 export default function Gorevlendirme() {
   const { school, can } = useAuth();
-  const [date, setDate] = useState(() => localIso());
-  const path = useSchoolPath(`cover-day?date=${date}`);
+  // Tarih seçilmediyse sunucunun gösterdiği gün: okul günü bitmediyse bugün, bittiyse sonraki okul günü
+  const [date, setDate] = useState<string | null>(null);
+  const path = useSchoolPath(date ? `cover-day?date=${date}` : 'cover-day');
   const coversPath = useSchoolPath('covers');
   const subsPath = useSchoolPath('duty-substitutions');
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: [school?.id, 'cover-day', date], queryFn: () => api<CoverDay>(path), enabled: Boolean(school) && can('duties.manage') });
+  const q = useQuery({ queryKey: [school?.id, 'cover-day', date ?? 'active'], queryFn: () => api<CoverDay>(path), enabled: Boolean(school) && can('duties.manage') });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const run = async (fn: () => Promise<unknown>) => {
@@ -108,6 +111,7 @@ export default function Gorevlendirme() {
     }
   };
   const d = q.data;
+  const shown = date ?? d?.date ?? null;
   const open = d ? d.lessons.filter((l) => !l.cover).length + d.duties.filter((x) => !x.substitute).length : 0;
 
   if (!can('duties.manage')) {
@@ -119,14 +123,16 @@ export default function Gorevlendirme() {
   }
   return (
     <Screen back title="Ders görevlendirme" subtitle="İzinli öğretmenin dersleri ve nöbet yeri" refreshing={q.isRefetching} onRefresh={() => void q.refetch()}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Button variant="secondary" size="sm" icon="chevron-back" accessibilityLabel="Önceki gün" onPress={() => setDate((x) => addDays(x, -1))} />
-        <T size={16} weight="800" style={{ flex: 1, textAlign: 'center' }}>
-          {date === localIso() ? 'Bugün · ' : ''}
-          {dayTitle(date)}
-        </T>
-        <Button variant="secondary" size="sm" icon="chevron-forward" accessibilityLabel="Sonraki gün" onPress={() => setDate((x) => addDays(x, 1))} />
-      </View>
+      {shown && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Button variant="secondary" size="sm" icon="chevron-back" accessibilityLabel="Önceki gün" onPress={() => setDate(addDays(shown, -1))} />
+          <T size={16} weight="800" style={{ flex: 1, textAlign: 'center' }}>
+            {d && ['Bugün', 'Yarın'].includes(relativeDayWord(shown, d.today)) ? `${relativeDayWord(shown, d.today)} · ` : ''}
+            {dayTitle(shown)}
+          </T>
+          <Button variant="secondary" size="sm" icon="chevron-forward" accessibilityLabel="Sonraki gün" onPress={() => setDate(addDays(shown, 1))} />
+        </View>
+      )}
       {error && <ErrorNote error={new Error(error)} />}
       {q.isLoading ? (
         <Loading />

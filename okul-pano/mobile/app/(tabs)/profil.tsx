@@ -255,7 +255,6 @@ export default function Menu() {
     ]);
     add('Personel', [
       role === 'editor' && isTeacher && { title: 'Nöbetlerim', subtitle: 'Bu hafta ve yerine görevlendirmeler', icon: 'shield-checkmark-outline', to: '/nobet' },
-      isTeacher && { title: 'Görevlerim', subtitle: 'İzinli yerine girdiğim dersler · taşımalı', icon: 'school-outline', to: '/gorevlerim' },
       can('duties.manage') && { title: 'Ders görevlendirme', subtitle: 'İzinli öğretmenin dersleri ve nöbet yeri', icon: 'people-outline', to: '/gorevlendirme' },
       isTeacher && { title: 'Nöbet hatırlatmaları', subtitle: reminderSummary(reminders), icon: 'notifications-outline', to: '/hatirlatmalar' },
       isTeacher && {

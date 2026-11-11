@@ -1,4 +1,4 @@
-import { bellClassDays, joinClassNames, leaveRequestSchema, lessonCounts, normalizeName, pushTokenSchema, schoolSettingsSchema, zonedParts } from '@okulpano/shared';
+import { bellClassDays, joinClassNames, leaveRequestSchema, lessonCounts, nextSchoolDay, normalizeName, pushTokenSchema, schoolSettingsSchema, zonedParts, type SchoolCalendar } from '@okulpano/shared';
 import { and, asc, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -7,6 +7,7 @@ import { bellOverrides, bellSchedules, classGroups, examReminderAcks, examSchedu
 import { addDays, dutyDay, dutyScheduleStatus, effectiveHolidays, holidaysAndHalfDays, monthEnd, teacherDutyDays } from '../lib/dayinfo.ts';
 import { badRequest, notFound, parse } from '../lib/errors.ts';
 import { notifyUsers, usersWithPermission } from '../lib/push.ts';
+import { teacherCovers } from './covers.ts';
 
 /**
  * Mobil uygulamanın "benim" uç noktaları: öğretmenin günü (ders programı, nöbetleri), izin bildirimi
@@ -30,7 +31,7 @@ export async function meRoutes(app: FastifyInstance) {
       : [];
     const dates = Array.from({ length: 8 }, (_, i) => addDays(today, i));
 
-    const [bells, holidays, lessons, leaves, days, allLessons, classRows, overrideRows] = await Promise.all([
+    const [bells, holidays, lessons, leaves, days, allLessons, classRows, overrideRows, covers] = await Promise.all([
       db.select().from(bellSchedules).where(eq(bellSchedules.schoolId, schoolId)).orderBy(asc(bellSchedules.sortOrder)),
       holidaysAndHalfDays(db, schoolId, today, addDays(today, 21)),
       teacher
@@ -59,7 +60,19 @@ export async function meRoutes(app: FastifyInstance) {
         .select({ date: bellOverrides.date, target: bellOverrides.target, periods: bellOverrides.periods, note: bellOverrides.note })
         .from(bellOverrides)
         .where(and(eq(bellOverrides.schoolId, schoolId), gte(bellOverrides.date, today), lte(bellOverrides.date, addDays(today, 21)))),
+      // İzinli öğretmen yerine görevlendirildiği dersler (bugünden bir hafta)
+      teacher ? teacherCovers(db, schoolId, teacher.id, today, addDays(today, 7)) : Promise.resolve([]),
     ]);
+    const cal: SchoolCalendar = {
+      schedules: bells.map((b) => ({ ...b, classIds: b.classIds ?? null })),
+      holidays: holidays.holidays,
+      halfDays: holidays.halfDays,
+      halfDayEnd: settings.halfDayEnd,
+      lessonCounts: allLessons.length ? lessonCounts(allLessons, classRows, settings.dualShift) : null,
+      bellClasses: bellClassDays(allLessons, classRows),
+      overrides: overrideRows,
+      dualShift: settings.dualShift,
+    };
 
     const week = days.map((day) => {
       const mine = day.holiday
@@ -105,6 +118,10 @@ export async function meRoutes(app: FastifyInstance) {
       halfDays: holidays.halfDays,
       halfDayEnd: settings.halfDayEnd,
       lessons: mergeLessons(lessons),
+      /** İzinli yerine girilecek dersler (tarihe bağlı; o günün ders listesine "GÖREV" olarak eklenir) */
+      covers: covers.map((c) => ({ date: c.date, periodNo: c.periodNo, classId: c.classId, className: c.className, shift: c.shift, subject: c.subject, absentName: c.absentName })),
+      /** Sonraki okul günü (gün bitince "Yarın" bilgisi için) */
+      nextSchoolDay: nextSchoolDay(today, cal, 21)?.date ?? null,
       leaves: leaves.map((l) => ({ id: l.id, startDate: l.startDate, endDate: l.endDate, note: l.note, status: l.approvalStatus })),
       week,
     };

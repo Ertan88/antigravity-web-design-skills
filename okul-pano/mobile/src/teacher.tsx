@@ -3,10 +3,12 @@ import { Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Text } from './text.tsx';
 import { membershipLabel, useAuth } from './auth.tsx';
 import { useEvents, useExamSchedule, useExams, useInbox, useMeToday, useNow, useUpcomingHolidays, type MeToday } from './data.ts';
+import { relativeDayWord } from '@okulpano/shared/coverText';
 import { examRoles } from '@okulpano/shared/examCore';
-import { classLabel, clock, dative, dayTitle, localIso, teacherDay } from './day.ts';
+import { zonedParts } from '@okulpano/shared/time';
+import { classDayPeriods, classLabel, clock, dative, dayTitle, localIso, schoolDayEnded, teacherDay } from './day.ts';
 import { colors, tiles, type TileTone } from './theme.ts';
-import { LiveLesson } from './lesson.tsx';
+import { CoverTag, LiveLesson } from './lesson.tsx';
 import { Banner, Card, HeaderButton, HomeHeader, Icon, ListRow, Loading, Screen, SectionTitle, T, Tile, type IconName } from './ui.tsx';
 
 /** Sağ üstteki bildirim zili (okunmamış sayısıyla) */
@@ -93,6 +95,7 @@ export function TeacherHome() {
       ) : (
         <>
           {day.holiday ? <DayBanner data={today.data} /> : <LiveLesson data={today.data} link />}
+          <AssignmentNotice data={today.data} />
           {!linked && can('conduct.counsel') ? null : !linked ? (
             <Card tone="warning">
               <T weight="700">Hesabınız bir öğretmen kaydına bağlı değil</T>
@@ -296,6 +299,73 @@ function UpcomingCard() {
           );
         })}
       </Card>
+    </>
+  );
+}
+
+/**
+ * İzinli öğretmen yerine görevler. Okul günü sürerken: bugünün henüz bitmemiş görev dersleri ("GÖREV" satırı).
+ * Gün bitince (son zilden sonra, tatil ve hafta sonunda) bugünün görevi kalkar; sonraki okul gününde görev dersi ya da
+ * başkasının yerine nöbeti varsa "Yarın" (ya da gün adı) bilgisi görünür. Görev yoksa hiçbir şey görünmez.
+ */
+export function AssignmentNotice({ data }: { data: MeToday }) {
+  const now = useNow(60_000);
+  if (!data.teacher) return null;
+  const todayIso = zonedParts(now, data.timezone).isoDate;
+  if (!schoolDayEnded(data, now)) {
+    const left = teacherDay(data, now).lessons.filter((l) => l.coverFor && l.state !== 'past');
+    if (!left.length) return null;
+    return (
+      <Pressable accessibilityRole="button" accessibilityLabel="Ders programım" onPress={() => router.push('/programim')}>
+        <Card style={{ gap: 8, backgroundColor: colors.warningSoft }}>
+          {left.map((l) => (
+            <View key={l.period.no} style={{ gap: 2 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <CoverTag />
+                <Text style={{ fontSize: 15, fontWeight: '800', color: colors.ink }}>
+                  Bugün: {l.period.no}. ders ({l.period.start}) {classLabel(l.className)} {l.subject}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: colors.muted }}>{l.coverFor} yerine</Text>
+            </View>
+          ))}
+        </Card>
+      </Pressable>
+    );
+  }
+  const next = data.nextSchoolDay;
+  if (!next || next <= todayIso) return null;
+  const word = relativeDayWord(next, todayIso);
+  const lessons = (data.covers ?? []).filter((c) => c.date === next);
+  const duties = (data.week.find((d) => d.date === next)?.duties ?? []).filter((d) => d.substituteFor);
+  const shift = (c: { shift: 'morning' | 'afternoon' | null }) => (data.dualShift && c.shift === 'afternoon' ? 'afternoon' : 'morning');
+  return (
+    <>
+      {lessons.length > 0 && (
+        <Pressable accessibilityRole="button" accessibilityLabel="Ders programım" onPress={() => router.push('/programim')}>
+          <Banner
+            icon="school-outline"
+            tone="warning"
+            title={`${word} ${lessons.length} ek dersiniz var.`}
+            text={lessons
+              .map((c) => {
+                const start = classDayPeriods(data, next, c.classId, shift(c)).find((p) => p.no === c.periodNo)?.start;
+                return `${c.periodNo}. ders${start ? ` (${start})` : ''} ${classLabel(c.className)} ${c.subject}: ${c.absentName} yerine.`;
+              })
+              .join('\n')}
+          />
+        </Pressable>
+      )}
+      {duties.length > 0 && (
+        <Pressable accessibilityRole="button" accessibilityLabel="Nöbetlerim" onPress={() => router.push('/nobet')}>
+          <Banner
+            icon="shield-checkmark-outline"
+            tone="primary"
+            title={`${word} nöbetiniz var: ${duties.map((d) => d.area).join(', ')}`}
+            text={`${duties.map((d) => d.substituteFor).join(', ')} yerine görevlendirildiniz.`}
+          />
+        </Pressable>
+      )}
     </>
   );
 }

@@ -20,3 +20,13 @@ export function coverBandText(absentNames: readonly string[], openLessons: numbe
     detail: parts.length ? `${parts.join(' ve ')} boş.` : 'Boş ders ve nöbet yeri yok.',
   };
 }
+
+const WEEKDAYS = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'] as const;
+
+/** Gösterilen günün adı: "Bugün", "Yarın" ya da (hafta sonu, tatil sonrası) gün adı, ör. "Pazartesi" */
+export function relativeDayWord(date: string, today: string): string {
+  if (date === today) return 'Bugün';
+  const diff = Math.round((Date.parse(`${date}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / 86400_000);
+  if (diff === 1) return 'Yarın';
+  return WEEKDAYS[new Date(`${date}T12:00:00Z`).getUTCDay()]!;
+}
