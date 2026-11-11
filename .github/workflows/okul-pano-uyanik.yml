@@ -1,5 +1,7 @@
-# Okul Yayın sunucusunu uyanık tutar: Render'ın ücretsiz planı 15 dakika ziyaret almayan servisi uyutur,
-# ilk açılışta "Application loading" ekranı çıkar. Her 10 dakikada bir sağlık adresine istek gönderilir.
+# Okul Yayın sunucusunu uyanık tutmaya YEDEK: Render'ın ücretsiz planı 15 dakika ziyaret almayan servisi uyutur.
+# GitHub zamanlanmış işleri yoğunlukta saatlerce geciktirir (10 dakika yazsa da 3-8 saatte bir çalıştığı görüldü);
+# asıl uyandırma dış izleme hizmetiyle yapılır (okul-pano/docs/ucretsiz-yayin.md › Sunucuyu uyanık tutma).
+# Zamanlanmış işler yalnızca deponun varsayılan dalında (main) çalışır.
 # Adres GitHub › Settings › Secrets and variables › Actions › Variables altındaki PANOKUL_API_URL'den alınır.
 # Ücretli plana geçince bu dosya silinebilir.
 name: Okul Pano · Sunucuyu uyanık tut
@@ -19,6 +21,6 @@ jobs:
       - name: Sağlık adresine istek
         env:
           URL: ${{ vars.PANOKUL_API_URL || 'https://okul-pano.onrender.com' }}
-        # Uyanması bir dakikayı bulabilir; bir kez yeniden denenir. Başarısızlık iş akışını kırmızıya çevirmez.
+        # Uyanması bir dakikayı bulabilir; bir kez yeniden denenir. Yine yanıt yoksa iş kırmızı görünür (sorun gizlenmez).
         run: |
-          curl -fsS -m 120 "$URL/api/health" || { sleep 20; curl -fsS -m 120 "$URL/api/health"; } || echo "Sunucu yanıt vermedi"
+          curl -fsS -m 120 "$URL/api/health" || { sleep 20; curl -fsS -m 120 "$URL/api/health"; } || { echo "::error::Sunucu yanıt vermedi: $URL"; exit 1; }

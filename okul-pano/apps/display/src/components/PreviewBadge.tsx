@@ -14,10 +14,10 @@ function expiresAt(token: string): number | null {
 
 /**
  * Paneldeki "Tam ekran aç" ile açılan önizleme: kısa ömürlüdür (30 dk) ve TV için değildir. Üstte kalan süreyi
- * ve "TV için panoyu eşleştirin" uyarısını gösteren bir rozet durur; süre dolunca ekranı bir uyarı kaplar.
+ * ve "TV için panoyu eşleştirin" uyarısını gösteren bir rozet durur; süre dolunca eşleştirme ekranına geçilir.
  * Panelin içindeki küçük önizlemede (iframe) rozet görünmez; panel anahtarı kendisi yeniler.
  */
-export function PreviewBadge({ token }: { token: string }) {
+export function PreviewBadge({ token, onExpired }: { token: string; onExpired: () => void }) {
   const until = expiresAt(token);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -25,8 +25,13 @@ export function PreviewBadge({ token }: { token: string }) {
     return () => clearInterval(t);
   }, []);
   const embedded = window.self !== window.top;
-  if (!until) return null;
-  const left = Math.max(0, Math.ceil((until - now) / 60_000));
+  const left = until ? Math.max(0, Math.ceil((until - now) / 60_000)) : null;
+  const expired = left === 0;
+  // Tam ekranda süre dolunca eşleştirme ekranına geçilir (App)
+  useEffect(() => {
+    if (expired && !embedded) onExpired();
+  }, [expired, embedded, onExpired]);
+  if (left === null) return null;
   const displayUrl = `${location.origin}${location.pathname}`;
   if (left <= 0) {
     return (

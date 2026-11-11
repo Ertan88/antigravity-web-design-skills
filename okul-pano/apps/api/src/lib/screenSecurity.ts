@@ -20,7 +20,7 @@ const CONCURRENT_MS = 3 * 60_000;
 /** Aynı pano için "başka yerden açıldı" uyarısı en çok günde bir */
 const ALERT_EVERY_MS = 24 * 3600_000;
 
-async function tellScreenAdmins(deps: AppDeps, schoolId: string, n: { title: string; body: string; push: string }) {
+export async function tellScreenAdmins(deps: AppDeps, schoolId: string, n: { title: string; body: string; push: string }) {
   const userIds = await usersWithPermission(deps, schoolId, 'screens.manage');
   if (!userIds.length) return;
   await addToInbox(deps.db, userIds, { key: `screen-security:${randomUUID()}`, kind: 'screen-security', title: n.title, body: n.body, to: '/panolar', schoolId });

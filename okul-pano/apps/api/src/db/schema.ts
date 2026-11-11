@@ -777,6 +777,8 @@ export const screens = pgTable(
     lastIp: text('last_ip'),
     /** Son "başka yerden açıldı" uyarısı (günde en çok bir kez) */
     ipAlertAt: timestamp('ip_alert_at', { withTimezone: true }),
+    /** "Pano bağlantısı koptu" bildirimi gönderildi (kesinti başına bir kez); pano geri gelince sıfırlanır */
+    offlineAlertAt: timestamp('offline_alert_at', { withTimezone: true }),
     /** Bu panoya özel kart düzeni; null ise okulun varsayılanı */
     layout: jsonb('layout').$type<BoardLayout>(),
     /** Ekran biçimi: yatay / dikey, yalnızca duyurular, video duvarı */

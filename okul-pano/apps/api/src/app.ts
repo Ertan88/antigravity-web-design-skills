@@ -34,13 +34,12 @@ import { enrollRoutes } from './routes/enroll.ts';
 import { loadPlatformMail, platformSettingsRoutes } from './routes/platformSettings.ts';
 import { platformAccountsRoutes } from './routes/platformAccounts.ts';
 import { runExamReminders } from './lib/examReminders.ts';
+import { runScreenOfflineAlerts } from './lib/screenOffline.ts';
 import { controlRoutes } from './routes/control.ts';
 import { meRoutes } from './routes/me.ts';
 import { bellOverrideRoutes } from './routes/bellOverrides.ts';
 import { privacyRoutes } from './routes/privacy.ts';
 import { runTrialReminders, signupRoutes } from './routes/signup.ts';
-import { notifyUsers, usersWithPermission } from './lib/push.ts';
-import { screens } from './db/schema.ts';
 import { eq } from 'drizzle-orm';
 import { schoolRoutes } from './routes/schools.ts';
 import { screenRoutes } from './routes/screens.ts';
@@ -153,7 +152,11 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     const first = setTimeout(run, 60_000);
     const hourly = setInterval(run, 3600_000);
     // Sınav hatırlatmaları dakika hassasiyetinde (teneffüs başı)
-    const minutely = setInterval(() => void runExamReminders(deps).catch((err) => app.log.error(err, 'sınav hatırlatması')), 60_000);
+    const minutely = setInterval(() => {
+      void runExamReminders(deps).catch((err) => app.log.error(err, 'sınav hatırlatması'));
+      // Ders saatlerinde bağlantısı kopan pano: ekranları yönetenlere bildirim
+      void runScreenOfflineAlerts(deps).catch((err) => app.log.error(err, 'pano kopma bildirimi'));
+    }, 60_000);
     minutely.unref();
     first.unref();
     hourly.unref();
@@ -163,19 +166,6 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
       clearInterval(minutely);
     });
   }
-
-  // Pano 10 dakikadan uzun süre bağlantısız kalırsa ekranları yönetenlerin telefonuna bildirim
-  deps.bus.onLongOffline = (screenId) => {
-    void (async () => {
-      const [screen] = await deps.db.select({ name: screens.name, schoolId: screens.schoolId }).from(screens).where(eq(screens.id, screenId));
-      if (!screen) return;
-      notifyUsers(deps, await usersWithPermission(deps, screen.schoolId, 'screens.manage'), {
-        title: 'Pano bağlantısı koptu',
-        body: `${screen.name} panosu 10 dakikadır çevrimdışı. Elektrik ya da internet bağlantısını kontrol edin.`,
-        url: '/panolar',
-      });
-    })().catch(() => {});
-  };
 
   /* ---------- Statik dosyalar: yüklenen görseller ve derlenmiş ön yüzler ---------- */
   await app.register(fastifyStatic, {

@@ -166,7 +166,8 @@ export function LessonsCard({
       <div className="card-label">
         <BookIcon size={22} /> {heading}
         <span className="card-label-aside">
-          {periodTitle}
+          {/* Sınav varken saat yazılmaz (zil kartında var): başlık tek satıra sığar */}
+          {examCount > 0 ? periodTitle.replace(/ · \d{1,2}:\d{2}$/, '') : periodTitle}
           {examCount > 0 && <span className="lessons-exam-count"> · {examCount} sınavda</span>}
         </span>
       </div>

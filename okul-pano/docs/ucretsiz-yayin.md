@@ -58,7 +58,29 @@ istediğiniz zaman silebilirsiniz. Örnek okul hiç kurulmasın isterseniz Rende
 
 - **Uyku:** Render'ın ücretsiz sunucusu 15 dakika hiç istek gelmezse uyur; ilk açılış yaklaşık 1 dakika sürer.
   Açık bir pano (TV) sunucuyla sürekli bağlantıda kaldığı için gün içinde uyumaz. Gece panolar kapalıyken
-  uyuyabilir; sabah ilk açılan pano onu uyandırır.
+  uyuyabilir; sabah ilk açılan pano onu uyandırır (bu sırada pano son kayıtlı veriyle açılır). Uykuyu kaldırmak için
+  aşağıdaki dış izlemeyi kurun.
+
+### Sunucuyu uyanık tutma (dış izleme, ücretsiz)
+
+Depodaki GitHub iş akışı (`okul-pano-uyanik.yml`) yalnızca yedektir: GitHub zamanlanmış işleri saatlerce
+geciktirebildiği için sunucuyu uyanık tutmaya yetmez. Asıl iş için ücretsiz bir izleme hizmeti kullanın:
+
+1. [UptimeRobot](https://uptimerobot.com) hesabı açın (ücretsiz plan; kredi kartı istemez).
+2. **Add New Monitor** › tür **HTTP(s)**, adres `https://<sunucunuz>.onrender.com/api/health`,
+   aralık **5 dakika**.
+3. Uyarı kişisi olarak kendi e-postanızı seçin; isterseniz telefon uygulamasını kurup anlık bildirimi açın.
+
+Böylece sunucu hiç uyumaz; çökerse ya da açılamazsa size haber gelir. (Sunucu kapalıyken kendisi bildirim
+gönderemez; bu yüzden dış izleme gereklidir.) Alternatif: [cron-job.org](https://cron-job.org) ile aynı adrese
+dakikada bir istek. Render'da ücretli plana geçince dış izleme yine çökme uyarısı için kalabilir.
+
+### Pano bağlantısı koptu bildirimi
+
+Eşleştirilmiş bir pano **okul günü, ilk dersten 15 dakika önceden son ders bitimine kadar** 10 dakika bağlanmazsa
+okul müdürüne, müdür yardımcılarına ve "Panolar" görevi verilenlere telefon bildirimi ve uygulama içi bildirim gider
+(kesinti başına bir kez); pano geri gelince "yeniden bağlandı" bildirimi gelir. Akşam, hafta sonu ve tatilde
+bildirim gitmez. Sabah açılmayan pano için "bugün henüz bağlanmadı" yazar.
 - **Aylık süre:** ücretsiz planda ayda 750 saat çalışma hakkı vardır; tek sunucu için bütün ay yeter.
 - **Veritabanı:** Neon ücretsiz planı 0,5 GB. Görseller de veritabanında durduğu için duyuru görsellerini
   makul boyutta tutun (panel 10 MB'a kadar kabul eder; 1-2 MB yeterlidir).

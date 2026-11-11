@@ -45,6 +45,7 @@ import { addDays, holidaysAndHalfDays } from '../lib/dayinfo.ts';
 import { DEVICE_TOKEN_PREFIX } from './screens.ts';
 import { noteScreenSeen, noticeScreenPaired } from '../lib/screenSecurity.ts';
 import { listExams } from '../lib/examSchedule.ts';
+import { noteScreenAlive, touchScreen } from '../lib/screenOffline.ts';
 
 const PAIRING_TTL_MS = 10 * 60 * 1000;
 /** Sunucu her başlatıldığında (güncelleme yayınlanınca) değişir; panolar bunu görünce kendini yeniler */
@@ -68,9 +69,8 @@ async function resolveDisplay(app: FastifyInstance, req: FastifyRequest, queryTo
     if (!screen) throw unauthorized('Ekran anahtarı geçersiz ya da ekran silinmiş.');
     // Adres değiştiyse kaydedilir; kısa sürede iki farklı adres: anahtar kopyalanmış olabilir, yönetici uyarılır
     if (req.ip !== screen.lastIp) await noteScreenSeen(app.deps, screen, req.ip).catch(() => {});
-    if (!screen.lastSeenAt || Date.now() - screen.lastSeenAt.getTime() > 60_000) {
-      await app.deps.db.update(screens).set({ lastSeenAt: new Date() }).where(eq(screens.id, screen.id));
-    }
+    // Son görülme (en çok dakikada bir); kopma bildirimi gönderilmişse "yeniden bağlandı"
+    await noteScreenAlive(app.deps, screen);
     return { schoolId: screen.schoolId, screen };
   }
   try {
@@ -417,7 +417,15 @@ export async function displayRoutes(app: FastifyInstance) {
       send(e.type, e);
     });
     const offline = screenId ? bus.screenConnected(screenId) : () => {};
-    const ping = setInterval(() => raw.write(`: ping ${Date.now()}\n\n`), 25_000);
+    // Bağlantı açık kaldıkça son görülme dakikada bir yazılır (kopma bildirimi veritabanındaki bu zamana bakar)
+    let touched = Date.now();
+    const ping = setInterval(() => {
+      raw.write(`: ping ${Date.now()}\n\n`);
+      if (screenId && Date.now() - touched >= 60_000) {
+        touched = Date.now();
+        void touchScreen(app.deps, screenId).catch(() => {});
+      }
+    }, 25_000);
 
     req.raw.on('close', () => {
       clearInterval(ping);

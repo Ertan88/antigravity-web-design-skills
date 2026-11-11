@@ -22,6 +22,31 @@ function safeSet(key: string, value: string | null) {
   }
 }
 
+/** Panelin içindeki küçük önizleme (iframe) mi */
+export const embedded = (() => {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+})();
+
+/** Önizleme bağlantısına özgü adres parametreleri (anahtar, seçili pano, zaman makinesi) */
+const PREVIEW_PARAMS = ['preview', 'screen', 'at'];
+
+/** Önizleme parametrelerini adresten siler (sayfa yenilenmez) */
+export function dropPreviewParams() {
+  const params = new URLSearchParams(location.search);
+  for (const k of PREVIEW_PARAMS) params.delete(k);
+  const qs = params.toString();
+  history.replaceState(null, '', `${location.pathname}${qs ? `?${qs}` : ''}`);
+}
+
+// Eşleştirilmiş cihazda (TV) panelin önizleme bağlantısı yok sayılır: tarayıcı geçmişinden ya da panelden aynı adres
+// yeniden açılsa da pano kendi kalıcı anahtarıyla açılır, 30 dakika sonra kararmaz. Panelin içindeki küçük önizleme
+// (iframe) bundan etkilenmez.
+if (!embedded && new URLSearchParams(location.search).has('preview') && safeGet(TOKEN_KEY)) dropPreviewParams();
+
 export interface DisplayAuth {
   token: string;
   /** Paneldeki önizleme: anahtar saklanmaz, önbellek kullanılmaz */
@@ -61,9 +86,11 @@ async function getJson<T>(path: string, token: string): Promise<T> {
 }
 
 /** Paneldeki önizlemede belirli bir pano seçilebilir (?screen=): o panonun düzeni ve ekran biçimiyle */
-const previewScreen = new URLSearchParams(location.search).get('screen');
-export const fetchState = (token: string) =>
-  getJson<DisplayState>(`/api/display/state${previewScreen ? `?screen=${encodeURIComponent(previewScreen)}` : ''}`, token);
+export const fetchState = (token: string) => {
+  // Her istekte adresten okunur: önizlemeden çıkınca (dropPreviewParams) seçili pano bırakılır
+  const previewScreen = new URLSearchParams(location.search).get('screen');
+  return getJson<DisplayState>(`/api/display/state${previewScreen ? `?screen=${encodeURIComponent(previewScreen)}` : ''}`, token);
+};
 export const fetchWeather = (token: string) => getJson<WeatherNow | null>('/api/display/weather', token);
 
 export async function postStatus(token: string, status: Omit<ScreenLiveStatus, 'at'>) {
