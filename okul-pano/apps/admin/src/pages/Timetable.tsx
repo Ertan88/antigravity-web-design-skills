@@ -179,8 +179,7 @@ export function Timetable() {
                 e-Okul PDF'i yükle
               </Button>
               <Button
-                variant="ghost"
-                className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                variant="delete"
                 icon={<Trash2 className="size-4" />}
                 disabled={!entries.data?.length}
                 onClick={() => setClearTarget({ scope: 'all' })}
@@ -284,9 +283,9 @@ export function Timetable() {
             <span className="text-xs whitespace-nowrap text-slate-500 tabular-nums">{hourCount} ders saati</span>
             {editable && hourCount > 0 && (
               <Button
-                variant="ghost"
+                variant="delete"
                 size="sm"
-                className="text-red-600 hover:bg-red-50 hover:text-red-700 sm:ml-auto"
+                className="sm:ml-auto"
                 icon={<Trash2 className="size-4" />}
                 onClick={() =>
                   setClearTarget(mode === 'class' ? { scope: 'class', id: activeClass, name: activeClassName } : { scope: 'teacher', id: activeTeacher, name: activeTeacherName })

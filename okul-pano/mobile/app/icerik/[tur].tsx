@@ -220,7 +220,7 @@ export default function Icerik() {
                   </Button>
                   <Button
                     size="sm"
-                    variant="ghost"
+                    variant="delete"
                     icon="trash-outline"
                     onPress={() =>
                       void confirm('Silinsin mi?', `“${kind.rowTitle(r)}” panodan ve listeden kaldırılır.`, 'Sil').then((ok) => ok && remove.mutate(r))

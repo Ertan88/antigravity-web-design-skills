@@ -193,7 +193,7 @@ export function AccountFinderDialog({ open, onClose, onChanged }: { open: boolea
 
             {!account.isSuperAdmin && (
               <div className="mt-5 flex flex-wrap gap-2">
-                <Button variant="danger" icon={<Trash2 className="size-4" />} disabled={blocked} loading={busy === 'delete'} onClick={() => void remove()}>
+                <Button variant="delete" icon={<Trash2 className="size-4" />} disabled={blocked} loading={busy === 'delete'} onClick={() => void remove()}>
                   Hesabı sil
                 </Button>
                 <Button variant="secondary" icon={<KeyRound className="size-4" />} loading={busy === 'password'} onClick={() => void newPassword()}>

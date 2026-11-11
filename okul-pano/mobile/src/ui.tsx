@@ -330,7 +330,12 @@ export function SectionTitle({ children, right }: { children: ReactNode; right?:
   );
 }
 
-type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'success' | 'ghost';
+/**
+ * delete: silme ve kaldırma düğmelerinin ortak görünüşü (yumuşak kırmızı: açık kırmızı zemin, kırmızı yazı, ince
+ * kırmızı çerçeve; koyu temada koyu kırmızı zemin, açık kırmızı yazı). Her silme düğmesi bunu ya da
+ * DeleteIconButton'ı kullanır. danger (dolu kırmızı) yalnızca onay penceresindeki son adım gibi yerler içindir.
+ */
+type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'delete' | 'success' | 'ghost';
 
 export function Button({
   children,
@@ -386,6 +391,9 @@ const BUTTONS: Record<ButtonVariant, { bg: string; fg: string; border: string }>
   get danger() {
     return { bg: '#e11d48', fg: '#fff', border: '#e11d48' };
   },
+  get delete() {
+    return { bg: colors.dangerSoft, fg: colors.danger, border: colors.dangerBorder };
+  },
   get success() {
     return { bg: colors.success, fg: dark ? '#0f0e0d' : '#fff', border: colors.success };
   },
@@ -393,6 +401,32 @@ const BUTTONS: Record<ButtonVariant, { bg: string; fg: string; border: string }>
     return { bg: 'transparent', fg: colors.primary, border: 'transparent' };
   },
 };
+
+/** Satırlardaki çöp kutusu düğmesi: Button variant="delete" ile aynı yumuşak kırmızı (açık ve koyu temada) */
+export function DeleteIconButton({ label, onPress, size = 40, disabled }: { label: string; onPress: () => void; size?: number; disabled?: boolean }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      hitSlop={8}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        borderWidth: 1,
+        borderColor: colors.dangerBorder,
+        backgroundColor: colors.dangerSoft,
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: disabled ? 0.45 : pressed ? 0.8 : 1,
+      })}
+    >
+      <Icon name="trash-outline" size={Math.round(size * 0.45)} color={colors.danger} />
+    </Pressable>
+  );
+}
 
 /** Seçilebilir küçük düğme (şablon, süre, görünüm seçimi) */
 export function Chip({ label, selected, onPress, icon }: { label: string; selected?: boolean; onPress?: () => void; icon?: IconName }) {

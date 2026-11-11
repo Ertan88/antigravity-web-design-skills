@@ -35,6 +35,7 @@ import {
   Badge,
   Button,
   Card,
+  DELETE_TONE,
   DeleteButton,
   EmptyState,
   Field,
@@ -889,7 +890,7 @@ function CellMenu({
         type="button"
         disabled={busy || !marked}
         onClick={() => commit("-", true)}
-        className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 py-1.5 text-xs font-bold text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-40 disabled:hover:bg-transparent"
+        className={clsx('mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold disabled:opacity-40', DELETE_TONE)}
       >
         <Trash2 className="size-3.5" /> İşareti sil
       </button>

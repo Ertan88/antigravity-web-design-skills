@@ -27,7 +27,15 @@ import { confirm } from './confirm.tsx';
 
 /* ---------- Düğmeler ---------- */
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'delete' | 'success';
+
+/**
+ * Silme düğmelerinin ortak görünüşü (A, yumuşak kırmızı): açık kırmızı zemin, kırmızı yazı, ince kırmızı çerçeve.
+ * Koyu temada rose tonları koyu zemine göre yeniden eşlenir (index.css). Projedeki her silme / kaldırma düğmesi
+ * bunu kullanır: yazılı düğmede variant="delete", simgeli düğmede DeleteButton ya da IconButton tone="delete".
+ * Onay penceresindeki son "Sil" dolu kırmızıdır (variant="danger").
+ */
+export const DELETE_TONE = 'bg-rose-50 text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100 hover:text-rose-800';
 
 const variants: Record<Variant, string> = {
   // Düz mürekkep hap düğme (bento): gölge ve geçiş yok
@@ -35,6 +43,7 @@ const variants: Record<Variant, string> = {
   secondary: 'bg-surface text-ink ring-1 ring-slate-200 hover:bg-slate-100 hover:ring-slate-300',
   ghost: 'text-slate-600 hover:bg-slate-100 hover:text-ink',
   danger: 'bg-rose-600 text-white hover:bg-rose-500',
+  delete: DELETE_TONE,
   success: 'bg-emerald-600 text-white hover:bg-emerald-500',
 };
 
@@ -71,8 +80,9 @@ export function IconButton({
   className,
   children,
   ref,
+  tone = 'default',
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; ref?: Ref<HTMLButtonElement> }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; ref?: Ref<HTMLButtonElement>; tone?: 'default' | 'delete' }) {
   return (
     <button
       ref={ref}
@@ -80,7 +90,8 @@ export function IconButton({
       title={label}
       aria-label={label}
       className={clsx(
-        'inline-flex size-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-ink disabled:opacity-40',
+        'inline-flex size-9 items-center justify-center rounded-full transition-colors disabled:opacity-40',
+        tone === 'delete' ? DELETE_TONE : 'text-slate-500 hover:bg-slate-100 hover:text-ink',
         className,
       )}
       {...rest}
@@ -639,7 +650,8 @@ export function DeleteButton({
     <IconButton
       label={label}
       disabled={disabled}
-      className={clsx('hover:bg-red-50 hover:text-red-600', open && 'bg-red-50 text-red-600', className)}
+      tone="delete"
+      className={clsx(open && 'bg-rose-100', className)}
       onClick={async () => {
         setOpen(true);
         const ok = await confirm({

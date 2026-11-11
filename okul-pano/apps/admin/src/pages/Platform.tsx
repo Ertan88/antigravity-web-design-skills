@@ -171,8 +171,8 @@ export function Platform() {
                     <Button size="sm" icon={<Check className="size-4" />} loading={approve.isPending && approve.variables?.id === x.id} onClick={() => approve.mutate(x)}>
                       Onayla
                     </Button>
-                    <IconButton label="Başvuruyu sil" onClick={() => reject.mutate(x)}>
-                      <Trash2 className="size-4 text-red-600" />
+                    <IconButton label="Başvuruyu sil" tone="delete" onClick={() => reject.mutate(x)}>
+                      <Trash2 className="size-4" />
                     </IconButton>
                   </div>
                 </Td>
@@ -275,12 +275,13 @@ export function Platform() {
                     )}
                     <IconButton
                       label="Okulu ve bütün verilerini sil"
+                      tone="delete"
                       onClick={() => {
                         setConfirmSlug('');
                         setDeleting(s);
                       }}
                     >
-                      <Trash2 className="size-4 text-red-600" />
+                      <Trash2 className="size-4" />
                     </IconButton>
                   </div>
                 </Td>

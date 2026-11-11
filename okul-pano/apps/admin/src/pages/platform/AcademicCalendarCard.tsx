@@ -248,9 +248,10 @@ export function AcademicCalendarCard() {
                     <Input aria-label="Bitiş" type="date" value={b.end} onChange={(e) => setBreak(i, { end: e.target.value })} />
                     <IconButton
                       label="Ara tatili kaldır"
+                      tone="delete"
                       onClick={() => setEditing({ ...editing, data: { ...editing.data, breaks: editing.data.breaks.filter((_, j) => j !== i) } })}
                     >
-                      <Trash2 className="size-4 text-red-600" />
+                      <Trash2 className="size-4" />
                     </IconButton>
                   </div>
                 ))}

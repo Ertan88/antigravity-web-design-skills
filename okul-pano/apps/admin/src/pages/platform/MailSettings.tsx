@@ -134,8 +134,8 @@ export function MailSettingsPage() {
           </Button>
           {d?.source === 'panel' && (
             <Button
-              variant="ghost"
-              className="ml-auto text-red-600"
+              variant="delete"
+              className="ml-auto"
               icon={<Trash2 className="size-4" />}
               loading={remove.isPending}
               onClick={async () => {

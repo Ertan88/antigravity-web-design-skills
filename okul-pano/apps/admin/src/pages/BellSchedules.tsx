@@ -211,7 +211,7 @@ function Editor({ form, classes, lunchThresholdMin }: { form: ReturnType<typeof 
                   <TimeBox value={p.end} onChange={(t) => updatePeriod(i, { end: t })} label={`${i + 1}. ders bitiş`} className="w-[4.6rem] rounded-lg border border-slate-200 bg-surface px-2 py-1.5 text-center text-sm font-bold text-ink tabular-nums" />
                   <span className="w-12 text-xs font-semibold text-slate-400 tabular-nums">{len(p)} dk</span>
                   <span className="flex-1" />
-                  <IconButton label={`${i + 1}. dersi sil`} onClick={() => removeAt(i)}>
+                  <IconButton label={`${i + 1}. dersi sil`} tone="delete" onClick={() => removeAt(i)}>
                     <Trash2 className="size-4" />
                   </IconButton>
                 </div>

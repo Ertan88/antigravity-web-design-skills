@@ -326,7 +326,7 @@ function Detail({ p, ctx }: { p: Person; ctx: ReturnType<typeof usePeople> }) {
                 )}
               </Card>
               <Button
-                variant="danger"
+                variant="delete"
                 icon="trash-outline"
                 loading={busy === 'remove'}
                 onPress={() =>

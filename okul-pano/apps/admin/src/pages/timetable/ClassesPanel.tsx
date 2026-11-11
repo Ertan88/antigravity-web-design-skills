@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import { Check, Pencil, Plus, Trash2, X } from '../../components/icons.tsx';
 import { useState, type CSSProperties } from 'react';
 import { useToast } from '../../components/Toast.tsx';
-import { Card } from '../../components/ui.tsx';
+import { Card, DELETE_TONE } from '../../components/ui.tsx';
 import { api } from '../../lib/api.ts';
 import { useAuth } from '../../lib/auth.tsx';
 import { useSchoolPath, type ClassGroup } from '../../lib/data.ts';
@@ -219,7 +219,7 @@ export function ClassesPanel({
                             type="button"
                             aria-label={`${c.name} sil`}
                             onClick={() => setConfirmDelete(c.id)}
-                            className={clsx('flex size-6 items-center justify-center rounded-lg', active ? 'text-white/80 hover:bg-white/20' : 'text-slate-400 hover:bg-red-50 hover:text-red-600')}
+                            className={clsx('flex size-6 items-center justify-center rounded-lg', active ? 'text-white/80 hover:bg-white/20' : DELETE_TONE)}
                           >
                             <Trash2 className="size-3" />
                           </button>

@@ -8,7 +8,7 @@ import { useMeToday, useMyLeaves, type Leave } from '../src/data.ts';
 import { addDays, dayTitle } from '../src/day.ts';
 import { Text } from '../src/text.tsx';
 import { colors, tiles, type TileTone } from '../src/theme.ts';
-import { Badge, Button, Card, Choice, confirm, Empty, Field, Icon, Screen, T, type IconName } from '../src/ui.tsx';
+import { Badge, Button, Card, Choice, confirm, DeleteIconButton, Empty, Field, Icon, Screen, T, type IconName } from '../src/ui.tsx';
 
 type Preset = 'today' | 'tomorrow' | 'custom';
 type Tab = 'new' | 'list';
@@ -391,15 +391,7 @@ function Group({ title, items, removable, onRemove, faded }: { title: string; it
                 </View>
               </View>
               {removable(l) && (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="İzin bildirimini sil"
-                  hitSlop={8}
-                  onPress={() => onRemove(l)}
-                  style={{ width: 40, height: 40, borderRadius: 12, borderWidth: 1, borderColor: colors.dangerBorder, backgroundColor: colors.dangerTint, alignItems: 'center', justifyContent: 'center' }}
-                >
-                  <Icon name="trash-outline" size={18} color={colors.danger} />
-                </Pressable>
+                <DeleteIconButton label="İzin bildirimini sil" onPress={() => onRemove(l)} />
               )}
             </View>
           );

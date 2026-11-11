@@ -172,7 +172,7 @@ export default function IsletmeDevam() {
             accessibilityLabel="İşareti sil"
             disabled={marks.busy || !marked}
             onPress={() => apply('-', true)}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: colors.dangerBorder, backgroundColor: colors.dangerTint, opacity: marked ? 1 : 0.4 }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: colors.dangerBorder, backgroundColor: colors.dangerSoft, opacity: marked ? 1 : 0.4 }}
           >
             <Icon name="trash-outline" size={15} color={colors.danger} />
             <Text style={{ fontSize: 13, fontWeight: '800', color: colors.danger }}>Sil</Text>

@@ -254,9 +254,9 @@ function ClearStudents({ count }: { count: number }) {
   return (
     <>
       <Button
-        variant="ghost"
+        variant="delete"
         size="sm"
-        className="ml-auto text-red-600! hover:bg-red-50 hover:text-red-700!"
+        className="ml-auto"
         icon={<Trash2 className="size-3.5" />}
         loading={busy}
         onClick={async () => {

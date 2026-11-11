@@ -187,7 +187,7 @@ export function Teachers() {
             </>
           )}
           {editable && all.length > 0 && (
-            <Button variant="ghost" size="sm" className="ml-auto text-red-600! hover:bg-red-50 hover:text-red-700!" icon={<Trash2 className="size-3.5" />} onClick={() => setDeletingAll(true)}>
+            <Button variant="delete" size="sm" className="ml-auto" icon={<Trash2 className="size-3.5" />} onClick={() => setDeletingAll(true)}>
               Tümünü sil
             </Button>
           )}

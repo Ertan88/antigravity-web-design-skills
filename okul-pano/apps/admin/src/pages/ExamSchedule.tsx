@@ -651,8 +651,8 @@ function ExamDialog({ exam, options, onClose }: { exam: Partial<ScheduledExam> &
         <>
           {exam.id && (
             <Button
-              variant="secondary"
-              className="mr-auto text-rose-600! ring-rose-300! hover:bg-rose-50! dark:text-[#fb7185]! dark:ring-[#5c1d31]! dark:hover:bg-[#3e1422]!"
+              variant="delete"
+              className="mr-auto"
               icon={<Trash2 className="size-4" />}
               onClick={() => void remove()}
             >

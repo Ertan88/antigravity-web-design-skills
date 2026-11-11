@@ -23,12 +23,22 @@ Böyle bir durum varsa kullanıcı **onaylanmaz**. Yanlış açıkça söylenir;
 - İl, ilçe, okul adı, MEM adı ya da belirli bir okulun özel durumu koda sabit yazılmaz; her şey ayardan ya da veriden gelir.
 - Kullanıcının örnek olsun diye verdiği günler ya da durumlar ürün kuralına dönüştürülmez.
 
-## 4. KVKK
+## 4. Ortak görünüm kuralları
+
+- **Sil düğmeleri** (silme, kaldırma, çıkarma) her yerde kırmızıdır ve ortak bileşenle yapılır; tek tek renk
+  verilmez. Görünüş "yumuşak kırmızı"dır: açık kırmızı zemin, kırmızı yazı, ince kırmızı çerçeve; koyu temada
+  koyu kırmızı zemin, açık kırmızı yazı. İki temada da kontrol edilir.
+  - Web (panel): yazılı düğme `<Button variant="delete">`, çöp kutusu simgesi `DeleteButton` ya da
+    `<IconButton tone="delete">`, özel düğmede `DELETE_TONE` sınıfları (`apps/admin/src/components/ui.tsx`).
+  - Mobil: yazılı düğme `<Button variant="delete">`, çöp kutusu simgesi `DeleteIconButton` (`mobile/src/ui.tsx`).
+  - Dolu kırmızı (`variant="danger"`) yalnızca onay penceresindeki son adım gibi kesin işlem düğmesindir.
+
+## 5. KVKK
 
 - Gerçek okul belgeleri ve kişisel veriler depoya eklenmez.
 - Testler, videolar ve ekran görüntüleri yalnızca uydurma (sentetik) verilerle hazırlanır.
 
-## 5. Teslim
+## 6. Teslim
 
 - Mobil değişikliklerden sonra `mobile/app.json` içindeki version ve versionCode artırılır, commit ve push yapılır, APK derlemesi beklenir ve indirme bağlantısı paylaşılır.
 - Pull request yalnızca kullanıcı isterse açılır.

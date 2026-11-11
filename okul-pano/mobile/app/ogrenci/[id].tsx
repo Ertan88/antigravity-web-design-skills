@@ -9,7 +9,7 @@ import { useConductStudent } from '../../src/data.ts';
 import { clock } from '../../src/day.ts';
 import { Text } from '../../src/text.tsx';
 import { colors } from '../../src/theme.ts';
-import { BentoRow, Card, confirm, Empty, ErrorNote, Icon, Loading, Screen, SectionTitle, T, Tile } from '../../src/ui.tsx';
+import { BentoRow, Card, confirm, DeleteIconButton, Empty, ErrorNote, Icon, Loading, Screen, SectionTitle, T, Tile } from '../../src/ui.tsx';
 
 const shortStamp = (iso: string) => `${new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short' }).format(new Date(iso))} ${clock(iso)}`;
 
@@ -114,9 +114,7 @@ export default function StudentCard() {
                     </View>
                     <Text style={{ fontSize: 11, color: colors.subtle, fontWeight: '600' }}>{shortStamp(e.createdAt)}</Text>
                     {e.mine && (
-                      <Pressable accessibilityRole="button" accessibilityLabel="Kaydı sil" hitSlop={8} onPress={() => void remove(e.id)}>
-                        <Icon name="trash-outline" size={17} color={colors.faint} />
-                      </Pressable>
+                      <DeleteIconButton label="Kaydı sil" size={32} onPress={() => void remove(e.id)} />
                     )}
                   </View>
                 );

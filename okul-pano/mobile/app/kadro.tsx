@@ -216,7 +216,7 @@ function EditSheet({ teacher, branches, titles, onClose }: { teacher: Teacher | 
       )}
       <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
         {teacher && (
-          <Button variant="secondary" icon="trash-outline" loading={busy === 'delete'} disabled={busy !== null} onPress={() => void remove()}>
+          <Button variant="delete" icon="trash-outline" loading={busy === 'delete'} disabled={busy !== null} onPress={() => void remove()}>
             Sil
           </Button>
         )}

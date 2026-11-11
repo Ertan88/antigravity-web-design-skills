@@ -89,7 +89,7 @@ function OptionRow({ kind, option }: { kind: OptionKind; option: TeacherOption }
           <IconButton label="Adını değiştir" onClick={() => setEditing(true)}>
             <Pencil className="size-4" />
           </IconButton>
-          <IconButton label="Sil" className="hover:bg-red-50 hover:text-red-600" onClick={() => setConfirmDelete(true)}>
+          <IconButton label="Sil" tone="delete" onClick={() => setConfirmDelete(true)}>
             <Trash2 className="size-4" />
           </IconButton>
         </div>

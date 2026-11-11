@@ -119,7 +119,7 @@ export default function Isletmelerim() {
                         </Button>
                       )}
                       {b.canManage && (
-                        <Button variant="secondary" size="sm" icon="trash-outline" onPress={() => void remove(b)}>
+                        <Button variant="delete" size="sm" icon="trash-outline" onPress={() => void remove(b)}>
                           Sil
                         </Button>
                       )}
