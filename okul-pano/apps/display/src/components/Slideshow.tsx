@@ -9,30 +9,58 @@ const EXAM_KIND: Record<ExamSlideRow['groups'][number]['kind'], string> = { writ
 
 /** Sığmayan slaytta yazı en çok bu kadar küçülür; daha fazlası gerekiyorsa ders saatleri sayfalara bölünür */
 const MIN_EXAM_SCALE = 0.82;
-const EXAM_ROW_GAP = 12;
+const EXAM_ROW_GAP = 14;
 
 type ExamLayout = { pages: { rows: number[]; scale: number }[] };
 
-/** Bir ders saati satırı (görünen ve ölçülen kopyada aynı) */
+type ExamKindKey = ExamSlideRow['groups'][number]['kind'];
+
+/**
+ * Bir ders saatindeki sınavlar ders adına göre: ders adı bir kez, altında sınıf etiketleri. Yazılı sınav olağan
+ * olandır; uygulama ya da ortak sınav ders adının yanında (hepsi aynıysa) ya da ilgili etiketin içinde belirtilir.
+ */
+function bySubject(groups: ExamSlideRow['groups']) {
+  const out: { key: string; subject: string; groups: ExamSlideRow['groups'] }[] = [];
+  for (const g of groups) {
+    const key = g.subject.trim().toLocaleLowerCase('tr-TR');
+    const hit = out.find((o) => o.key === key);
+    if (hit) hit.groups.push(g);
+    else out.push({ key, subject: g.subject, groups: [g] });
+  }
+  return out.map((o) => {
+    const kinds = new Set(o.groups.map((g) => g.kind));
+    const shared: ExamKindKey | null = kinds.size === 1 ? o.groups[0]!.kind : null;
+    return { ...o, shared };
+  });
+}
+
+/** Bir ders saati kartı (görünen ve ölçülen kopyada aynı) */
 function ExamRow({ r }: { r: ExamSlideRow }) {
   return (
     <div className={`exam-slide-row${r.now ? ' is-now' : ''}`}>
       <div className="exam-slide-period">
         {r.periodNo}. ders
-        <small>{r.now ? `Şimdi${r.end ? ` · bitiş ${r.end}` : ''}` : r.start && r.end ? `${r.start} – ${r.end}` : ''}</small>
+        {r.now && <span className="exam-slide-now">Şimdi</span>}
       </div>
-      <div className="exam-slide-chips">
-        {r.groups.map((g) => (
-          <span key={g.key} className="exam-slide-chip" style={{ '--chip-hue': gradeHue(g.label) } as CSSProperties}>
-            <i>{g.label}</i>
-            {g.subject}
-            <em>
-              {EXAM_KIND[g.kind]}
-              {g.classes ? ` · ${g.classes}` : ''}
-            </em>
-          </span>
-        ))}
-      </div>
+      {bySubject(r.groups).map((s) => (
+        <div key={s.key} className="exam-slide-subject">
+          <div className="exam-slide-name">
+            {s.subject}
+            {s.shared && s.shared !== 'written' && <em>{EXAM_KIND[s.shared]}</em>}
+          </div>
+          <div className="exam-slide-badges">
+            {s.groups.map((g) => {
+              const note = [!s.shared && g.kind !== 'written' ? EXAM_KIND[g.kind] : null, g.classes].filter(Boolean).join(' · ');
+              return (
+                <span key={g.key} className="exam-slide-badge" style={{ '--chip-hue': gradeHue(g.label) } as CSSProperties}>
+                  {g.label}
+                  {note && <small>{note}</small>}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -58,7 +86,7 @@ function planExamLayout(heights: number[], available: number): ExamLayout {
 }
 
 /**
- * Panonun kendi oluşturduğu slayt: ders saatleri alt alta, şu anki sınav saati vurgulu. Satırlar görünmeyen bir
+ * Panonun kendi oluşturduğu slayt: her ders saati bir kart (ders adı bir kez, altında sınıf etiketleri), şu anki sınav saati vurgulu. Satırlar görünmeyen bir
  * kopyada ölçülür; alana sığmıyorsa önce yazı küçülür (en çok %18), yetmezse sayfalara bölünür ve sayfalar slaytın
  * süresini paylaşır ("1/2", "2/2").
  */

@@ -116,7 +116,7 @@ export function examReminderText(exam: Pick<ScheduledExam, 'className' | 'subjec
  */
 export interface ExamGroup<T> {
   key: string;
-  /** "9. sınıflar", "AMP 10. sınıflar"; tek şubede sınıfın kendi adı */
+  /** "9. Sınıflar", "AMP 10. Sınıflar"; tek şubede sınıfın kendi adı */
   label: string;
   /** Pano etiketi için: "9", "AMP 10"; tek şubede sınıf adı */
   badge: string;
@@ -140,7 +140,7 @@ export function groupExams<T extends Groupable>(exams: readonly T[]): ExamGroup<
     const key = [e.date, level ?? `#${name}`, e.subject.trim().toLocaleLowerCase('tr-TR'), e.kind].join('|');
     let g = groups.get(key);
     if (!g) {
-      g = { key, label: level ? `${level}. sınıflar` : name, badge: level ?? name, items: [], classNames: [], samePeriod: true };
+      g = { key, label: level ? `${level}. Sınıflar` : name, badge: level ?? name, items: [], classNames: [], samePeriod: true };
       groups.set(key, g);
     }
     if (g.items.length && g.items[0]!.periodNo !== e.periodNo) g.samePeriod = false;

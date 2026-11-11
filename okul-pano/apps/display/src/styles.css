@@ -3427,7 +3427,7 @@ body.cursor-hidden * {
 }
 
 /* ---------- İsteğe bağlı "Bugünkü sınavlar" slaytı ----------
-   Dar saat sütunu, küçük sınav etiketleri (her sınav tek satırda). Sığmazsa yazı en çok %18 küçülür; o da
+   Her ders saati bir kart: ders adı bir kez ve büyük, altında sınıf etiketleri. Sığmazsa yazı en çok %18 küçülür; o da
    yetmezse ders saatleri sayfalara bölünür (Slideshow.tsx › ExamSlide). */
 .exam-slide {
   position: absolute;
@@ -3503,78 +3503,92 @@ body.cursor-hidden * {
 
 .exam-slide-row {
   display: grid;
-  grid-template-columns: 118px 1fr;
-  gap: 12px;
-  align-items: center;
-  padding: 10px 14px;
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--text) 5%, transparent);
+  gap: 10px;
+  padding: 16px 20px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--text) 4%, transparent);
   border: 1px solid var(--border);
 }
 
 .exam-slide-row.is-now {
-  background: color-mix(in srgb, #fbbf24 15%, transparent);
+  background: color-mix(in srgb, #fbbf24 12%, transparent);
   border-color: #fbbf24;
 }
 
 .exam-slide-period {
-  font-size: 22px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 26px;
   font-weight: 800;
 }
 
-.exam-slide-period small {
-  display: block;
-  margin-top: 2px;
+.exam-slide-now {
+  font-size: 16px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #1c1206;
+  background: #fbbf24;
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.exam-slide-subject {
+  display: grid;
+  gap: 10px;
+}
+
+.exam-slide-name {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+.exam-slide-name em {
+  font-style: normal;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.exam-slide-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.exam-slide-badge {
+  /* Bütün sınıf etiketleri en az aynı genişlikte: alt alta gelen satırlar düzenli görünür */
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  min-width: 132px;
+  padding: 5px 12px;
+  border-radius: 10px;
+  border: 2px solid var(--chip-hue, var(--primary));
+  color: var(--chip-hue, var(--primary));
+  font-size: 20px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.exam-slide-badge small {
   font-size: 15px;
   font-weight: 600;
   color: var(--muted);
 }
 
-.exam-slide-row.is-now .exam-slide-period small {
-  color: #fbbf24;
-}
-
-.exam-slide-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  min-width: 0;
-}
-
-.exam-slide-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 10px 5px 5px;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--text) 6%, transparent);
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.exam-slide-chip i {
-  /* Bütün sınıf etiketleri aynı genişlikte: alt alta gelen sınav adları aynı hizadan başlar */
-  flex: none;
-  min-width: 112px;
-  text-align: center;
-  white-space: nowrap;
-  font-style: normal;
-  font-size: 16px;
-  font-weight: 800;
-  padding: 3px 8px;
-  border-radius: 9px;
-  border: 2px solid var(--chip-hue, var(--primary));
-  color: var(--chip-hue, var(--primary));
-}
-
-.exam-slide-chip em {
-  font-style: normal;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--muted);
-}
-
-.theme-light .exam-slide-kicker,
-.theme-light .exam-slide-row.is-now .exam-slide-period small {
+.theme-light .exam-slide-kicker {
   color: #b45309;
+}
+
+.theme-light .exam-slide-row.is-now {
+  border-color: #d97706;
 }
