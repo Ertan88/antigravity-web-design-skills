@@ -1,0 +1,52 @@
+# Okul Pano'yu Render'da ücretsiz yayına alma (Blueprint). Adımlar: okul-pano/docs/ucretsiz-yayin.md
+# Veritabanı Neon'da (ücretsiz PostgreSQL); görseller de veritabanında saklanır (FILE_STORAGE=db),
+# çünkü Render'ın ücretsiz sunucusunda kalıcı disk yoktur.
+services:
+  - type: web
+    name: okul-pano
+    runtime: docker
+    plan: free
+    region: frankfurt
+    branch: claude/okul-dijital-pano-4oao0y
+    dockerfilePath: ./okul-pano/Dockerfile
+    dockerContext: ./okul-pano
+    healthCheckPath: /api/health
+    autoDeploy: true
+    buildFilter:
+      paths:
+        - okul-pano/**
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: FILE_STORAGE
+        value: db
+      - key: JWT_SECRET
+        generateValue: true
+      # Neon'daki veritabanının bağlantı adresi (postgresql://...): kurulumda sorulur
+      - key: DATABASE_URL
+        sync: false
+      # İlk açılışta oluşturulacak platform yöneticisi: kurulumda sorulur
+      - key: SEED_SUPERADMIN_EMAIL
+        sync: false
+      - key: SEED_SUPERADMIN_PASSWORD
+        sync: false
+      # Tanıtım için örnek okul (örnek hesapların şifresi yöneticinin şifresiyle aynıdır). İstemiyorsanız false yapın.
+      - key: SEED_DEMO
+        value: "true"
+      # Aydınlatma metni şablonunda "verilerin saklandığı yer" olarak yazılır. Kendi sunucunuza geçince değiştirin.
+      - key: DATA_REGION
+        value: Almanya (Frankfurt)
+      # Web'den okul kaydı: open (e-posta doğrulanınca açılır), approval (platform yöneticisi onaylar), closed (kapalı).
+      # E-posta ayarlı değilse doğrulama e-postası gitmez; başvurular Platform sayfasında onaylanır.
+      - key: SIGNUP_MODE
+        value: open
+      # E-posta: Render'ın ücretsiz sunucusu SMTP portlarını kapatır, bu yüzden Brevo'nun HTTPS API'si kullanılır.
+      # brevo.com'da API anahtarı oluşturun; gönderen adresi Brevo'da doğrulanmış olmalı: "Okulyayın <adres@alanadi.com>"
+      - key: BREVO_API_KEY
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      # KVKK: platform yöneticisi okul verilerine yalnızca üye olduğu okullarda ya da okulun verdiği süreli
+      # destek erişimiyle girer. Kendi okul(lar)ınızın kısa adlarını virgülle yazın; açılışta okul sahibi olarak eklenirsiniz.
+      - key: PLATFORM_OWNER_SCHOOLS
+        sync: false

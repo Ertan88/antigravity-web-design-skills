@@ -17,3 +17,8 @@ for Gemini Antigravity focused on professional web design workflows.
 ## Usage
 Just describe the website you want to build.
 The agent will automatically select and orchestrate the correct skills.
+
+## Okul Pano (okul-pano/)
+
+Bu depo ayrıca okullar için çok okullu dijital pano ve yönetim paneli projesini içerir.
+Ayrıntılar ve kurulum için: [okul-pano/README.md](okul-pano/README.md)

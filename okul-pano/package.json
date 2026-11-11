@@ -1,0 +1,32 @@
+{
+  "name": "okul-pano",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Okullar için çok kiracılı (multi-tenant) dijital pano ve yönetim paneli",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n api,admin,pano -c blue,magenta,green \"npm run dev -w @okulpano/api\" \"node scripts/wait-for-api.mjs && npm run dev -w @okulpano/admin\" \"node scripts/wait-for-api.mjs && npm run dev -w @okulpano/display\"",
+    "build": "npm run build -w @okulpano/admin && npm run build -w @okulpano/display && npm run build -w @okulpano/api",
+    "start": "npm run start -w @okulpano/api",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:generate": "npm run db:generate -w @okulpano/api",
+    "seed": "npm run seed -w @okulpano/api"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6",
+    "typescript": "~5.9.3"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "^11.1.1"
+    }
+  }
+}
