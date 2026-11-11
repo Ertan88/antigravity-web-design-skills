@@ -4,7 +4,8 @@ import { PERMISSION_KEYS } from './permissions.ts';
 
 describe('görev paketleri', () => {
   it('her yetki ya bir pakette ya diğer yetkilerde ya da rolde (kayıp yok)', () => {
-    const covered = new Set<string>([...DUTY_PACKAGES.flatMap((d) => d.permissions), ...EXTRA_PERMISSIONS.map((e) => e.key), 'users.manage', 'conduct.counsel']);
+    // internship.manage artık verilmez (işletmeleri görecekler Okul Ayarları'ndan seçilir); eski kayıtlar için listede
+    const covered = new Set<string>([...DUTY_PACKAGES.flatMap((d) => d.permissions), ...EXTRA_PERMISSIONS.map((e) => e.key), 'users.manage', 'conduct.counsel', 'internship.manage']);
     expect(PERMISSION_KEYS.filter((p) => !covered.has(p))).toEqual([]);
   });
   it('paket aç/kapat; diğer yetkiler korunur; yarım paket ayrı gösterilir', () => {

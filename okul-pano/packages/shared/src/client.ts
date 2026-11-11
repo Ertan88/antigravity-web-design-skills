@@ -13,6 +13,7 @@ export * from './youtube.ts';
 export type { SchoolSettings } from './schemas.ts';
 export * from './grade.ts';
 export * from './holidays.ts';
+export * from './internshipSubject.ts';
 export * from './schoolDay.ts';
 export * from './bellPlan.ts';
 export * from './academicCalendar.ts';

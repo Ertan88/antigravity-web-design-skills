@@ -1,3 +1,4 @@
+import { isInternshipSubject } from './internshipSubject.ts';
 import { z } from 'zod';
 import { isoWeekday } from './schoolDay.ts';
 
@@ -95,14 +96,8 @@ export function internMonthDays(month: string, holidays: readonly { date: string
 
 export const internKey = (date: string, half: InternHalf) => `${date}|${half}`;
 
-/**
- * Ders programındaki işletme dersi (MEB ders adı: "İşletmelerde Mesleki Eğitim", eski adıyla "İşletmelerde Beceri
- * Eğitimi"). e-Okul programında işletme günleri bu dersle doldurulur; bu saatler okul günü sayılmaz.
- */
-export function isInternshipSubject(subject: string): boolean {
-  const s = subject.toLocaleLowerCase('tr-TR');
-  return /işletme(lerde|de)\s+(mesleki|beceri)\s+eğitim/.test(s);
-}
+/** Ders programındaki işletme dersi: e-Okul programında işletme günleri bu dersle doldurulur (okul günü sayılmaz) */
+export { isInternshipSubject } from './internshipSubject.ts';
 
 /** Bir sınıfın okulda olduğu bölümler: hafta günü -> [öğleden önce, öğleden sonra] */
 export type SchoolHalves = ReadonlyMap<number, readonly [boolean, boolean]>;
