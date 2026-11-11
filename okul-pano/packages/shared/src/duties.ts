@@ -1,4 +1,4 @@
-import type { Permission } from './permissions.ts';
+import { ADMIN_GRANTABLE, type Permission } from './permissions.ts';
 
 /**
  * Kişiler ve Yetkiler: tek tek 19 yetki yerine okulun iş bölümüne göre görev paketleri. Veritabanında yetkiler aynen
@@ -23,6 +23,7 @@ export const EXTRA_PERMISSIONS: readonly { key: Permission; label: string; text:
   { key: 'emergency.manage', label: 'Acil durum uyarısı', text: 'Bütün panolarda acil durum uyarısı başlatır' },
   { key: 'settings.manage', label: 'Okul ayarları', text: 'Okul bilgileri, konum ve modüller' },
   { key: 'support.contact', label: 'Platforma yazar', text: 'Okul Yayın ekibine sorun, öneri ya da soru yazar' },
+  { key: 'internship.manage', label: 'Mesleki eğitimi yönetir', text: 'Bütün işletmeleri ve öğrencileri görür, koordinatör öğretmenleri işaretler, koordinatör müdür yardımcısını seçer' },
 ];
 
 /** Kişinin açık görev paketleri (paketin bütün yetkileri verilmişse) */
@@ -62,7 +63,8 @@ export function personRole(m: { role: string; permissions: readonly string[]; te
 
 /** Kişi kartındaki rol seçimini veritabanı rolüne çevirir (görevler ve diğer yetkiler korunur) */
 export function applyPersonRole(role: Exclude<PersonRole, 'owner'>, permissions: readonly string[]): { role: 'admin' | 'editor'; permissions: string[] } {
-  if (role === 'admin') return { role: 'admin', permissions: [] };
+  // Müdür yardımcısının rolü bütün yetkileri verir; yalnızca açıkça verilenler saklanır (ör. "Mesleki eğitimi yönetir")
+  if (role === 'admin') return { role: 'admin', permissions: permissions.filter((p) => (ADMIN_GRANTABLE as readonly string[]).includes(p)) };
   const rest = permissions.filter((p) => p !== 'conduct.counsel' && p !== 'users.manage');
   return { role: 'editor', permissions: role === 'counselor' ? [...rest, 'conduct.counsel'] : rest };
 }

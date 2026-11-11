@@ -239,6 +239,22 @@ function Detail({ p, ctx }: { p: Person; ctx: ReturnType<typeof usePeople> }) {
             </>
           )}
 
+          {m.role === 'admin' && role === 'admin' && (
+            // Mesleki eğitim (KVKK): müdür yardımcısının rolü öğrencilerin işletme kayıtlarını kendiliğinden açmaz
+            <Card>
+              <ToggleRow
+                label="Mesleki eğitimi yönetir"
+                description="Bütün işletmeleri ve öğrencileri görür, koordinatör öğretmenleri işaretler, koordinatör müdür yardımcısını seçer."
+                value={perms.includes('internship.manage')}
+                onChange={(on) => {
+                  if (!editable) return;
+                  setPerms((x) => (on ? [...x, 'internship.manage'] : x.filter((y) => y !== 'internship.manage')));
+                  setSaved(false);
+                }}
+              />
+            </Card>
+          )}
+
           {editable && (dirty || saved) && (
             <Button
               loading={busy === 'save'}

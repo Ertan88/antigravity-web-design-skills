@@ -1,6 +1,7 @@
 import type { AnnouncementDesign, BoardLayout, Period, SchoolSettings, ScreenDisplay } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './api.ts';
+import type { InternshipAccess } from './nav.ts';
 import { useAuth } from './auth.tsx';
 import { useToast } from '../components/Toast.tsx';
 
@@ -172,6 +173,17 @@ export interface School {
 export function useSchoolPath(resource = ''): string {
   const { schoolId } = useAuth();
   return `/api/schools/${schoolId}${resource ? `/${resource}` : ''}`;
+}
+
+/** Mesleki eğitimde kişinin yeri (yönetim, işaretli koordinatör, alan şefi); kararı sunucu verir */
+export function useInternshipAccess(enabled = true) {
+  const { schoolId } = useAuth();
+  const path = useSchoolPath('internship/access');
+  return useQuery({
+    queryKey: [schoolId, 'internship', 'access'],
+    queryFn: () => api<InternshipAccess>(path),
+    enabled: Boolean(schoolId) && enabled,
+  });
 }
 
 /** Okul kapsamlı liste sorgusu */

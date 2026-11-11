@@ -54,13 +54,25 @@ export async function schoolRoutes(app: FastifyInstance) {
     const sent = Object.keys(((req.body ?? {}) as { settings?: object }).settings ?? {});
     const changes = settings ? Object.fromEntries(Object.entries(settings).filter(([k]) => sent.includes(k))) : undefined;
     const merged = changes ? schoolSettingsSchema.parse({ ...req.ctx.school.settings, ...changes }) : undefined;
-    // İşletmeleri kimin göreceğini (koordinatör müdür yardımcısı, ek kişiler) yalnızca okul müdürü değiştirir:
-    // bir müdür yardımcısı kendini listeye ekleyip bütün öğrencileri göremesin (KVKK)
-    if (merged && (req.ctx.role !== 'owner' || req.ctx.isSupport)) {
+    // Mesleki eğitim (KVKK): koordinatör müdür yardımcısını yalnızca okul müdürü ve "Mesleki eğitimi yönetir" yetkisi
+    // verilenler değiştirir; seçilen kişi müdür yardımcısı ya da bu yetkiyi alan biri olmalı. Koordinatör öğretmenler
+    // yalnızca kendi ekranından (meslek öğretmeni denetimiyle) değişir.
+    if (merged) {
       const current = schoolSettingsSchema.parse(req.ctx.school.settings ?? {});
-      const same = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x) => b.includes(x));
-      if (merged.internshipManagerUserId !== current.internshipManagerUserId || !same(merged.internshipViewerUserIds, current.internshipViewerUserIds))
-        throw forbidden('İşletmeleri görecek kişileri yalnızca okul müdürü değiştirebilir.');
+      if (merged.internshipManagerUserId !== current.internshipManagerUserId) {
+        const canPick = !req.ctx.isSupport && (req.ctx.role === 'owner' || req.ctx.granted.includes('internship.manage'));
+        if (!canPick) throw forbidden('Koordinatör müdür yardımcısını yalnızca okul müdürü ve "Mesleki eğitimi yönetir" yetkisi verilenler değiştirebilir.');
+        if (merged.internshipManagerUserId) {
+          const [m] = await db
+            .select({ role: memberships.role, permissions: memberships.permissions })
+            .from(memberships)
+            .where(and(eq(memberships.userId, merged.internshipManagerUserId), eq(memberships.schoolId, req.ctx.schoolId)));
+          if (!m || !(m.role === 'admin' || m.permissions.includes('internship.manage')))
+            throw badRequest('Koordinatör müdür yardımcısı, müdür yardımcılarından ya da "Mesleki eğitimi yönetir" yetkisi verilenlerden seçilir.');
+        }
+      }
+      // Ayar formu eski bir listeyi geri yazmasın: koordinatör öğretmenler yalnızca kendi ekranından değişir
+      merged.internshipCoordinatorTeacherIds = current.internshipCoordinatorTeacherIds;
     }
     const [updated] = await db
       .update(schools)

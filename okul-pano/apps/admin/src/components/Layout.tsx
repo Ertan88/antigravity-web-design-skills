@@ -3,7 +3,7 @@ import { Building2, Lifebuoy2, ChevronDown, Mail, ChevronRight, ChevronsUpDown, 
 import { Suspense, useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth.tsx';
-import { useSchool } from '../lib/data.ts';
+import { useInternshipAccess, useSchool } from '../lib/data.ts';
 import { findNav, NAV } from '../lib/nav.ts';
 import { useTheme } from '../lib/theme.ts';
 import { BrandMark, BrandName } from './Brand.tsx';
@@ -81,16 +81,17 @@ const COLLAPSE_KEY = 'okulpano.navCollapsed';
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { me, can, logout, school: access } = useAuth();
+  const school = useSchool();
+  const settings = school.data?.settings;
+  // Mesleki eğitim menüsü: kimin göreceğine sunucu karar verir (yönetim, işaretli koordinatör, alan şefi)
+  const internship = useInternshipAccess(Boolean(settings?.internshipEnabled));
   const who = {
     userId: me?.user.id ?? null,
     teacherId: access?.teacherId ?? null,
     role: access?.role ?? null,
-    vocational: Boolean(access?.vocational),
-    coordinator: Boolean(access?.coordinator),
+    internship: internship.data ?? null,
     can,
   };
-  const school = useSchool();
-  const settings = school.data?.settings;
   const current = findNav(useLocation().pathname)?.item.to;
   const [collapsed, setCollapsed] = useState<string[]>(() => {
     try {

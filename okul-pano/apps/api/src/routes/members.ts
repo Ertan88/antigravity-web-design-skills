@@ -1,4 +1,4 @@
-import { createMemberSchema, effectivePermissions, resetPasswordSchema, updateMemberSchema } from '@okulpano/shared';
+import { ADMIN_GRANTABLE, createMemberSchema, effectivePermissions, resetPasswordSchema, updateMemberSchema } from '@okulpano/shared';
 import { and, asc, count, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
@@ -12,6 +12,9 @@ import { createInvite } from './signup.ts';
 import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
 
 /** Davetle eklenen ve henüz şifresini belirlemeyen hesap: bu değerle hiçbir şifre eşleşmez */
+/** Müdür yardımcısında saklanan yetkiler: yalnızca açıkça verilenler (ör. "Mesleki eğitimi yönetir") */
+const adminGrants = (perms: readonly string[] | undefined) => (perms ?? []).filter((p) => (ADMIN_GRANTABLE as readonly string[]).includes(p));
+
 export const INVITE_PENDING = 'davet-bekliyor';
 
 export async function memberRoutes(app: FastifyInstance) {
@@ -110,7 +113,7 @@ export async function memberRoutes(app: FastifyInstance) {
     if (req.ctx.role !== 'owner') throw forbidden('Öneriyi yalnızca okul müdürü onaylayabilir.');
     const m = await loadMember(req);
     if (m.membership.role !== 'editor') throw badRequest(`${m.fullName} zaten yönetici.`);
-    await db.update(memberships).set({ role: 'admin', permissions: [], promotionRequestedBy: null, promotionRequestedAt: null }).where(eq(memberships.id, m.membership.id));
+    await db.update(memberships).set({ role: 'admin', permissions: adminGrants(m.membership.permissions), promotionRequestedBy: null, promotionRequestedAt: null }).where(eq(memberships.id, m.membership.id));
     await audit(req, 'update', 'Yönetici önerisi', m.membership.id, `${m.fullName} Yönetici yapıldı (öneri onaylandı)`);
     const title = 'Yönetici yapıldınız';
     const body = `${req.ctx.school.name} okulunda artık Yönetici olarak bütün bölümleri düzenleyebilirsiniz.`;
@@ -175,7 +178,7 @@ export async function memberRoutes(app: FastifyInstance) {
         userId: user!.id,
         schoolId: req.ctx.schoolId,
         role: body.role,
-        permissions: body.role === 'editor' ? effectivePermissions('editor', body.permissions) : [],
+        permissions: body.role === 'editor' ? effectivePermissions('editor', body.permissions) : body.role === 'admin' ? adminGrants(body.permissions) : [],
         teacherId: body.teacherId ?? null,
       })
       .returning();
@@ -220,7 +223,12 @@ export async function memberRoutes(app: FastifyInstance) {
     const body = parse(updateMemberSchema, req.body);
     if (body.role && body.role !== 'editor' && req.ctx.role !== 'owner') throw forbidden('Yönetici atamayı yalnızca okul müdürü yapabilir.');
     const role = body.role ?? m.membership.role;
-    const permissions = role === 'editor' ? effectivePermissions('editor', body.permissions ?? m.membership.permissions) : [];
+    const permissions =
+      role === 'editor'
+        ? effectivePermissions('editor', body.permissions ?? m.membership.permissions)
+        : role === 'admin'
+          ? adminGrants(body.permissions ?? m.membership.permissions)
+          : [];
     await checkTeacher(req, body.teacherId);
     await db
       .update(memberships)

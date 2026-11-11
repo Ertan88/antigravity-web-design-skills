@@ -24,10 +24,10 @@ export const PERMISSIONS = {
   'accounts.enroll': 'Öğretmen hesabı açma',
   'conduct.manage': 'Gözlem kriterleri ve ayın öğrencisi',
   /**
-   * Artık kullanılmıyor: işletmeleri kimin göreceği Okul Ayarları'ndan seçilir (müdür, koordinatör müdür yardımcısı,
-   * ek kişiler). Eski kayıtlarda kalan değer doğrulamada hata vermesin diye listede durur.
+   * Mesleki eğitimi yönetir: bütün işletmeleri ve öğrencileri görür, koordinatör öğretmenleri işaretler, koordinatör
+   * müdür yardımcısını seçer. Müdür yardımcılarına da açıkça verilir (rolle kendiliğinden gelmez; bkz. ADMIN_GRANTABLE).
    */
-  'internship.manage': 'İşletmeler ve işletmede devam çizelgesi (eski)',
+  'internship.manage': 'Mesleki eğitimi yönetir',
   /** Rehber öğretmen: bütün öğrencilerin gözlem kayıtlarını görür (panelde "Rehber öğretmen" rolü olarak verilir) */
   'conduct.counsel': 'Rehber öğretmen (bütün gözlem kayıtları)',
   /** Okul Yayın ekibine (platforma) destek talebi yazma; müdür ve müdür yardımcılarında hep vardır */
@@ -44,6 +44,12 @@ export const ROLES = {
 } as const;
 
 export type Role = keyof typeof ROLES;
+
+/**
+ * Müdür yardımcılarına (admin) da tek tek verilen yetkiler: rol bütün yetkileri verse de bu yetkinin asıl anlamı
+ * (ör. bütün işletmelerdeki öğrencileri görmek) yalnızca açıkça verilmişse geçerlidir.
+ */
+export const ADMIN_GRANTABLE: readonly Permission[] = ['internship.manage'];
 
 /** Editörlere verilemeyen yetkiler: yetki yükseltmeyi engeller. */
 export const ADMIN_ONLY_PERMISSIONS: readonly Permission[] = ['users.manage'];

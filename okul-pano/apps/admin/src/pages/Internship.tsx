@@ -26,11 +26,13 @@ import {
   Trash2,
   Undo2,
   Users,
+  X,
 } from '../components/icons.tsx';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useToast } from "../components/Toast.tsx";
 import {
+  ACTION_SHAPE,
   Alert,
   Badge,
   Button,
@@ -51,7 +53,7 @@ import {
 } from "../components/ui.tsx";
 import { api } from "../lib/api.ts";
 import { useAuth } from "../lib/auth.tsx";
-import { useList, useSchoolPath, type Teacher } from "../lib/data.ts";
+import { useInternshipAccess, useList, useSchoolPath, type Teacher } from "../lib/data.ts";
 
 /*
  * İşletmelerde mesleki eğitim: işletmeler ve aylık işletmede devam çizelgesi. Okul günleri ders programından,
@@ -1090,19 +1092,81 @@ function useAreas() {
   });
 }
 
-/** Kişinin mesleki eğitimdeki yetkisi (sunucu karar verir): manage = müdür, koordinatör müdür yardımcısı, ek kişi */
-function useInternshipAccess() {
+/**
+ * Koordinatör öğretmenler (yönetim işaretler): yalnızca meslek alanı branşlı öğretmenler. İşaretlenen öğretmen
+ * mesleki eğitimi görür, kendi işletmelerini ve öğrencilerini girer; işletmeye yalnızca işaretliler atanır.
+ */
+function CoordinatorsCard() {
   const { schoolId } = useAuth();
-  const path = useSchoolPath("internship/access");
-  return useQuery({
-    queryKey: [schoolId, "internship", "access"],
-    queryFn: () => api<{ enabled: boolean; all: boolean; coordinator: boolean; manage: boolean; teacher: boolean }>(path),
+  const path = useSchoolPath("internship/coordinators");
+  const qc = useQueryClient();
+  const toast = useToast();
+  const q = useQuery({
+    queryKey: [schoolId, "internship", "coordinators"],
+    queryFn: () => api<{ teachers: { id: string; fullName: string; branchName: string | null; designated: boolean }[] }>(path),
   });
+  const save = useMutation({
+    mutationFn: (teacherIds: string[]) => api(path, { method: "PUT", body: { teacherIds } }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: [schoolId, "internship"] });
+    },
+    onError: (err) => toast.error(errorText(err, "Kaydedilemedi")),
+  });
+  const list = q.data?.teachers ?? [];
+  const on = list.filter((t) => t.designated);
+  const off = list.filter((t) => !t.designated);
+  const set = (ids: string[]) => save.mutate(ids);
+  return (
+    <Card className="mb-4 p-5">
+      <div className="mb-1 font-bold text-ink">Koordinatör öğretmenler</div>
+      <p className="mb-3 text-sm text-slate-500">
+        Yalnızca işaretlenen meslek öğretmenleri mesleki eğitimi görür; kendi işletmelerini ve öğrencilerini girebilir, işletmelere
+        koordinatör olarak atanabilir. Kültür dersi öğretmenleri listede yer almaz.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        {on.map((t) => (
+          <span key={t.id} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 py-1 pr-1 pl-3 text-sm font-semibold text-ink ring-1 ring-slate-200">
+            {t.fullName}
+            {t.branchName && <span className="text-xs font-medium text-slate-500">{t.branchName}</span>}
+            <button
+              type="button"
+              aria-label={`${t.fullName} koordinatörlükten çıkar`}
+              disabled={save.isPending}
+              onClick={() => set(on.filter((x) => x.id !== t.id).map((x) => x.id))}
+              className={clsx(ACTION_SHAPE, "size-6 rounded-full", DELETE_TONE)}
+            >
+              <X className="size-3.5" />
+            </button>
+          </span>
+        ))}
+        {!on.length && <span className="text-sm text-slate-500">Henüz işaretli koordinatör yok.</span>}
+        {off.length > 0 && (
+          <Select
+            value=""
+            disabled={save.isPending}
+            onChange={(e) => e.target.value && set([...on.map((x) => x.id), e.target.value])}
+            className="w-auto max-w-xs"
+            aria-label="Koordinatör ekle"
+          >
+            <option value="">+ Koordinatör ekle</option>
+            {off.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.fullName}
+                {t.branchName ? ` · ${t.branchName}` : ""}
+              </option>
+            ))}
+          </Select>
+        )}
+      </div>
+    </Card>
+  );
 }
 
 export function Businesses() {
-  const { schoolId, school } = useAuth();
-  const manager = Boolean(useInternshipAccess().data?.manage);
+  const { schoolId } = useAuth();
+  const access = useInternshipAccess();
+  const manager = Boolean(access.data?.manage);
+  const designated = Boolean(access.data?.teacher);
   const path = useSchoolPath("internship/businesses");
   const list = useQuery({
     queryKey: [schoolId, "internship", "businesses"],
@@ -1162,7 +1226,9 @@ export function Businesses() {
         description={
           manager
             ? "Öğrencilerin mesleki eğitim gördüğü işletmeler; okulun meslek alanlarına göre. Koordinatör öğretmen kendi işletmelerindeki öğrencilerin devamını işaretler."
-            : "Eklediğiniz ve koordinatörü olduğunuz işletmeler. Eklediğiniz işletmenin alanı branşınızdan gelir, koordinatörü siz olursunuz."
+            : designated
+              ? "Koordinatörü olduğunuz işletmeler. Eklediğiniz işletmenin alanı branşınızdan gelir, koordinatörü siz olursunuz."
+              : "Alanınızdaki işletmeler (alan şefi olarak yalnızca görüntülersiniz)."
         }
         actions={
           <div className="flex flex-wrap gap-2">
@@ -1175,7 +1241,7 @@ export function Businesses() {
                 Alanlar ve meslek öğretmenleri
               </Button>
             )}
-            {(manager || school?.teacherId) && (
+            {(manager || designated) && (
               <Button
                 icon={<Plus className="size-4" />}
                 onClick={() => setEditing("new")}
@@ -1186,6 +1252,7 @@ export function Businesses() {
           </div>
         }
       />
+      {manager && <CoordinatorsCard />}
       {manager && areas.data && !areas.data.areas.length && (
         <div className="mb-4">
           <Alert>

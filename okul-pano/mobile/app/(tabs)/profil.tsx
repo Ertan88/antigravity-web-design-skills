@@ -269,7 +269,8 @@ export default function Menu() {
       (managerial || (role === 'editor' && counsel)) && { title: 'Rehberlik uyarıları', subtitle: 'Kısa sürede çok eksi alan öğrenciler', icon: 'heart-outline', to: '/rehberlik' },
       { title: 'Doğum günleri', subtitle: 'Bugün doğum günü olan öğrenciler', icon: 'gift-outline', to: '/dogum-gunleri' },
     ]);
-    if (internship.data?.enabled && (internship.data.all || internship.data.coordinator || internship.data.teacher)) {
+    // Yönetim, işaretli koordinatör öğretmen ve alan şefi görür; diğer öğretmenler görmez
+    if (internship.data?.enabled && (internship.data.all || internship.data.teacher || internship.data.areaHead)) {
       add('Mesleki eğitim', [
         { title: 'İşletmede devam', subtitle: 'Aylık çizelge: X, D, İ, R, H, K, T · özürlü / özürsüz', icon: 'grid-outline', to: '/isletme-devam' },
         { title: 'İşletmelerim', subtitle: 'İşletme bilgileri, ekle, düzenle', icon: 'business-outline', to: '/isletme' },

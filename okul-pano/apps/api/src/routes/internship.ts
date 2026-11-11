@@ -38,7 +38,7 @@ import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { audit, schoolGuard, UUID_RE, type AppDeps } from '../context.ts';
-import { businesses, classGroups, internshipMarks, memberships, schools, students, teacherBranches, teachers, timetableEntries, users } from '../db/schema.ts';
+import { businesses, classGroups, internshipMarks, memberships, schools, students, teacherBranches, teachers, teacherTitles, timetableEntries, users } from '../db/schema.ts';
 import { holidaysAndHalfDays } from '../lib/dayinfo.ts';
 import { badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 import { notifyUsers } from '../lib/push.ts';
@@ -63,8 +63,42 @@ const idParam = (req: FastifyRequest) => {
 
 const settingsOf = (req: FastifyRequest) => schoolSettingsSchema.parse(req.ctx.school.settings ?? {});
 const isVp = (req: FastifyRequest) => settingsOf(req).internshipManagerUserId === req.ctx.userId;
-/** Bütün işletmeleri gören ve yöneten: okul müdürü, koordinatör müdür yardımcısı, ayarda seçilen ek kişiler */
-const isManager = (req: FastifyRequest) => req.ctx.role === 'owner' || isVp(req) || settingsOf(req).internshipViewerUserIds.includes(req.ctx.userId);
+/** "Mesleki eğitimi yönetir" yetkisi açıkça verilmiş mi (müdür yardımcısının rolü bunu kendiliğinden vermez) */
+const isGranted = (req: FastifyRequest) => req.ctx.granted.includes('internship.manage');
+/** Bütün işletmeleri gören ve yöneten: okul müdürü, koordinatör müdür yardımcısı, "Mesleki eğitimi yönetir" yetkisi verilenler */
+const isManager = (req: FastifyRequest) => !req.ctx.isSupport && (req.ctx.role === 'owner' || isVp(req) || isGranted(req));
+
+/** İşaretli koordinatör öğretmenler; hiç kaydedilmemişse (eski okullar) işletmelerin bugünkü koordinatörleri */
+async function designatedCoordinators(deps: AppDeps, req: FastifyRequest): Promise<Set<string>> {
+  const list = settingsOf(req).internshipCoordinatorTeacherIds;
+  if (list) return new Set(list);
+  const rows = await deps.db
+    .selectDistinct({ id: businesses.coordinatorTeacherId })
+    .from(businesses)
+    .where(and(eq(businesses.schoolId, req.ctx.schoolId), isNotNull(businesses.coordinatorTeacherId)));
+  return new Set(rows.map((r) => r.id!));
+}
+
+/** Alan şefi: kadroda ünvanı "Alan Şefi" olan öğretmen; branşı (alanı) döner, değilse null */
+async function areaHeadBranch(deps: AppDeps, req: FastifyRequest): Promise<string | null> {
+  if (!req.ctx.teacherId) return null;
+  const [t] = await deps.db
+    .select({ branchId: teachers.branchId, title: teacherTitles.name })
+    .from(teachers)
+    .leftJoin(teacherTitles, eq(teacherTitles.id, teachers.titleId))
+    .where(and(eq(teachers.id, req.ctx.teacherId), eq(teachers.schoolId, req.ctx.schoolId)));
+  return t?.branchId && t.title && /alan\s*şef/.test(t.title.toLocaleLowerCase('tr-TR')) ? t.branchId : null;
+}
+
+/** Bir alanın işletmeleri: alanı o branş olanlar ve koordinatörü o branştan olanlar */
+async function areaBusinessIds(deps: AppDeps, schoolId: string, branchId: string): Promise<Set<string>> {
+  const rows = await deps.db
+    .select({ id: businesses.id })
+    .from(businesses)
+    .leftJoin(teachers, eq(teachers.id, businesses.coordinatorTeacherId))
+    .where(and(eq(businesses.schoolId, schoolId), or(eq(businesses.areaId, branchId), eq(teachers.branchId, branchId))));
+  return new Set(rows.map((r) => r.id));
+}
 
 function requireModule(req: FastifyRequest) {
   if (req.ctx.isSupport) throw forbidden('Destek erişimi öğrenci devam kayıtlarını göremez.');
@@ -87,16 +121,30 @@ async function ownBusinessIds(deps: AppDeps, req: FastifyRequest): Promise<Set<s
   return new Set(rows.map((r) => r.id));
 }
 
-/**
- * Görme ve işaretleme kapsamı: idare ve koordinatör müdür yardımcısı hepsi, öğretmen kendi işletmeleri. `teacher`
- * açıkken işletmesi olmayan öğretmen de geçer (işletme ekleyebilsin).
- */
-async function scope(deps: AppDeps, req: FastifyRequest, opts: { teacher?: boolean } = {}) {
-  requireModule(req);
+/** Kişinin mesleki eğitimdeki yeri (hata vermeden): yönetim, işaretli koordinatör, alan şefi */
+async function roleOf(deps: AppDeps, req: FastifyRequest) {
   const all = isManager(req);
-  const own = await ownBusinessIds(deps, req);
-  if (!all && !own.size && !(opts.teacher && req.ctx.teacherId)) throw forbidden('Devam çizelgesini idare ve koordinatör öğretmenler görebilir.');
-  return { all, own, canEdit: (businessId: string | null) => Boolean(businessId) && (all || own.has(businessId!)) };
+  const designated = !all && req.ctx.teacherId ? (await designatedCoordinators(deps, req)).has(req.ctx.teacherId) : false;
+  // İşaretlenmemiş öğretmen kendi eklediği ya da koordinatörü olduğu işletmeyi de görmez
+  const own = designated ? await ownBusinessIds(deps, req) : new Set<string>();
+  const head = all ? null : await areaHeadBranch(deps, req);
+  const area = head ? await areaBusinessIds(deps, req.ctx.schoolId, head) : new Set<string>();
+  return { all, designated, own, head, area };
+}
+
+/**
+ * Görme ve işaretleme kapsamı: yönetim hepsini görür ve düzenler; işaretli koordinatör kendi işletmelerini görür ve
+ * düzenler; alan şefi kendi alanının işletmelerini yalnızca görür. Bunların dışındaki herkes erişemez.
+ */
+async function scope(deps: AppDeps, req: FastifyRequest, _opts: { teacher?: boolean } = {}) {
+  requireModule(req);
+  const r = await roleOf(deps, req);
+  if (!r.all && !r.designated && !r.head) throw forbidden('Mesleki eğitimi yönetim, koordinatör öğretmenler ve alan şefleri görebilir.');
+  return {
+    ...r,
+    sees: (businessId: string | null) => Boolean(businessId) && (r.all || r.own.has(businessId!) || r.area.has(businessId!)),
+    canEdit: (businessId: string | null) => Boolean(businessId) && (r.all || r.own.has(businessId!)),
+  };
 }
 
 /** Okulun branşları ve meslek alanı olup olmadıkları */
@@ -237,7 +285,7 @@ export async function internshipRoutes(app: FastifyInstance) {
   const { db } = deps;
   const base = '/api/schools/:schoolId/internship';
   const member = { preHandler: [app.authenticate, schoolGuard()] };
-  // Yönetim: müdür, koordinatör müdür yardımcısı ve ayarda seçilen ek kişiler (diğer müdür yardımcıları değil)
+  // Yönetim: müdür, koordinatör müdür yardımcısı ve "Mesleki eğitimi yönetir" yetkisi verilenler (diğer müdür yardımcıları değil)
   const manage = {
     preHandler: [
       app.authenticate,
@@ -248,24 +296,77 @@ export async function internshipRoutes(app: FastifyInstance) {
     ],
   };
 
-  /** Menüde gösterilsin mi: modül açık ve kullanıcı idare, koordinatör müdür yardımcısı ya da koordinatör öğretmen */
+  /**
+   * Menüde gösterilsin mi: modül açık ve kişi yönetimde, işaretli koordinatör öğretmen ya da alan şefi. Kültür dersi
+   * öğretmenleri ve işaretlenmemiş meslek öğretmenleri görmez. `canPickManager`: koordinatör müdür yardımcısını seçebilir.
+   */
   app.get(`${base}/access`, member, async (req) => {
     const enabled = settingsOf(req).internshipEnabled && !req.ctx.isSupport;
-    if (!enabled) return { enabled: false, all: false, coordinator: false, manage: false, teacher: false };
-    const own = await ownBusinessIds(deps, req);
-    // Öğretmen tarafı yalnızca meslek öğretmenine (branşı meslek alanı ya da işletme dersi var) ya da işletmesi olana açılır
-    const vocational = req.ctx.teacherId ? await isVocationalTeacher(deps, req.ctx.schoolId, req.ctx.teacherId) : false;
-    return { enabled: true, all: isManager(req), coordinator: own.size > 0, manage: isManager(req), teacher: vocational || own.size > 0 };
+    const canPickManager = !req.ctx.isSupport && (req.ctx.role === 'owner' || isGranted(req));
+    if (!enabled) return { enabled: false, all: false, coordinator: false, manage: false, teacher: false, areaHead: false, canPickManager };
+    const r = await roleOf(deps, req);
+    return { enabled: true, all: r.all, coordinator: r.designated, manage: r.all, teacher: r.designated, areaHead: Boolean(r.head), canPickManager };
   });
 
-  /** Koordinatör müdür yardımcısı seçimi (Genel Ayarlar): okulun kullanıcıları */
-  app.get(`${base}/manager-candidates`, { preHandler: [app.authenticate, schoolGuard('settings.manage')] }, async (req) => {
+  /**
+   * Koordinatör müdür yardımcısı adayları: müdür yardımcıları ve "Mesleki eğitimi yönetir" yetkisi verilenler.
+   * Listeyi okul müdürü ve bu yetkiyi alanlar görür (seçimi yalnızca onlar değiştirir).
+   */
+  app.get(`${base}/manager-candidates`, member, async (req) => {
+    if (req.ctx.isSupport || !(req.ctx.role === 'owner' || isGranted(req) || req.ctx.permissions.includes('settings.manage'))) throw forbidden();
     const rows = await db
-      .select({ userId: users.id, fullName: users.fullName, role: memberships.role })
+      .select({ userId: users.id, fullName: users.fullName, role: memberships.role, permissions: memberships.permissions })
       .from(memberships)
       .innerJoin(users, eq(users.id, memberships.userId))
       .where(eq(memberships.schoolId, req.ctx.schoolId));
-    return rows.sort((a, b) => trCompare(a.fullName, b.fullName));
+    return rows
+      .filter((r) => r.role === 'admin' || r.permissions.includes('internship.manage'))
+      .map(({ userId, fullName, role }) => ({ userId, fullName, role }))
+      .sort((a, b) => trCompare(a.fullName, b.fullName));
+  });
+
+  /** Koordinatör öğretmenler: işaretliler ve işaretlenebilecek meslek öğretmenleri (branşı meslek alanı ya da işletme dersi var) */
+  app.get(`${base}/coordinators`, manage, async (req) => {
+    requireModule(req);
+    const [designated, areas, rows, lessonTeachers] = await Promise.all([
+      designatedCoordinators(deps, req),
+      schoolAreas(deps, req.ctx.schoolId),
+      db
+        .select({ id: teachers.id, fullName: teachers.fullName, branchId: teachers.branchId })
+        .from(teachers)
+        .where(and(eq(teachers.schoolId, req.ctx.schoolId), eq(teachers.isActive, true))),
+      db
+        .selectDistinct({ teacherId: timetableEntries.teacherId, subject: timetableEntries.subject })
+        .from(timetableEntries)
+        .where(and(eq(timetableEntries.schoolId, req.ctx.schoolId), isNotNull(timetableEntries.teacherId))),
+    ]);
+    const areaOf = new Map(areas.map((a) => [a.id, a]));
+    const internship = new Set(lessonTeachers.filter((l) => isInternshipSubject(l.subject)).map((l) => l.teacherId!));
+    const list = rows
+      .map((t) => {
+        const area = t.branchId ? areaOf.get(t.branchId) : undefined;
+        return { id: t.id, fullName: t.fullName, branchName: area?.name ?? null, vocational: Boolean(area?.isVocational) || internship.has(t.id), designated: designated.has(t.id) };
+      })
+      .filter((t) => t.vocational || t.designated)
+      .sort((a, b) => trCompare(a.branchName ?? 'ZZZ', b.branchName ?? 'ZZZ') || trCompare(a.fullName, b.fullName));
+    return { teachers: list };
+  });
+
+  /** Koordinatör öğretmenleri işaretle: yalnızca meslek öğretmenleri (kültür dersi öğretmeni koordinatör olamaz) */
+  app.put(`${base}/coordinators`, manage, async (req) => {
+    requireModule(req);
+    const body = parse(z.object({ teacherIds: z.array(z.uuid()).max(500) }), req.body);
+    const ids = [...new Set(body.teacherIds)];
+    for (const id of ids) {
+      if (!(await isVocationalTeacher(deps, req.ctx.schoolId, id))) {
+        const [t] = await db.select({ fullName: teachers.fullName }).from(teachers).where(and(eq(teachers.id, id), eq(teachers.schoolId, req.ctx.schoolId)));
+        throw badRequest(`${t?.fullName ?? 'Öğretmen'} meslek öğretmeni değil (branşı meslek alanı değil, işletme dersi de yok); koordinatör olamaz.`);
+      }
+    }
+    const settings = schoolSettingsSchema.parse({ ...(req.ctx.school.settings ?? {}), internshipCoordinatorTeacherIds: ids });
+    await db.update(schools).set({ settings }).where(eq(schools.id, req.ctx.schoolId));
+    await audit(req, 'update', 'Koordinatör öğretmenler', null, `${ids.length} öğretmen`);
+    return { teacherIds: ids };
   });
 
   /* ---------- İşletmeler ---------- */
@@ -301,7 +402,7 @@ export async function internshipRoutes(app: FastifyInstance) {
     const n = new Map<string, number>();
     for (const c of counts) n.set(c.businessId!, (n.get(c.businessId!) ?? 0) + 1);
     return rows
-      .filter((r) => s.all || s.own.has(r.id))
+      .filter((r) => s.sees(r.id))
       .sort((a, b) => trCompare(a.name, b.name))
       .map((r) => ({ ...r, students: n.get(r.id) ?? 0, canEdit: s.canEdit(r.id), canManage: s.all && isManager(req) }));
   });
@@ -314,7 +415,9 @@ export async function internshipRoutes(app: FastifyInstance) {
     requireModule(req);
     const body = parse(businessSchema, req.body);
     const manager = isManager(req);
-    if (!manager && !req.ctx.teacherId) throw forbidden('İşletmeyi idare ya da öğretmenler ekleyebilir.');
+    // Koordinatör öğretmen kendi işletmesini ekleyebilir; işaretlenmemiş öğretmen ekleyemez
+    const designated = req.ctx.teacherId ? (await designatedCoordinators(deps, req)).has(req.ctx.teacherId) : false;
+    if (!manager && !designated) throw forbidden('İşletmeyi yönetim ya da koordinatör öğretmenler ekleyebilir.');
     const areas = await schoolAreas(deps, req.ctx.schoolId);
     const vocational = new Set(areas.filter((a) => a.isVocational).map((a) => a.id));
     if (body.areaId && !areas.some((a) => a.id === body.areaId)) throw badRequest('Alan bulunamadı.');
@@ -382,10 +485,11 @@ export async function internshipRoutes(app: FastifyInstance) {
   async function checkTeacher(req: FastifyRequest, teacherId: string | null | undefined) {
     if (!teacherId) return;
     const [t] = await db
-      .select({ id: teachers.id })
+      .select({ id: teachers.id, fullName: teachers.fullName })
       .from(teachers)
       .where(and(eq(teachers.id, teacherId), eq(teachers.schoolId, req.ctx.schoolId)));
     if (!t) throw badRequest('Koordinatör öğretmen bulunamadı.');
+    if (!(await designatedCoordinators(deps, req)).has(t.id)) throw badRequest(`${t.fullName} koordinatör öğretmen olarak işaretli değil; önce Koordinatör öğretmenler listesine ekleyin.`);
   }
 
   /** İşletmenin öğrencileri: listedekiler bu işletmeye bağlanır, listeden çıkarılanların bağı kalkar */
@@ -456,7 +560,7 @@ export async function internshipRoutes(app: FastifyInstance) {
           (a.listNo ?? 9999) - (b.listNo ?? 9999),
       )
       // KVKK: öğretmen başka işletmenin adını görmez, yalnızca "başka işletmede" bilgisini
-      .map((r) => ({ ...r, businessId: s.all || !r.businessId || s.own.has(r.businessId) ? r.businessId : 'other' }));
+      .map((r) => ({ ...r, businessId: !r.businessId || s.sees(r.businessId) ? r.businessId : 'other' }));
     const classes = eligible.classes
       .filter((c) => eligible.ids.has(c.id))
       .map((c) => ({ id: c.id, name: c.name, withLesson: eligible.withLesson.has(c.id) }))
@@ -480,7 +584,7 @@ export async function internshipRoutes(app: FastifyInstance) {
         .from(teachers)
         .where(and(eq(teachers.schoolId, req.ctx.schoolId), eq(teachers.isActive, true))),
     ]);
-    const visible = bizRows.filter((b) => s.all || s.own.has(b.id));
+    const visible = bizRows.filter((b) => s.sees(b.id));
     const count = (id: string) => visible.filter((b) => b.areaId === id).length;
     const teacherCount = (id: string) => teacherRows.filter((t) => t.branchId === id).length;
     const out = areas.map((a) => ({ ...a, businesses: count(a.id), teachers: teacherCount(a.id) }));
@@ -544,10 +648,7 @@ export async function internshipRoutes(app: FastifyInstance) {
     return { ok: true, branchId };
   });
 
-  /**
-   * Koordinatör adayları: branşı meslek alanı olan öğretmenler, ders programında işletme dersi olanlar ve şu an
-   * koordinatör olanlar. Hiç meslek branşlı öğretmen yoksa `fallback` ile bütün öğretmenler döner.
-   */
+  /** İşletmeye atanabilecek koordinatörler: işaretli koordinatör öğretmenler (Koordinatör öğretmenler listesi) */
   app.get(`${base}/coordinator-candidates`, manage, async (req) => {
     requireModule(req);
     const [areas, rows, lessonTeachers, current] = await Promise.all([
@@ -579,11 +680,11 @@ export async function internshipRoutes(app: FastifyInstance) {
         coordinator: coordinators.has(t.id),
       };
     });
-    const picked = all.filter((t) => t.vocational || t.coordinator);
-    const anyVocational = all.some((t) => t.vocational);
+    // İşletmeye yalnızca işaretli koordinatör öğretmenler atanır
+    const designated = await designatedCoordinators(deps, req);
     return {
-      fallback: !anyVocational,
-      teachers: (anyVocational ? picked : all).sort((a, b) => trCompare(a.branchName ?? 'ZZZ', b.branchName ?? 'ZZZ') || trCompare(a.fullName, b.fullName)),
+      fallback: false,
+      teachers: all.filter((t) => designated.has(t.id)).sort((a, b) => trCompare(a.branchName ?? 'ZZZ', b.branchName ?? 'ZZZ') || trCompare(a.fullName, b.fullName)),
     };
   });
 
@@ -594,7 +695,7 @@ export async function internshipRoutes(app: FastifyInstance) {
     const s = await scope(deps, req);
     const q = req.query as { month?: string; classId?: string; businessId?: string; areaId?: string };
     const month = q.month ? parse(monthSchema, q.month) : today(req).slice(0, 7);
-    const list = (await internStudents(deps, req.ctx.schoolId)).filter((st) => s.all || s.own.has(st.businessId!));
+    const list = (await internStudents(deps, req.ctx.schoolId)).filter((st) => s.sees(st.businessId));
     const classes = [...new Map(list.filter((x) => x.classId).map((x) => [x.classId!, { id: x.classId!, name: x.className ?? '' }])).values()];
     const bizs = [...new Map(list.map((x) => [x.businessId!, { id: x.businessId!, name: x.businessName }])).values()].sort((a, b) => trCompare(a.name, b.name));
     const shown = list.filter((x) => (!q.classId || x.classId === q.classId) && (!q.businessId || x.businessId === q.businessId) && (!q.areaId || x.areaId === q.areaId));
@@ -639,7 +740,7 @@ export async function internshipRoutes(app: FastifyInstance) {
     const s = await scope(deps, req);
     const q = req.query as { date?: string };
     const date = q.date && /^\d{4}-\d{2}-\d{2}$/.test(q.date) ? q.date : today(req);
-    const list = (await internStudents(deps, req.ctx.schoolId)).filter((st) => s.all || s.own.has(st.businessId!));
+    const list = (await internStudents(deps, req.ctx.schoolId)).filter((st) => s.sees(st.businessId));
     const month = date.slice(0, 7);
     const classIds = [...new Set(list.map((x) => x.classId).filter((x): x is string => Boolean(x)))];
     const [days, weekdays, marks, infoRows] = await Promise.all([

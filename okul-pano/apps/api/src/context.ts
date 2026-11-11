@@ -32,6 +32,8 @@ export interface SchoolCtx {
   school: typeof schools.$inferSelect;
   role: Role;
   permissions: Permission[];
+  /** Kişiye açıkça verilmiş yetkiler (rolden gelenler hariç); ör. müdür yardımcısına verilen "Mesleki eğitimi yönetir" */
+  granted: string[];
   userId: string;
   isSuperAdmin: boolean;
   /** Platform yöneticisi okula üye değil, okulun verdiği destek erişimiyle giriyor */
@@ -112,7 +114,7 @@ export function schoolGuard(permission?: Permission) {
     }
     const perms = effectivePermissions(role, granted);
     if (permission && !perms.includes(permission)) throw forbidden();
-    req.ctx = { schoolId, school, role, permissions: perms, userId: user.sub, isSuperAdmin: user.sa, isSupport, teacherId };
+    req.ctx = { schoolId, school, role, permissions: perms, granted, userId: user.sub, isSuperAdmin: user.sa, isSupport, teacherId };
   };
 }
 

@@ -168,10 +168,11 @@ export const schoolSettingsSchema = z.object({
   /** Koordinatör müdür yardımcısı (kullanıcı): işletmede devamsızlık ve rapor bildirimlerini alır */
   internshipManagerUserId: z.uuid().nullable().default(null),
   /**
-   * Bütün işletmeleri ve öğrencileri görebilecek ek kişiler (ör. atölye ve laboratuvar müdür yardımcısı, alan şefi).
-   * Okul müdürü ve koordinatör müdür yardımcısı zaten görür; diğer herkes yalnızca koordinatörü olduğu işletmeleri.
+   * Koordinatör öğretmenler (öğretmen kaydı): yönetim (müdür, koordinatör müdür yardımcısı, "Mesleki eğitimi yönetir"
+   * yetkisi verilenler) işaretler; yalnızca meslek alanı branşlı öğretmenler. İşaretlenmeyen öğretmen modülü görmez.
+   * Hiç kaydedilmemişse (undefined) işletmelerin bugünkü koordinatörleri işaretli sayılır (eski okullar için).
    */
-  internshipViewerUserIds: z.array(z.uuid()).max(30).default([]),
+  internshipCoordinatorTeacherIds: z.array(z.uuid()).max(500).optional(),
   /** Arifede (yarım gün) derslerin bittiği saat; kamuda arife 13.00'ten itibaren tatildir */
   halfDayEnd: clock.default('13:00'),
   /** Okulun kendi adlandırdığı başlıklar (kart ve sekme adları); boş olan varsayılanı kullanır */

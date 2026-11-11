@@ -219,7 +219,7 @@ export const useLeaves = (enabled = true) => useSchoolQuery<Leave[]>('leaves', {
 export const useMyLeaves = () => useSchoolQuery<Leave[]>('me/leaves');
 /** İşletmelerde mesleki eğitim: menüde "Ziyaret kaydı" görünsün mü (modül açık; idare ya da koordinatör öğretmen) */
 export const useInternshipAccess = () =>
-  useSchoolQuery<{ enabled: boolean; all: boolean; coordinator: boolean; manage: boolean; teacher?: boolean }>('internship/access');
+  useSchoolQuery<{ enabled: boolean; all: boolean; coordinator: boolean; manage: boolean; teacher?: boolean; areaHead?: boolean; canPickManager?: boolean }>('internship/access');
 /** Bildirim kutusu: okul seçiliyse okulun ve platformun bildirimleri, değilse (platform yöneticisi) yalnızca platformunkiler */
 export function useInbox(filter: 'all' | 'unread' = 'all') {
   const { school } = useAuth();

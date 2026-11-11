@@ -76,6 +76,11 @@ describe('işletmelerde mesleki eğitim', () => {
     expect((await owner.get(`${base}/internship/access`)).json().enabled).toBe(false);
     expectStatus(await owner.patch(base, { settings: { internshipEnabled: true, internshipManagerUserId: vpId } }), 200);
     expect((await owner.get(`${base}/internship/access`)).json()).toMatchObject({ enabled: true, all: true, manage: true });
+    // Koordinatör öğretmen meslek öğretmeni olmalı ve yönetim tarafından işaretlenmeli
+    expectStatus(await owner.put(`${base}/internship/teachers/${coordTeacherId}/branch`, { newBranch: 'Mobilya ve İç Mekân Tasarımı' }), 200);
+    expect((await coord.get(`${base}/internship/access`)).json()).toMatchObject({ enabled: true, teacher: false, coordinator: false });
+    expectStatus(await vp.put(`${base}/internship/coordinators`, { teacherIds: [coordTeacherId] }), 200);
+    expect((await coord.get(`${base}/internship/access`)).json()).toMatchObject({ teacher: true, coordinator: true });
   });
 
   it('işletmeler ve öğrenci ataması (idare); koordinatör yalnızca kendi işletmesini görür', async () => {
@@ -261,8 +266,8 @@ describe('işletmelerde mesleki eğitim', () => {
   it('alanlar branştan: MEB alan adları tanınır, okul açıp kapatabilir; koordinatör adayları branşa göre', async () => {
     const tchs = (await owner.get(`${base}/teachers`)).json() as { id: string; fullName: string }[];
     const mob = tchs.find((x) => x.fullName === 'Başka Öğretmen')!.id;
-    // Henüz meslek branşlı öğretmen yok: bütün öğretmenler
-    expect((await owner.get(`${base}/internship/coordinator-candidates`)).json().fallback).toBe(true);
+    // İşletmeye yalnızca işaretli koordinatör atanır: şu an yalnızca Koordinatör Öğretmen
+    expect((await owner.get(`${base}/internship/coordinator-candidates`)).json().teachers.map((x: { fullName: string }) => x.fullName)).toEqual(['Koordinatör Öğretmen']);
     expectStatus(await owner.put(`${base}/internship/teachers/${mob}/branch`, { newBranch: 'Mobilya ve İç Mekân Tasarımı' }), 200);
     const math = (await owner.post(`${base}/teachers`, { fullName: 'Matematik Hoca' })).json().id;
     expectStatus(await owner.put(`${base}/internship/teachers/${math}/branch`, { newBranch: 'Matematik' }), 200);
@@ -270,10 +275,12 @@ describe('işletmelerde mesleki eğitim', () => {
     const areaNames = areas.areas.map((a: { name: string }) => a.name);
     expect(areaNames).toContain('Mobilya ve İç Mekân Tasarımı');
     expect(areaNames).not.toContain('Matematik');
-    expect(areas.unbranched.map((u: { fullName: string }) => u.fullName)).toContain('Koordinatör Öğretmen');
+    expect(areas.unbranched.map((u: { fullName: string }) => u.fullName)).not.toContain('Koordinatör Öğretmen');
+    // İşaretlenebilecekler meslek branşlı öğretmenler (matematik öğretmeni yok); Başka Öğretmen işaretlenir
+    const pool = (await owner.get(`${base}/internship/coordinators`)).json().teachers as { fullName: string; designated: boolean }[];
+    expect(pool.map((x) => x.fullName).sort()).toEqual(['Başka Öğretmen', 'Koordinatör Öğretmen']);
+    expectStatus(await owner.put(`${base}/internship/coordinators`, { teacherIds: [coordTeacherId, mob] }), 200);
     const cands = (await owner.get(`${base}/internship/coordinator-candidates`)).json();
-    expect(cands.fallback).toBe(false);
-    // Meslek branşlı öğretmen ve şu anki koordinatör; matematik öğretmeni yok
     expect(cands.teachers.map((x: { fullName: string }) => x.fullName).sort()).toEqual(['Başka Öğretmen', 'Koordinatör Öğretmen']);
     // Okul matematik branşını meslek alanı yapabilir (ör. yanlış tanınan ad)
     const mathBranch = areas.branches.find((b: { name: string }) => b.name === 'Matematik').id;
@@ -316,7 +323,7 @@ describe('işletmelerde mesleki eğitim', () => {
     expect((await owner.put(`${base}/internship/businesses/${biz.kent}/students`, { studentIds: [ids['Burak Şahin'], nine] })).statusCode).toBe(400);
   });
 
-  it('mesleki eğitim öğretmen tarafı yalnızca meslek öğretmenine açılır; /api/me ünvanı kadrodan verir', async () => {
+  it('meslek öğretmeni de işaretlenmeden modülü görmez; /api/me ünvanı kadrodan verir', async () => {
     const titles = (await owner.get(`${base}/teacher-titles`)).json() as { id: string; name: string }[];
     const title = titles.find((x) => /Uzman/.test(x.name)) ?? titles[0];
     const tid = (await owner.post(`${base}/teachers`, { fullName: 'Kültür Öğretmeni', ...(title ? { titleId: title.id } : {}) })).json().id as string;
@@ -330,50 +337,73 @@ describe('işletmelerde mesleki eğitim', () => {
     expect(school.vocational).toBe(false);
     if (title) expect(school.teacherTitle).toBe(title.name);
     expectStatus(await owner.put(`${base}/internship/teachers/${tid}/branch`, { newBranch: 'Elektrik-Elektronik Teknolojisi' }), 200);
-    expect((await user.get(`${base}/internship/access`)).json().teacher).toBe(true);
+    expect((await user.get(`${base}/internship/access`)).json().teacher).toBe(false);
     school = (await user.get('/api/me')).json().schools[0];
     expect(school.vocational).toBe(true);
   });
 });
 
-describe('işletmeleri kim görür (B): müdür, koordinatör müdür yardımcısı, ek kişiler; diğerleri yalnızca kendi işletmesi', () => {
+describe('mesleki eğitim yetkileri: yönetim, işaretli koordinatör, alan şefi', () => {
   let admin2: ReturnType<typeof client>;
   let admin2Id: string;
+  let admin2MemberId: string;
   beforeAll(async () => {
-    expectStatus(await owner.post(`${base}/members`, { email: 'mdy2@meslek.test', fullName: 'İkinci Müdür Yardımcısı', password: 'GizliSifre42', role: 'admin', permissions: [] }), 201);
+    const r = await owner.post(`${base}/members`, { email: 'mdy2@meslek.test', fullName: 'İkinci Müdür Yardımcısı', password: 'GizliSifre42', role: 'admin', permissions: [] });
+    expectStatus(r, 201);
+    admin2MemberId = r.json().id;
     admin2 = client(t.app, (await login(t.app, 'mdy2@meslek.test', 'GizliSifre42')).token);
     const me = (await admin2.get('/api/me')).json();
     admin2Id = me.user?.id ?? me.id;
   });
 
-  it('diğer müdür yardımcısı işletmeleri ve öğrencileri göremez, yönetemez', async () => {
-    expect((await admin2.get(`${base}/internship/access`)).json()).toMatchObject({ enabled: true, all: false, manage: false });
+  it('diğer müdür yardımcısı göremez, yönetemez, koordinatör müdür yardımcısını değiştiremez', async () => {
+    expect((await admin2.get(`${base}/internship/access`)).json()).toMatchObject({ enabled: true, all: false, manage: false, canPickManager: false });
     expect((await admin2.get(`${base}/internship/businesses`)).statusCode).toBe(403);
-    expect((await admin2.get(`${base}/internship/coordinator-candidates`)).statusCode).toBe(403);
-  });
-
-  it('kimin göreceğini yalnızca okul müdürü değiştirir', async () => {
-    expect((await admin2.patch(base, { settings: { internshipViewerUserIds: [admin2Id] } })).statusCode).toBe(403);
+    expect((await admin2.get(`${base}/internship/coordinators`)).statusCode).toBe(403);
     expect((await admin2.patch(base, { settings: { internshipManagerUserId: admin2Id } })).statusCode).toBe(403);
-    // Başka ayarı değiştiren müdür yardımcısı engellenmez (kişiler aynı kaldığı sürece)
+    // Başka ayarları değiştirebilir
     expectStatus(await admin2.patch(base, { settings: { tickerSpeed: 95 } }), 200);
-    expectStatus(await owner.patch(base, { settings: { internshipViewerUserIds: [admin2Id] } }), 200);
-    expect((await admin2.get(`${base}/internship/access`)).json()).toMatchObject({ all: true, manage: true });
+  });
+
+  it('"Mesleki eğitimi yönetir" yetkisi verilen müdür yardımcısı yönetir ve koordinatör müdür yardımcısını seçer', async () => {
+    expectStatus(await owner.patch(`${base}/members/${admin2MemberId}`, { permissions: ['internship.manage'] }), 200);
+    expect((await admin2.get(`${base}/internship/access`)).json()).toMatchObject({ all: true, manage: true, canPickManager: true });
     expect(((await admin2.get(`${base}/internship/businesses`)).json() as unknown[]).length).toBeGreaterThan(0);
-    expectStatus(await owner.patch(base, { settings: { internshipViewerUserIds: [] } }), 200);
+    // Seçilebilenler müdür yardımcıları ve yetkisi olanlar; öğretmen seçilemez
+    const cands = (await admin2.get(`${base}/internship/manager-candidates`)).json() as { fullName: string }[];
+    expect(cands.map((c) => c.fullName)).toEqual(expect.arrayContaining(['Müdür Yardımcısı', 'İkinci Müdür Yardımcısı']));
+    expect(cands.some((c) => c.fullName === 'Koordinatör Öğretmen')).toBe(false);
+    const coordUser = (await coord.get('/api/me')).json();
+    expect((await admin2.patch(base, { settings: { internshipManagerUserId: coordUser.user?.id ?? coordUser.id } })).statusCode).toBe(400);
+    expectStatus(await admin2.patch(base, { settings: { internshipManagerUserId: vpId } }), 200);
+    expectStatus(await owner.patch(`${base}/members/${admin2MemberId}`, { permissions: [] }), 200);
     expect((await admin2.get(`${base}/internship/businesses`)).statusCode).toBe(403);
   });
 
-  it('branşı meslek alanı olmayan öğretmen koordinatör atanınca menüyü görür ve yalnızca o işletmeyi görür', async () => {
+  it('kültür dersi öğretmeni koordinatör işaretlenemez ve modülü görmez', async () => {
     const teacherId = (await owner.post(`${base}/teachers`, { fullName: 'Kültür Koordinatör' })).json().id;
     expectStatus(await owner.post(`${base}/members`, { email: 'yeni-koord@meslek.test', fullName: 'Kültür Koordinatör', password: 'GizliSifre42', role: 'editor', permissions: [], teacherId }), 201);
     const c = client(t.app, (await login(t.app, 'yeni-koord@meslek.test', 'GizliSifre42')).token);
-    expect((await c.get(`${base}/internship/access`)).json()).toMatchObject({ coordinator: false, all: false });
-    const b = (await owner.post(`${base}/internship/businesses`, { name: 'Örnek Atölye', coordinatorTeacherId: teacherId })).json().id;
-    expect((await c.get(`${base}/internship/access`)).json()).toMatchObject({ coordinator: true, all: false });
-    const me = (await c.get('/api/me')).json() as { schools: { coordinator?: boolean }[] };
-    expect(me.schools[0]!.coordinator).toBe(true);
-    const list = (await c.get(`${base}/internship/businesses`)).json() as { id: string }[];
-    expect(list.map((x) => x.id)).toEqual([b]);
+    expect((await owner.put(`${base}/internship/coordinators`, { teacherIds: [coordTeacherId, teacherId] })).statusCode).toBe(400);
+    expect((await c.get(`${base}/internship/access`)).json()).toMatchObject({ teacher: false, coordinator: false, all: false, areaHead: false });
+    expect((await c.get(`${base}/internship/businesses`)).statusCode).toBe(403);
+    // İşaretlenmemiş öğretmen işletmeye koordinatör atanamaz
+    expect((await owner.post(`${base}/internship/businesses`, { name: 'Örnek Atölye', coordinatorTeacherId: teacherId })).statusCode).toBe(400);
+  });
+
+  it('alan şefi yalnızca kendi alanının işletmelerini görür, değiştiremez', async () => {
+    const titles = (await owner.get(`${base}/teacher-titles`)).json() as { id: string; name: string }[];
+    let title = titles.find((x) => /alan şef/i.test(x.name));
+    if (!title) title = (await owner.post(`${base}/teacher-titles`, { name: 'Alan Şefi' })).json() as { id: string; name: string };
+    const headId = (await owner.post(`${base}/teachers`, { fullName: 'Örnek Alan Şefi', titleId: title!.id })).json().id;
+    expectStatus(await owner.put(`${base}/internship/teachers/${headId}/branch`, { newBranch: 'Mobilya ve İç Mekân Tasarımı' }), 200);
+    expectStatus(await owner.post(`${base}/members`, { email: 'alan-sefi@meslek.test', fullName: 'Örnek Alan Şefi', password: 'GizliSifre42', role: 'editor', permissions: [], teacherId: headId }), 201);
+    const head = client(t.app, (await login(t.app, 'alan-sefi@meslek.test', 'GizliSifre42')).token);
+    expect((await head.get(`${base}/internship/access`)).json()).toMatchObject({ areaHead: true, all: false, teacher: false });
+    const list = (await head.get(`${base}/internship/businesses`)).json() as { name: string; canEdit: boolean }[];
+    // Koordinatörü bu alandan olan "Usta Mobilya" görünür; koordinatörsüz ve alansız "Kent Dekorasyon" görünmez
+    expect(list.map((x) => x.name)).toContain('Usta Mobilya');
+    expect(list.map((x) => x.name)).not.toContain('Kent Dekorasyon');
+    expect(list.every((x) => !x.canEdit)).toBe(true);
   });
 });

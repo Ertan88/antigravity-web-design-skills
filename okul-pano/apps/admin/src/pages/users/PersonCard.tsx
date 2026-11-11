@@ -223,6 +223,22 @@ export function PersonCard({ person, ctx }: { person: Person; ctx: CardContext }
             </>
           )}
           {m.role !== 'editor' && <p className="mt-4 text-xs text-slate-500">Bütün bölümleri düzenler; ayrıca görev vermeye gerek yok.</p>}
+          {m.role === 'admin' && role === 'admin' && (
+            // Mesleki eğitim (KVKK): müdür yardımcısının rolü öğrencilerin işletme kayıtlarını kendiliğinden açmaz
+            <label className={clsx('mt-3 flex items-start gap-2.5 rounded-xl px-3 py-2 ring-1', perms.includes('internship.manage') ? 'bg-brand-50 ring-brand-200' : 'ring-slate-200', editable ? 'cursor-pointer' : 'cursor-not-allowed opacity-70')}>
+              <input
+                type="checkbox"
+                className="mt-0.5 size-4 accent-brand-600"
+                disabled={!editable}
+                checked={perms.includes('internship.manage')}
+                onChange={() => setPerms((p) => (p.includes('internship.manage') ? p.filter((x) => x !== 'internship.manage') : [...p, 'internship.manage']))}
+              />
+              <span>
+                <span className="block text-sm font-semibold">Mesleki eğitimi yönetir</span>
+                <span className="block text-xs text-slate-500">Bütün işletmeleri ve öğrencileri görür, koordinatör öğretmenleri işaretler, koordinatör müdür yardımcısını seçer.</span>
+              </span>
+            </label>
+          )}
 
           {dirty && editable && (
             <div className="sticky bottom-0 mt-5 flex justify-end gap-2 border-t border-slate-100 bg-surface pt-3">

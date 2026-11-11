@@ -40,7 +40,7 @@ export interface NavItem {
   /** Okul ayarına bağlı modüller (ör. taşımalı eğitim yalnızca açıksa görünür) */
   when?: (
     settings: SchoolSettings | undefined,
-    who: { userId: string | null; teacherId: string | null; role: string | null; vocational: boolean; coordinator: boolean; can: (p: Permission) => boolean },
+    who: { userId: string | null; teacherId: string | null; role: string | null; internship: InternshipAccess | null; can: (p: Permission) => boolean },
   ) => boolean;
 }
 
@@ -53,11 +53,21 @@ export interface NavGroup {
  * Gruplar konuya göre (web ve mobilde aynı ad ve sıra): Pano · Takvim ve Ders · Personel · Öğrenciler ·
  * Mesleki Eğitim · İletişim · Yönetim. Yetkisi olmayan kişide boş kalan grup görünmez.
  */
-/** Mesleki eğitim menüsü: modül açık ve kişi yönetici (müdür, koordinatör müdür yardımcısı, ek kişi), koordinatör ya da meslek öğretmeni */
-function internshipVisible(s: SchoolSettings | undefined, who: { userId: string | null; role: string | null; vocational: boolean; coordinator: boolean }) {
-  if (!s?.internshipEnabled) return false;
-  const full = who.role === 'owner' || (who.userId !== null && (s.internshipManagerUserId === who.userId || (s.internshipViewerUserIds ?? []).includes(who.userId)));
-  return full || who.coordinator || who.vocational;
+/** Mesleki eğitimde kişinin yeri (sunucudan, /internship/access) */
+export interface InternshipAccess {
+  enabled: boolean;
+  all: boolean;
+  coordinator: boolean;
+  manage: boolean;
+  teacher: boolean;
+  areaHead: boolean;
+  canPickManager: boolean;
+}
+
+/** Mesleki eğitim menüsü: modül açık ve kişi yönetimde, işaretli koordinatör öğretmen ya da alan şefi */
+function internshipVisible(s: SchoolSettings | undefined, who: { internship: InternshipAccess | null }) {
+  const a = who.internship;
+  return Boolean(s?.internshipEnabled && a?.enabled && (a.all || a.teacher || a.areaHead));
 }
 
 export const NAV: NavGroup[] = [
@@ -107,8 +117,8 @@ export const NAV: NavGroup[] = [
   {
     title: 'Mesleki Eğitim',
     items: [
-      // Müdür, koordinatör müdür yardımcısı ve ayarda seçilen ek kişiler hepsini; koordinatör öğretmen (branşı ne
-      // olursa olsun) ve meslek öğretmeni kendi işletmelerini görür. Diğer müdür yardımcıları görmez.
+      // Yönetim (müdür, koordinatör müdür yardımcısı, "Mesleki eğitimi yönetir" yetkisi) hepsini; işaretli koordinatör
+      // öğretmen kendi işletmelerini; alan şefi kendi alanını görür. Diğer müdür yardımcıları ve öğretmenler görmez.
       {
         to: '/isletmeler',
         label: 'İşletmeler',
