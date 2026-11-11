@@ -86,6 +86,8 @@ export interface Announcement {
   design: AnnouncementDesign | null;
   screenIds: string[] | null;
   schedule: { days: number[]; from: string | null; to: string | null; phase: 'any' | 'break' | 'lesson' } | null;
+  youtubeUrl?: string | null;
+  durationSec?: number | null;
   approvalStatus: 'approved' | 'pending' | 'rejected';
   reviewNote: string | null;
   startsAt: string | null;

@@ -7,15 +7,16 @@ import { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, View } from 'react-native';
 import { api, uploadImage } from '../src/api.ts';
 import { useAuth, useSchoolPath } from '../src/auth.tsx';
-import { useAnnouncementDrafts, useScreens, useSchoolInfo, type AnnouncementDraft } from '../src/data.ts';
+import { useAnnouncementDrafts, useAnnouncements, useScreens, useSchoolInfo, type Announcement, type AnnouncementDraft } from '../src/data.ts';
 import { AnnouncementPreview } from '../src/preview.tsx';
 import { Text } from '../src/text.tsx';
 import { colors } from '../src/theme.ts';
 import { Button, Card, Chip, Choice, Field, Icon, Screen, SectionTitle, T, type IconName } from '../src/ui.tsx';
 
 type Kind = 'design' | 'image' | 'text';
-type Until = '1' | '3' | '7' | 'none';
-type Phase = 'any' | 'break';
+/** 'keep': düzenlemede yayın planı (web panelinde ayrıntılı ayarlanmış olabilir) aynı kalır */
+type Until = '1' | '3' | '7' | 'none' | 'keep';
+type Phase = 'any' | 'break' | 'keep';
 
 /*
  * Adım adım duyuru (tasarım A): Tür → İçerik → Nerede ve ne zaman → Kontrol ve gönder. Üstte ilerleme çubuğu ve
@@ -30,7 +31,8 @@ const KINDS: { value: Kind; label: string; text: string; icon: IconName; bg: str
   { value: 'image', label: 'Fotoğraf', text: 'Fotoğraf ya da afiş', icon: 'image-outline', bg: '#dbeafe' },
   { value: 'text', label: 'Yazı', text: 'Başlık ve kısa yazı', icon: 'text', bg: '#fef3c7' },
 ];
-const UNTIL_LABEL: Record<Until, string> = { '1': 'Bugün', '3': '3 gün', '7': '1 hafta', none: 'Süresiz' };
+const UNTIL_LABEL: Record<Until, string> = { keep: 'Aynı kalsın', '1': 'Bugün', '3': '3 gün', '7': '1 hafta', none: 'Süresiz' };
+const dateText = (iso: string) => new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 
 interface State {
   kind: Kind;
@@ -48,7 +50,7 @@ const hasContent = (s: State) => Boolean(s.title.trim() || s.body.trim() || s.im
 
 /** Seçilen gün sayısı sonunda gece yarısı (telefonun saatiyle) yayından kalkar */
 function endOf(until: Until): Date | null {
-  if (until === 'none') return null;
+  if (until === 'none' || until === 'keep') return null;
   const end = new Date();
   end.setHours(0, 0, 0, 0);
   end.setDate(end.getDate() + Number(until));
@@ -67,9 +69,9 @@ function toDraftData(s: State): AnnouncementDraft['data'] {
     body: s.body,
     imageUrl: s.imageUrl,
     screenIds: s.screenIds,
-    schedule: { days: [], from: null, to: null, phase: s.phase },
+    schedule: { days: [], from: null, to: null, phase: s.phase === 'break' ? 'break' : 'any' },
     endsAt: end ? localInput(end) : '',
-    until: s.until,
+    until: s.until === 'keep' ? '7' : s.until,
   };
 }
 
@@ -78,8 +80,11 @@ export default function DuyuruYeni() {
   const qc = useQueryClient();
   const path = useSchoolPath('announcements');
   const draftsPath = useSchoolPath('announcement-drafts');
-  const { taslak } = useLocalSearchParams<{ taslak?: string }>();
+  // taslak: taslaktan devam; duzenle: var olan duyuru (özet adımından açılır); kopya: benzerini oluştur
+  const { taslak, duzenle, kopya } = useLocalSearchParams<{ taslak?: string; duzenle?: string; kopya?: string }>();
   const drafts = useAnnouncementDrafts(Boolean(taslak));
+  const announcements = useAnnouncements();
+  const [editing, setEditing] = useState<Announcement | null>(null);
   const info = useSchoolInfo();
   const screens = useScreens();
   const [step, setStep] = useState(0);
@@ -88,6 +93,8 @@ export default function DuyuruYeni() {
   useEffect(() => setFurthest((f) => Math.max(f, step)), [step]);
   const [kind, setKind] = useState<Kind>('design');
   const [templateId, setTemplateId] = useState(ANNOUNCEMENT_TEMPLATES[0]!.id);
+  // Web panelinde seçilmiş renk (düzenleme ve benzerini oluşturmada korunur; şablon değişince şablonun rengi gelir)
+  const [palette, setPalette] = useState<AnnouncementDesign['palette'] | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -111,6 +118,7 @@ export default function DuyuruYeni() {
     setDraftId(d.id);
     if (x.kind === 'design' || x.kind === 'image' || x.kind === 'text') setKind(x.kind);
     if (x.design?.template) setTemplateId(designTemplate(x.design.template).id);
+    if (x.design?.palette) setPalette(x.design.palette as AnnouncementDesign['palette']);
     setFields(x.design?.fields ?? {});
     setTitle(x.title ?? '');
     setBody(x.body ?? '');
@@ -121,15 +129,43 @@ export default function DuyuruYeni() {
     setStep(Math.min(3, Math.max(0, d.step)));
   }, [taslak, drafts.data]);
 
+  // Düzenleme ya da benzerini oluşturma: duyurunun içeriği bir kez doldurulur
+  const loadedSrc = useRef(false);
+  useEffect(() => {
+    const id = duzenle ?? kopya;
+    if (!id || loadedSrc.current || !announcements.data) return;
+    loadedSrc.current = true;
+    const a = announcements.data.find((x) => x.id === id);
+    if (!a || a.kind === 'video') return;
+    setKind(a.kind);
+    if (a.design?.template) setTemplateId(designTemplate(a.design.template).id);
+    if (a.design?.palette) setPalette(a.design.palette);
+    setFields(a.design?.fields ?? {});
+    setTitle(a.kind === 'design' ? '' : a.title);
+    setBody(a.body ?? '');
+    setImageUrl(a.imageUrl);
+    setScreenIds(a.screenIds ?? []);
+    if (duzenle) {
+      setEditing(a);
+      setPhase('keep');
+      setUntil('keep');
+      setStep(3);
+    } else {
+      setPhase(a.schedule?.phase === 'break' ? 'break' : 'any');
+      setStep(1);
+    }
+  }, [duzenle, kopya, announcements.data]);
+
   // Ekrandan yarıda çıkılırsa taslak saklanır (geri düğmesi, telefonun geri tuşu, sekme değişimi)
   const state: State = { kind, templateId, fields, title, body, imageUrl, screenIds, phase, until };
-  const latest = useRef({ state, step: furthest, draftId, draftsPath, schoolId: school?.id });
-  latest.current = { state, step: furthest, draftId, draftsPath, schoolId: school?.id };
+  const latest = useRef({ state, step: furthest, draftId, draftsPath, schoolId: school?.id, editing: Boolean(duzenle) });
+  latest.current = { state, step: furthest, draftId, draftsPath, schoolId: school?.id, editing: Boolean(duzenle) };
   const submitted = useRef(false);
   useEffect(
     () => () => {
       const l = latest.current;
-      if (submitted.current || !hasContent(l.state)) return;
+      // Var olan duyurunun düzenlemesi taslak olmaz
+      if (submitted.current || l.editing || !hasContent(l.state)) return;
       const body = { step: l.step, data: toDraftData(l.state) };
       void (l.draftId ? api(`${l.draftsPath}/${l.draftId}`, { method: 'PUT', body }) : api(l.draftsPath, { method: 'POST', body }))
         .then(() => qc.invalidateQueries({ queryKey: [l.schoolId, 'announcement-drafts'] }))
@@ -140,7 +176,7 @@ export default function DuyuruYeni() {
   );
 
   const t = designTemplate(templateId);
-  const design: AnnouncementDesign = { template: t.id, palette: t.palette, fields };
+  const design: AnnouncementDesign = { template: t.id, palette: palette ?? t.palette, fields };
   const needsApproval = Boolean(info.data?.settings.requireApproval) && !can('announcements.approve');
 
   const pick = async (camera: boolean) => {
@@ -197,16 +233,19 @@ export default function DuyuruYeni() {
         : kind === 'image'
           ? { kind, title: title.trim(), body: body.trim() || null, imageUrl }
           : { kind, title: title.trim(), body: body.trim() || null };
+    // Düzenlemede "Aynı kalsın" seçiliyse web panelinde ayarlanmış plan (günler, saatler, başlangıç) korunur
+    const schedule = phase === 'keep' ? (editing?.schedule ?? null) : phase === 'break' ? { days: [], from: null, to: null, phase: 'break' } : null;
+    const endsAt = until === 'keep' ? (editing?.endsAt ?? null) : end ? end.toISOString() : null;
+    const request = {
+      ...payload,
+      screenIds: screenIds.length ? screenIds : null,
+      schedule,
+      endsAt,
+      ...(editing ? { startsAt: editing.startsAt, durationSec: editing.durationSec ?? null } : {}),
+    };
     try {
-      await api(path, {
-        method: 'POST',
-        body: {
-          ...payload,
-          screenIds: screenIds.length ? screenIds : null,
-          schedule: phase === 'break' ? { days: [], from: null, to: null, phase: 'break' } : null,
-          endsAt: end ? end.toISOString() : null,
-        },
-      });
+      if (editing) await api(`${path}/${editing.id}`, { method: 'PUT', body: request });
+      else await api(path, { method: 'POST', body: request });
       submitted.current = true;
       if (draftId) await api(`${draftsPath}/${draftId}`, { method: 'DELETE' }).catch(() => undefined);
       await Promise.all(['announcements', 'control-center', 'announcement-drafts'].map((k) => qc.invalidateQueries({ queryKey: [school?.id, k] })));
@@ -240,7 +279,7 @@ export default function DuyuruYeni() {
     <Screen
       back
       onBack={step > 0 ? () => setStep(step - 1) : undefined}
-      title="Yeni duyuru"
+      title={duzenle ? 'Duyuruyu düzenle' : 'Yeni duyuru'}
       footer={
         <>
           {error && <T color={colors.danger}>{error}</T>}
@@ -255,7 +294,7 @@ export default function DuyuruYeni() {
             </Button>
           ) : (
             <Button size="lg" loading={busy} disabled={uploading} onPress={() => void submit()}>
-              {needsApproval ? 'Onaya gönder' : 'Yayına al'}
+              {needsApproval ? 'Onaya gönder' : editing ? 'Kaydet' : 'Yayına al'}
             </Button>
           )}
         </>
@@ -298,7 +337,7 @@ export default function DuyuruYeni() {
           {kind === 'design' && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
               {ANNOUNCEMENT_TEMPLATES.map((x) => (
-                <Chip key={x.id} label={x.name} selected={x.id === templateId} onPress={() => setTemplateId(x.id)} />
+                <Chip key={x.id} label={x.name} selected={x.id === templateId} onPress={() => (setTemplateId(x.id), setPalette(null))} />
               ))}
             </ScrollView>
           )}
@@ -356,16 +395,17 @@ export default function DuyuruYeni() {
             value={phase}
             onChange={setPhase}
             options={[
-              { value: 'any', label: 'Her zaman' },
-              { value: 'break', label: 'Teneffüslerde' },
+              ...(editing ? [{ value: 'keep' as const, label: 'Aynı kalsın' }] : []),
+              { value: 'any' as const, label: 'Her zaman' },
+              { value: 'break' as const, label: 'Teneffüslerde' },
             ]}
           />
           <SectionTitle>Ne kadar süre</SectionTitle>
           <Choice
             value={until}
             onChange={setUntil}
-            columns={4}
-            options={(Object.keys(UNTIL_LABEL) as Until[]).map((u) => ({ value: u, label: UNTIL_LABEL[u] }))}
+            columns={editing ? 3 : 4}
+            options={(Object.keys(UNTIL_LABEL) as Until[]).filter((u) => editing || u !== 'keep').map((u) => ({ value: u, label: UNTIL_LABEL[u] }))}
           />
         </>
       )}
@@ -378,7 +418,14 @@ export default function DuyuruYeni() {
               { label: 'Tür', value: KINDS.find((k) => k.value === kind)!.label, to: 0 },
               { label: 'Başlık', value: shownTitle || '—', to: 1 },
               { label: 'Panolar', value: screenNames.length ? screenNames.join(', ') : 'Tüm panolar', to: 2 },
-              { label: 'Zaman', value: `${phase === 'break' ? 'Teneffüslerde' : 'Her zaman'} · ${UNTIL_LABEL[until]}`, to: 2 },
+              {
+                label: 'Zaman',
+                value:
+                  phase === 'keep' && until === 'keep'
+                    ? `Plan aynı kalıyor${editing?.endsAt ? ` · ${dateText(editing.endsAt)} tarihine kadar` : ' · süresiz'}`
+                    : `${phase === 'break' ? 'Teneffüslerde' : phase === 'keep' ? 'Zamanlama aynı' : 'Her zaman'} · ${until === 'keep' ? (editing?.endsAt ? `${dateText(editing.endsAt)} tarihine kadar` : 'süresiz') : UNTIL_LABEL[until]}`,
+                to: 2,
+              },
             ].map((r, i) => (
               <View key={r.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: colors.divider }}>
                 <Text style={{ width: 70, fontSize: 13, color: colors.muted }}>{r.label}</Text>
