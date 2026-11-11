@@ -29,6 +29,11 @@ export interface ResourceConfig<S extends ZodType> {
   affectsDisplay?: boolean;
   /** Ek doğrulama (ör. büyük/küçük harf duyarsız tekillik); güncellemede id verilir */
   validate?: (req: FastifyRequest, row: Record<string, unknown>, id: string | null) => Promise<void>;
+  /**
+   * Var olan kayıtta değişiklik (güncelleme, yayın anahtarı, silme) yapılabilir mi; yapılamıyorsa hata fırlatır
+   * (ör. başkasının duyurusunu yalnızca onay yetkisi olan değiştirir). Toplu silmede izin verilmeyenler atlanır.
+   */
+  guardRow?: (req: FastifyRequest, current: Record<string, unknown>) => void;
   /** Ekleme / güncelleme sonrası (ör. onay bekleyen duyuru için bildirim) */
   afterWrite?: (req: FastifyRequest, row: Record<string, unknown>, action: 'create' | 'update') => Promise<void>;
 }
@@ -73,6 +78,14 @@ export function registerResource<S extends ZodType>(app: FastifyInstance, cfg: R
 
   const scoped = (req: FastifyRequest, id: string) => and(eq(t.id, id), eq(t.schoolId, req.ctx.schoolId));
 
+  /** guardRow tanımlıysa kaydı okuyup denetler (yoksa 404) */
+  async function guard(req: FastifyRequest, id: string) {
+    if (!cfg.guardRow) return;
+    const [current] = (await db.select().from(t as PgTable).where(scoped(req, id))) as Record<string, unknown>[];
+    if (!current) throw notFound();
+    cfg.guardRow(req, current);
+  }
+
   app.get(base, read, async (req) => {
     if (cfg.list) return cfg.list(req);
     return db
@@ -98,6 +111,7 @@ export function registerResource<S extends ZodType>(app: FastifyInstance, cfg: R
 
   app.put(`${base}/:id`, write, async (req) => {
     const id = idParam(req);
+    await guard(req, id);
     // Formda olmayan sıra ve yayın durumu korunur: yoksa şemanın varsayılanı (sıra 0, yayında) kaydı geri alırdı
     const body = { ...((req.body ?? {}) as Record<string, unknown>) };
     const keep = (['sortOrder', 'isActive'] as const).filter((k) => cols[k] && !(k in body));
@@ -125,6 +139,8 @@ export function registerResource<S extends ZodType>(app: FastifyInstance, cfg: R
     app.patch(`${base}/:id`, write, async (req) => {
       const id = idParam(req);
       const patch = parse(quickPatchSchema, req.body);
+      // Yalnızca sıra değişikliği denetlenmez (sıralama listenin tamamına aittir)
+      if (patch.isActive !== undefined) await guard(req, id);
       const set: Record<string, unknown> = {};
       if (patch.isActive !== undefined && cols.isActive) set.isActive = patch.isActive;
       if (patch.sortOrder !== undefined && cols.sortOrder) set.sortOrder = patch.sortOrder;
@@ -162,6 +178,7 @@ export function registerResource<S extends ZodType>(app: FastifyInstance, cfg: R
 
   app.delete(`${base}/:id`, write, async (req, reply) => {
     const id = idParam(req);
+    await guard(req, id);
     const [deleted] = (await db.delete(t).where(scoped(req, id)).returning()) as Record<string, unknown>[];
     if (!deleted) throw notFound();
     await audit(req, 'delete', cfg.entity, id, summarize(deleted));
@@ -171,7 +188,23 @@ export function registerResource<S extends ZodType>(app: FastifyInstance, cfg: R
 
   const bulkDeleteSchema = z.object({ ids: z.array(z.uuid()).min(1).max(1000) });
   app.post(`${base}/bulk-delete`, write, async (req) => {
-    const { ids } = parse(bulkDeleteSchema, req.body);
+    const parsed = parse(bulkDeleteSchema, req.body);
+    let ids = parsed.ids;
+    if (cfg.guardRow) {
+      // İzin verilmeyen kayıtlar atlanır
+      const rows = (await db.select().from(t as PgTable).where(and(inArray(t.id, ids), eq(t.schoolId, req.ctx.schoolId)))) as Record<string, unknown>[];
+      ids = rows
+        .filter((r) => {
+          try {
+            cfg.guardRow!(req, r);
+            return true;
+          } catch {
+            return false;
+          }
+        })
+        .map((r) => String(r.id));
+      if (!ids.length) return { deleted: 0 };
+    }
     const deleted = await db
       .delete(t)
       .where(and(inArray(t.id, ids), eq(t.schoolId, req.ctx.schoolId)))

@@ -1,4 +1,5 @@
 import { errorText } from '@okulpano/shared';
+import { parseYouTubeUrl } from '@okulpano/shared/youtube';
 import { ANNOUNCEMENT_TEMPLATES, designFields, designTemplate, designTitle, type AnnouncementDesign } from '@okulpano/shared/designs';
 import { useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
@@ -13,7 +14,7 @@ import { Text } from '../src/text.tsx';
 import { colors } from '../src/theme.ts';
 import { Button, Card, Chip, Choice, Field, Icon, Screen, SectionTitle, T, type IconName } from '../src/ui.tsx';
 
-type Kind = 'design' | 'image' | 'text';
+type Kind = 'design' | 'image' | 'text' | 'video';
 /** 'keep': düzenlemede yayın planı (web panelinde ayrıntılı ayarlanmış olabilir) aynı kalır */
 type Until = '1' | '3' | '7' | 'none' | 'keep';
 type Phase = 'any' | 'break' | 'keep';
@@ -30,6 +31,7 @@ const KINDS: { value: Kind; label: string; text: string; icon: IconName; bg: str
   { value: 'design', label: 'Hazır şablon', text: 'Doldurup gönderin', icon: 'albums-outline', bg: '#d1fae5' },
   { value: 'image', label: 'Fotoğraf', text: 'Fotoğraf ya da afiş', icon: 'image-outline', bg: '#dbeafe' },
   { value: 'text', label: 'Yazı', text: 'Başlık ve kısa yazı', icon: 'text', bg: '#fef3c7' },
+  { value: 'video', label: 'YouTube', text: 'Video bağlantısı', icon: 'play', bg: '#fee2e2' },
 ];
 const UNTIL_LABEL: Record<Until, string> = { keep: 'Aynı kalsın', '1': 'Bugün', '3': '3 gün', '7': '1 hafta', none: 'Süresiz' };
 const dateText = (iso: string) => new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
@@ -41,12 +43,13 @@ interface State {
   title: string;
   body: string;
   imageUrl: string | null;
+  youtubeUrl: string;
   screenIds: string[];
   phase: Phase;
   until: Until;
 }
 
-const hasContent = (s: State) => Boolean(s.title.trim() || s.body.trim() || s.imageUrl || Object.values(s.fields).some((v) => v?.trim()));
+const hasContent = (s: State) => Boolean(s.title.trim() || s.body.trim() || s.imageUrl || s.youtubeUrl.trim() || Object.values(s.fields).some((v) => v?.trim()));
 
 /** Seçilen gün sayısı sonunda gece yarısı (telefonun saatiyle) yayından kalkar */
 function endOf(until: Until): Date | null {
@@ -68,6 +71,7 @@ function toDraftData(s: State): AnnouncementDraft['data'] {
     title: s.title,
     body: s.body,
     imageUrl: s.imageUrl,
+    youtubeUrl: s.youtubeUrl,
     screenIds: s.screenIds,
     schedule: { days: [], from: null, to: null, phase: s.phase === 'break' ? 'break' : 'any' },
     endsAt: end ? localInput(end) : '',
@@ -99,6 +103,7 @@ export default function DuyuruYeni() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [youtubeUrl, setYoutubeUrl] = useState('');
   const [uploading, setUploading] = useState(false);
   const [screenIds, setScreenIds] = useState<string[]>([]);
   const [phase, setPhase] = useState<Phase>('any');
@@ -116,13 +121,14 @@ export default function DuyuruYeni() {
     if (!d) return;
     const x = d.data;
     setDraftId(d.id);
-    if (x.kind === 'design' || x.kind === 'image' || x.kind === 'text') setKind(x.kind);
+    if (x.kind) setKind(x.kind);
     if (x.design?.template) setTemplateId(designTemplate(x.design.template).id);
     if (x.design?.palette) setPalette(x.design.palette as AnnouncementDesign['palette']);
     setFields(x.design?.fields ?? {});
     setTitle(x.title ?? '');
     setBody(x.body ?? '');
     setImageUrl(x.imageUrl ?? null);
+    setYoutubeUrl(x.youtubeUrl ?? '');
     setScreenIds(x.screenIds ?? []);
     setPhase(x.schedule?.phase === 'break' ? 'break' : 'any');
     setUntil(x.until ?? (x.endsAt ? '7' : 'none'));
@@ -136,7 +142,7 @@ export default function DuyuruYeni() {
     if (!id || loadedSrc.current || !announcements.data) return;
     loadedSrc.current = true;
     const a = announcements.data.find((x) => x.id === id);
-    if (!a || a.kind === 'video') return;
+    if (!a) return;
     setKind(a.kind);
     if (a.design?.template) setTemplateId(designTemplate(a.design.template).id);
     if (a.design?.palette) setPalette(a.design.palette);
@@ -144,6 +150,7 @@ export default function DuyuruYeni() {
     setTitle(a.kind === 'design' ? '' : a.title);
     setBody(a.body ?? '');
     setImageUrl(a.imageUrl);
+    setYoutubeUrl(a.youtubeUrl ?? '');
     setScreenIds(a.screenIds ?? []);
     if (duzenle) {
       setEditing(a);
@@ -157,7 +164,7 @@ export default function DuyuruYeni() {
   }, [duzenle, kopya, announcements.data]);
 
   // Ekrandan yarıda çıkılırsa taslak saklanır (geri düğmesi, telefonun geri tuşu, sekme değişimi)
-  const state: State = { kind, templateId, fields, title, body, imageUrl, screenIds, phase, until };
+  const state: State = { kind, templateId, fields, title, body, imageUrl, youtubeUrl, screenIds, phase, until };
   const latest = useRef({ state, step: furthest, draftId, draftsPath, schoolId: school?.id, editing: Boolean(duzenle) });
   latest.current = { state, step: furthest, draftId, draftsPath, schoolId: school?.id, editing: Boolean(duzenle) };
   const submitted = useRef(false);
@@ -203,6 +210,12 @@ export default function DuyuruYeni() {
       ? fields[t.headline.key]?.trim()
         ? null
         : `"${t.headline.label}" alanını doldurun.`
+      : kind === 'video'
+        ? !parseYouTubeUrl(youtubeUrl)
+          ? 'Geçerli bir YouTube bağlantısı yapıştırın.'
+          : !title.trim()
+            ? 'Başlık yazın.'
+            : null
       : kind === 'image'
         ? !imageUrl
           ? 'Bir fotoğraf seçin.'
@@ -232,7 +245,9 @@ export default function DuyuruYeni() {
         ? { kind, title: designTitle(design), design }
         : kind === 'image'
           ? { kind, title: title.trim(), body: body.trim() || null, imageUrl }
-          : { kind, title: title.trim(), body: body.trim() || null };
+          : kind === 'video'
+            ? { kind, title: title.trim(), body: body.trim() || null, youtubeUrl: youtubeUrl.trim() }
+            : { kind, title: title.trim(), body: body.trim() || null };
     // Düzenlemede "Aynı kalsın" seçiliyse web panelinde ayarlanmış plan (günler, saatler, başlangıç) korunur
     const schedule = phase === 'keep' ? (editing?.schedule ?? null) : phase === 'break' ? { days: [], from: null, to: null, phase: 'break' } : null;
     const endsAt = until === 'keep' ? (editing?.endsAt ?? null) : end ? end.toISOString() : null;
@@ -271,7 +286,7 @@ export default function DuyuruYeni() {
   const shownTitle = kind === 'design' ? designTitle(design) : title;
   const preview = (
     <View style={{ borderRadius: 16, overflow: 'hidden' }}>
-      <AnnouncementPreview kind={kind} title={title || 'Duyuru başlığı'} body={body || null} imageUrl={imageUrl} design={kind === 'design' ? design : null} height={190} />
+      <AnnouncementPreview kind={kind} title={title || 'Duyuru başlığı'} body={body || null} imageUrl={imageUrl} design={kind === 'design' ? design : null} youtubeUrl={youtubeUrl} height={190} />
     </View>
   );
 
@@ -369,6 +384,18 @@ export default function DuyuruYeni() {
                     Galeriden seç
                   </Button>
                 </View>
+              )}
+              {kind === 'video' && (
+                <Field
+                  label="YouTube bağlantısı"
+                  value={youtubeUrl}
+                  onChangeText={setYoutubeUrl}
+                  placeholder="https://www.youtube.com/watch?v=…"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  help="youtube.com/watch, youtu.be ve Shorts bağlantıları desteklenir. Video bitince sıradaki slayta geçilir."
+                />
               )}
               <Field label="Başlık" value={title} onChangeText={setTitle} maxLength={120} placeholder="ör. Bilim fuarımızdan kareler" />
               <Field label={kind === 'text' ? 'Duyuru metni' : 'Açıklama (isteğe bağlı)'} value={body} onChangeText={setBody} maxLength={600} multiline />

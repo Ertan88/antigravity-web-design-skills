@@ -101,7 +101,7 @@ export function Announcements() {
   const closeReview = () => setParams({}, { replace: true });
   const pendingCount = (all.data ?? []).filter((a) => a.approvalStatus === 'pending').length;
   const [filter, setFilter] = useState<'all' | 'pending' | 'drafts'>('all');
-  const { schoolId } = useAuth();
+  const { schoolId, me } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
   const draftsPath = useSchoolPath('announcement-drafts');
@@ -176,6 +176,9 @@ export function Announcements() {
         filter === 'drafts' ? <DraftList drafts={drafts.data ?? []} loading={drafts.isLoading} onOpen={openDraft} onDelete={(id) => removeDraft.mutate(id)} /> : undefined
       }
       openRequest={openRequest}
+      // Başkasının duyurusunu yalnızca onay yetkisi olan değiştirir (sunucuda da aynı kural)
+      rowEditable={(r) => approver || r.createdBy === me?.user.id}
+      lockedReason="Başkasının duyurusunu yalnızca duyuru onaylama yetkisi olan değiştirebilir."
       renderModal={(m) => (
         <AnnouncementWizard
           api={m}

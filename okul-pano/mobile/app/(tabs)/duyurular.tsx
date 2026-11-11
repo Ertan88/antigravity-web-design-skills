@@ -1,4 +1,5 @@
 import { DESIGN_PALETTES, designTemplate, designTitle, type AnnouncementDesign } from '@okulpano/shared/designs';
+import { parseYouTubeUrl, youTubeThumbnail } from '@okulpano/shared/youtube';
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
@@ -70,12 +71,15 @@ function Thumb({ a, w = 76, h = 46 }: { a: Announcement; w?: number; h?: number 
         <Image source={{ uri: absoluteUrl(a.imageUrl)! }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
       </View>
     );
-  if (a.kind === 'video')
+  if (a.kind === 'video') {
+    const yt = a.youtubeUrl ? parseYouTubeUrl(a.youtubeUrl) : null;
     return (
-      <View style={[box, { backgroundColor: '#1c1917', alignItems: 'center', justifyContent: 'center' }]}>
+      <View style={[box, { backgroundColor: '#1c1917', alignItems: 'center', justifyContent: 'center', padding: 0 }]}>
+        {yt && <Image source={{ uri: youTubeThumbnail(yt.id) }} style={{ position: 'absolute', width: '100%', height: '100%' }} resizeMode="cover" />}
         <Icon name="play" size={18} color="#ffffff" />
       </View>
     );
+  }
   const bg = a.kind === 'design' && a.design ? (DESIGN_PALETTES[a.design.palette as keyof typeof DESIGN_PALETTES] ?? DESIGN_PALETTES.petrol).from : colors.brand;
   return (
     <View style={[box, { backgroundColor: bg }]}>
@@ -141,8 +145,6 @@ function Drafts({ list }: { list: AnnouncementDraft[] }) {
       {list.map((d) => {
         const x = d.data;
         const title = (x.kind === 'design' && x.design ? designTitle(x.design as AnnouncementDesign) : x.title)?.trim() || 'Başlıksız taslak';
-        // YouTube duyurusu yalnızca web panelinden eklenir
-        const webOnly = x.kind === 'video';
         return (
           <Card key={d.id} style={{ gap: 10 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -165,15 +167,9 @@ function Drafts({ list }: { list: AnnouncementDraft[] }) {
                 }
               />
             </View>
-            {webOnly ? (
-              <T size={12.5} color={colors.muted}>
-                YouTube duyurusuna web panelinden devam edin.
-              </T>
-            ) : (
-              <Button size="sm" onPress={() => router.push(`/duyuru-yeni?taslak=${d.id}`)}>
-                Devam et
-              </Button>
-            )}
+            <Button size="sm" onPress={() => router.push(`/duyuru-yeni?taslak=${d.id}`)}>
+              Devam et
+            </Button>
           </Card>
         );
       })}
@@ -188,7 +184,6 @@ function ActionSheet({ a, canAct, onClose, onToggle, onDelete }: { a: Announceme
   if (!a) return <Sheet open={false} onClose={onClose}>{null}</Sheet>;
   const st = statusOf(a, now);
   const p = phaseOf(a, now);
-  const video = a.kind === 'video';
   const action = (icon: IconName, label: string, onPress: () => void, tone: 'default' | 'danger' = 'default') => (
     <Pressable
       key={label}
@@ -204,7 +199,7 @@ function ActionSheet({ a, canAct, onClose, onToggle, onDelete }: { a: Announceme
     <Sheet open onClose={onClose}>
       <View style={{ gap: 10 }}>
         <View style={{ borderRadius: 14, overflow: 'hidden' }}>
-          <AnnouncementPreview kind={a.kind} title={a.title} body={a.body} imageUrl={a.imageUrl} design={a.design} height={150} />
+          <AnnouncementPreview kind={a.kind} title={a.title} body={a.body} imageUrl={a.imageUrl} design={a.design} youtubeUrl={a.youtubeUrl} height={150} />
         </View>
         <View style={{ gap: 4 }}>
           <T size={16} weight="800" lines={2}>
@@ -230,13 +225,8 @@ function ActionSheet({ a, canAct, onClose, onToggle, onDelete }: { a: Announceme
             <Switch value={a.isActive} onValueChange={(v) => onToggle(a, v)} {...switchColors()} accessibilityLabel="Panolarda yayında" />
           </View>
         )}
-        {canAct && !video && action('create-outline', 'Düzenle', () => (onClose(), router.push(`/duyuru-yeni?duzenle=${a.id}`)))}
-        {!video && action('albums-outline', 'Benzerini oluştur', () => (onClose(), router.push(`/duyuru-yeni?kopya=${a.id}`)))}
-        {video && (
-          <T size={12.5} color={colors.muted}>
-            YouTube duyurusu web panelinden düzenlenir.
-          </T>
-        )}
+        {canAct && action('create-outline', 'Düzenle', () => (onClose(), router.push(`/duyuru-yeni?duzenle=${a.id}`)))}
+        {action('albums-outline', 'Benzerini oluştur', () => (onClose(), router.push(`/duyuru-yeni?kopya=${a.id}`)))}
         {canAct && (
           <Button variant="delete" icon="trash-outline" onPress={() => onDelete(a)}>
             Sil
@@ -271,7 +261,7 @@ function OnAir({ list }: { list: Announcement[] }) {
         {open && (
           <View style={{ gap: 10 }}>
             <View style={{ borderRadius: 14, overflow: 'hidden' }}>
-              <AnnouncementPreview kind={open.kind} title={open.title} body={open.body} imageUrl={open.imageUrl} design={open.design} height={200} />
+              <AnnouncementPreview kind={open.kind} title={open.title} body={open.body} imageUrl={open.imageUrl} design={open.design} youtubeUrl={open.youtubeUrl} height={200} />
             </View>
             <T size={17} weight="800">
               {titleOf(open)}
@@ -412,7 +402,7 @@ export default function Duyurular() {
               {byPhase('live').map((a) => (
                 <Card key={a.id} style={{ padding: 0, gap: 0, overflow: 'hidden' }}>
                   <Pressable accessibilityRole="button" accessibilityLabel={`${titleOf(a)}: işlemler`} onPress={() => setSelected(a)}>
-                    <AnnouncementPreview kind={a.kind} title={a.title} body={a.body} imageUrl={a.imageUrl} design={a.design} height={110} />
+                    <AnnouncementPreview kind={a.kind} title={a.title} body={a.body} imageUrl={a.imageUrl} design={a.design} youtubeUrl={a.youtubeUrl} height={110} />
                   </Pressable>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 8 }}>
                     <Pressable style={{ flex: 1 }} onPress={() => setSelected(a)}>

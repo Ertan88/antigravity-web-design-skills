@@ -207,6 +207,7 @@ export interface AnnouncementDraft {
     title?: string;
     body?: string;
     imageUrl?: string | null;
+    youtubeUrl?: string;
     screenIds?: string[];
     schedule?: { days: number[]; from: string | null; to: string | null; phase: 'any' | 'break' | 'lesson' };
     endsAt?: string;

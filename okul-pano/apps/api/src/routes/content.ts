@@ -29,7 +29,7 @@ import {
   tickerItems,
   users,
 } from '../db/schema.ts';
-import { badRequest, notFound, parse } from '../lib/errors.ts';
+import { badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 import { notifyUsers, usersWithPermission } from '../lib/push.ts';
 import { registerResource } from './crud.ts';
 
@@ -94,6 +94,11 @@ export async function contentRoutes(app: FastifyInstance) {
         .from(screens)
         .where(and(inArray(screens.id, ids), eq(screens.schoolId, req.ctx.schoolId)));
       if (found.length !== ids.length) throw badRequest('Seçilen panolardan biri bu okula ait değil.');
+    },
+    // Başkasının duyurusunu (yayından kaldırma, düzenleme, silme) yalnızca onay yetkisi olan değiştirir
+    guardRow: (req, current) => {
+      if (req.ctx.permissions.includes('announcements.approve') || current.createdBy === req.ctx.userId) return;
+      throw forbidden('Başkasının duyurusunu yalnızca duyuru onaylama yetkisi olan değiştirebilir.');
     },
     // Onaya düşen duyuru: onay yetkisi olanların telefonuna bildirim
     afterWrite: async (req, row) => {

@@ -1,4 +1,5 @@
 import { DESIGN_PALETTES, designTemplate, type AnnouncementDesign } from '@okulpano/shared/designs';
+import { parseYouTubeUrl, youTubeThumbnail } from '@okulpano/shared/youtube';
 import { Image, View } from 'react-native';
 import { Text } from './text.tsx';
 import { absoluteUrl } from './api.ts';
@@ -12,8 +13,28 @@ export function AnnouncementPreview({
   body,
   imageUrl,
   design,
+  youtubeUrl,
   height = 170,
-}: Pick<Announcement, 'kind' | 'title' | 'body' | 'imageUrl'> & { design: AnnouncementDesign | null; height?: number }) {
+}: Pick<Announcement, 'kind' | 'title' | 'body' | 'imageUrl'> & { design: AnnouncementDesign | null; youtubeUrl?: string | null; height?: number }) {
+  // YouTube: videonun kapak görseli ve oynat simgesi
+  if (kind === 'video') {
+    const yt = youtubeUrl ? parseYouTubeUrl(youtubeUrl) : null;
+    return (
+      <View style={{ height, backgroundColor: '#000000', justifyContent: 'flex-end' }}>
+        {yt && <Image source={{ uri: youTubeThumbnail(yt.id) }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} resizeMode="cover" accessibilityLabel={title} />}
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ width: 54, height: 38, borderRadius: 10, backgroundColor: '#ff0033', alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="play" size={22} color="#ffffff" />
+          </View>
+        </View>
+        <View style={{ padding: 10, backgroundColor: 'rgba(0,0,0,0.45)' }}>
+          <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }} numberOfLines={2}>
+            {title}
+          </Text>
+        </View>
+      </View>
+    );
+  }
   if (kind === 'image' && imageUrl) {
     return (
       <View style={{ height, backgroundColor: '#0b1220' }}>

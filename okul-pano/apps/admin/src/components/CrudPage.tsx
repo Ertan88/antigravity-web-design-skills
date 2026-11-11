@@ -72,6 +72,9 @@ export interface CrudPageProps<T extends { id: string }, F extends Record<string
   renderModal?: (api: ModalApi<T, F>) => ReactNode;
   /** Dışarıdan yeni kayıt penceresini hazır değerlerle açar (ör. taslaktan devam); `key` her istekte değişir */
   openRequest?: { values: F; key: number } | null;
+  /** Satır değiştirilebilir mi (düzenle, sil, yayın anahtarı); false ise yerine `lockedReason` ipucu görünür */
+  rowEditable?: (row: T) => boolean;
+  lockedReason?: string;
   /** Satırın görünümü: soluk (süresi dolmuş) ve yayın anahtarının durumu */
   rowState?: (row: T) => { dim?: boolean; toggle?: { checked: boolean; disabled: string } };
 }
@@ -114,7 +117,7 @@ export function CrudPage<T extends { id: string; isActive?: boolean }, F extends
     const next = new URLSearchParams(params);
     next.delete('duzenle');
     setParams(next, { replace: true });
-    if (row && editable) openEdit(row);
+    if (row && rowOk(row)) openEdit(row);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, list.data]);
   useEffect(() => {
@@ -154,8 +157,10 @@ export function CrudPage<T extends { id: string; isActive?: boolean }, F extends
 
   const saving = ops.create.isPending || ops.update.isPending;
 
+  const rowOk = (row: T) => editable && (p.rowEditable ? p.rowEditable(row) : true);
   const toggle = (row: T) => {
-    const st = p.rowState?.(row).toggle;
+    const locked = !rowOk(row) && editable;
+    const st = locked ? { checked: Boolean(row.isActive), disabled: p.lockedReason ?? 'Bu kaydı değiştiremezsiniz' } : p.rowState?.(row).toggle;
     return (
       <span title={st?.disabled}>
         <Toggle
@@ -180,11 +185,18 @@ export function CrudPage<T extends { id: string; isActive?: boolean }, F extends
           </IconButton>
         </>
       )}
-      {editable && (
+      {rowOk(row) ? (
         <>
           <EditButton onClick={() => openEdit(row)} />
           <DeleteButton onConfirm={() => ops.remove.mutate(row.id)} />
         </>
+      ) : (
+        editable &&
+        p.lockedReason && (
+          <span className="text-xs text-slate-400" title={p.lockedReason}>
+            Yalnızca görüntüleme
+          </span>
+        )
       )}
     </div>
   );
