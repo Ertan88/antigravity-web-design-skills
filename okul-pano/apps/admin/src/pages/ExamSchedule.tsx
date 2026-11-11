@@ -403,7 +403,7 @@ function ExamGrid({
       const c = { id: raw.id, name: classDisplayName(raw.name, main) };
       const p = parseClassName(c.name);
       const key = p ? `${p.program ? `${p.program} ` : ''}${p.grade}` : `#${c.name}`;
-      const g = map.get(key) ?? { key, label: p ? `${key}. sınıflar` : c.name, classes: [] };
+      const g = map.get(key) ?? { key, label: p ? `${key}. Sınıflar` : c.name, classes: [] };
       g.classes.push(c);
       map.set(key, g);
     }
@@ -587,7 +587,7 @@ function ExamDialog({ exam, options, onClose }: { exam: Partial<ScheduledExam> &
     for (const c of sortedClasses) {
       const p = parseClassName(c.name);
       if (!p) continue;
-      const label = `${p.program ? `${p.program} ` : ''}${p.grade}. sınıflar`;
+      const label = `${p.program ? `${p.program} ` : ''}${p.grade}. Sınıflar`;
       map.set(label, [...(map.get(label) ?? []), c.id]);
     }
     return [...map].filter(([, ids]) => ids.length > 1);

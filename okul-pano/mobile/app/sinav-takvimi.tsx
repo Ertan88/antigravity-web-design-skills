@@ -24,12 +24,12 @@ const SHORT = ['', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
 /** Görünen sınıf adı; eski sunucu sürümü bu alanı göndermezse sınıfın tam adı */
 const labelOf = (e: Pick<ScheduledExam, 'className'> & { classLabel?: string }) => e.classLabel || e.className;
 
-/** Kademe anahtarı ve adı: "9" → "9. sınıflar", "ATP 10" → "ATP 10. sınıflar"; tanınmayan ad kendisi */
+/** Kademe anahtarı ve adı: "9" → "9. Sınıflar", "ATP 10" → "ATP 10. Sınıflar"; tanınmayan ad kendisi */
 const levelOf = (name: string): { key: string; label: string } => {
   const p = parseClassName(name);
   if (!p) return { key: `#${name}`, label: name };
   const key = `${p.program ? `${p.program} ` : ''}${p.grade}`;
-  return { key, label: `${key}. sınıflar` };
+  return { key, label: `${key}. Sınıflar` };
 };
 const mondayOf = (iso: string) => addDays(iso, 1 - weekday(iso));
 /** Haftanın dersleri sırayla renk alır (web ızgarasıyla aynı kural) */
