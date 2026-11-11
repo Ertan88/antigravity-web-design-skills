@@ -28,6 +28,7 @@ const ROUTES: Record<string, string> = {
   'duty-assign': '/nobet',
   emergency: '/acil',
   'screen-security': '/panolar',
+  'lesson-cover': '/gorevlerim',
 };
 const ICONS: Record<string, { icon: IconName; tone: 'primary' | 'warning' | 'danger' | 'gold' | 'muted' }> = {
   approval: { icon: 'checkmark-done-outline', tone: 'primary' },
@@ -51,6 +52,7 @@ const ICONS: Record<string, { icon: IconName; tone: 'primary' | 'warning' | 'dan
   'duty-assign': { icon: 'shield-checkmark-outline', tone: 'primary' },
   emergency: { icon: 'alert-triangle', tone: 'danger' },
   'screen-security': { icon: 'tv-outline', tone: 'warning' },
+  'lesson-cover': { icon: 'school-outline', tone: 'primary' },
   enroll: { icon: 'people-outline', tone: 'primary' },
 };
 const FALLBACK = { icon: 'notifications-outline' as IconName, tone: 'muted' as const };

@@ -66,6 +66,7 @@ export const KIND_STYLE: Record<string, { icon: LucideIcon; tone: string }> = {
   'duty-assign': { icon: ShieldCheck, tone: 'bg-brand-100 text-brand-700' },
   emergency: { icon: AlertTriangle, tone: 'bg-red-100 text-red-700' },
   'screen-security': { icon: MonitorSmartphone, tone: 'bg-amber-100 text-amber-700' },
+  'lesson-cover': { icon: CalendarClock, tone: 'bg-brand-100 text-brand-700' },
 };
 export const kindStyle = (kind: string) => KIND_STYLE[kind] ?? { icon: Bell, tone: 'bg-slate-100 text-slate-600' };
 
