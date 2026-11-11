@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { client, createTestApp, expectStatus, login, SUPER, type TestCtx } from './helpers.ts';
+import { client, createTestApp, expectStatus, login, multipartBody, PNG_1PX, SUPER, type TestCtx } from './helpers.ts';
 
 /* Duyuru taslakları: yarım kalan duyuru kişiye özel saklanır (sentetik okul) */
 let t: TestCtx;
@@ -45,5 +45,17 @@ describe('duyuru taslakları', () => {
     const list = (await owner.get(path())).json() as { data: { title: string } }[];
     expect(list).toHaveLength(20);
     expect(list.map((d) => d.data.title)).not.toContain('T0');
+  });
+
+  it('destek talebi eki: "Platforma yazar" yetkisi olan görsel yükleyebilir, yetkisi olmayan yükleyemez', async () => {
+    expectStatus(await owner.post(`/api/schools/${schoolId}/members`, { email: 'destek@taslak.test', fullName: 'Destek', password: 'GizliSifre42', role: 'editor', permissions: ['support.contact'] }), 201);
+    expectStatus(await owner.post(`/api/schools/${schoolId}/members`, { email: 'yok@taslak.test', fullName: 'Yetkisiz', password: 'GizliSifre42', role: 'editor', permissions: [] }), 201);
+    const send = async (email: string) => {
+      const token = (await login(t.app, email, 'GizliSifre42')).token;
+      const png = multipartBody('file', 'ekran.png', PNG_1PX, 'image/png');
+      return t.app.inject({ method: 'POST', url: `/api/schools/${schoolId}/uploads`, headers: { ...png.headers, authorization: `Bearer ${token}` }, payload: png.payload });
+    };
+    expectStatus(await send('destek@taslak.test'), 201);
+    expect((await send('yok@taslak.test')).statusCode).toBe(403);
   });
 });

@@ -1,3 +1,4 @@
+import { absoluteUrl } from './api.ts';
 import { specialDayFor, type ActiveSpecialDay, type SpecialDayArt, type SpecialDaySettings } from '@okulpano/shared/specialDays';
 import { shortSchoolName } from '@okulpano/shared/schoolName';
 import { useEffect, useState } from 'react';
@@ -113,7 +114,7 @@ function Art({ day }: { day: ActiveSpecialDay }) {
           />
         ))}
       {day.imageUrl ? (
-        <Image source={{ uri: day.imageUrl }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} resizeMode="cover" accessibilityIgnoresInvertColors />
+        <Image source={{ uri: absoluteUrl(day.imageUrl)! }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} resizeMode="cover" accessibilityIgnoresInvertColors />
       ) : day.def.art === 'flag' ? (
         <View style={{ shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 8 }, elevation: 8 }}>
           <Flag width={140} />

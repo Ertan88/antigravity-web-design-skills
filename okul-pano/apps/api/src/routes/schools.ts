@@ -252,8 +252,10 @@ export async function schoolRoutes(app: FastifyInstance) {
     '/api/schools/:schoolId/uploads',
     { preHandler: [app.authenticate, schoolGuard()], config: { rateLimit: { max: 60, timeWindow: '1 minute' } } },
     async (req, reply) => {
-      // Duyuru, okul ayarları (logo, özel gün görseli) ve başarılar / haftanın kitabı fotoğrafları
-      const canUpload = req.ctx.permissions.some((p) => p === 'announcements.manage' || p === 'settings.manage' || p === 'highlights.manage');
+      // Duyuru, okul ayarları (logo, özel gün görseli), başarılar / haftanın kitabı fotoğrafları ve destek talebi eki
+      const canUpload = req.ctx.permissions.some(
+        (p) => p === 'announcements.manage' || p === 'settings.manage' || p === 'highlights.manage' || p === 'support.contact',
+      );
       if (!canUpload) throw forbidden();
       const file = await req.file();
       if (!file) throw badRequest('Dosya bulunamadı.');

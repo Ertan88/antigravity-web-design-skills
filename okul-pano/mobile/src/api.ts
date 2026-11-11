@@ -149,28 +149,74 @@ export async function logout() {
 /** Yüklemeden önce en uzun kenar bu boyuta indirilir (pano 1920 piksel gösterir; telefon fotoğrafları 10 MB'ı aşabiliyor) */
 const UPLOAD_MAX_SIDE = 1920;
 
-export async function uploadImage(schoolId: string, asset: { uri: string; mimeType?: string | null; fileName?: string | null; file?: File; width?: number; height?: number }, endpoint = 'uploads') {
-  const form = new FormData();
-  if (asset.file) form.append('file', asset.file);
-  else {
-    // Kamera fotoğrafları büyük olur: küçültülüp JPEG olarak sıkıştırılır (yükleme hızlı, sunucu sınırına takılmaz)
-    let uri = asset.uri;
-    let type = asset.mimeType ?? 'image/jpeg';
-    let name = asset.fileName ?? 'foto.jpg';
-    if (type !== 'image/gif') {
+/**
+ * Telefonda dosya gönderme: Expo'nun fetch'i telefondaki dosyayı ({ uri, name, type }) FormData'da desteklemez
+ * ("Unsupported FormDataPart"); React Native'in XMLHttpRequest'i destekler. Oturum yenileme api() ile aynıdır.
+ */
+function sendForm(path: string, form: FormData): Promise<{ status: number; json: { message?: string } | null }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${server}${path}`);
+    if (accessToken) xhr.setRequestHeader('authorization', `Bearer ${accessToken}`);
+    xhr.timeout = 90_000;
+    xhr.onload = () => {
+      let json: { message?: string } | null = null;
       try {
-        const w = asset.width ?? 0;
-        const h = asset.height ?? 0;
-        const resize = Math.max(w, h) > UPLOAD_MAX_SIDE ? [{ resize: w >= h ? { width: UPLOAD_MAX_SIDE } : { height: UPLOAD_MAX_SIDE } }] : [];
-        const out = await manipulateAsync(uri, resize, { compress: 0.82, format: SaveFormat.JPEG });
-        uri = out.uri;
-        type = 'image/jpeg';
-        name = name.replace(/\.[a-z0-9]+$/i, '') + '.jpg';
+        json = JSON.parse(xhr.responseText) as { message?: string };
       } catch {
-        // Küçültülemezse özgün dosya gönderilir
+        json = null;
       }
-    }
-    form.append('file', { uri, name, type } as unknown as Blob);
+      resolve({ status: xhr.status, json });
+    };
+    xhr.onerror = () => reject(new Error('network'));
+    xhr.ontimeout = () => reject(new Error('timeout'));
+    xhr.send(form);
+  });
+}
+
+async function upload<T>(path: string, form: FormData): Promise<T> {
+  let res: { status: number; json: { message?: string } | null };
+  try {
+    if (!accessToken && refreshToken) await refresh();
+    res = await sendForm(path, form);
+    if (res.status === 401 && refreshToken && (await refresh())) res = await sendForm(path, form);
+  } catch {
+    throw new ApiError('Fotoğraf gönderilemedi. İnternet bağlantınızı kontrol edip yeniden deneyin.', 0);
   }
-  return api<{ url: string }>(`/api/schools/${schoolId}/${endpoint}`, { method: 'POST', form });
+  if (res.status === 401) {
+    await session.setTokens(null, null);
+    onSignedOut?.();
+  }
+  if (res.status < 200 || res.status >= 300) throw new ApiError(res.json?.message ?? `Fotoğraf yüklenemedi (${res.status})`, res.status);
+  return res.json as T;
+}
+
+export async function uploadImage(schoolId: string, asset: { uri: string; mimeType?: string | null; fileName?: string | null; file?: File; width?: number; height?: number }, endpoint = 'uploads') {
+  const path = `/api/schools/${schoolId}/${endpoint}`;
+  const form = new FormData();
+  // Web: tarayıcının dosyası tarayıcının fetch'iyle gider
+  if (asset.file) {
+    form.append('file', asset.file);
+    return api<{ url: string }>(path, { method: 'POST', form });
+  }
+  // Kamera fotoğrafları büyük olur: küçültülüp JPEG olarak sıkıştırılır (yükleme hızlı, sunucu sınırına takılmaz)
+  let uri = asset.uri;
+  let type = asset.mimeType ?? 'image/jpeg';
+  let name = asset.fileName ?? 'foto.jpg';
+  if (type !== 'image/gif') {
+    try {
+      const w = asset.width ?? 0;
+      const h = asset.height ?? 0;
+      const resize = Math.max(w, h) > UPLOAD_MAX_SIDE ? [{ resize: w >= h ? { width: UPLOAD_MAX_SIDE } : { height: UPLOAD_MAX_SIDE } }] : [];
+      const out = await manipulateAsync(uri, resize, { compress: 0.82, format: SaveFormat.JPEG });
+      uri = out.uri;
+      type = 'image/jpeg';
+      name = name.replace(/\.[a-z0-9]+$/i, '') + '.jpg';
+    } catch {
+      // Küçültülemezse özgün dosya gönderilir
+    }
+  }
+  form.append('file', { uri, name, type } as unknown as Blob);
+  if (Platform.OS === 'web') return api<{ url: string }>(path, { method: 'POST', form });
+  return upload<{ url: string }>(path, form);
 }
