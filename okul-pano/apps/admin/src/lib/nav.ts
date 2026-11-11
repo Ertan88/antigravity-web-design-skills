@@ -101,6 +101,8 @@ export const NAV: NavGroup[] = [
       { to: '/ogretmenler', label: 'Öğretmen Kadrosu', icon: Users, permission: 'directory.manage' },
       { to: '/nobet', label: 'Nöbet Çizelgesi', icon: ShieldCheck, permission: 'duties.manage' },
       { to: '/izinler', label: 'İzinli Öğretmenler', icon: UserMinus, permission: 'leaves.manage' },
+      // Öğretmen kaydına bağlı herkes: izinli yerine girdiği dersler ve taşımalı görevleri
+      { to: '/gorevlerim', label: 'Görevlerim', icon: CalendarCheck2, when: (_s, who) => Boolean(who.teacherId) },
     ],
   },
   {

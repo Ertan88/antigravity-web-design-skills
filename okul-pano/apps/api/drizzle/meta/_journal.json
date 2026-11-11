@@ -309,6 +309,13 @@
       "when": 1796100000000,
       "tag": "0043_screen_offline_alert",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1796200000000,
+      "tag": "0044_lesson_covers",
+      "breakpoints": true
     }
   ]
 }

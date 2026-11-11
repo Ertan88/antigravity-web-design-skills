@@ -11,6 +11,7 @@ import { useAuth } from '../lib/auth.tsx';
 import { useList, useSchoolPath, type Announcement, type Screen } from '../lib/data.ts';
 import { timeAgo } from '../lib/format.ts';
 import { TodaySummary } from './dashboard/Today.tsx';
+import { CoverDayCard } from './covers/Covers.tsx';
 
 interface Stats {
   activeAnnouncements: number;
@@ -159,6 +160,9 @@ export function Dashboard() {
       </div>
 
       <PendingApprovals />
+
+      {/* İzinli öğretmenlerin boş kalan dersleri ve nöbet yerleri: tek dokunuşla görevlendirme */}
+      <CoverDayCard />
 
       <TodaySummary />
 

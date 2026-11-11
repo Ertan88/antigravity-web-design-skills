@@ -307,6 +307,32 @@ export const dutySubstitutions = pgTable(
   (t) => [uniqueIndex('duty_substitutions_school_date_duty_uq').on(t.schoolId, t.date, t.dutyId)],
 );
 
+/**
+ * Ders görevlendirmesi: izinli öğretmenin o tarihteki dersine giren öğretmen. Sınıf + ders saati + tarih başına bir
+ * kayıt. İstatistik (ay / toplam, sınıf geçmişi) bundan hesaplanır; bilgi amaçlıdır (ek ders puantajı değildir).
+ */
+export const lessonCovers = pgTable(
+  'lesson_covers',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    date: date('date', { mode: 'string' }).notNull(),
+    periodNo: integer('period_no').notNull(),
+    classGroupId: uuid('class_group_id')
+      .notNull()
+      .references(() => classGroups.id, { onDelete: 'cascade' }),
+    /** İzinli (yerine girilen) öğretmen; kadrodan silinirse boş kalır */
+    absentTeacherId: uuid('absent_teacher_id').references(() => teachers.id, { onDelete: 'set null' }),
+    teacherId: uuid('teacher_id')
+      .notNull()
+      .references(() => teachers.id, { onDelete: 'cascade' }),
+    subject: text('subject').notNull(),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('lesson_covers_slot_uq').on(t.schoolId, t.date, t.periodNo, t.classGroupId), index('lesson_covers_teacher_idx').on(t.schoolId, t.teacherId, t.date)],
+);
+
 export const students = pgTable(
   'students',
   {

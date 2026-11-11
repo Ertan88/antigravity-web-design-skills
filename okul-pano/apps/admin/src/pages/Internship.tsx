@@ -1141,11 +1141,11 @@ function CoordinatorsCard() {
         ))}
         {!on.length && <span className="text-sm text-slate-500">Henüz işaretli koordinatör yok.</span>}
         {off.length > 0 && (
+          <div className="w-64">
           <Select
             value=""
             disabled={save.isPending}
             onChange={(e) => e.target.value && set([...on.map((x) => x.id), e.target.value])}
-            className="w-auto max-w-xs"
             aria-label="Koordinatör ekle"
           >
             <option value="">+ Koordinatör ekle</option>
@@ -1156,6 +1156,7 @@ function CoordinatorsCard() {
               </option>
             ))}
           </Select>
+          </div>
         )}
       </div>
     </Card>

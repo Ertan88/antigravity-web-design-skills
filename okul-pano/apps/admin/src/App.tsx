@@ -15,6 +15,7 @@ function page<K extends string>(load: () => Promise<Record<K, ComponentType>>, n
 }
 
 const Account = page(() => import('./pages/Account.tsx'), 'Account');
+const MyCoversPage = page(() => import('./pages/covers/Covers.tsx'), 'MyCoversPage');
 const Announcements = page(() => import('./pages/Announcements.tsx'), 'Announcements');
 const Audit = page(() => import('./pages/Audit.tsx'), 'Audit');
 const BellSchedules = page(() => import('./pages/BellSchedules.tsx'), 'BellSchedules');
@@ -121,6 +122,7 @@ export function App() {
         <Route path="etkinlikler" element={needsSchool(<Guard permission="highlights.manage"><Events /></Guard>)} />
         <Route path="haftanin-kitabi" element={needsSchool(<Guard permission="highlights.manage"><Books /></Guard>)} />
         <Route path="nobet" element={needsSchool(<Guard permission="duties.manage"><Duties /></Guard>)} />
+        <Route path="gorevlerim" element={needsSchool(<MyCoversPage />)} />
         <Route path="tasimali" element={<Navigate to="/nobet?bolum=tasimali" replace />} />
         <Route path="izinler" element={needsSchool(<Guard permission="leaves.manage"><Leaves /></Guard>)} />
         <Route path="ogrenciler" element={needsSchool(<Guard permission="students.manage"><Students /></Guard>)} />
