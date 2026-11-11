@@ -38,6 +38,14 @@ Böyle bir durum varsa kullanıcı **onaylanmaz**. Yanlış açıkça söylenir;
   duyuru alanının içinde tasarlanır. (Acil durum ekranı ve panelden seçilen "Yalnızca duyurular / Tam ekran saat"
   biçimleri okulun kendi seçimidir, bu kuralın dışındadır.)
 
+## 4a. Türkçe yazım
+
+- Arayüzdeki bütün metinler (web, mobil, pano, bildirim, e-posta, Excel) Türkçe yazım kurallarına uyar
+  (TDK yazımı, büyük harf, bağlaç "de/da" ve soru eki "mi" ayrı, kesme işareti vb.).
+- Devrik cümle kullanılmaz; yüklem sondadır. Örnek: "Bugün: Ayşe Yılmaz izinli. 2 dersi ve 1 nöbet yeri boş."
+  (Yanlış: "Bugün 3 boş: 2 ders, 1 nöbet yeri · Ayşe Yılmaz izinli".)
+- Yeni metin eklerken ve var olan bir metne dokunurken bu kural kontrol edilir.
+
 ## 5. KVKK
 
 - Gerçek okul belgeleri ve kişisel veriler depoya eklenmez.
