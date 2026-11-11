@@ -1,3 +1,4 @@
+import { coverBandText } from '@okulpano/shared/coverText';
 import { EMERGENCY_INFO } from '@okulpano/shared/emergency';
 import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
@@ -114,8 +115,8 @@ export function ManagerHome() {
               <Banner
                 tone="warning"
                 icon="people-outline"
-                title={`Bugün ${openLessons + openDuties} boş · görevlendir`}
-                text={[[openLessons ? `${openLessons} ders` : '', openDuties ? `${openDuties} nöbet yeri` : ''].filter(Boolean).join(', '), `${cover.data!.absent.map((a) => a.fullName).join(', ')} izinli`].join(' · ')}
+                title={coverBandText(cover.data!.absent.map((a) => a.fullName), openLessons, openDuties).title}
+                text={`${coverBandText(cover.data!.absent.map((a) => a.fullName), openLessons, openDuties).detail} Görevlendirmek için dokunun.`}
               />
             </Pressable>
           )}

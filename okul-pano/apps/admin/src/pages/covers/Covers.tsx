@@ -1,4 +1,4 @@
-import { errorText } from '@okulpano/shared';
+import { coverBandText, errorText } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { useState } from 'react';
@@ -35,11 +35,14 @@ interface CoverDay {
   duties: { dutyId: string; area: string; absentName: string; substitute: { id: string; teacherName: string } | null; candidates: Candidate[] }[];
 }
 
-/** Aday öğretmen çipleri: ilk birkaçı çip, kalanı açılır listede; nöbetçiler "Nöbetçi" etiketli */
-function CandidateChips({ list, busy, onPick }: { list: Candidate[]; busy: boolean; onPick: (teacherId: string) => void }) {
+/**
+ * Aday öğretmen çipleri: ilk birkaçı çip, kalanı açılır listede. Nöbetçiler "NÖBETÇİ" etiketli; ders satırında diğerleri
+ * "DERSİ YOK" etiketli (o gün dersi olan, o saatte boş). Nöbet yerinde ikinci etiket yoktur.
+ */
+function CandidateChips({ list, busy, onPick, freeTag = false }: { list: Candidate[]; busy: boolean; onPick: (teacherId: string) => void; freeTag?: boolean }) {
   const shown = list.slice(0, 6);
   const rest = list.slice(6);
-  if (!list.length) return <p className="mt-2 text-xs font-semibold text-rose-700">O saatte boş öğretmen yok.</p>;
+  if (!list.length) return <p className="mt-2 text-xs font-semibold text-rose-700">Okulda olup bu saatte boş olan öğretmen yok.</p>;
   return (
     <div className="mt-2 flex flex-wrap items-center gap-1.5">
       {shown.map((c) => (
@@ -55,7 +58,11 @@ function CandidateChips({ list, busy, onPick }: { list: Candidate[]; busy: boole
           )}
         >
           {c.fullName}
-          {c.onDuty && <span className="rounded-md bg-brand-700 px-1.5 py-px text-[10px] font-extrabold tracking-wide text-white">NÖBETÇİ</span>}
+          {c.onDuty ? (
+            <span className="rounded-md bg-brand-700 px-1.5 py-px text-[10px] font-extrabold tracking-wide text-white">NÖBETÇİ</span>
+          ) : (
+            freeTag && <span className="rounded-md bg-slate-200 px-1.5 py-px text-[10px] font-extrabold tracking-wide text-slate-700 dark:bg-slate-700 dark:text-slate-100">DERSİ YOK</span>
+          )}
         </button>
       ))}
       {rest.length > 0 && (
@@ -65,7 +72,7 @@ function CandidateChips({ list, busy, onPick }: { list: Candidate[]; busy: boole
           {rest.map((c) => (
             <option key={c.teacherId} value={c.teacherId}>
               {c.fullName}
-              {c.onDuty ? ' (nöbetçi)' : ''}
+              {c.onDuty ? ' (nöbetçi)' : freeTag ? ' (dersi yok)' : ''}
             </option>
           ))}
         </Select>
@@ -95,14 +102,16 @@ export function CoverBand() {
   const d = useCoverDay().data;
   const open = openCount(d);
   if (!d || !open) return null;
-  const lessons = d.lessons.filter((l) => !l.cover).length;
-  const duties = d.duties.filter((x) => !x.substitute).length;
-  const parts = [lessons ? `${lessons} ders` : '', duties ? `${duties} nöbet yeri` : ''].filter(Boolean).join(', ');
+  const text = coverBandText(
+    d.absent.map((a) => a.fullName),
+    d.lessons.filter((l) => !l.cover).length,
+    d.duties.filter((x) => !x.substitute).length,
+  );
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-amber-50 px-4 py-3 ring-1 ring-amber-200">
       <AlertTriangle className="size-5 shrink-0 text-amber-600" />
       <p className="min-w-0 flex-1 text-sm text-slate-700">
-        <b className="text-amber-800">Bugün {open} boş:</b> {parts} · {d.absent.map((a) => a.fullName).join(', ')} izinli
+        <b className="text-amber-800">{text.title}</b> {text.detail}
       </p>
       <Link to="/gorevlendirme" className="inline-flex items-center gap-1.5 rounded-full bg-ink px-4 py-1.5 text-sm font-bold whitespace-nowrap text-surface hover:opacity-90">
         Görevlendir <ArrowRight className="size-4" />
@@ -142,7 +151,7 @@ function CoverDayList({ date }: { date?: string }) {
     <div className="grid gap-2">
       <div className="mb-1 flex flex-wrap items-center gap-2">
         {open > 0 ? <Badge tone="red">{open} boş</Badge> : <Badge tone="green">hepsi atandı</Badge>}
-        <span className="text-sm text-slate-500">İzinli: {d.absent.map((a) => a.fullName).join(', ')}. Önerilenler o saatte dersi olmayan öğretmenler; nöbetçiler önce.</span>
+        <span className="text-sm text-slate-500">İzinli: {d.absent.map((a) => a.fullName).join(', ')}. O gün okulda olup o saatte boş olan öğretmenler önerilir; nöbetçiler öndedir.</span>
       </div>
       {d.lessons.map((l) => (
         <div key={`${l.periodNo}-${l.classGroupId}`} className={clsx('rounded-2xl p-3 ring-1', l.cover ? 'ring-slate-200' : 'bg-rose-50/60 ring-rose-200')}>
@@ -162,6 +171,7 @@ function CoverDayList({ date }: { date?: string }) {
             <CandidateChips
               list={l.candidates}
               busy={act.isPending}
+              freeTag
               onPick={(teacherId) => act.mutate(() => api(coversPath, { method: 'POST', body: { date: d.date, periodNo: l.periodNo, classGroupId: l.classGroupId, teacherId } }))}
             />
           )}
@@ -204,7 +214,7 @@ export function AssignmentsPage() {
     <div className="space-y-5">
       <PageHeader
         title="Görevlendirme"
-        description="İzinli öğretmenin boş kalan dersleri ve nöbet yeri: o saatte boş öğretmenler (nöbetçiler önce) önerilir, dokununca görevlendirilir ve öğretmene bildirim gider."
+        description="İzinli öğretmenin boş kalan dersleri ve nöbet yeri burada listelenir. O gün okulda olup o saatte boş olan öğretmenler önerilir. Öğretmene dokunulunca görevlendirilir ve öğretmene bildirim gider."
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Segmented
@@ -255,11 +265,9 @@ interface StatsRow {
   fullName: string;
   month: number;
   total: number;
-  transportMonth: number;
-  transportTotal: number;
 }
 
-/** Nöbet Çizelgesi › Ders görevlendirmeleri: öğretmen başına ay ve toplam; sınıf geçmişi ayrı pencerede */
+/** Görevlendirme › İstatistik: öğretmen başına ay ve toplam; sınıf geçmişi ayrı pencerede */
 export function CoverStatsView({ month }: { month: string }) {
   const { schoolId } = useAuth();
   const path = useSchoolPath('cover-stats');
@@ -274,7 +282,7 @@ export function CoverStatsView({ month }: { month: string }) {
         </span>
         <div>
           <h2 className="text-sm font-semibold text-ink">{monthLabel(month)} · İzinli yerine girilen dersler</h2>
-          <p className="text-xs text-slate-500">Ay ve kayıtların başından toplam; taşımalı görevler ayrı sütunda. Bilgi amaçlıdır.</p>
+          <p className="text-xs text-slate-500">Önce seçili ay, sonra kayıtların başından toplam gösterilir. Bilgi amaçlıdır.</p>
         </div>
         <Button size="sm" variant="secondary" className="ml-auto" icon={<History className="size-4" />} onClick={() => setHistory(true)}>
           Sınıf geçmişi
@@ -284,18 +292,15 @@ export function CoverStatsView({ month }: { month: string }) {
         <div className="flex justify-center py-10">
           <Spinner />
         </div>
-      ) : !rows.some((r) => r.total || r.transportTotal) ? (
-        <EmptyState icon={<ShieldCheck className="size-7" />} title="Henüz görevlendirme yok" description="Genel Bakış'taki 'Bugün boş kalanlar' kartından izinli öğretmenin dersine öğretmen gönderdikçe burada sayılır." />
+      ) : !rows.some((r) => r.total) ? (
+        <EmptyState icon={<ShieldCheck className="size-7" />} title="Henüz görevlendirme yok" description="İzinli öğretmenin dersine öğretmen gönderildikçe burada sayılır." />
       ) : (
-        <Table head={['Öğretmen', `${monthLabel(month).split(' ')[0]} (ders)`, 'Toplam (ders)', 'Taşımalı (ay / toplam)']}>
+        <Table head={['Öğretmen', `${monthLabel(month).split(' ')[0]} (ders)`, 'Toplam (ders)']}>
           {rows.map((r) => (
             <tr key={r.teacherId}>
               <Td className="font-semibold text-ink">{r.fullName}</Td>
               <Td className="tabular-nums">{r.month || '—'}</Td>
               <Td className="font-bold tabular-nums">{r.total || '—'}</Td>
-              <Td className="tabular-nums">
-                {r.transportMonth} / {r.transportTotal}
-              </Td>
             </tr>
           ))}
         </Table>

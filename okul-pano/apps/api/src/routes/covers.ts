@@ -10,9 +10,9 @@ import { loadExamContext } from '../lib/examSchedule.ts';
 import { tell, usersForTeacher } from '../lib/push.ts';
 
 /*
- * İzinli öğretmen yerine görevlendirme (A): günün boş kalan dersleri ve nöbet yerleri, her biri için o saatte boş olan
- * öğretmenler (nöbetçiler önce, "Nöbetçi" etiketiyle) ve tek dokunuşla atama. İstatistik: öğretmen başına ay ve toplam
- * ders saati, taşımalı görev sayısı; sınıf geçmişi ayrı. Öğretmen kendi görevlerini ve sayılarını görür.
+ * İzinli öğretmen yerine görevlendirme (A): günün boş kalan dersleri ve nöbet yerleri, her biri için o gün okulda olup
+ * o saatte boş olan öğretmenler (nöbetçiler önce, "Nöbetçi" etiketiyle) ve tek dokunuşla atama. İstatistik: öğretmen
+ * başına ay ve toplam ders saati; sınıf geçmişi ayrı. Öğretmen kendi görevlerini ve sayılarını görür.
  * Bilgi amaçlıdır (ek ders puantajı değildir). Okula özgü hiçbir sabit yoktur.
  */
 
@@ -60,12 +60,43 @@ async function coverDay(deps: AppDeps, school: School, date: string) {
   const activeIds = new Set((await db.select({ id: teachers.id }).from(teachers).where(and(eq(teachers.schoolId, school.id), eq(teachers.isActive, true)))).map((t) => t.id));
   const bells = holiday ? [] : dayBells(date, ctx.cal);
 
-  /** O ders saatinde boş olanlar: dersi yok, izinli değil, başka bir boş derse görevli değil */
+  // Dersin saati (sınıfa özel zil ve ikili öğretim dahil); "HH:MM" karşılaştırması için
+  const shiftOf = (classGroupId: string) => (ctx.settings.dualShift && ctx.classes.find((c) => c.id === classGroupId)?.shift === 'afternoon' ? 'afternoon' : 'morning');
+  const timeOf = (periodNo: number, classGroupId: string) => classBell(bells, classGroupId, shiftOf(classGroupId))?.periods.find((p) => p.no === periodNo) ?? null;
+  // O gün okulda olduğu aralık: ilk dersinin başı ile son dersinin sonu (işletmede mesleki eğitim dersi okulda sayılmaz)
+  const windows = new Map<string, { minNo: number; maxNo: number; start: string | null; end: string | null; timed: boolean }>();
+  for (const l of lessonsToday) {
+    if (!l.teacherId || isInternshipSubject(l.subject)) continue;
+    const t = timeOf(l.periodNo, l.classGroupId);
+    const w = windows.get(l.teacherId) ?? { minNo: l.periodNo, maxNo: l.periodNo, start: t?.start ?? null, end: t?.end ?? null, timed: true };
+    w.minNo = Math.min(w.minNo, l.periodNo);
+    w.maxNo = Math.max(w.maxNo, l.periodNo);
+    if (!t) w.timed = false;
+    else {
+      if (!w.start || t.start < w.start) w.start = t.start;
+      if (!w.end || t.end > w.end) w.end = t.end;
+    }
+    windows.set(l.teacherId, w);
+  }
+  /** Ders saati, öğretmenin o günkü ilk ve son dersinin arasında mı (okulda mı) */
+  const inSchoolAt = (teacherId: string, periodNo: number, classGroupId: string) => {
+    const w = windows.get(teacherId);
+    if (!w) return false;
+    const t = timeOf(periodNo, classGroupId);
+    if (w.timed && w.start && w.end && t) return t.start >= w.start && t.end <= w.end;
+    return periodNo > w.minNo && periodNo < w.maxNo;
+  };
+
+  /**
+   * O ders saatine önerilenler: o gün okulda olan (nöbetçi ya da ilk ve son dersinin arasında boş saati olan),
+   * izinli değil, o saatte dersi yok, başka bir boş derse görevli değil. Bütün günü boş olan öğretmen önerilmez.
+   */
   const candidatesFor = (periodNo: number, classGroupId: string): CoverCandidate[] => {
     const teaching = new Set(lessonsToday.filter((l) => l.periodNo === periodNo && l.teacherId).map((l) => l.teacherId!));
     const covering = new Set(covers.filter((c) => c.periodNo === periodNo && c.classGroupId !== classGroupId).map((c) => c.teacherId));
     return ctx.staff
       .filter((t) => activeIds.has(t.id) && !unavailable.has(t.id) && !teaching.has(t.id) && !covering.has(t.id))
+      .filter((t) => onDuty.has(t.id) || inSchoolAt(t.id, periodNo, classGroupId))
       .map((t) => ({ teacherId: t.id, fullName: t.fullName, onDuty: onDuty.has(t.id), monthCount: monthCount.get(t.id) ?? 0 }))
       .sort((a, b) => Number(b.onDuty) - Number(a.onDuty) || a.monthCount - b.monthCount || trCompare(a.fullName, b.fullName));
   };
@@ -79,8 +110,7 @@ async function coverDay(deps: AppDeps, school: School, date: string) {
   const lessons = slots
     .map((l) => {
       const cls = ctx.classes.find((c) => c.id === l.classGroupId);
-      const shift = ctx.settings.dualShift && cls?.shift === 'afternoon' ? 'afternoon' : 'morning';
-      const period = classBell(bells, l.classGroupId, shift)?.periods.find((p) => p.no === l.periodNo) ?? null;
+      const period = timeOf(l.periodNo, l.classGroupId);
       const cover = covers.find((c) => c.periodNo === l.periodNo && c.classGroupId === l.classGroupId);
       return {
         periodNo: l.periodNo,
@@ -97,16 +127,16 @@ async function coverDay(deps: AppDeps, school: School, date: string) {
     })
     .sort((a, b) => a.periodNo - b.periodNo || trCompare(a.className, b.className));
 
-  // Boş nöbet yerleri: o günün nöbetçileri önce ("Nöbetçi"), sonra o gün nöbeti olmayan uygun öğretmenler
+  // Boş nöbet yerleri: o günün nöbetçileri önce ("Nöbetçi"), sonra o gün nöbeti olmayan ama dersi olan (okulda) öğretmenler
   const dutyGaps = day.holiday ? [] : day.entries.filter((e) => e.onLeave);
-  const others = dutyGaps.some((g) => !g.substitute) ? await substituteCandidates(db, school.id, day, 50) : [];
+  const others = dutyGaps.some((g) => !g.substitute) ? await substituteCandidates(db, school.id, day, 200) : [];
   const busySubs = new Set(day.entries.flatMap((e) => (e.substitute ? [e.substitute.teacherId] : [])));
   const dutyCands: CoverCandidate[] = [
     ...day.entries
       .filter((e) => !e.onLeave && !unavailable.has(e.teacherId) && !busySubs.has(e.teacherId))
       .filter((e, i, all) => all.findIndex((x) => x.teacherId === e.teacherId) === i)
       .map((e) => ({ teacherId: e.teacherId, fullName: e.teacherName, onDuty: true, monthCount: monthCount.get(e.teacherId) ?? 0 })),
-    ...others.filter((o) => !unavailable.has(o.teacherId)).map((o) => ({ teacherId: o.teacherId, fullName: o.fullName, onDuty: false, monthCount: o.monthCount })),
+    ...others.filter((o) => !unavailable.has(o.teacherId) && windows.has(o.teacherId)).map((o) => ({ teacherId: o.teacherId, fullName: o.fullName, onDuty: false, monthCount: o.monthCount })),
   ];
 
   return {
@@ -200,18 +230,16 @@ export async function coverRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
-  /** Öğretmen başına izinli yerine girilen ders saati (ay ve toplam) ve taşımalı görev sayısı (Nöbet Çizelgesi) */
+  /** Öğretmen başına izinli yerine girilen ders saati (ay ve toplam) */
   app.get(`${base}/cover-stats`, manage, async (req) => {
     const { month } = parse(z.object({ month: monthSchema.optional() }), req.query);
     const m = month ?? todayOf(req).slice(0, 7);
     const from = `${m}-01`;
     const to = monthEnd(m);
-    const [staff, coverAll, coverMonth, transAll, transMonth] = await Promise.all([
+    const [staff, coverAll, coverMonth] = await Promise.all([
       db.select({ id: teachers.id, fullName: teachers.fullName, isActive: teachers.isActive }).from(teachers).where(eq(teachers.schoolId, req.ctx.schoolId)),
       countBy(lessonCovers, req.ctx.schoolId),
       countBy(lessonCovers, req.ctx.schoolId, from, to),
-      countBy(transportDuties, req.ctx.schoolId),
-      countBy(transportDuties, req.ctx.schoolId, from, to),
     ]);
     const rows = staff
       .map((t) => ({
@@ -219,11 +247,9 @@ export async function coverRoutes(app: FastifyInstance) {
         fullName: t.fullName,
         month: coverMonth.get(t.id) ?? 0,
         total: coverAll.get(t.id) ?? 0,
-        transportMonth: transMonth.get(t.id) ?? 0,
-        transportTotal: transAll.get(t.id) ?? 0,
         isActive: t.isActive,
       }))
-      .filter((r) => r.isActive || r.total || r.transportTotal)
+      .filter((r) => r.isActive || r.total)
       .sort((a, b) => b.month - a.month || b.total - a.total || trCompare(a.fullName, b.fullName));
     return { month: m, rows };
   });

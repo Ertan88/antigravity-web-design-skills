@@ -10,8 +10,9 @@ import { Text } from '../src/text.tsx';
 import { Badge, Button, Card, confirm, DeleteIconButton, Empty, ErrorNote, Loading, Screen, T } from '../src/ui.tsx';
 
 /*
- * İzinli öğretmen yerine görevlendirme (yönetim): günün boş dersleri ve nöbet yerleri; her satırda o saatte boş
- * öğretmenler (nöbetçiler önce, "NÖBETÇİ" etiketli), dokununca görevlendirilir ve öğretmene bildirim gider.
+ * İzinli öğretmen yerine görevlendirme (yönetim): günün boş dersleri ve nöbet yerleri. Her satırda o gün okulda olup
+ * o saatte boş olan öğretmenler önerilir: nöbetçiler önce ("NÖBETÇİ"), sonra o saatte dersi olmayanlar ("DERSİ YOK").
+ * Öğretmene dokunulunca görevlendirilir ve öğretmene bildirim gider.
  */
 
 type Candidate = { teacherId: string; fullName: string; onDuty: boolean; monthCount: number };
@@ -32,9 +33,12 @@ interface CoverDay {
   duties: { dutyId: string; area: string; absentName: string; substitute: { id: string; teacherName: string } | null; candidates: Candidate[] }[];
 }
 
-function Candidates({ list, busy, onPick }: { list: Candidate[]; busy: boolean; onPick: (id: string) => void }) {
+const tagStyle = { fontSize: 10, fontWeight: '800', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden' } as const;
+
+/** Aday çipleri: nöbetçi "NÖBETÇİ"; ders satırında diğerleri "DERSİ YOK" (o gün dersi olan, o saatte boş) */
+function Candidates({ list, busy, onPick, freeTag = false }: { list: Candidate[]; busy: boolean; onPick: (id: string) => void; freeTag?: boolean }) {
   const [all, setAll] = useState(false);
-  if (!list.length) return <T size={13} color={colors.danger} weight="700">O saatte boş öğretmen yok.</T>;
+  if (!list.length) return <T size={13} color={colors.danger} weight="700">Okulda olup bu saatte boş olan öğretmen yok.</T>;
   const shown = all ? list : list.slice(0, 6);
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -42,7 +46,7 @@ function Candidates({ list, busy, onPick }: { list: Candidate[]; busy: boolean; 
         <Pressable
           key={c.teacherId}
           accessibilityRole="button"
-          accessibilityLabel={`${c.fullName}${c.onDuty ? ', nöbetçi' : ''} görevlendir`}
+          accessibilityLabel={`${c.fullName}${c.onDuty ? ', nöbetçi' : freeTag ? ', dersi yok' : ''}: görevlendir`}
           disabled={busy}
           onPress={() => onPick(c.teacherId)}
           style={({ pressed }) => ({
@@ -59,10 +63,10 @@ function Candidates({ list, busy, onPick }: { list: Candidate[]; busy: boolean; 
           })}
         >
           <Text style={{ fontSize: 13.5, fontWeight: '700', color: colors.ink }}>{c.fullName}</Text>
-          {c.onDuty && (
-            <Text style={{ fontSize: 10, fontWeight: '800', color: '#ffffff', backgroundColor: colors.brand, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden' }}>
-              NÖBETÇİ
-            </Text>
+          {c.onDuty ? (
+            <Text style={[tagStyle, { color: '#ffffff', backgroundColor: colors.brand }]}>NÖBETÇİ</Text>
+          ) : (
+            freeTag && <Text style={[tagStyle, { color: colors.ink, backgroundColor: colors.borderStrong }]}>DERSİ YOK</Text>
           )}
         </Pressable>
       ))}
@@ -138,7 +142,7 @@ export default function Gorevlendirme() {
               {open > 0 ? <Badge tone="danger">{`${open} boş`}</Badge> : <Badge tone="success">hepsi atandı</Badge>}
             </View>
             <T size={13} color={colors.muted}>
-              İzinli: {d.absent.map((a) => a.fullName).join(', ')}. Önerilenler o saatte dersi olmayanlar; nöbetçiler önce.
+              İzinli: {d.absent.map((a) => a.fullName).join(', ')}. O gün okulda olup o saatte boş olan öğretmenler önerilir; nöbetçiler öndedir.
             </T>
           </Card>
           {d.lessons.map((l) => (
@@ -164,7 +168,7 @@ export default function Gorevlendirme() {
                   ✓ {l.cover.fullName} girecek
                 </T>
               ) : (
-                <Candidates list={l.candidates} busy={busy} onPick={(teacherId) => void run(() => api(coversPath, { method: 'POST', body: { date: d.date, periodNo: l.periodNo, classGroupId: l.classGroupId, teacherId } }))} />
+                <Candidates list={l.candidates} busy={busy} freeTag onPick={(teacherId) => void run(() => api(coversPath, { method: 'POST', body: { date: d.date, periodNo: l.periodNo, classGroupId: l.classGroupId, teacherId } }))} />
               )}
             </Card>
           ))}
