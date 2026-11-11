@@ -4,14 +4,14 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { audit, schoolGuard, UUID_RE, type AppDeps } from '../context.ts';
 import { classGroups, dutySubstitutions, duties, lessonCovers, schools, teacherLeaves, teachers, transportDuties } from '../db/schema.ts';
-import { addDays, dutyDay, monthEnd, substituteCandidates, weekdayOf } from '../lib/dayinfo.ts';
+import { addDays, dutyDay, monthEnd, weekdayOf } from '../lib/dayinfo.ts';
 import { badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 import { loadExamContext } from '../lib/examSchedule.ts';
 import { tell, usersForTeacher } from '../lib/push.ts';
 
 /*
- * İzinli öğretmen yerine görevlendirme (A): günün boş kalan dersleri ve nöbet yerleri, her biri için o gün okulda olup
- * o saatte boş olan öğretmenler (nöbetçiler önce, "Nöbetçi" etiketiyle) ve tek dokunuşla atama. İstatistik: öğretmen
+ * İzinli öğretmen yerine görevlendirme (A): günün boş kalan dersleri (o gün okulda olup o saatte boş olan öğretmenler,
+ * nöbetçiler önce, "Nöbetçi" etiketiyle; tek dokunuşla atama) ve bilgi olarak boş nöbet yerleri. İstatistik: öğretmen
  * başına ay ve toplam ders saati; sınıf geçmişi ayrı. Öğretmen kendi görevlerini ve sayılarını görür.
  * Bilgi amaçlıdır (ek ders puantajı değildir). Okula özgü hiçbir sabit yoktur.
  */
@@ -165,12 +165,9 @@ async function coverDay(deps: AppDeps, school: School, date: string, today = dat
     })
     .sort((a, b) => a.periodNo - b.periodNo || trCompare(a.className, b.className));
 
-  // Boş nöbet yerleri: yalnızca o günün nöbetçileri önerilir (bu ay en az nöbet tutan önce); dersi boş olsa da
-  // o gün nöbeti olmayan öğretmen önerilmez
+  // Boş nöbet yerleri yalnızca bilgi olarak gösterilir (bantta da "1 nöbet yeri boş" yazar); nöbetçiye ikinci nöbet
+  // verilmediği için görevlendirme ve öneri yoktur. Daha önce yapılmış görevlendirme varsa görünür.
   const dutyGaps = day.holiday ? [] : day.entries.filter((e) => e.onLeave);
-  const dutyCands: CoverCandidate[] = dutyGaps.some((g) => !g.substitute)
-    ? (await substituteCandidates(db, school.id, day, 200)).map((o) => ({ teacherId: o.teacherId, fullName: o.fullName, onDuty: true, monthCount: o.monthCount }))
-    : [];
 
   return {
     date,
@@ -185,7 +182,7 @@ async function coverDay(deps: AppDeps, school: School, date: string, today = dat
       area: g.area,
       absentName: g.teacherName,
       substitute: g.substitute,
-      candidates: g.substitute ? [] : dutyCands,
+      candidates: [] as CoverCandidate[],
     })),
   };
 }

@@ -51,7 +51,7 @@ function neverOnAir(startsAt: string, endsAt: string, s: AnnouncementSchedule): 
 }
 
 /** "21 Ekim 09:00'dan 25 Ekim 17:00'ye kadar, Pazartesi ve Çarşamba, 12:00–13:30 arası, teneffüslerde, Kantin panosunda" */
-function planSentence(startsAt: string, endsAt: string, s: AnnouncementSchedule, screenNames: string[]): string {
+export function planSentence(startsAt: string, endsAt: string, s: AnnouncementSchedule, screenNames: string[]): string {
   const parts: string[] = [];
   if (startsAt && endsAt) parts.push(`${dateFmt.format(new Date(startsAt))} – ${dateFmt.format(new Date(endsAt))} arasında`);
   else if (startsAt) parts.push(`${dateFmt.format(new Date(startsAt))} itibarıyla`);

@@ -333,6 +333,27 @@ export const lessonCovers = pgTable(
   (t) => [uniqueIndex('lesson_covers_slot_uq').on(t.schoolId, t.date, t.periodNo, t.classGroupId), index('lesson_covers_teacher_idx').on(t.schoolId, t.teacherId, t.date)],
 );
 
+/**
+ * Yarım kalan duyuru (adım adım ekleme): pencere kapanınca kaydedilir, Duyurular › Taslaklar'da durur. Yalnızca giren
+ * kişi görür; yayına alınınca ya da silinince kalkar. İçerik doğrulanmamış form verisidir (eksik olabilir).
+ */
+export const announcementDrafts = pgTable(
+  'announcement_drafts',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Kaldığı adım (0: tür, 1: içerik, 2: nerede ve ne zaman, 3: kontrol) */
+    step: integer('step').notNull().default(0),
+    data: jsonb('data').$type<Record<string, unknown>>().notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index('announcement_drafts_user_idx').on(t.schoolId, t.userId)],
+);
+
 export const students = pgTable(
   'students',
   {

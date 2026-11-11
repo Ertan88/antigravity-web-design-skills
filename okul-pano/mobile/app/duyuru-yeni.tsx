@@ -2,30 +2,90 @@ import { errorText } from '@okulpano/shared';
 import { ANNOUNCEMENT_TEMPLATES, designFields, designTemplate, designTitle, type AnnouncementDesign } from '@okulpano/shared/designs';
 import { useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
-import { useState } from 'react';
-import { Platform, ScrollView, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import { Platform, Pressable, ScrollView, View } from 'react-native';
 import { api, uploadImage } from '../src/api.ts';
 import { useAuth, useSchoolPath } from '../src/auth.tsx';
-import { useScreens, useSchoolInfo } from '../src/data.ts';
+import { useAnnouncementDrafts, useScreens, useSchoolInfo, type AnnouncementDraft } from '../src/data.ts';
 import { AnnouncementPreview } from '../src/preview.tsx';
+import { Text } from '../src/text.tsx';
 import { colors } from '../src/theme.ts';
-import { Button, Card, Chip, Choice, Field, Screen, SectionTitle, Segmented, T } from '../src/ui.tsx';
+import { Button, Card, Chip, Choice, Field, Icon, Screen, SectionTitle, T, type IconName } from '../src/ui.tsx';
 
 type Kind = 'design' | 'image' | 'text';
 type Until = '1' | '3' | '7' | 'none';
 type Phase = 'any' | 'break';
 
-/**
- * Hızlı duyuru (tasarım 3): hazır şablon ya da telefonla çekilen fotoğraf; panodaki görünüm canlı önizlenir.
- * Okulda onay açıksa ve kişinin onay yetkisi yoksa "Onaya gönder" olur.
+/*
+ * Adım adım duyuru (tasarım A): Tür → İçerik → Nerede ve ne zaman → Kontrol ve gönder. Üstte ilerleme çubuğu ve
+ * "Adım 2/4", altta sabit "Devam". Ekrandan yarıda çıkılırsa (bir şey yazıldıysa) duyuru taslak olarak saklanır;
+ * Duyurular › Taslaklar'dan kaldığı adımdan devam edilir. Okulda onay açıksa ve kişinin onay yetkisi yoksa son düğme
+ * "Onaya gönder" olur.
  */
+
+const STEPS = ['Tür', 'İçerik', 'Nerede ve ne zaman', 'Kontrol ve gönder'] as const;
+const KINDS: { value: Kind; label: string; text: string; icon: IconName; bg: string }[] = [
+  { value: 'design', label: 'Hazır şablon', text: 'Doldurup gönderin', icon: 'albums-outline', bg: '#d1fae5' },
+  { value: 'image', label: 'Fotoğraf', text: 'Fotoğraf ya da afiş', icon: 'image-outline', bg: '#dbeafe' },
+  { value: 'text', label: 'Yazı', text: 'Başlık ve kısa yazı', icon: 'text', bg: '#fef3c7' },
+];
+const UNTIL_LABEL: Record<Until, string> = { '1': 'Bugün', '3': '3 gün', '7': '1 hafta', none: 'Süresiz' };
+
+interface State {
+  kind: Kind;
+  templateId: string;
+  fields: Record<string, string>;
+  title: string;
+  body: string;
+  imageUrl: string | null;
+  screenIds: string[];
+  phase: Phase;
+  until: Until;
+}
+
+const hasContent = (s: State) => Boolean(s.title.trim() || s.body.trim() || s.imageUrl || Object.values(s.fields).some((v) => v?.trim()));
+
+/** Seçilen gün sayısı sonunda gece yarısı (telefonun saatiyle) yayından kalkar */
+function endOf(until: Until): Date | null {
+  if (until === 'none') return null;
+  const end = new Date();
+  end.setHours(0, 0, 0, 0);
+  end.setDate(end.getDate() + Number(until));
+  return end;
+}
+const localInput = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T00:00`;
+
+/** Taslak web paneliyle aynı biçimde saklanır (oradan da devam edilebilir) */
+function toDraftData(s: State): AnnouncementDraft['data'] {
+  const t = designTemplate(s.templateId);
+  const end = endOf(s.until);
+  return {
+    kind: s.kind,
+    design: { template: t.id, palette: t.palette, fields: s.fields },
+    title: s.title,
+    body: s.body,
+    imageUrl: s.imageUrl,
+    screenIds: s.screenIds,
+    schedule: { days: [], from: null, to: null, phase: s.phase },
+    endsAt: end ? localInput(end) : '',
+    until: s.until,
+  };
+}
+
 export default function DuyuruYeni() {
   const { school, can } = useAuth();
   const qc = useQueryClient();
   const path = useSchoolPath('announcements');
+  const draftsPath = useSchoolPath('announcement-drafts');
+  const { taslak } = useLocalSearchParams<{ taslak?: string }>();
+  const drafts = useAnnouncementDrafts(Boolean(taslak));
   const info = useSchoolInfo();
   const screens = useScreens();
+  const [step, setStep] = useState(0);
+  // Taslak, ulaşılan en ileri adımdan açılır (geri gelinip çıkılsa da)
+  const [furthest, setFurthest] = useState(0);
+  useEffect(() => setFurthest((f) => Math.max(f, step)), [step]);
   const [kind, setKind] = useState<Kind>('design');
   const [templateId, setTemplateId] = useState(ANNOUNCEMENT_TEMPLATES[0]!.id);
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -36,8 +96,48 @@ export default function DuyuruYeni() {
   const [screenIds, setScreenIds] = useState<string[]>([]);
   const [phase, setPhase] = useState<Phase>('any');
   const [until, setUntil] = useState<Until>('7');
+  const [draftId, setDraftId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Taslaktan devam: bir kez doldurulur, kaldığı adımdan açılır
+  const loaded = useRef(false);
+  useEffect(() => {
+    if (!taslak || loaded.current || !drafts.data) return;
+    loaded.current = true;
+    const d = drafts.data.find((x) => x.id === taslak);
+    if (!d) return;
+    const x = d.data;
+    setDraftId(d.id);
+    if (x.kind === 'design' || x.kind === 'image' || x.kind === 'text') setKind(x.kind);
+    if (x.design?.template) setTemplateId(designTemplate(x.design.template).id);
+    setFields(x.design?.fields ?? {});
+    setTitle(x.title ?? '');
+    setBody(x.body ?? '');
+    setImageUrl(x.imageUrl ?? null);
+    setScreenIds(x.screenIds ?? []);
+    setPhase(x.schedule?.phase === 'break' ? 'break' : 'any');
+    setUntil(x.until ?? (x.endsAt ? '7' : 'none'));
+    setStep(Math.min(3, Math.max(0, d.step)));
+  }, [taslak, drafts.data]);
+
+  // Ekrandan yarıda çıkılırsa taslak saklanır (geri düğmesi, telefonun geri tuşu, sekme değişimi)
+  const state: State = { kind, templateId, fields, title, body, imageUrl, screenIds, phase, until };
+  const latest = useRef({ state, step: furthest, draftId, draftsPath, schoolId: school?.id });
+  latest.current = { state, step: furthest, draftId, draftsPath, schoolId: school?.id };
+  const submitted = useRef(false);
+  useEffect(
+    () => () => {
+      const l = latest.current;
+      if (submitted.current || !hasContent(l.state)) return;
+      const body = { step: l.step, data: toDraftData(l.state) };
+      void (l.draftId ? api(`${l.draftsPath}/${l.draftId}`, { method: 'PUT', body }) : api(l.draftsPath, { method: 'POST', body }))
+        .then(() => qc.invalidateQueries({ queryKey: [l.schoolId, 'announcement-drafts'] }))
+        .catch(() => undefined);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   const t = designTemplate(templateId);
   const design: AnnouncementDesign = { template: t.id, palette: t.palette, fields };
@@ -55,7 +155,6 @@ export default function DuyuruYeni() {
     try {
       const { url } = await uploadImage(school.id, asset as never);
       setImageUrl(url);
-      setKind('image');
     } catch (err) {
       setError(errorText(err, 'Fotoğraf yüklenemedi'));
     } finally {
@@ -63,14 +162,35 @@ export default function DuyuruYeni() {
     }
   };
 
+  const contentProblem =
+    kind === 'design'
+      ? fields[t.headline.key]?.trim()
+        ? null
+        : `"${t.headline.label}" alanını doldurun.`
+      : kind === 'image'
+        ? !imageUrl
+          ? 'Bir fotoğraf seçin.'
+          : !title.trim()
+            ? 'Başlık yazın.'
+            : null
+        : !title.trim()
+          ? 'Başlık yazın.'
+          : null;
+
+  const next = () => {
+    setError(null);
+    if (step === 1 && contentProblem) return setError(contentProblem);
+    setStep(step + 1);
+  };
+
   const submit = async () => {
+    if (contentProblem) {
+      setError(contentProblem);
+      return setStep(1);
+    }
     setBusy(true);
     setError(null);
-    // Seçilen gün sayısı sonunda gece yarısı (telefonun saatiyle) yayından kalkar
-    const end = new Date();
-    end.setHours(0, 0, 0, 0);
-    end.setDate(end.getDate() + Number(until));
-    const endsAt = until === 'none' ? null : end.toISOString();
+    const end = endOf(until);
     const payload =
       kind === 'design'
         ? { kind, title: designTitle(design), design }
@@ -84,10 +204,12 @@ export default function DuyuruYeni() {
           ...payload,
           screenIds: screenIds.length ? screenIds : null,
           schedule: phase === 'break' ? { days: [], from: null, to: null, phase: 'break' } : null,
-          endsAt,
+          endsAt: end ? end.toISOString() : null,
         },
       });
-      await Promise.all(['announcements', 'control-center'].map((k) => qc.invalidateQueries({ queryKey: [school?.id, k] })));
+      submitted.current = true;
+      if (draftId) await api(`${draftsPath}/${draftId}`, { method: 'DELETE' }).catch(() => undefined);
+      await Promise.all(['announcements', 'control-center', 'announcement-drafts'].map((k) => qc.invalidateQueries({ queryKey: [school?.id, k] })));
       router.back();
     } catch (err) {
       setError(errorText(err, 'Kaydedilemedi'));
@@ -106,113 +228,171 @@ export default function DuyuruYeni() {
     );
   }
 
-  const ready = kind === 'design' ? Boolean(fields[t.headline.key]?.trim()) : kind === 'image' ? Boolean(imageUrl && title.trim()) : Boolean(title.trim());
+  const screenNames = screenIds.map((id) => screens.data?.find((s) => s.id === id)?.name ?? '?');
+  const shownTitle = kind === 'design' ? designTitle(design) : title;
+  const preview = (
+    <View style={{ borderRadius: 16, overflow: 'hidden' }}>
+      <AnnouncementPreview kind={kind} title={title || 'Duyuru başlığı'} body={body || null} imageUrl={imageUrl} design={kind === 'design' ? design : null} height={190} />
+    </View>
+  );
 
   return (
     <Screen
       back
+      onBack={step > 0 ? () => setStep(step - 1) : undefined}
       title="Yeni duyuru"
       footer={
         <>
           {error && <T color={colors.danger}>{error}</T>}
-          {needsApproval && (
+          {step === 3 && needsApproval && (
             <T size={12} color={colors.muted} style={{ textAlign: 'center' }}>
               Okulunuzda onay açık: yönetici onaylayınca panoya çıkar
             </T>
           )}
-          <Button size="lg" loading={busy} disabled={!ready || uploading} onPress={() => void submit()}>
-            {needsApproval ? 'Onaya gönder' : 'Yayınla'}
-          </Button>
+          {step < 3 ? (
+            <Button size="lg" disabled={uploading} onPress={next}>
+              Devam
+            </Button>
+          ) : (
+            <Button size="lg" loading={busy} disabled={uploading} onPress={() => void submit()}>
+              {needsApproval ? 'Onaya gönder' : 'Yayına al'}
+            </Button>
+          )}
         </>
       }
     >
-      <Segmented
-        value={kind}
-        onChange={setKind}
-        options={[
-          { value: 'design', label: 'Hazır Şablon' },
-          { value: 'image', label: 'Fotoğraf' },
-          { value: 'text', label: 'Yazı' },
-        ]}
-      />
-
-      {kind === 'design' && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
-          {ANNOUNCEMENT_TEMPLATES.map((x) => (
-            <Chip key={x.id} label={x.name} selected={x.id === templateId} onPress={() => setTemplateId(x.id)} />
-          ))}
-        </ScrollView>
-      )}
-
-      <View style={{ borderRadius: 16, overflow: 'hidden' }}>
-        <AnnouncementPreview kind={kind} title={title || 'Duyuru başlığı'} body={body || null} imageUrl={imageUrl} design={kind === 'design' ? design : null} height={190} />
+      <View style={{ gap: 6 }}>
+        <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.border, overflow: 'hidden' }}>
+          <View style={{ width: `${((step + 1) / STEPS.length) * 100}%`, height: '100%', backgroundColor: colors.brand }} />
+        </View>
+        <T size={12.5} weight="700" color={colors.muted}>
+          Adım {step + 1}/{STEPS.length} · {STEPS[step]}
+        </T>
       </View>
 
-      {kind === 'design' ? (
-        designFields(t)
-          .filter((f) => f.type !== 'image')
-          .map((f) => (
-            <Field
-              key={`${t.id}-${f.key}`}
-              label={f.label}
-              value={fields[f.key] ?? ''}
-              onChangeText={(v) => setFields((x) => ({ ...x, [f.key]: v }))}
-              placeholder={f.placeholder}
-              maxLength={f.max}
-              multiline={f.multiline}
-            />
-          ))
-      ) : (
+      {step === 0 &&
+        KINDS.map((k) => {
+          const on = k.value === kind;
+          return (
+            <Pressable
+              key={k.value}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              onPress={() => setKind(k.value)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 18, borderWidth: on ? 2 : 1, borderColor: on ? colors.ink : colors.border, backgroundColor: colors.card }}
+            >
+              <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: k.bg, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name={k.icon} size={20} color="#1c1917" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.ink }}>{k.label}</Text>
+                <Text style={{ fontSize: 13, color: colors.muted }}>{k.text}</Text>
+              </View>
+              {on && <Icon name="checkmark-circle" size={22} color={colors.ink} />}
+            </Pressable>
+          );
+        })}
+
+      {step === 1 && (
         <>
-          {kind === 'image' && (
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              {Platform.OS !== 'web' && (
-                <Button variant="secondary" icon="camera-outline" style={{ flex: 1 }} loading={uploading} onPress={() => void pick(true)}>
-                  Fotoğraf çek
-                </Button>
-              )}
-              <Button variant="secondary" icon="image-outline" style={{ flex: 1 }} loading={uploading} onPress={() => void pick(false)}>
-                Galeriden seç
-              </Button>
-            </View>
+          {kind === 'design' && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
+              {ANNOUNCEMENT_TEMPLATES.map((x) => (
+                <Chip key={x.id} label={x.name} selected={x.id === templateId} onPress={() => setTemplateId(x.id)} />
+              ))}
+            </ScrollView>
           )}
-          <Field label="Başlık" value={title} onChangeText={setTitle} maxLength={120} placeholder="ör. Bilim fuarımızdan kareler" />
-          <Field label="Açıklama (isteğe bağlı)" value={body} onChangeText={setBody} maxLength={600} multiline />
+          {preview}
+          {kind === 'design' ? (
+            designFields(t)
+              .filter((f) => f.type !== 'image')
+              .map((f) => (
+                <Field
+                  key={`${t.id}-${f.key}`}
+                  label={f.label}
+                  value={fields[f.key] ?? ''}
+                  onChangeText={(v) => setFields((x) => ({ ...x, [f.key]: v }))}
+                  placeholder={f.placeholder}
+                  maxLength={f.max}
+                  multiline={f.multiline}
+                />
+              ))
+          ) : (
+            <>
+              {kind === 'image' && (
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  {Platform.OS !== 'web' && (
+                    <Button variant="secondary" icon="camera-outline" style={{ flex: 1 }} loading={uploading} onPress={() => void pick(true)}>
+                      Fotoğraf çek
+                    </Button>
+                  )}
+                  <Button variant="secondary" icon="image-outline" style={{ flex: 1 }} loading={uploading} onPress={() => void pick(false)}>
+                    Galeriden seç
+                  </Button>
+                </View>
+              )}
+              <Field label="Başlık" value={title} onChangeText={setTitle} maxLength={120} placeholder="ör. Bilim fuarımızdan kareler" />
+              <Field label={kind === 'text' ? 'Duyuru metni' : 'Açıklama (isteğe bağlı)'} value={body} onChangeText={setBody} maxLength={600} multiline />
+            </>
+          )}
+          <T size={12} color={colors.muted}>
+            Uzun metinleri yazarken telefon klavyesindeki mikrofonla sesli yazabilirsiniz.
+          </T>
         </>
       )}
-      <T size={12} color={colors.muted}>
-        Uzun metinleri yazarken telefon klavyesindeki mikrofonla sesli yazabilirsiniz.
-      </T>
 
-      <SectionTitle>Hangi panolarda</SectionTitle>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        <Chip label="Tüm panolar" selected={!screenIds.length} onPress={() => setScreenIds([])} />
-        {(screens.data ?? []).map((s) => {
-          const on = screenIds.includes(s.id);
-          return <Chip key={s.id} label={s.name} selected={on} onPress={() => setScreenIds(on ? screenIds.filter((x) => x !== s.id) : [...screenIds, s.id])} />;
-        })}
-      </View>
+      {step === 2 && (
+        <>
+          <SectionTitle>Hangi panolarda</SectionTitle>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <Chip label="Tüm panolar" selected={!screenIds.length} onPress={() => setScreenIds([])} />
+            {(screens.data ?? []).map((s) => {
+              const on = screenIds.includes(s.id);
+              return <Chip key={s.id} label={s.name} selected={on} onPress={() => setScreenIds(on ? screenIds.filter((x) => x !== s.id) : [...screenIds, s.id])} />;
+            })}
+          </View>
+          <SectionTitle>Ne zaman</SectionTitle>
+          <Choice
+            value={phase}
+            onChange={setPhase}
+            options={[
+              { value: 'any', label: 'Her zaman' },
+              { value: 'break', label: 'Teneffüslerde' },
+            ]}
+          />
+          <SectionTitle>Ne kadar süre</SectionTitle>
+          <Choice
+            value={until}
+            onChange={setUntil}
+            columns={4}
+            options={(Object.keys(UNTIL_LABEL) as Until[]).map((u) => ({ value: u, label: UNTIL_LABEL[u] }))}
+          />
+        </>
+      )}
 
-      <SectionTitle>Yayın zamanı</SectionTitle>
-      <Choice
-        value={phase}
-        onChange={setPhase}
-        options={[
-          { value: 'any', label: 'Her zaman' },
-          { value: 'break', label: 'Teneffüslerde' },
-        ]}
-      />
-      <Choice
-        value={until}
-        onChange={setUntil}
-        columns={4}
-        options={[
-          { value: '1', label: 'Bugün' },
-          { value: '3', label: '3 gün' },
-          { value: '7', label: '1 hafta' },
-          { value: 'none', label: 'Süresiz' },
-        ]}
-      />
+      {step === 3 && (
+        <>
+          {preview}
+          <Card style={{ paddingVertical: 4, gap: 0 }}>
+            {[
+              { label: 'Tür', value: KINDS.find((k) => k.value === kind)!.label, to: 0 },
+              { label: 'Başlık', value: shownTitle || '—', to: 1 },
+              { label: 'Panolar', value: screenNames.length ? screenNames.join(', ') : 'Tüm panolar', to: 2 },
+              { label: 'Zaman', value: `${phase === 'break' ? 'Teneffüslerde' : 'Her zaman'} · ${UNTIL_LABEL[until]}`, to: 2 },
+            ].map((r, i) => (
+              <View key={r.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: colors.divider }}>
+                <Text style={{ width: 70, fontSize: 13, color: colors.muted }}>{r.label}</Text>
+                <Text style={{ flex: 1, fontSize: 14, fontWeight: '700', color: colors.ink }} numberOfLines={2}>
+                  {r.value}
+                </Text>
+                <Pressable accessibilityRole="button" accessibilityLabel={`${r.label}: değiştir`} onPress={() => setStep(r.to)} hitSlop={8}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: colors.brand }}>Değiştir</Text>
+                </Pressable>
+              </View>
+            ))}
+          </Card>
+        </>
+      )}
     </Screen>
   );
 }

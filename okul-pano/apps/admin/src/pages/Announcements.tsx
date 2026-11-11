@@ -1,53 +1,46 @@
-import { announcementSchema, designTemplate, designTitle, parseYouTubeUrl, youTubeThumbnail, type AnnouncementDesign } from '@okulpano/shared';
-import { Image as ImageIcon, LayoutTemplate, Megaphone, PlayCircle, ScanEye, Type } from '../components/icons.tsx';
+import { announcementSchema, designTemplate, designTitle, parseYouTubeUrl, youTubeThumbnail } from '@okulpano/shared';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { FileText, Megaphone, PlayCircle, ScanEye } from '../components/icons.tsx';
 import { useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
+import { confirm } from '../components/confirm.tsx';
 import { CrudPage } from '../components/CrudPage.tsx';
-import { ImageUpload } from '../components/ImageUpload.tsx';
-import { Alert, Badge, Button, Field, Input, Segmented, Textarea, Toggle } from '../components/ui.tsx';
+import { useToast } from '../components/Toast.tsx';
+import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Segmented } from '../components/ui.tsx';
+import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
-import { useList, useSchool, type Announcement, type AnnouncementSchedule, type Screen } from '../lib/data.ts';
-import { expiredRowState, formatDateTime, isoToLocalInput, localInputToIso, publishState, sortByPublish } from '../lib/format.ts';
-import { DesignEditor, DesignThumb, emptyDesign } from './announcements/DesignEditor.tsx';
+import { useList, useSchool, useSchoolPath, type Announcement, type Screen } from '../lib/data.ts';
+import { expiredRowState, formatDateTime, isoToLocalInput, publishState, sortByPublish } from '../lib/format.ts';
+import { DesignThumb, emptyDesign } from './announcements/DesignEditor.tsx';
 import { ReviewDialog } from './announcements/ReviewDialog.tsx';
-import { emptySchedule, ScheduleFields, scheduleSummary } from './announcements/ScheduleFields.tsx';
+import { emptySchedule, scheduleSummary } from './announcements/ScheduleFields.tsx';
+import { AnnouncementWizard, emptyAnnouncementForm, hasContent, KIND_LABEL as FORM_KIND_LABEL, STEPS, toAnnouncementPayload, type AnnouncementForm } from './announcements/Wizard.tsx';
 
-type Form = {
-  kind: 'image' | 'video' | 'text' | 'design';
-  design: AnnouncementDesign;
-  screenIds: string[];
-  schedule: AnnouncementSchedule;
-  title: string;
-  body: string;
-  imageUrl: string | null;
-  youtubeUrl: string;
-  durationSec: string;
-  startsAt: string;
-  endsAt: string;
-  isActive: boolean;
-};
+type Form = AnnouncementForm;
+const empty = emptyAnnouncementForm;
 
-const empty = (): Form => ({
-  kind: 'image',
-  design: emptyDesign(),
-  screenIds: [],
-  schedule: emptySchedule(),
-  title: '',
-  body: '',
-  imageUrl: null,
-  youtubeUrl: '',
-  durationSec: '',
-  startsAt: '',
-  endsAt: '',
-  isActive: true,
-});
-
-/** Şablonun bilgi satırları ve notu listede özet olarak görünür */
-function designBody(d: AnnouncementDesign): string | null {
-  const t = designTemplate(d.template);
-  const parts = [t.subline, ...t.info, t.note].map((f) => (f ? d.fields[f.key]?.trim() : '')).filter(Boolean);
-  return parts.length ? parts.join(' · ').slice(0, 600) : null;
+/** Yarım kalan duyuru (yalnızca giren kişiye görünür) */
+interface Draft {
+  id: string;
+  step: number;
+  data: Partial<Form>;
+  updatedAt: string;
 }
+
+const toForm = (r: Announcement): Form => ({
+  kind: r.kind,
+  design: r.design ?? emptyDesign(),
+  screenIds: r.screenIds ?? [],
+  schedule: r.schedule ?? emptySchedule(),
+  title: r.title,
+  body: r.body ?? '',
+  imageUrl: r.imageUrl,
+  youtubeUrl: r.youtubeUrl ?? '',
+  durationSec: r.durationSec ? String(r.durationSec) : '',
+  startsAt: isoToLocalInput(r.startsAt),
+  endsAt: isoToLocalInput(r.endsAt),
+  isActive: r.isActive,
+});
 
 export function StateBadge({ row }: { row: { isActive: boolean; startsAt: string | null; endsAt: string | null } }) {
   const state = publishState(row);
@@ -107,7 +100,23 @@ export function Announcements() {
   const openReview = (id: string) => setParams({ incele: id });
   const closeReview = () => setParams({}, { replace: true });
   const pendingCount = (all.data ?? []).filter((a) => a.approvalStatus === 'pending').length;
-  const [filter, setFilter] = useState<'all' | 'pending'>('all');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'drafts'>('all');
+  const { schoolId } = useAuth();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const draftsPath = useSchoolPath('announcement-drafts');
+  const drafts = useQuery({ queryKey: [schoolId, 'announcement-drafts'], queryFn: () => api<Draft[]>(draftsPath), enabled: can('announcements.manage') });
+  const refreshDrafts = () => qc.invalidateQueries({ queryKey: [schoolId, 'announcement-drafts'] });
+  const removeDraft = useMutation({ mutationFn: (id: string) => api(`${draftsPath}/${id}`, { method: 'DELETE' }), onSuccess: refreshDrafts });
+  // Taslaktan açılan pencere: kapanınca taslak güncellenir, yayına alınınca silinir
+  const [draft, setDraft] = useState<{ id: string; step: number } | null>(null);
+  const [openRequest, setOpenRequest] = useState<{ values: Form; key: number } | null>(null);
+  const draftCount = drafts.data?.length ?? 0;
+  const approvalNeeded = Boolean(school.data?.settings.requireApproval) && !approver;
+  const openDraft = (d: Draft) => {
+    setDraft({ id: d.id, step: d.step });
+    setOpenRequest({ values: { ...empty(), ...d.data }, key: Date.now() });
+  };
 
   return (
     <>
@@ -130,26 +139,79 @@ export function Announcements() {
         sortByPublish(filter === 'pending' ? rows.filter((r) => r.approvalStatus === 'pending') : rows, (r) => r.approvalStatus !== 'approved')
       }
       tabs={
-        (pendingCount > 0 || school.data?.settings.requireApproval) && (
-          <div className="space-y-3">
-            {pendingCount > 0 && (
-              <Alert tone="amber">
-                {approver
-                  ? `${pendingCount} duyuru onayınızı bekliyor. Onaylanınca panolarda yayına çıkar.`
-                  : `${pendingCount} duyuru onay bekliyor; yetkili kişi onaylayınca panolarda yayına çıkar.`}
-              </Alert>
-            )}
-            <Segmented
-              value={filter}
-              onChange={setFilter}
-              options={[
-                { value: 'all', label: 'Tümü' },
-                { value: 'pending', label: `Onay Bekleyenler${pendingCount ? ` (${pendingCount})` : ''}` },
-              ]}
-            />
-          </div>
-        )
+        <div className="space-y-3">
+          {pendingCount > 0 && (
+            <Alert tone="amber">
+              {approver
+                ? `${pendingCount} duyuru onayınızı bekliyor. Onaylanınca panolarda yayına çıkar.`
+                : `${pendingCount} duyuru onay bekliyor; yetkili kişi onaylayınca panolarda yayına çıkar.`}
+            </Alert>
+          )}
+          <Segmented
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { value: 'all', label: 'Tümü' },
+              ...(pendingCount > 0 || school.data?.settings.requireApproval
+                ? [{ value: 'pending' as const, label: `Onay Bekleyenler${pendingCount ? ` (${pendingCount})` : ''}` }]
+                : []),
+              {
+                value: 'drafts' as const,
+                label: (
+                  <span className="flex items-center gap-1.5">
+                    Taslaklar
+                    {draftCount > 0 && (
+                      <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-rose-600 px-1.5 text-[11px] leading-5 font-extrabold text-white" aria-label={`${draftCount} taslak`}>
+                        {draftCount}
+                      </span>
+                    )}
+                  </span>
+                ),
+              },
+            ]}
+          />
+        </div>
       }
+      replaceContent={
+        filter === 'drafts' ? <DraftList drafts={drafts.data ?? []} loading={drafts.isLoading} onOpen={openDraft} onDelete={(id) => removeDraft.mutate(id)} /> : undefined
+      }
+      openRequest={openRequest}
+      renderModal={(m) => (
+        <AnnouncementWizard
+          api={m}
+          startStep={draft?.step ?? 0}
+          defaultDuration={defaultDuration}
+          approvalNeeded={approvalNeeded}
+          onDismiss={(values, step) => {
+            void (async () => {
+              if (m.editing) {
+                // Düzenleme: değişiklik varsa uyarı; taslak tutulmaz
+                const changed = JSON.stringify(values) !== JSON.stringify(toForm(m.editing));
+                if (changed && !(await confirm({ title: 'Değişiklikler kaydedilmedi', message: 'Pencere kapanırsa yaptığınız değişiklikler kaybolur.', confirmLabel: 'Kapat', tone: 'warning' }))) return;
+                m.close();
+                return;
+              }
+              // Yeni duyuru: bir şey yazıldıysa taslak olarak saklanır
+              if (hasContent(values) || draft) {
+                try {
+                  if (draft) await api(`${draftsPath}/${draft.id}`, { method: 'PUT', body: { step, data: values } });
+                  else await api(draftsPath, { method: 'POST', body: { step, data: values } });
+                  await refreshDrafts();
+                  toast.success('Duyuru taslaklara kaydedildi');
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : 'Taslak kaydedilemedi');
+                }
+              }
+              setDraft(null);
+              m.close();
+            })();
+          }}
+          onSaved={() => {
+            if (draft) void api(`${draftsPath}/${draft.id}`, { method: 'DELETE' }).then(refreshDrafts, refreshDrafts);
+            setDraft(null);
+          }}
+        />
+      )}
       rowActions={(r) =>
         approver && r.approvalStatus === 'pending' ? (
           <Button size="sm" variant="success" icon={<ScanEye className="size-3.5" />} onClick={() => openReview(r.id)}>
@@ -206,125 +268,46 @@ export function Announcements() {
         },
       ]}
       emptyForm={empty}
-      toForm={(r) => ({
-        kind: r.kind,
-        design: r.design ?? emptyDesign(),
-        screenIds: r.screenIds ?? [],
-        schedule: r.schedule ?? emptySchedule(),
-        title: r.title,
-        body: r.body ?? '',
-        imageUrl: r.imageUrl,
-        youtubeUrl: r.youtubeUrl ?? '',
-        durationSec: r.durationSec ? String(r.durationSec) : '',
-        startsAt: isoToLocalInput(r.startsAt),
-        endsAt: isoToLocalInput(r.endsAt),
-        isActive: r.isActive,
-      })}
-      toPayload={(f) => ({
-        kind: f.kind,
-        // Şablonlu duyuruda başlık ve metin şablondaki alanlardan oluşur (listede ve geçmişte görünür)
-        title: f.kind === 'design' ? designTitle(f.design) : f.title,
-        body: f.kind === 'design' ? designBody(f.design) : f.body || null,
-        design: f.kind === 'design' ? f.design : null,
-        screenIds: f.screenIds.length ? f.screenIds : null,
-        schedule: f.schedule,
-        imageUrl: f.kind === 'image' ? f.imageUrl : null,
-        youtubeUrl: f.kind === 'video' ? f.youtubeUrl : null,
-        durationSec: f.durationSec ? Number(f.durationSec) : null,
-        startsAt: localInputToIso(f.startsAt),
-        endsAt: localInputToIso(f.endsAt),
-        isActive: f.isActive,
-      })}
-      renderForm={({ values: v, set, errors }) => {
-        const yt = v.youtubeUrl ? parseYouTubeUrl(v.youtubeUrl) : null;
-        return (
-          <>
-            <Segmented
-              value={v.kind}
-              onChange={(k) => set('kind', k)}
-              options={[
-                { value: 'image', label: <span className="flex items-center gap-1.5"><ImageIcon className="size-4" /> Görsel</span> },
-                { value: 'video', label: <span className="flex items-center gap-1.5"><PlayCircle className="size-4" /> YouTube</span> },
-                { value: 'text', label: <span className="flex items-center gap-1.5"><Type className="size-4" /> Metin</span> },
-                { value: 'design', label: <span className="flex items-center gap-1.5"><LayoutTemplate className="size-4" /> Hazır Şablon</span> },
-              ]}
-            />
-
-            {v.kind === 'design' && <DesignEditor value={v.design} onChange={(d) => set('design', d)} />}
-
-            {v.kind === 'image' && (
-              <div>
-                <ImageUpload value={v.imageUrl} onChange={(url) => set('imageUrl', url)} invalid={Boolean(errors.imageUrl)} />
-                {errors.imageUrl && <p className="mt-1.5 text-xs font-medium text-red-600">{errors.imageUrl}</p>}
-              </div>
-            )}
-
-            {v.kind === 'video' && (
-              <Field label="YouTube bağlantısı" error={errors.youtubeUrl} help="youtube.com/watch, youtu.be ve Shorts bağlantıları desteklenir. Video bitince sıradaki slayta geçilir.">
-                {(id) => (
-                  <div className="space-y-3">
-                    <Input
-                      id={id}
-                      value={v.youtubeUrl}
-                      onChange={(e) => set('youtubeUrl', e.target.value)}
-                      placeholder="https://www.youtube.com/watch?v=…"
-                      invalid={Boolean(errors.youtubeUrl)}
-                    />
-                    {yt && (
-                      <img src={youTubeThumbnail(yt.id)} alt="Video önizlemesi" className="aspect-video w-full rounded-xl object-cover ring-1 ring-slate-200" />
-                    )}
-                  </div>
-                )}
-              </Field>
-            )}
-
-            {v.kind !== 'design' && (
-              <>
-                <Field label="Başlık" error={errors.title}>
-                  {(id) => (
-                    <Input id={id} value={v.title} onChange={(e) => set('title', e.target.value)} maxLength={120} placeholder="ör. Bilim Fuarı Başvuruları Başladı" invalid={Boolean(errors.title)} />
-                  )}
-                </Field>
-
-                <Field label={v.kind === 'text' ? 'Duyuru metni' : 'Açıklama (isteğe bağlı)'} error={errors.body} help={`${v.body.length}/600 · Koridordan okunabilmesi için kısa tutun.`}>
-                  {(id) => <Textarea id={id} value={v.body} onChange={(e) => set('body', e.target.value)} maxLength={600} rows={3} />}
-                </Field>
-              </>
-            )}
-
-            <ScheduleFields
-              screenIds={v.screenIds}
-              schedule={v.schedule}
-              startsAt={v.startsAt}
-              endsAt={v.endsAt}
-              onScreens={(ids) => set('screenIds', ids)}
-              onSchedule={(x) => set('schedule', x)}
-              onStartsAt={(x) => set('startsAt', x)}
-              onEndsAt={(x) => set('endsAt', x)}
-              error={errors.schedule}
-              endsError={errors.endsAt}
-            />
-
-            <Field label="Slaytın ekranda kalma süresi (sn)" error={errors.durationSec}>
-              {(id) => (
-                <Input
-                  id={id}
-                  type="number"
-                  min={3}
-                  max={1800}
-                  className="max-w-56"
-                  value={v.durationSec}
-                  onChange={(e) => set('durationSec', e.target.value)}
-                  placeholder={v.kind === 'video' ? 'Video süresi' : `Varsayılan (${defaultDuration})`}
-                />
-              )}
-            </Field>
-
-            <Toggle checked={v.isActive} onChange={(x) => set('isActive', x)} label="Yayında" description="Kapalıysa duyuru saklanır ama panoda gösterilmez." />
-          </>
-        );
-      }}
+      toForm={toForm}
+      toPayload={toAnnouncementPayload}
+      // Pencere adım adım sihirbazdır (renderModal); bu ortak form kullanılmaz
+      renderForm={() => null}
     />
     </>
+  );
+}
+
+/** Taslaklar: yarım kalan duyurular (yalnızca giren kişi görür); "Devam et" kaldığı adımdan açar */
+function DraftList({ drafts, loading, onOpen, onDelete }: { drafts: Draft[]; loading: boolean; onOpen: (d: Draft) => void; onDelete: (id: string) => void }) {
+  if (!loading && !drafts.length)
+    return (
+      <Card>
+        <EmptyState icon={<FileText className="size-6" />} title="Taslak yok" description="Yeni duyuruyu yarıda bırakırsanız burada saklanır; kaldığınız adımdan devam edebilirsiniz." />
+      </Card>
+    );
+  return (
+    <Card>
+      <ul className="divide-y divide-slate-100">
+        {drafts.map((d) => {
+          const f = { ...emptyAnnouncementForm(), ...d.data };
+          const title = (f.kind === 'design' ? designTitle(f.design).trim() : f.title.trim()) || 'Başlıksız taslak';
+          return (
+            <li key={d.id} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
+              <FileText className="size-5 shrink-0 text-slate-400" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-semibold text-ink">{title}</div>
+                <div className="text-xs text-slate-500">
+                  {FORM_KIND_LABEL[f.kind]} · "{STEPS[Math.min(3, d.step)]}" adımında kaldı · {formatDateTime(d.updatedAt)}
+                </div>
+              </div>
+              <Button size="sm" onClick={() => onOpen(d)}>
+                Devam et
+              </Button>
+              <DeleteButton label="Taslağı sil" what="Bu taslak" onConfirm={() => onDelete(d.id)} />
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
   );
 }

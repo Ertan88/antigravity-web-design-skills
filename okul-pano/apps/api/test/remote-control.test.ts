@@ -104,8 +104,9 @@ describe.skipIf(holidayToday)('izin bildirimi ve boş nöbet', () => {
     const day = (await owner.get(path('duty-day'))).json();
     expect(day.gaps).toEqual([dutyId]);
     const names = (day.candidates as { fullName: string }[]).map((c) => c.fullName);
-    // Yalnızca o günün nöbetçisi önerilir; izinli ve o gün nöbeti olmayanlar önerilmez
-    expect(names).toEqual(['Mehmet Kaya']);
+    // Boş nöbet yerine öneri yok; nöbetçiye (Mehmet Kaya) ikinci nöbet verilmez
+    expect(names).toEqual([]);
+    expect((await owner.post(path('duty-substitutions'), { date: today.isoDate, dutyId, teacherId: teacherIds['Mehmet Kaya'] })).statusCode).toBe(400);
 
     const center = (await owner.get(path('control-center'))).json();
     expect(center.dutyGaps).toEqual([{ dutyId, area: 'Bahçe', teacherName: 'Ayşe Demir' }]);

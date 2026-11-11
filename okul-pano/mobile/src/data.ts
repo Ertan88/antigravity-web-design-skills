@@ -194,6 +194,26 @@ export function useSchoolQuery<T>(resource: string, opts: { refetchInterval?: nu
 }
 
 export const useSchoolInfo = () => useSchoolQuery<SchoolInfo>('');
+
+/** Yarım kalan duyuru (web ile ortak; yalnızca giren kişi görür). `data` web panelinin form alanlarıdır. */
+export interface AnnouncementDraft {
+  id: string;
+  step: number;
+  data: {
+    kind?: 'image' | 'video' | 'text' | 'design';
+    design?: { template: string; palette: string; fields: Record<string, string> };
+    title?: string;
+    body?: string;
+    imageUrl?: string | null;
+    screenIds?: string[];
+    schedule?: { days: number[]; from: string | null; to: string | null; phase: 'any' | 'break' | 'lesson' };
+    endsAt?: string;
+    /** Mobilin süre seçimi (1, 3, 7 gün ya da süresiz) */
+    until?: '1' | '3' | '7' | 'none';
+  };
+  updatedAt: string;
+}
+export const useAnnouncementDrafts = (enabled = true) => useSchoolQuery<AnnouncementDraft[]>('announcement-drafts', { enabled });
 /** Sınav takvimi: bugünden 60 gün (saat, gözetmen ve hatırlatma anı sunucuda hesaplanmış) */
 export const useExamSchedule = () => useSchoolQuery<{ today: string; exams: ScheduledExam[] }>('exam-schedule', { refetchInterval: 10 * 60_000 });
 export const useMeToday = () => useSchoolQuery<MeToday>('me/today', { refetchInterval: 5 * 60_000 });

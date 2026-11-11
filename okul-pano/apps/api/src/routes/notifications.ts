@@ -132,7 +132,8 @@ export async function notificationRoutes(app: FastifyInstance) {
           key: `duty-gap:${today}:${gaps.map((g) => g.dutyId).join(',')}`,
           kind: 'duty-gap',
           title: 'Boş nöbet yeri',
-          body: `${gaps.map((g) => `${g.area} (${g.teacherName} izinli)`).join(', ')}: yerine görevlendirme yapın.`,
+          // Nöbetçiye ikinci nöbet verilmez; bildirim yalnızca bilgi verir
+          body: `${gaps.map((g) => `${g.area} (${g.teacherName} izinli)`).join(', ')} nöbet yeri boş.`,
           at: new Date(`${today}T05:00:00Z`).toISOString(),
           to: '/nobet',
         });

@@ -1,12 +1,9 @@
-import { errorText } from '@okulpano/shared';
 import { normalizeName } from '@okulpano/shared/teachers';
-import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Text } from '../../src/text.tsx';
-import { api } from '../../src/api.ts';
-import { useAuth, useSchoolPath } from '../../src/auth.tsx';
+import { useAuth } from '../../src/auth.tsx';
 import { useDutyWeek, useMeToday, useMyDuties, useSchoolQuery, type DutyDay, type MyDuties, type ScheduleStatus } from '../../src/data.ts';
 import { CoverTag } from '../../src/lesson.tsx';
 import { addDays, dayTitle } from '../../src/day.ts';
@@ -281,7 +278,7 @@ const workdayOf = (iso: string) => {
  * arasında geçilir. Tatil günleri lila; kullanıcının kendi satırı vurgulu.
  */
 function AllDuties() {
-  const { can, school } = useAuth();
+  const { school } = useAuth();
   const today = useMeToday();
   const start = today.data ? workdayOf(today.data.today) : undefined;
   const [weekOffset, setWeekOffset] = useState(0);
@@ -290,7 +287,6 @@ function AllDuties() {
   const q = useDutyWeek(anchor);
   const week = q.data;
   const day = week?.days.find((d) => d.date === (selected ?? anchor)) ?? week?.days[0];
-  const canAssign = can('duties.manage');
   const todayIso = today.data?.today;
   const thisWeek = Boolean(week && todayIso && week.days.some((d) => d.date === todayIso));
 
@@ -384,7 +380,7 @@ function AllDuties() {
               {day.gaps.length > 0 &&
                 day.entries
                   .filter((e) => day.gaps.includes(e.dutyId))
-                  .map((gap) => <GapCard key={gap.dutyId} day={day} gap={gap} canAssign={canAssign} />)}
+                  .map((gap) => <GapCard key={gap.dutyId} gap={gap} />)}
               <Card style={{ paddingVertical: 4, gap: 0, overflow: 'hidden' }}>
                 {areas.map((list, i) => {
                   const mine = list.some((e) => (e.substitute?.teacherId ?? e.teacherId) === school?.teacherId);
@@ -415,31 +411,10 @@ function AllDuties() {
   );
 }
 
-/** Boş nöbet yeri ve öneriler (tasarım 10): "Ata" ile öğretmene bildirim gider, pano hemen güncellenir */
-function GapCard({ day, gap, canAssign }: { day: DutyDay; gap: DutyDay['entries'][number]; canAssign: boolean }) {
-  const { school } = useAuth();
-  const path = useSchoolPath('duty-substitutions');
-  const qc = useQueryClient();
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const assign = async (teacherId: string) => {
-    setBusy(teacherId);
-    setError(null);
-    try {
-      await api(path, { method: 'POST', body: { date: day.date, dutyId: gap.dutyId, teacherId } });
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: [school?.id, 'duty-day'] }),
-        qc.invalidateQueries({ queryKey: [school?.id, 'duty-week'] }),
-        qc.invalidateQueries({ queryKey: [school?.id, 'control-center'] }),
-      ]);
-    } catch (err) {
-      setError(errorText(err, 'Atanamadı'));
-    } finally {
-      setBusy(null);
-    }
-  };
+/** Boş nöbet yeri: yalnızca bilgi; nöbetçiye ikinci nöbet verilmediği için görevlendirme yapılmaz */
+function GapCard({ gap }: { gap: DutyDay['entries'][number] }) {
   return (
-    <Card tone="warning" style={{ gap: 12 }}>
+    <Card tone="warning" style={{ gap: 6 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <T size={16} weight="800">
           {gap.area}
@@ -447,46 +422,8 @@ function GapCard({ day, gap, canAssign }: { day: DutyDay; gap: DutyDay['entries'
         <Badge tone="warning">BOŞ</Badge>
       </View>
       <T size={13} color={colors.muted}>
-        {gap.teacherName} bu gün izinli.
+        {gap.teacherName} bu gün izinli. Nöbet yeri boş.
       </T>
-      {canAssign ? (
-        <>
-          <T size={13} weight="700">
-            Önerilenler: o günün nöbetçileri. Bu ay en az nöbet tutan öndedir.
-          </T>
-          {day.candidates.slice(0, 4).map((c) => (
-            <View key={c.teacherId} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12, backgroundColor: colors.primarySoft }}>
-              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 12 }}>
-                  {c.fullName
-                    .split(' ')
-                    .map((p) => p.charAt(0))
-                    .slice(0, 2)
-                    .join('')}
-                </Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <T weight="700">{c.fullName}</T>
-                <T size={12} color={colors.muted}>
-                  Bu ay ~{c.monthCount} nöbet
-                </T>
-              </View>
-              <Button size="sm" loading={busy === c.teacherId} onPress={() => void assign(c.teacherId)} style={{ paddingHorizontal: 14 }}>
-                Ata
-              </Button>
-            </View>
-          ))}
-          {!day.candidates.length && <T color={colors.muted}>O gün görevlendirilebilecek başka nöbetçi yok.</T>}
-          {error && <T color={colors.danger}>{error}</T>}
-          <T size={12} color={colors.muted}>
-            Atanan öğretmene bildirim gider, pano hemen güncellenir.
-          </T>
-        </>
-      ) : (
-        <T size={13} color={colors.muted}>
-          Görevlendirmeyi nöbet yetkisi olan yönetici yapar.
-        </T>
-      )}
     </Card>
   );
 }

@@ -156,7 +156,7 @@ function CoverDayList({ date }: { date?: string }) {
     <div className="grid gap-2">
       <div className="mb-1 flex flex-wrap items-center gap-2">
         {open > 0 ? <Badge tone="red">{open} boş</Badge> : <Badge tone="green">hepsi atandı</Badge>}
-        <span className="text-sm text-slate-500">İzinli: {d.absent.map((a) => a.fullName).join(', ')}. Derse o gün okulda olup o saatte boş olan öğretmenler önerilir; nöbetçiler öndedir. Nöbet yerine yalnızca o günün nöbetçileri önerilir.</span>
+        <span className="text-sm text-slate-500">İzinli: {d.absent.map((a) => a.fullName).join(', ')}. Derse o gün okulda olup o saatte boş olan öğretmenler önerilir; nöbetçiler öndedir. Boş nöbet yeri yalnızca bilgi olarak yazar.</span>
       </div>
       {d.lessons.map((l) => (
         <div key={`${l.periodNo}-${l.classGroupId}`} className={clsx('rounded-2xl p-3 ring-1', l.cover ? 'ring-slate-200' : 'bg-rose-50/60 ring-rose-200')}>
@@ -195,7 +195,7 @@ function CoverDayList({ date }: { date?: string }) {
             )}
           </div>
           {!x.substitute && (
-            <CandidateChips list={x.candidates} busy={act.isPending} onPick={(teacherId) => act.mutate(() => api(subsPath, { method: 'POST', body: { date: d.date, dutyId: x.dutyId, teacherId } }))} />
+            <p className="mt-2 text-xs font-semibold text-rose-700">Nöbet yeri boş. Nöbetçiye ikinci nöbet verilmediği için görevlendirme yapılmaz.</p>
           )}
         </div>
       ))}
@@ -223,7 +223,7 @@ export function AssignmentsPage() {
     <div className="space-y-5">
       <PageHeader
         title="Görevlendirme"
-        description="İzinli öğretmenin boş kalan dersleri ve nöbet yeri burada listelenir. O gün okulda olup o saatte boş olan öğretmenler önerilir. Öğretmenin adına dokunulunca görevlendirme yapılır ve öğretmene bildirim gider."
+        description="İzinli öğretmenin boş kalan dersleri ve nöbet yeri burada listelenir. Boş derse o gün okulda olup o saatte boş olan öğretmenler önerilir; öğretmenin adına dokunulunca görevlendirme yapılır ve öğretmene bildirim gider. Boş nöbet yeri yalnızca bilgi olarak yazar."
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Segmented

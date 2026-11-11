@@ -36,6 +36,7 @@ import { platformAccountsRoutes } from './routes/platformAccounts.ts';
 import { runExamReminders } from './lib/examReminders.ts';
 import { runScreenOfflineAlerts } from './lib/screenOffline.ts';
 import { controlRoutes } from './routes/control.ts';
+import { draftRoutes } from './routes/drafts.ts';
 import { coverRoutes } from './routes/covers.ts';
 import { meRoutes } from './routes/me.ts';
 import { bellOverrideRoutes } from './routes/bellOverrides.ts';
@@ -126,6 +127,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   await app.register(notificationRoutes);
   await app.register(controlRoutes);
   await app.register(coverRoutes);
+  await app.register(draftRoutes);
   await app.register(meRoutes);
   await app.register(bellOverrideRoutes);
   await app.register(privacyRoutes);

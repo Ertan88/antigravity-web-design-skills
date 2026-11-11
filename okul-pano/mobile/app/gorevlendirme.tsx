@@ -154,7 +154,7 @@ export default function Gorevlendirme() {
               {open > 0 ? <Badge tone="danger">{`${open} boş`}</Badge> : <Badge tone="success">hepsi atandı</Badge>}
             </View>
             <T size={13} color={colors.muted}>
-              İzinli: {d.absent.map((a) => a.fullName).join(', ')}. Derse o gün okulda olup o saatte boş olan öğretmenler önerilir; nöbetçiler öndedir. Nöbet yerine yalnızca o günün nöbetçileri önerilir.
+              İzinli: {d.absent.map((a) => a.fullName).join(', ')}. Derse o gün okulda olup o saatte boş olan öğretmenler önerilir; nöbetçiler öndedir. Boş nöbet yeri yalnızca bilgi olarak yazar.
             </T>
           </Card>
           {d.lessons.map((l) => (
@@ -207,7 +207,9 @@ export default function Gorevlendirme() {
                   ✓ {x.substitute.teacherName}
                 </T>
               ) : (
-                <Candidates list={x.candidates} busy={busy} onPick={(teacherId) => void run(() => api(subsPath, { method: 'POST', body: { date: d.date, dutyId: x.dutyId, teacherId } }))} />
+                <T size={13.5} weight="700" color={colors.danger}>
+                  Nöbet yeri boş. Nöbetçiye ikinci nöbet verilmediği için görevlendirme yapılmaz.
+                </T>
               )}
             </Card>
           ))}

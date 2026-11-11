@@ -4,7 +4,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { audit, schoolGuard, UUID_RE } from '../context.ts';
 import { announcements, duties, dutySubstitutions, screens, teacherLeaves, teachers, users } from '../db/schema.ts';
-import { addDays, dutyDay, dutyGaps, dutyScheduleStatus, substituteCandidates, weekdayOf } from '../lib/dayinfo.ts';
+import { addDays, dutyDay, dutyGaps, dutyScheduleStatus, weekdayOf } from '../lib/dayinfo.ts';
 import { badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 import { tell, usersForTeacher } from '../lib/push.ts';
 
@@ -42,8 +42,9 @@ export async function controlRoutes(app: FastifyInstance) {
       schedule,
       entries: seesRequests ? day.entries : day.entries.map((e) => ({ ...e, leavePending: false })),
       gaps: dutyGaps(day).map((g) => g.dutyId),
-      // Öneriler yalnızca görevlendirme yapabilenlere (ve boş yer varken) hesaplanır
-      candidates: canAssign && dutyGaps(day).length ? await substituteCandidates(db, req.ctx.schoolId, day) : [],
+      // Boş nöbet yerine görevlendirme yapılmaz (nöbetçiye ikinci nöbet verilmez); boş yer yalnızca bilgi olarak
+      // gösterilir. Alan eski uygulama sürümleri için boş liste olarak kalır.
+      candidates: [] as { teacherId: string; fullName: string; monthCount: number }[],
     };
   }
 
@@ -71,6 +72,10 @@ export async function controlRoutes(app: FastifyInstance) {
       .from(teachers)
       .where(and(eq(teachers.id, body.teacherId), eq(teachers.schoolId, req.ctx.schoolId)));
     if (!duty || !teacher) throw badRequest('Nöbet ya da öğretmen bu okula ait değil.');
+    // O gün nöbeti olan (ya da başka bir yere görevli) öğretmene ikinci nöbet verilmez
+    const day = await dutyDay(db, req.ctx.schoolId, body.date);
+    if (day.entries.some((e) => (e.teacherId === teacher.id && !e.onLeave) || (e.substitute?.teacherId === teacher.id && e.dutyId !== duty.id)))
+      throw badRequest('Bu öğretmenin o gün nöbeti var; nöbetçiye ikinci nöbet verilmez.');
     const [row] = await db
       .insert(dutySubstitutions)
       .values({ schoolId: req.ctx.schoolId, date: body.date, dutyId: body.dutyId, teacherId: body.teacherId, createdBy: req.ctx.userId })

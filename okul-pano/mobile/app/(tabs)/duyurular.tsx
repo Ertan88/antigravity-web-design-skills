@@ -1,11 +1,74 @@
+import { designTitle, type AnnouncementDesign } from '@okulpano/shared/designs';
+import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { View } from 'react-native';
-import { useAuth } from '../../src/auth.tsx';
-import { useAnnouncements, type Announcement } from '../../src/data.ts';
+import { api } from '../../src/api.ts';
+import { useAuth, useSchoolPath } from '../../src/auth.tsx';
+import { useAnnouncementDrafts, useAnnouncements, type Announcement, type AnnouncementDraft } from '../../src/data.ts';
 import { fullDate, localIso, timeAgo } from '../../src/day.ts';
 import { AnnouncementPreview } from '../../src/preview.tsx';
 import { colors } from '../../src/theme.ts';
-import { Badge, Button, Card, Empty, Loading, Screen, SectionTitle, T } from '../../src/ui.tsx';
+import { Badge, Button, Card, confirm, DeleteIconButton, Empty, Loading, Screen, SectionTitle, Segmented, T } from '../../src/ui.tsx';
+
+const DRAFT_STEPS = ['Tür', 'İçerik', 'Nerede ve ne zaman', 'Kontrol ve gönder'];
+const DRAFT_KIND: Record<string, string> = { design: 'Hazır şablon', image: 'Fotoğraf', text: 'Yazı', video: 'YouTube' };
+
+/** Taslaklar: yarım kalan duyurular (web ile ortak); "Devam et" kaldığı adımdan açar */
+function Drafts({ list }: { list: AnnouncementDraft[] }) {
+  const { school } = useAuth();
+  const path = useSchoolPath('announcement-drafts');
+  const qc = useQueryClient();
+  if (!list.length)
+    return (
+      <Card>
+        <Empty icon="albums-outline" title="Taslak yok" text="Yeni duyuruyu yarıda bırakırsanız burada saklanır; kaldığınız adımdan devam edebilirsiniz." />
+      </Card>
+    );
+  return (
+    <>
+      {list.map((d) => {
+        const x = d.data;
+        const title = (x.kind === 'design' && x.design ? designTitle(x.design as AnnouncementDesign) : x.title)?.trim() || 'Başlıksız taslak';
+        // YouTube duyurusu yalnızca web panelinden eklenir
+        const webOnly = x.kind === 'video';
+        return (
+          <Card key={d.id} style={{ gap: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <T weight="700" lines={2}>
+                  {title}
+                </T>
+                <T size={12} color={colors.muted}>
+                  {DRAFT_KIND[x.kind ?? 'design']} · "{DRAFT_STEPS[Math.min(3, d.step)]}" adımında kaldı · {timeAgo(d.updatedAt)}
+                </T>
+              </View>
+              <DeleteIconButton
+                label="Taslağı sil"
+                onPress={() =>
+                  void confirm('Taslak silinsin mi?', 'Bu taslak kalıcı olarak silinir.', 'Sil').then(async (ok) => {
+                    if (!ok) return;
+                    await api(`${path}/${d.id}`, { method: 'DELETE' }).catch(() => undefined);
+                    await qc.invalidateQueries({ queryKey: [school?.id, 'announcement-drafts'] });
+                  })
+                }
+              />
+            </View>
+            {webOnly ? (
+              <T size={12.5} color={colors.muted}>
+                YouTube duyurusuna web panelinden devam edin.
+              </T>
+            ) : (
+              <Button size="sm" onPress={() => router.push(`/duyuru-yeni?taslak=${d.id}`)}>
+                Devam et
+              </Button>
+            )}
+          </Card>
+        );
+      })}
+    </>
+  );
+}
 
 function status(a: Announcement): { label: string; tone: 'success' | 'warning' | 'danger' | 'muted' } {
   if (a.approvalStatus === 'pending') return { label: 'Onay bekliyor', tone: 'warning' };
@@ -57,11 +120,15 @@ export default function Duyurular() {
   const can = (p: Parameters<typeof canRaw>[0]) => role !== 'teacher' && canRaw(p);
   const list = useAnnouncements();
   const mine = (list.data ?? []).filter((a) => a.createdBy === me?.user.id);
+  const manages = can('announcements.manage');
+  const drafts = useAnnouncementDrafts(manages);
+  const draftCount = drafts.data?.length ?? 0;
+  const [tab, setTab] = useState<'sent' | 'drafts'>('sent');
   return (
     <Screen
       title={can('announcements.manage') ? 'Duyurularım' : 'Duyurular'}
       refreshing={list.isRefetching}
-      onRefresh={() => void list.refetch()}
+      onRefresh={() => void Promise.all([list.refetch(), manages ? drafts.refetch() : null])}
       right={
         can('announcements.manage') ? (
           <Button size="sm" icon="add" onPress={() => router.push('/duyuru-yeni')}>
@@ -70,8 +137,20 @@ export default function Duyurular() {
         ) : undefined
       }
     >
+      {manages && (
+        <Segmented
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'sent', label: 'Gönderdiklerim' },
+            { value: 'drafts', label: 'Taslaklar', badge: draftCount },
+          ]}
+        />
+      )}
       {list.isLoading ? (
         <Loading />
+      ) : manages && tab === 'drafts' ? (
+        <Drafts list={drafts.data ?? []} />
       ) : !can('announcements.manage') ? (
         <OnAir list={list.data ?? []} />
       ) : !mine.length ? (

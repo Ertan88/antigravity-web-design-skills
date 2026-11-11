@@ -158,10 +158,13 @@ export function Screen({
   onRefresh,
   tone = 'default',
   scroll = true,
+  onBack,
 }: {
   title?: string;
   subtitle?: ReactNode;
   back?: boolean;
+  /** Geri düğmesinin işi (ör. adım adım ekranda önceki adım); verilmezse önceki ekrana döner */
+  onBack?: () => void;
   right?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
@@ -242,7 +245,7 @@ export function Screen({
       {(title || back) && (
         <View style={styles.header}>
           {back && (
-            <Pressable accessibilityRole="button" accessibilityLabel="Geri" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} style={styles.iconButton}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Geri" onPress={() => (onBack ? onBack() : router.canGoBack() ? router.back() : router.replace('/'))} style={styles.iconButton}>
               <Icon name="chevron-back" size={22} />
             </Pressable>
           )}
@@ -491,14 +494,27 @@ export function Choice<V extends string | number>({
   );
 }
 
-export function Segmented<V extends string>({ options, value, onChange }: { options: { value: V; label: string }[]; value: V; onChange: (v: V) => void }) {
+/** Sekme düğmeleri; `badge` verilirse yanında kırmızı sayı baloncuğu (ör. "Taslaklar 2") */
+export function Segmented<V extends string>({ options, value, onChange }: { options: { value: V; label: string; badge?: number }[]; value: V; onChange: (v: V) => void }) {
   return (
     <View style={styles.segmented} accessibilityRole="tablist">
       {options.map((o) => {
         const on = o.value === value;
         return (
-          <Pressable key={o.value} accessibilityRole="tab" accessibilityState={{ selected: on }} onPress={() => onChange(o.value)} style={[styles.segment, on && styles.segmentOn]}>
+          <Pressable
+            key={o.value}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: on }}
+            accessibilityLabel={o.badge ? `${o.label}, ${o.badge}` : o.label}
+            onPress={() => onChange(o.value)}
+            style={[styles.segment, on && styles.segmentOn, { flexDirection: 'row', gap: 6 }]}
+          >
             <Text style={{ fontSize: 14, fontWeight: on ? '700' : '600', color: on ? colors.ink : colors.muted }}>{o.label}</Text>
+            {Boolean(o.badge) && (
+              <View style={{ minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, backgroundColor: '#e11d48', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: '#ffffff' }}>{o.badge}</Text>
+              </View>
+            )}
           </Pressable>
         );
       })}

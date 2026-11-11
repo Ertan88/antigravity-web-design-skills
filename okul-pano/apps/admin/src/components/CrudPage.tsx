@@ -18,6 +18,17 @@ export interface Column<T> {
 
 export type FormApi<F extends Record<string, unknown>> = ReturnType<typeof useForm<F>>;
 
+/** Özel pencere (ör. adım adım duyuru): CrudPage'in açık/kapalı durumu, formu ve kaydetme işlemi */
+export interface ModalApi<T, F extends Record<string, unknown>> {
+  open: boolean;
+  close: () => void;
+  editing: T | null;
+  form: FormApi<F>;
+  /** Doğrulayıp kaydeder; başarılıysa pencereyi kapatır ve true döner */
+  submit: () => Promise<boolean>;
+  saving: boolean;
+}
+
 export interface CrudPageProps<T extends { id: string }, F extends Record<string, unknown>> {
   resource: string;
   /** Bildirimlerde kullanılan tekil ad: "Duyuru eklendi" */
@@ -57,6 +68,10 @@ export interface CrudPageProps<T extends { id: string }, F extends Record<string
   replaceContent?: ReactNode;
   /** Kayıttan sonra özel mesaj (yoksa "… eklendi / güncellendi") */
   savedMessage?: (saved: T, isNew: boolean) => string | null;
+  /** Verilirse ortak düzenleme penceresi yerine bu pencere kullanılır (ör. adım adım duyuru) */
+  renderModal?: (api: ModalApi<T, F>) => ReactNode;
+  /** Dışarıdan yeni kayıt penceresini hazır değerlerle açar (ör. taslaktan devam); `key` her istekte değişir */
+  openRequest?: { values: F; key: number } | null;
   /** Satırın görünümü: soluk (süresi dolmuş) ve yayın anahtarının durumu */
   rowState?: (row: T) => { dim?: boolean; toggle?: { checked: boolean; disabled: string } };
 }
@@ -102,21 +117,30 @@ export function CrudPage<T extends { id: string; isActive?: boolean }, F extends
     if (row && editable) openEdit(row);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, list.data]);
+  useEffect(() => {
+    if (!p.openRequest) return;
+    setEditing(null);
+    form.reset(p.openRequest.values);
+    setOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [p.openRequest?.key]);
   const openEdit = (row: T) => {
     setEditing(row);
     form.reset(p.toForm(row));
     setOpen(true);
   };
 
-  const submit = async () => {
+  const submit = async (): Promise<boolean> => {
     const payload = form.validate(p.schema, p.toPayload(form.values));
-    if (!payload) return;
+    if (!payload) return false;
     try {
       if (editing) await ops.update.mutateAsync({ id: editing.id, body: payload });
       else await ops.create.mutateAsync(payload);
       setOpen(false);
+      return true;
     } catch (err) {
       form.fail(err);
+      return false;
     }
   };
 
@@ -274,6 +298,9 @@ export function CrudPage<T extends { id: string; isActive?: boolean }, F extends
       </Card>
       )}
 
+      {p.renderModal ? (
+        p.renderModal({ open, close: () => setOpen(false), editing, form, submit, saving })
+      ) : (
       <Modal
         open={open}
         onClose={() => setOpen(false)}
@@ -302,6 +329,7 @@ export function CrudPage<T extends { id: string; isActive?: boolean }, F extends
           <button type="submit" className="hidden" />
         </form>
       </Modal>
+      )}
     </>
   );
 }

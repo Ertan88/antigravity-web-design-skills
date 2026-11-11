@@ -67,9 +67,13 @@ describe('izinli öğretmen yerine görevlendirme', () => {
     // Fatma'nın o gün dersi yok, Ayşe izinli.
     expect(d.lessons[0]!.candidates.map((c) => `${c.fullName}|${c.onDuty}`)).toEqual(['Burak Demir|true', 'Deniz Ak|false']);
     expect(d.lessons[1]!.candidates.map((c) => c.fullName)).toEqual(['Burak Demir', 'Deniz Ak']);
-    // İzinli öğretmenin nöbet yeri: yalnızca o günün nöbetçileri; dersi boş olan Deniz önerilmez
+    // İzinli öğretmenin nöbet yeri: boş olarak yazar, öneri yok (nöbetçiye ikinci nöbet verilmez)
     expect(d.duties.map((x) => x.area)).toEqual(['Bahçe']);
-    expect(d.duties[0]!.candidates.map((c) => `${c.fullName}|${c.onDuty}`)).toEqual(['Burak Demir|true']);
+    expect(d.duties[0]!.candidates).toEqual([]);
+    const dutyId = (await owner.get(path(`duty-day?date=${DATE}`))).json().entries.find((e: { area: string }) => e.area === 'Bahçe').dutyId;
+    const res = await owner.post(path('duty-substitutions'), { date: DATE, dutyId, teacherId: T.Burak });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.stringify(res.json())).toMatch(/ikinci nöbet/);
   });
 
   it('dersi olan öğretmen gönderilemez; boş öğretmen atanır ve bildirim alır', async () => {
