@@ -81,7 +81,14 @@ const COLLAPSE_KEY = 'okulpano.navCollapsed';
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { me, can, logout, school: access } = useAuth();
-  const who = { userId: me?.user.id ?? null, teacherId: access?.teacherId ?? null, vocational: Boolean(access?.vocational), can };
+  const who = {
+    userId: me?.user.id ?? null,
+    teacherId: access?.teacherId ?? null,
+    role: access?.role ?? null,
+    vocational: Boolean(access?.vocational),
+    coordinator: Boolean(access?.coordinator),
+    can,
+  };
   const school = useSchool();
   const settings = school.data?.settings;
   const current = findNav(useLocation().pathname)?.item.to;

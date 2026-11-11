@@ -54,6 +54,14 @@ export async function schoolRoutes(app: FastifyInstance) {
     const sent = Object.keys(((req.body ?? {}) as { settings?: object }).settings ?? {});
     const changes = settings ? Object.fromEntries(Object.entries(settings).filter(([k]) => sent.includes(k))) : undefined;
     const merged = changes ? schoolSettingsSchema.parse({ ...req.ctx.school.settings, ...changes }) : undefined;
+    // İşletmeleri kimin göreceğini (koordinatör müdür yardımcısı, ek kişiler) yalnızca okul müdürü değiştirir:
+    // bir müdür yardımcısı kendini listeye ekleyip bütün öğrencileri göremesin (KVKK)
+    if (merged && (req.ctx.role !== 'owner' || req.ctx.isSupport)) {
+      const current = schoolSettingsSchema.parse(req.ctx.school.settings ?? {});
+      const same = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x) => b.includes(x));
+      if (merged.internshipManagerUserId !== current.internshipManagerUserId || !same(merged.internshipViewerUserIds, current.internshipViewerUserIds))
+        throw forbidden('İşletmeleri görecek kişileri yalnızca okul müdürü değiştirebilir.');
+    }
     const [updated] = await db
       .update(schools)
       .set({ ...profile, ...(merged ? { settings: merged } : {}) })

@@ -1090,9 +1090,19 @@ function useAreas() {
   });
 }
 
+/** Kişinin mesleki eğitimdeki yetkisi (sunucu karar verir): manage = müdür, koordinatör müdür yardımcısı, ek kişi */
+function useInternshipAccess() {
+  const { schoolId } = useAuth();
+  const path = useSchoolPath("internship/access");
+  return useQuery({
+    queryKey: [schoolId, "internship", "access"],
+    queryFn: () => api<{ enabled: boolean; all: boolean; coordinator: boolean; manage: boolean; teacher: boolean }>(path),
+  });
+}
+
 export function Businesses() {
-  const { schoolId, can, school } = useAuth();
-  const manager = can("internship.manage");
+  const { schoolId, school } = useAuth();
+  const manager = Boolean(useInternshipAccess().data?.manage);
   const path = useSchoolPath("internship/businesses");
   const list = useQuery({
     queryKey: [schoolId, "internship", "businesses"],

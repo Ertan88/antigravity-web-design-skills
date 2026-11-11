@@ -23,7 +23,11 @@ export const PERMISSIONS = {
   /** Dar yetki: yalnızca "Öğretmen" rolüyle hesap açar (giriş kodu, toplantı QR'ı, onay, davet); yetki veremez, şifre sıfırlayamaz */
   'accounts.enroll': 'Öğretmen hesabı açma',
   'conduct.manage': 'Gözlem kriterleri ve ayın öğrencisi',
-  'internship.manage': 'İşletmeler ve işletmede devam çizelgesi',
+  /**
+   * Artık kullanılmıyor: işletmeleri kimin göreceği Okul Ayarları'ndan seçilir (müdür, koordinatör müdür yardımcısı,
+   * ek kişiler). Eski kayıtlarda kalan değer doğrulamada hata vermesin diye listede durur.
+   */
+  'internship.manage': 'İşletmeler ve işletmede devam çizelgesi (eski)',
   /** Rehber öğretmen: bütün öğrencilerin gözlem kayıtlarını görür (panelde "Rehber öğretmen" rolü olarak verilir) */
   'conduct.counsel': 'Rehber öğretmen (bütün gözlem kayıtları)',
   /** Okul Yayın ekibine (platforma) destek talebi yazma; müdür ve müdür yardımcılarında hep vardır */

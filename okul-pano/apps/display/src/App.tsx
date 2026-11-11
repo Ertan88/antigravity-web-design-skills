@@ -25,9 +25,51 @@ function useAutoHideCursor() {
   }, []);
 }
 
+type WakeLockSentinelLike = { released: boolean; release(): Promise<void> };
+type WakeLockLike = { request(type: 'screen'): Promise<WakeLockSentinelLike> };
+
+/**
+ * Ekran kilidi (Screen Wake Lock): tarayıcıda açık panoda TV'nin ekran koruyucusu ya da enerji tasarrufu ekranı
+ * kapatmasın. Sekme gizlenince tarayıcı kilidi bırakır; görünür olunca ve dakikada bir yeniden istenir. Desteklemeyen
+ * tarayıcıda (ve panelin içindeki küçük önizlemede) hiçbir şey yapmaz. TV uygulaması ekranı zaten kendisi açık tutar.
+ */
+function useWakeLock() {
+  useEffect(() => {
+    const wl = (navigator as Navigator & { wakeLock?: WakeLockLike }).wakeLock;
+    if (embedded || !wl) return;
+    let lock: WakeLockSentinelLike | null = null;
+    let alive = true;
+    let pending = false;
+    const acquire = () => {
+      if (!alive || pending || document.visibilityState !== 'visible' || (lock && !lock.released)) return;
+      pending = true;
+      wl.request('screen')
+        .then((l) => {
+          if (alive) lock = l;
+          else void l.release().catch(() => undefined);
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          pending = false;
+        });
+    };
+    acquire();
+    document.addEventListener('visibilitychange', acquire);
+    // Sistem kilidi bırakabilir (ör. güç tasarrufu): dakikada bir kontrol edilir
+    const timer = setInterval(acquire, 60_000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', acquire);
+      void lock?.release().catch(() => undefined);
+    };
+  }, []);
+}
+
 export function App() {
   const [auth, setAuth] = useState<DisplayAuth | null>(() => resolveAuth());
   useAutoHideCursor();
+  useWakeLock();
 
   // Tam ekran önizlemenin süresi dolunca koyu bir ekranda kalınmaz: eşleştirme ekranına geçilir (bu cihaz daha önce
   // eşleştirildiyse kendi anahtarıyla panoya). Panelin içindeki küçük önizlemenin anahtarını panel yeniler.

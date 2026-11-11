@@ -45,9 +45,10 @@ import { notifyUsers } from '../lib/push.ts';
 import { addToInbox } from './notifications.ts';
 
 /*
- * İşletmelerde mesleki eğitim: işletmeler, öğrencilerin işletmeleri ve aylık devam çizelgesi. İşletmeleri ve bütün
- * çizelgeyi idare yönetir (internship.manage); koordinatör öğretmen kendi işletmelerindeki öğrencileri işaretler.
- * Öğretmen kendi eklediği ya da koordinatörü olduğu işletmeleri görür (KVKK); idare ve koordinatör müdür yardımcısı hepsini.
+ * İşletmelerde mesleki eğitim: işletmeler, öğrencilerin işletmeleri ve aylık devam çizelgesi.
+ * Görme (KVKK): bütün işletmeleri ve öğrencileri yalnızca okul müdürü, koordinatör müdür yardımcısı ve Okul Ayarları'nda
+ * seçilen ek kişiler görür; işletme ekler, koordinatör atar. Diğer müdür yardımcıları dahil herkes yalnızca koordinatörü
+ * olduğu işletmeleri (branşı ne olursa olsun) ve kendi eklediği, henüz koordinatörü atanmamış işletmeleri görür.
  * "İşletmede" (X) da koordinatörün koyduğu işarettir; işaretsiz geçmiş gün "kontrol edilmedi" (?) görünür. Devamsızlıklar
  * (D, İ, R, H) hemen bildirilmez: koordinatör kontrol edip "Gönder" deyince koordinatör müdür yardımcısına (okul ayarlarında
  * seçilen kullanıcı) gider. KVKK: destek erişimi öğrenci devam kayıtlarını
@@ -61,8 +62,9 @@ const idParam = (req: FastifyRequest) => {
 };
 
 const settingsOf = (req: FastifyRequest) => schoolSettingsSchema.parse(req.ctx.school.settings ?? {});
-const isManager = (req: FastifyRequest) => req.ctx.permissions.includes('internship.manage');
 const isVp = (req: FastifyRequest) => settingsOf(req).internshipManagerUserId === req.ctx.userId;
+/** Bütün işletmeleri gören ve yöneten: okul müdürü, koordinatör müdür yardımcısı, ayarda seçilen ek kişiler */
+const isManager = (req: FastifyRequest) => req.ctx.role === 'owner' || isVp(req) || settingsOf(req).internshipViewerUserIds.includes(req.ctx.userId);
 
 function requireModule(req: FastifyRequest) {
   if (req.ctx.isSupport) throw forbidden('Destek erişimi öğrenci devam kayıtlarını göremez.');
@@ -74,9 +76,9 @@ const today = (req: FastifyRequest) => zonedParts(new Date(), req.ctx.school.tim
 const dateText = (iso: string) =>
   new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', weekday: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));
 
-/** Kullanıcının işletmeleri: koordinatörü olduğu ya da kendi eklediği */
+/** Kullanıcının işletmeleri: koordinatörü olduğu ya da kendi ekleyip henüz koordinatör atanmamış olanlar */
 async function ownBusinessIds(deps: AppDeps, req: FastifyRequest): Promise<Set<string>> {
-  const mine = [eq(businesses.createdBy, req.ctx.userId)];
+  const mine = [and(eq(businesses.createdBy, req.ctx.userId), isNull(businesses.coordinatorTeacherId))!];
   if (req.ctx.teacherId) mine.push(eq(businesses.coordinatorTeacherId, req.ctx.teacherId));
   const rows = await deps.db
     .select({ id: businesses.id })
@@ -91,7 +93,7 @@ async function ownBusinessIds(deps: AppDeps, req: FastifyRequest): Promise<Set<s
  */
 async function scope(deps: AppDeps, req: FastifyRequest, opts: { teacher?: boolean } = {}) {
   requireModule(req);
-  const all = isManager(req) || isVp(req);
+  const all = isManager(req);
   const own = await ownBusinessIds(deps, req);
   if (!all && !own.size && !(opts.teacher && req.ctx.teacherId)) throw forbidden('Devam çizelgesini idare ve koordinatör öğretmenler görebilir.');
   return { all, own, canEdit: (businessId: string | null) => Boolean(businessId) && (all || own.has(businessId!)) };
@@ -235,7 +237,16 @@ export async function internshipRoutes(app: FastifyInstance) {
   const { db } = deps;
   const base = '/api/schools/:schoolId/internship';
   const member = { preHandler: [app.authenticate, schoolGuard()] };
-  const manage = { preHandler: [app.authenticate, schoolGuard('internship.manage')] };
+  // Yönetim: müdür, koordinatör müdür yardımcısı ve ayarda seçilen ek kişiler (diğer müdür yardımcıları değil)
+  const manage = {
+    preHandler: [
+      app.authenticate,
+      schoolGuard(),
+      async (req: FastifyRequest) => {
+        if (!isManager(req)) throw forbidden('İşletmeleri okul müdürü, koordinatör müdür yardımcısı ve yetki verilen kişiler yönetir.');
+      },
+    ],
+  };
 
   /** Menüde gösterilsin mi: modül açık ve kullanıcı idare, koordinatör müdür yardımcısı ya da koordinatör öğretmen */
   app.get(`${base}/access`, member, async (req) => {
@@ -244,7 +255,7 @@ export async function internshipRoutes(app: FastifyInstance) {
     const own = await ownBusinessIds(deps, req);
     // Öğretmen tarafı yalnızca meslek öğretmenine (branşı meslek alanı ya da işletme dersi var) ya da işletmesi olana açılır
     const vocational = req.ctx.teacherId ? await isVocationalTeacher(deps, req.ctx.schoolId, req.ctx.teacherId) : false;
-    return { enabled: true, all: isManager(req) || isVp(req), coordinator: own.size > 0, manage: isManager(req), teacher: vocational || own.size > 0 };
+    return { enabled: true, all: isManager(req), coordinator: own.size > 0, manage: isManager(req), teacher: vocational || own.size > 0 };
   });
 
   /** Koordinatör müdür yardımcısı seçimi (Genel Ayarlar): okulun kullanıcıları */

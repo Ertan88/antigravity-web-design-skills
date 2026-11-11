@@ -1,13 +1,14 @@
 import { SCHOOL_TYPE_OPTIONS, SPECIAL_DAYS, specialDayFor, splitSchoolName, updateSchoolSchema, type SchoolSettings, errorText } from '@okulpano/shared';
+import clsx from 'clsx';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Copy, Download, ExternalLink, FileText, MapPin, Search } from '../components/icons.tsx';
+import { Copy, Download, ExternalLink, FileText, MapPin, Search, X } from '../components/icons.tsx';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ImageUpload } from '../components/ImageUpload.tsx';
 import { SampleDataCard } from '../components/Onboarding.tsx';
 import { SupportAccessCard } from '../components/SupportAccess.tsx';
 import { SaveBar } from '../components/SaveBar.tsx';
 import { useToast } from '../components/Toast.tsx';
-import { Alert, Badge, Button, Card, Field, Input, PageHeader, Select, Spinner, Textarea, Toggle } from '../components/ui.tsx';
+import { ACTION_SHAPE, Alert, Badge, Button, Card, DELETE_TONE, Field, Input, PageHeader, Select, Spinner, Textarea, Toggle } from '../components/ui.tsx';
 import { confirm } from '../components/confirm.tsx';
 import { downloadJson } from '../lib/download.ts';
 import { Link } from 'react-router-dom';
@@ -205,23 +206,84 @@ function PrivacySection({ value, onChange, slug }: { value: string; onChange: (v
 }
 
 /** Koordinatör müdür yardımcısı: işletmede devamsızlık (D) ve rapor (R) bildirimlerini alır */
-function InternshipManagerField({ value, onChange }: { value: string | null; onChange: (v: string | null) => void }) {
+/**
+ * İşletmeleri kimin göreceği (KVKK): okul müdürü ve koordinatör müdür yardımcısı hepsini görür; isteğe bağlı ek
+ * kişiler (ör. atölye ve laboratuvar müdür yardımcısı, alan şefi) aynı yetkiyi alır. Diğer müdür yardımcıları dahil
+ * herkes yalnızca koordinatörü olduğu işletmeleri görür. Bu kişileri yalnızca okul müdürü değiştirir.
+ */
+function InternshipAccessFields({
+  manager,
+  viewers,
+  onManager,
+  onViewers,
+}: {
+  manager: string | null;
+  viewers: string[];
+  onManager: (v: string | null) => void;
+  onViewers: (v: string[]) => void;
+}) {
   const path = useSchoolPath('internship/manager-candidates');
-  const { schoolId } = useAuth();
+  const { schoolId, school } = useAuth();
+  const owner = school?.role === 'owner';
   const list = useQuery({ queryKey: [schoolId, 'internship', 'candidates'], queryFn: () => api<{ userId: string; fullName: string }[]>(path) });
+  const people = list.data ?? [];
+  const nameOf = (id: string) => people.find((u) => u.userId === id)?.fullName ?? 'Silinmiş kullanıcı';
+  const addable = people.filter((u) => u.userId !== manager && !viewers.includes(u.userId));
   return (
-    <Field label="Koordinatör müdür yardımcısı" help="İşletmede devamsızlık (D) ya da rapor (R) kaydedilince bu kişiye uygulama bildirimi gider.">
-      {(id) => (
-        <Select id={id} value={value ?? ''} onChange={(e) => onChange(e.target.value || null)} className="max-w-sm">
-          <option value="">Seçilmedi (bildirim gitmez)</option>
-          {(list.data ?? []).map((u) => (
-            <option key={u.userId} value={u.userId}>
-              {u.fullName}
-            </option>
-          ))}
-        </Select>
-      )}
-    </Field>
+    <div className="grid gap-4">
+      <Field
+        label="Koordinatör müdür yardımcısı"
+        help="Bütün işletmeleri ve öğrencileri görür, işletme ekler, koordinatör atar; devamsızlık (D) ve rapor (R) bildirimlerini alır."
+      >
+        {(id) => (
+          <Select id={id} value={manager ?? ''} disabled={!owner} onChange={(e) => onManager(e.target.value || null)} className="max-w-sm">
+            <option value="">Seçilmedi</option>
+            {people.map((u) => (
+              <option key={u.userId} value={u.userId}>
+                {u.fullName}
+              </option>
+            ))}
+          </Select>
+        )}
+      </Field>
+      {!manager && <Alert tone="amber">Koordinatör müdür yardımcısı seçilmedi: bütün işletmeleri yalnızca okul müdürü görür ve devamsızlık bildirimi kimseye gitmez.</Alert>}
+      <Field
+        label="Bütün işletmeleri görebilecek ek kişiler"
+        help="İsteğe bağlı (ör. atölye ve laboratuvar müdür yardımcısı, alan şefi). Seçilen kişi koordinatör müdür yardımcısıyla aynı yetkiyi alır. Diğer müdür yardımcıları dahil herkes yalnızca koordinatörü olduğu işletmeleri görür."
+      >
+        {(id) => (
+          <div className="flex flex-wrap items-center gap-2">
+            {viewers.map((v) => (
+              <span key={v} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 py-1 pr-1 pl-3 text-sm font-semibold text-ink ring-1 ring-slate-200">
+                {nameOf(v)}
+                {owner && (
+                  <button
+                    type="button"
+                    aria-label={`${nameOf(v)} listeden çıkar`}
+                    onClick={() => onViewers(viewers.filter((x) => x !== v))}
+                    className={clsx(ACTION_SHAPE, 'size-6 rounded-full', DELETE_TONE)}
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
+              </span>
+            ))}
+            {owner && addable.length > 0 && (
+              <Select id={id} value="" onChange={(e) => e.target.value && onViewers([...viewers, e.target.value])} className="w-auto max-w-xs">
+                <option value="">+ Kişi ekle</option>
+                {addable.map((u) => (
+                  <option key={u.userId} value={u.userId}>
+                    {u.fullName}
+                  </option>
+                ))}
+              </Select>
+            )}
+            {!viewers.length && !owner && <span className="text-sm text-slate-500">Seçilmedi</span>}
+          </div>
+        )}
+      </Field>
+      {!owner && <p className="text-xs text-slate-500">Bu kişileri yalnızca okul müdürü değiştirebilir.</p>}
+    </div>
   );
 }
 
@@ -387,7 +449,14 @@ export function Settings() {
             label="İşletmelerde mesleki eğitim"
             description="Meslek liseleri için: işletmeler, koordinatör öğretmenler ve aylık işletmede devam çizelgesi. Koordinatör öğretmenler devamsızlık ve raporu mobil uygulamadan girer."
           />
-          {s.internshipEnabled && <InternshipManagerField value={s.internshipManagerUserId ?? null} onChange={(x) => setting('internshipManagerUserId', x)} />}
+          {s.internshipEnabled && (
+            <InternshipAccessFields
+              manager={s.internshipManagerUserId ?? null}
+              viewers={s.internshipViewerUserIds ?? []}
+              onManager={(x) => setting('internshipManagerUserId', x)}
+              onViewers={(x) => setting('internshipViewerUserIds', x)}
+            />
+          )}
           <p className="text-sm text-slate-500">
             Panodaki kartların yeri, renkler ve slayt süreleri{' '}
             <Link to="/ekranlar" className="font-semibold text-brand-700 hover:underline">

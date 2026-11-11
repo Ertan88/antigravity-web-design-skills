@@ -12,7 +12,6 @@ export const DUTY_PACKAGES = [
   { key: 'boards', label: 'Panolar', text: 'Ekranlar ve panoları uzaktan yönetme', permissions: ['screens.manage', 'board.control'] },
   { key: 'students', label: 'Öğrenciler', text: 'Öğrenci listesi ve doğum günleri', permissions: ['students.manage'] },
   { key: 'conduct', label: 'Gözlem', text: 'Gözlem kriterleri ve ayın öğrencisi', permissions: ['conduct.manage'] },
-  { key: 'internship', label: 'İşletmede eğitim', text: 'İşletmeler ve devam çizelgesi', permissions: ['internship.manage'] },
 ] as const satisfies readonly { key: string; label: string; text: string; permissions: readonly Permission[] }[];
 
 export type DutyKey = (typeof DUTY_PACKAGES)[number]['key'];

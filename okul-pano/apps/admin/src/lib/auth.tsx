@@ -17,6 +17,8 @@ export interface SchoolAccess {
   teacherTitle?: string | null;
   /** Meslek öğretmeni (branşı meslek alanı ya da işletme dersi var) */
   vocational?: boolean;
+  /** En az bir işletmenin koordinatör öğretmeni */
+  coordinator?: boolean;
   /** Üyelik yok, okulun verdiği süreli destek erişimi (platform yöneticisi) */
   support?: boolean;
 }

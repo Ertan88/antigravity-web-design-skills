@@ -3,7 +3,7 @@ import { and, asc, eq, gt, inArray, lt } from 'drizzle-orm';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { accessUser } from '../context.ts';
-import { memberships, schools, sessions, teacherBranches, teachers, teacherTitles, timetableEntries, users } from '../db/schema.ts';
+import { businesses, memberships, schools, sessions, teacherBranches, teachers, teacherTitles, timetableEntries, users } from '../db/schema.ts';
 import { burnPasswordCheck, hashPassword, randomToken, sha256, verifyPassword } from '../lib/crypto.ts';
 import { badRequest, conflict, notFound, parse, unauthorized } from '../lib/errors.ts';
 
@@ -130,7 +130,11 @@ export async function authRoutes(app: FastifyInstance) {
     // (branşı meslek alanı ya da programında işletmelerde mesleki eğitim dersi var)
     const teacherIds = rows.map((r) => r.teacherId).filter((x): x is string => Boolean(x));
     const info = new Map<string, { title: string | null; vocational: boolean }>();
+    // İşletme koordinatörü olan öğretmenler (branşı ne olursa olsun mesleki eğitim menüsünü görür)
+    const coordinators = new Set<string>();
     if (teacherIds.length) {
+      const coord = await db.selectDistinct({ teacherId: businesses.coordinatorTeacherId }).from(businesses).where(inArray(businesses.coordinatorTeacherId, teacherIds));
+      for (const c of coord) if (c.teacherId) coordinators.add(c.teacherId);
       const [rowsT, internship] = await Promise.all([
         db
           .select({ id: teachers.id, title: teacherTitles.name, branchName: teacherBranches.name, branchVocational: teacherBranches.vocational })
@@ -170,6 +174,8 @@ export async function authRoutes(app: FastifyInstance) {
         teacherTitle: r.teacherId ? (info.get(r.teacherId)?.title ?? null) : null,
         /** Meslek öğretmeni: branşı meslek alanı ya da işletmelerde mesleki eğitim dersi var */
         vocational: r.teacherId ? (info.get(r.teacherId)?.vocational ?? false) : false,
+        /** En az bir işletmenin koordinatör öğretmeni */
+        coordinator: r.teacherId ? coordinators.has(r.teacherId) : false,
         /** Üyelik yok, okulun verdiği süreli destek erişimi */
         support: 'support' in r ? true : undefined,
       })),

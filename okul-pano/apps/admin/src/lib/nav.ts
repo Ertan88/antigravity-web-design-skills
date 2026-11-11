@@ -38,7 +38,10 @@ export interface NavItem {
   /** Menüde görünmesi için gereken yetki (yoksa tüm üyeler görür) */
   permission?: Permission;
   /** Okul ayarına bağlı modüller (ör. taşımalı eğitim yalnızca açıksa görünür) */
-  when?: (settings: SchoolSettings | undefined, who: { userId: string | null; teacherId: string | null; vocational: boolean; can: (p: Permission) => boolean }) => boolean;
+  when?: (
+    settings: SchoolSettings | undefined,
+    who: { userId: string | null; teacherId: string | null; role: string | null; vocational: boolean; coordinator: boolean; can: (p: Permission) => boolean },
+  ) => boolean;
 }
 
 export interface NavGroup {
@@ -50,6 +53,13 @@ export interface NavGroup {
  * Gruplar konuya göre (web ve mobilde aynı ad ve sıra): Pano · Takvim ve Ders · Personel · Öğrenciler ·
  * Mesleki Eğitim · İletişim · Yönetim. Yetkisi olmayan kişide boş kalan grup görünmez.
  */
+/** Mesleki eğitim menüsü: modül açık ve kişi yönetici (müdür, koordinatör müdür yardımcısı, ek kişi), koordinatör ya da meslek öğretmeni */
+function internshipVisible(s: SchoolSettings | undefined, who: { userId: string | null; role: string | null; vocational: boolean; coordinator: boolean }) {
+  if (!s?.internshipEnabled) return false;
+  const full = who.role === 'owner' || (who.userId !== null && (s.internshipManagerUserId === who.userId || (s.internshipViewerUserIds ?? []).includes(who.userId)));
+  return full || who.coordinator || who.vocational;
+}
+
 export const NAV: NavGroup[] = [
   { title: '', items: [{ to: '/', label: 'Genel Bakış', icon: LayoutDashboard }] },
   {
@@ -97,19 +107,19 @@ export const NAV: NavGroup[] = [
   {
     title: 'Mesleki Eğitim',
     items: [
-      // İdare bütün işletmeleri, meslek öğretmeni kendi eklediği ya da koordinatörü olduğu işletmeleri görür
+      // Müdür, koordinatör müdür yardımcısı ve ayarda seçilen ek kişiler hepsini; koordinatör öğretmen (branşı ne
+      // olursa olsun) ve meslek öğretmeni kendi işletmelerini görür. Diğer müdür yardımcıları görmez.
       {
         to: '/isletmeler',
         label: 'İşletmeler',
         icon: Building2,
-        when: (s, who) => Boolean(s?.internshipEnabled) && (who.can('internship.manage') || who.vocational),
+        when: (s, who) => internshipVisible(s, who),
       },
       {
         to: '/isletme-devam',
         label: 'İşletmede Devam',
         icon: CalendarCheck2,
-        // İdare, koordinatör müdür yardımcısı ve meslek öğretmenleri (koordinatör öğretmen kendi işletmelerini görür)
-        when: (s, who) => Boolean(s?.internshipEnabled) && (who.can('internship.manage') || who.vocational || s?.internshipManagerUserId === who.userId),
+        when: (s, who) => internshipVisible(s, who),
       },
     ],
   },
