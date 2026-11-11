@@ -1,5 +1,5 @@
 import { gradeHue, isWithinWindow, parseYouTubeUrl, splitSchoolName, youTubeThumbnail, type DisplayAnnouncement, type ExamSlideRow } from '@okulpano/shared/client';
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { DesignSlide } from '@okulpano/slides';
 import { MegaphoneIcon, SchoolIcon } from './Icons.tsx';
 
@@ -7,35 +7,118 @@ import { MegaphoneIcon, SchoolIcon } from './Icons.tsx';
 
 const EXAM_KIND: Record<ExamSlideRow['groups'][number]['kind'], string> = { written: 'Yazılı', practical: 'Uygulama', common: 'Ortak' };
 
-/** Panonun kendi oluşturduğu slayt: ders saatleri alt alta, şu anki sınav saati vurgulu */
-function ExamSlide({ title, rows }: { title: string; rows: ExamSlideRow[] }) {
+/** Sığmayan slaytta yazı en çok bu kadar küçülür; daha fazlası gerekiyorsa ders saatleri sayfalara bölünür */
+const MIN_EXAM_SCALE = 0.82;
+const EXAM_ROW_GAP = 12;
+
+type ExamLayout = { pages: { rows: number[]; scale: number }[] };
+
+/** Bir ders saati satırı (görünen ve ölçülen kopyada aynı) */
+function ExamRow({ r }: { r: ExamSlideRow }) {
+  return (
+    <div className={`exam-slide-row${r.now ? ' is-now' : ''}`}>
+      <div className="exam-slide-period">
+        {r.periodNo}. ders
+        <small>{r.now ? `Şimdi${r.end ? ` · bitiş ${r.end}` : ''}` : r.start && r.end ? `${r.start} – ${r.end}` : ''}</small>
+      </div>
+      <div className="exam-slide-chips">
+        {r.groups.map((g) => (
+          <span key={g.key} className="exam-slide-chip" style={{ '--chip-hue': gradeHue(g.label) } as CSSProperties}>
+            <i>{g.label}</i>
+            {g.subject}
+            <em>
+              {EXAM_KIND[g.kind]}
+              {g.classes ? ` · ${g.classes}` : ''}
+            </em>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Satır yüksekliklerine göre yerleşim: hepsi sığarsa tek sayfa; biraz taşarsa küçültülür; çok taşarsa sayfalara bölünür */
+function planExamLayout(heights: number[], available: number): ExamLayout {
+  const all = heights.map((_, i) => i);
+  const total = (ids: number[]) => ids.reduce((sum, id) => sum + heights[id]!, 0) + EXAM_ROW_GAP * Math.max(0, ids.length - 1);
+  const fit = (ids: number[]) => Math.min(1, available / Math.max(1, total(ids)));
+  if (!available || fit(all) >= MIN_EXAM_SCALE) return { pages: [{ rows: all, scale: fit(all) }] };
+  // Sayfalara böl: her sayfaya küçültmeden sığan kadar ders saati (tek başına sığmayan saat kendi sayfasında küçülür)
+  const pages: number[][] = [];
+  let current: number[] = [];
+  for (const id of all) {
+    if (current.length && total([...current, id]) > available) {
+      pages.push(current);
+      current = [];
+    }
+    current.push(id);
+  }
+  if (current.length) pages.push(current);
+  return { pages: pages.map((rows) => ({ rows, scale: fit(rows) })) };
+}
+
+/**
+ * Panonun kendi oluşturduğu slayt: ders saatleri alt alta, şu anki sınav saati vurgulu. Satırlar görünmeyen bir
+ * kopyada ölçülür; alana sığmıyorsa önce yazı küçülür (en çok %18), yetmezse sayfalara bölünür ve sayfalar slaytın
+ * süresini paylaşır ("1/2", "2/2").
+ */
+function ExamSlide({ title, rows, durationSec }: { title: string; rows: ExamSlideRow[]; durationSec: number }) {
+  const body = useRef<HTMLDivElement>(null);
+  const measure = useRef<HTMLDivElement>(null);
+  const [layout, setLayout] = useState<ExamLayout>({ pages: [{ rows: rows.map((_, i) => i), scale: 1 }] });
+  const [page, setPage] = useState(0);
+  const signature = JSON.stringify(rows);
+
+  useLayoutEffect(() => {
+    const box = body.current;
+    const copy = measure.current;
+    if (!box || !copy) return;
+    const run = () => {
+      const heights = [...copy.children].map((c) => (c as HTMLElement).offsetHeight);
+      const next = planExamLayout(heights, box.clientHeight);
+      setLayout((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
+    };
+    run();
+    // Yazı tipi geç yüklenirse ya da alan değişirse yeniden ölçülür
+    const ro = new ResizeObserver(run);
+    ro.observe(box);
+    ro.observe(copy);
+    return () => ro.disconnect();
+  }, [signature]);
+
+  const pages = layout.pages.length;
+  useEffect(() => {
+    setPage(0);
+    if (pages <= 1) return;
+    const t = setInterval(() => setPage((p) => (p + 1) % pages), Math.max(3, durationSec / pages) * 1000);
+    return () => clearInterval(t);
+  }, [pages, durationSec, signature]);
+
+  const current = layout.pages[Math.min(page, pages - 1)] ?? { rows: [], scale: 1 };
+  const scale = current.scale;
   return (
     <div className="exam-slide">
       <div className="exam-slide-head">
-        <div className="exam-slide-kicker">Sınav takvimi</div>
-        <h2>{title}</h2>
-      </div>
-      <div className="exam-slide-rows">
-        {rows.map((r) => (
-          <div key={r.periodNo} className={`exam-slide-row${r.now ? ' is-now' : ''}`}>
-            <div className="exam-slide-period">
-              {r.periodNo}. ders
-              <small>{r.now ? `Şimdi${r.end ? ` · bitiş ${r.end}` : ''}` : r.start && r.end ? `${r.start} – ${r.end}` : ''}</small>
-            </div>
-            <div className="exam-slide-chips">
-              {r.groups.map((g) => (
-                <span key={g.key} className="exam-slide-chip" style={{ '--chip-hue': gradeHue(g.label) } as CSSProperties}>
-                  <i>{g.label}</i>
-                  {g.subject}
-                  <em>
-                    {EXAM_KIND[g.kind]}
-                    {g.classes ? ` · ${g.classes}` : ''}
-                  </em>
-                </span>
-              ))}
-            </div>
+        <div>
+          <div className="exam-slide-kicker">Sınav takvimi</div>
+          <h2>{title}</h2>
+        </div>
+        {pages > 1 && (
+          <div className="exam-slide-page">
+            {Math.min(page, pages - 1) + 1}/{pages}
           </div>
-        ))}
+        )}
+      </div>
+      <div className="exam-slide-body" ref={body}>
+        <div className="exam-slide-rows" style={scale < 1 ? { transform: `scale(${scale})`, width: `${100 / scale}%` } : undefined}>
+          {current.rows.map((i) => rows[i] && <ExamRow key={rows[i].periodNo} r={rows[i]} />)}
+        </div>
+        {/* Ölçüm için bütün satırlar, küçültmesiz ve görünmez */}
+        <div className="exam-slide-rows exam-slide-measure" ref={measure} aria-hidden="true">
+          {rows.map((r) => (
+            <ExamRow key={r.periodNo} r={r} />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -262,7 +345,7 @@ export function Slideshow({ announcements, now, defaultDurationSec, videoSound, 
     <section className={`card slideshow ${full ? 'slideshow-full' : ''}`}>
       <div className={`slide slide-${slide.kind}`} key={key}>
         {slide.kind === 'exams' ? (
-          <ExamSlide title={slide.title} rows={slide.examRows ?? []} />
+          <ExamSlide title={slide.title} rows={slide.examRows ?? []} durationSec={duration} />
         ) : slide.kind === 'design' && slide.design ? (
           <div className="slide-design">
             <DesignSlide design={slide.design} schoolName={schoolName} schoolType={schoolType} logoUrl={logoUrl} />
