@@ -1,7 +1,7 @@
 import clsx from 'clsx';
 import { BellOff, CheckCheck, Mail, MailOpen, Trash2 } from '../components/icons.tsx';
 import { useState } from 'react';
-import { Badge, Button, Card, DELETE_TONE, EmptyState, PageHeader, Segmented, Spinner } from '../components/ui.tsx';
+import { Badge, Button, ACTION_SHAPE, Card, DELETE_TONE, EmptyState, PageHeader, Segmented, Spinner } from '../components/ui.tsx';
 import { kindStyle, useInboxActions, useInboxList, useOpenNotification, type InboxFilter, type InboxItem } from '../lib/inbox.tsx';
 
 const dayKey = (iso: string) => new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' });
@@ -116,7 +116,7 @@ export function NotificationsPage() {
                             title="Sil"
                             aria-label={`${n.title}: sil`}
                             onClick={() => remove.mutate(n.id)}
-                            className={clsx('rounded-lg p-2 transition', DELETE_TONE)}
+                            className={clsx(ACTION_SHAPE, DELETE_TONE)}
                           >
                             <Trash2 className="size-4" />
                           </button>

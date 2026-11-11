@@ -1,14 +1,14 @@
 import { classLongName, compareClassNames, gradeOf, timetableEntrySchema, WEEKDAY_NAMES, WEEKDAY_SHORT, type Period } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { CalendarClock, FileUp, Pencil, Plus, Trash2, Users } from '../components/icons.tsx';
+import { CalendarClock, FileUp, Plus, Trash2, Users } from '../components/icons.tsx';
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useToast } from '../components/Toast.tsx';
 import { ClassesPanel } from './timetable/ClassesPanel.tsx';
 import { ClearDialog, type ClearScope } from './timetable/ClearDialog.tsx';
 import { EokulImport } from './timetable/EokulImport.tsx';
-import { Alert, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Select, Spinner } from '../components/ui.tsx';
+import { Alert, Button, Card, DeleteButton, EditButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Select, Spinner } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { nameMap, useList, useSchoolPath, type BellSchedule, type ClassGroup, type Teacher, type TimetableEntry } from '../lib/data.ts';
@@ -335,7 +335,7 @@ export function Timetable() {
                               mode === 'class' ? (
                                 <>
                                   {lines.map((l) => (
-                                    <div key={l.key} className={clsx('min-w-0', editable && 'pr-6')}>
+                                    <div key={l.key} className={clsx('min-w-0', editable && 'pr-[4.6rem]')}>
                                       {l.group && <div className="line-clamp-1 text-[10.5px] font-bold tracking-wide text-slate-400 uppercase">{l.group}</div>}
                                       <div className="line-clamp-3 leading-snug font-semibold break-words text-ink" title={l.subject}>
                                         {l.subject}
@@ -346,11 +346,10 @@ export function Timetable() {
                                     </div>
                                   ))}
                                   {editable && (
-                                    <div className="absolute top-0.5 right-0.5 flex flex-col">
-                                      <IconButton label="Düzenle" className="size-7 hover:bg-surface" onClick={() => openCell(d, p)}>
-                                        <Pencil className="size-3.5" />
-                                      </IconButton>
-                                      <DeleteButton className="size-7" label="Dersi sil" what="Bu ders" onConfirm={() => clear.mutate(list.map((x) => x.id))} />
+                                    // Düzenle ve sil yan yana, hücrenin sağ üstünde (hücreden taşmaz)
+                                    <div className="absolute top-1.5 right-1.5 flex gap-1.5">
+                                      <EditButton onClick={() => openCell(d, p)} />
+                                      <DeleteButton label="Dersi sil" what="Bu ders" onConfirm={() => clear.mutate(list.map((x) => x.id))} />
                                     </div>
                                   )}
                                 </>

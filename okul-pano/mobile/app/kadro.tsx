@@ -8,7 +8,7 @@ import { useSchoolQuery } from '../src/data.ts';
 import { Sheet, SheetScroll } from '../src/sheet.tsx';
 import { Text } from '../src/text.tsx';
 import { colors, radius } from '../src/theme.ts';
-import { Avatar, Badge, Button, Card, Chip, confirm, Empty, ErrorNote, Field, Icon, Loading, Screen, T, ToggleRow } from '../src/ui.tsx';
+import { Avatar, Badge, Button, Card, Chip, confirm, EditIconButton, Empty, ErrorNote, Field, Icon, Loading, Screen, T, ToggleRow } from '../src/ui.tsx';
 
 /** Kadrodaki öğretmen (iletişim bilgileri yalnızca kadro ya da kullanıcı yönetimi yetkisi olana dolu gelir) */
 interface Teacher {
@@ -124,15 +124,7 @@ function TeacherRow({ t, last, onEdit }: { t: Teacher; last: boolean; onEdit: ()
         </Text>
       </View>
       {!t.isActive && <Badge tone="muted">Pasif</Badge>}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`${t.fullName} düzenle`}
-        onPress={onEdit}
-        hitSlop={8}
-        style={({ pressed }) => ({ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, backgroundColor: pressed ? colors.primarySoft : colors.card })}
-      >
-        <Icon name="create-outline" size={18} color={colors.muted} />
-      </Pressable>
+      <EditIconButton label={`${t.fullName} düzenle`} onPress={onEdit} />
     </View>
   );
 }

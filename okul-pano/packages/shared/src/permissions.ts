@@ -26,6 +26,8 @@ export const PERMISSIONS = {
   'internship.manage': 'İşletmeler ve işletmede devam çizelgesi',
   /** Rehber öğretmen: bütün öğrencilerin gözlem kayıtlarını görür (panelde "Rehber öğretmen" rolü olarak verilir) */
   'conduct.counsel': 'Rehber öğretmen (bütün gözlem kayıtları)',
+  /** Okul Yayın ekibine (platforma) destek talebi yazma; müdür ve müdür yardımcılarında hep vardır */
+  'support.contact': 'Platforma yazma',
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;

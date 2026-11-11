@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 import { Pencil, Trash2 } from '../../components/icons.tsx';
-import { DELETE_TONE } from '../../components/ui.tsx';
+import { ACTION_SHAPE, DELETE_TONE, EDIT_TONE } from '../../components/ui.tsx';
 import type { Teacher } from '../../lib/data.ts';
 
 /** Branşa göre sabit avatar rengi: aynı branştaki öğretmenler listede görsel olarak gruplanır. */
@@ -98,7 +98,7 @@ export function TeacherCard({
             }}
             aria-label={`${teacher.fullName} düzenle`}
             title="Düzenle"
-            className="inline-flex size-9 items-center justify-center rounded-lg bg-surface text-slate-500 ring-1 ring-slate-200 hover:bg-brand-50 hover:text-brand-700 hover:ring-brand-200"
+            className={clsx(ACTION_SHAPE, EDIT_TONE)}
           >
             <Pencil className="size-4" />
           </button>
@@ -110,7 +110,7 @@ export function TeacherCard({
             }}
             aria-label={`${teacher.fullName} sil`}
             title="Sil"
-            className={clsx('inline-flex size-9 items-center justify-center rounded-lg', DELETE_TONE)}
+            className={clsx(ACTION_SHAPE, DELETE_TONE)}
           >
             <Trash2 className="size-4" />
           </button>

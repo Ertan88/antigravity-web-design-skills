@@ -5,7 +5,7 @@ import { CalendarDays, CalendarPlus, GraduationCap, Plus, Sunset, Trash2 } from 
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useToast } from '../../components/Toast.tsx';
-import { Badge, Button, Card, DELETE_TONE, Input, Toggle } from '../../components/ui.tsx';
+import { Badge, Button, ACTION_SHAPE, Card, DELETE_TONE, Input, Toggle } from '../../components/ui.tsx';
 import { api } from '../../lib/api.ts';
 import { useAuth } from '../../lib/auth.tsx';
 import { useSchool, useSchoolPath, type School } from '../../lib/data.ts';
@@ -230,7 +230,7 @@ export function HolidaysCard() {
                         aria-label={`${r.name} tatilini kaldır`}
                         title={r.name.startsWith('İdari İzin') || r.name.endsWith('Arifesi') ? 'Kaldırınca önceki haline döner' : 'Kaldır'}
                         onClick={() => remove.mutate(r.id!)}
-                        className={clsx('rounded-lg p-1.5 transition', DELETE_TONE)}
+                        className={clsx(ACTION_SHAPE, DELETE_TONE)}
                       >
                         <Trash2 className="size-4" />
                       </button>

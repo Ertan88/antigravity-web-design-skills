@@ -1,9 +1,9 @@
 import { trCompare } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Check, ListPlus, Pencil, Plus, Search, Trash2, X } from '../../components/icons.tsx';
+import { Check, ListPlus, Plus, Search, Trash2, X } from '../../components/icons.tsx';
 import { useState } from 'react';
 import { useToast } from '../../components/Toast.tsx';
-import { Badge, Button, IconButton, Input, Modal, Segmented, Spinner } from '../../components/ui.tsx';
+import { Badge, Button, EditButton, IconButton, Input, Modal, Segmented, Spinner } from '../../components/ui.tsx';
 import { api } from '../../lib/api.ts';
 import { useAuth } from '../../lib/auth.tsx';
 import { useList, useSchoolPath, type TeacherOption } from '../../lib/data.ts';
@@ -86,9 +86,7 @@ function OptionRow({ kind, option }: { kind: OptionKind; option: TeacherOption }
         </div>
       ) : (
         <div className="flex pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100">
-          <IconButton label="Adını değiştir" onClick={() => setEditing(true)}>
-            <Pencil className="size-4" />
-          </IconButton>
+          <EditButton label="Adını değiştir" onClick={() => setEditing(true)} />
           <IconButton label="Sil" tone="delete" onClick={() => setConfirmDelete(true)}>
             <Trash2 className="size-4" />
           </IconButton>

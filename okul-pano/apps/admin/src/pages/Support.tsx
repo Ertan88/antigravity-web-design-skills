@@ -118,13 +118,14 @@ function TicketDialog({ id, base, platform, onClose }: { id: string; base: strin
 
 /** Okul: Platforma Yaz (yalnızca okul müdürü ve yöneticiler) */
 export function SupportPage() {
-  const { school } = useAuth();
+  const { school, can } = useAuth();
   const base = useSchoolPath('support');
   const [params, setParams] = useSearchParams();
   const [creating, setCreating] = useState(false);
-  const manager = school?.role === 'owner' || school?.role === 'admin';
+  // Müdür, müdür yardımcıları ve "Platforma yazar" yetkisi verilenler
+  const manager = school?.role === 'owner' || school?.role === 'admin' || can('support.contact');
   const list = useQuery({ queryKey: ['support', base, 'list'], queryFn: () => api<SupportTicket[]>(base), enabled: manager });
-  if (!manager) return <Alert tone="amber">Platforma yalnızca okul müdürü ve yöneticiler yazabilir.</Alert>;
+  if (!manager) return <Alert tone="amber">Platforma yalnızca okul müdürü, müdür yardımcıları ve yetki verilen kişiler yazabilir.</Alert>;
   return (
     <div>
       <PageHeader

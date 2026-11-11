@@ -2,7 +2,7 @@ import { DUTY_PACKAGES, normalizeName } from '@okulpano/shared';
 import clsx from 'clsx';
 import { useEffect, useState } from 'react';
 import { Check, Pencil, Search, Users as UsersIcon } from '../../components/icons.tsx';
-import { Badge, Button, Card, EmptyState, Input, Modal } from '../../components/ui.tsx';
+import { ACTION_SHAPE, Badge, Button, Card, EDIT_TONE, EmptyState, Input, Modal } from '../../components/ui.tsx';
 import { Avatar, PersonCard, RolePill, type CardContext } from './PersonCard.tsx';
 import { STATUS, type Person } from './people.ts';
 
@@ -140,8 +140,8 @@ export function PeopleTab({
                         aria-label={`${p.fullName} düzenle`}
                         title="Düzenle"
                         className={clsx(
-                          'inline-flex size-9 shrink-0 items-center justify-center rounded-lg ring-1 transition-colors',
-                          on ? 'bg-ink text-surface ring-ink' : 'bg-surface text-slate-500 ring-slate-200 hover:bg-brand-50 hover:text-brand-700 hover:ring-brand-200',
+                          ACTION_SHAPE,
+                          on ? 'bg-ink text-surface ring-1 ring-ink' : EDIT_TONE,
                         )}
                       >
                         <Pencil className="size-4" />

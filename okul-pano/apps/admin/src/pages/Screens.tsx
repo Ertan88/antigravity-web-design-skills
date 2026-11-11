@@ -1,9 +1,9 @@
 import { pairScreenSchema, screenSchema } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Check, Copy, KeyRound, LayoutTemplate, MonitorSmartphone, Pencil, Plus, RectangleHorizontal, RectangleVertical, RefreshCw, ScanEye } from '../components/icons.tsx';
+import { Check, Copy, KeyRound, LayoutTemplate, MonitorSmartphone, Plus, RectangleHorizontal, RectangleVertical, RefreshCw, ScanEye } from '../components/icons.tsx';
 import { useState } from 'react';
 import { useToast } from '../components/Toast.tsx';
-import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Spinner } from '../components/ui.tsx';
+import { Alert, Badge, Button, Card, DeleteButton, EditButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Spinner } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useList, useSchool, useSchoolPath, type Screen } from '../lib/data.ts';
@@ -297,15 +297,13 @@ export function Screens() {
                   Yenile
                 </Button>
                 <div className="ml-auto flex">
-                  <IconButton
+                  <EditButton
                     label="Adını değiştir"
                     onClick={() => {
                       renameForm.reset({ name: s.name, location: s.location ?? '' });
                       setRenaming(s);
                     }}
-                  >
-                    <Pencil className="size-4" />
-                  </IconButton>
+                  />
                   <IconButton label="Anahtarı yenile" onClick={() => rotate.mutate(s.id)}>
                     <KeyRound className="size-4" />
                   </IconButton>

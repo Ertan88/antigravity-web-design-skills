@@ -23,6 +23,7 @@ export const EXTRA_PERMISSIONS: readonly { key: Permission; label: string; text:
   { key: 'accounts.enroll', label: 'Öğretmen hesabı açar', text: 'Kadrodaki öğretmenlere hesap açar (yalnızca Öğretmen rolüyle)' },
   { key: 'emergency.manage', label: 'Acil durum uyarısı', text: 'Bütün panolarda acil durum uyarısı başlatır' },
   { key: 'settings.manage', label: 'Okul ayarları', text: 'Okul bilgileri, konum ve modüller' },
+  { key: 'support.contact', label: 'Platforma yazar', text: 'Okul Yayın ekibine sorun, öneri ya da soru yazar' },
 ];
 
 /** Kişinin açık görev paketleri (paketin bütün yetkileri verilmişse) */

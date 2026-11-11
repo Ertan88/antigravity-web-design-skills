@@ -87,9 +87,12 @@ describe('okul sorunları', () => {
 
 describe('destek talepleri', () => {
   let ticketId: string;
-  it('yalnızca müdür ve yöneticiler yazabilir', async () => {
+  it('yalnızca müdür, müdür yardımcıları ve "Platforma yazar" yetkisi verilenler yazabilir', async () => {
     expect((await teacher.post(`${base}/support`, { kind: 'problem', subject: 'Deneme konu', body: 'Açıklama metni' })).statusCode).toBe(403);
     expect((await teacher.get(`${base}/support`)).statusCode).toBe(403);
+    expectStatus(await owner.post(`${base}/members`, { email: 'yetkili@sorun.test', fullName: 'Yetkili Öğretmen', password: 'GizliSifre42', role: 'editor', permissions: ['support.contact'] }), 201);
+    const allowed = client(t.app, (await login(t.app, 'yetkili@sorun.test', 'GizliSifre42')).token);
+    expectStatus(await allowed.get(`${base}/support`), 200);
   });
 
   it('müdür yazar, platform yöneticisine bildirim gider; yanıt müdüre döner', async () => {

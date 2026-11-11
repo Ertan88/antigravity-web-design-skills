@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import { Check, Pencil, Plus, Trash2, X } from '../../components/icons.tsx';
 import { useState, type CSSProperties } from 'react';
 import { useToast } from '../../components/Toast.tsx';
-import { Card, DELETE_TONE } from '../../components/ui.tsx';
+import { ACTION_SHAPE, Card, DELETE_TONE, EDIT_TONE } from '../../components/ui.tsx';
 import { api } from '../../lib/api.ts';
 import { useAuth } from '../../lib/auth.tsx';
 import { useSchoolPath, type ClassGroup } from '../../lib/data.ts';
@@ -206,12 +206,12 @@ export function ClassesPanel({
                           Silinsin mi?
                         </button>
                       ) : (
-                        <span className={clsx('absolute top-1/2 right-1 hidden -translate-y-1/2 gap-0.5 pointer-fine:group-hover:flex', active && 'pointer-coarse:flex')}>
+                        <span className={clsx('absolute top-1/2 right-1 hidden -translate-y-1/2 gap-1 pointer-fine:group-hover:flex', active && 'pointer-coarse:flex')}>
                           <button
                             type="button"
                             aria-label={`${c.name} adını değiştir`}
                             onClick={() => setEditing({ id: c.id, name: c.name })}
-                            className={clsx('flex size-6 items-center justify-center rounded-lg', active ? 'text-white/80 hover:bg-white/20' : 'text-slate-400 hover:bg-slate-200 hover:text-slate-700')}
+                            className={clsx(ACTION_SHAPE, 'size-6 rounded-lg', EDIT_TONE)}
                           >
                             <Pencil className="size-3" />
                           </button>
@@ -219,7 +219,7 @@ export function ClassesPanel({
                             type="button"
                             aria-label={`${c.name} sil`}
                             onClick={() => setConfirmDelete(c.id)}
-                            className={clsx('flex size-6 items-center justify-center rounded-lg', active ? 'text-white/80 hover:bg-white/20' : DELETE_TONE)}
+                            className={clsx(ACTION_SHAPE, 'size-6 rounded-lg', DELETE_TONE)}
                           >
                             <Trash2 className="size-3" />
                           </button>

@@ -403,7 +403,12 @@ const BUTTONS: Record<ButtonVariant, { bg: string; fg: string; border: string }>
 };
 
 /** Satırlardaki çöp kutusu düğmesi: Button variant="delete" ile aynı yumuşak kırmızı (açık ve koyu temada) */
-export function DeleteIconButton({ label, onPress, size = 40, disabled }: { label: string; onPress: () => void; size?: number; disabled?: boolean }) {
+/**
+ * Satır işlemleri (düzenle / sil) her ekranda aynı biçimdedir: 36 px yuvarlatılmış kare, yan yana; kalem gri,
+ * çöp yumuşak kırmızı (web ile aynı). Tek tek boyut ve renk verilmez.
+ */
+function ActionIconButton({ label, onPress, size = 36, disabled, tone }: { label: string; onPress: () => void; size?: number; disabled?: boolean; tone: 'edit' | 'delete' }) {
+  const del = tone === 'delete';
   return (
     <Pressable
       accessibilityRole="button"
@@ -414,18 +419,26 @@ export function DeleteIconButton({ label, onPress, size = 40, disabled }: { labe
       style={({ pressed }) => ({
         width: size,
         height: size,
-        borderRadius: size / 2,
+        borderRadius: Math.round(size * 0.3),
         borderWidth: 1,
-        borderColor: colors.dangerBorder,
-        backgroundColor: colors.dangerSoft,
+        borderColor: del ? colors.dangerBorder : colors.borderStrong,
+        backgroundColor: del ? colors.dangerSoft : colors.primarySoft,
         alignItems: 'center',
         justifyContent: 'center',
-        opacity: disabled ? 0.45 : pressed ? 0.8 : 1,
+        opacity: disabled ? 0.45 : pressed ? 0.75 : 1,
       })}
     >
-      <Icon name="trash-outline" size={Math.round(size * 0.45)} color={colors.danger} />
+      <Icon name={del ? 'trash-outline' : 'create-outline'} size={Math.round(size * 0.47)} color={del ? colors.danger : colors.muted} />
     </Pressable>
   );
+}
+
+export function DeleteIconButton(props: { label: string; onPress: () => void; size?: number; disabled?: boolean }) {
+  return <ActionIconButton {...props} tone="delete" />;
+}
+
+export function EditIconButton(props: { label: string; onPress: () => void; size?: number; disabled?: boolean }) {
+  return <ActionIconButton {...props} tone="edit" />;
 }
 
 /** Seçilebilir küçük düğme (şablon, süre, görünüm seçimi) */

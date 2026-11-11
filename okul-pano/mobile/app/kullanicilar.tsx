@@ -8,7 +8,7 @@ import { STATUS_BADGE, usePeople } from '../src/people.ts';
 import { Sheet } from '../src/sheet.tsx';
 import { Text } from '../src/text.tsx';
 import { colors, radius } from '../src/theme.ts';
-import { Avatar, Badge, Button, Card, Chip, confirm, Empty, ErrorNote, Field, Icon, Loading, Screen, Segmented, T } from '../src/ui.tsx';
+import { Avatar, Badge, Button, Card, Chip, confirm, EditIconButton, Empty, ErrorNote, Field, Icon, Loading, Screen, Segmented, T } from '../src/ui.tsx';
 
 type Filter = 'all' | 'none' | 'invited' | 'pending' | 'management';
 type Tab = 'people' | 'duties';
@@ -151,15 +151,7 @@ function PersonRow({ p, last, onPress }: { p: Person; last: boolean; onPress: ()
           <Text style={{ fontSize: 11, fontWeight: '700', color: colors.warning }}>Öneri bekliyor</Text>
         )}
       </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`${p.fullName} düzenle`}
-        onPress={onPress}
-        hitSlop={8}
-        style={({ pressed }) => ({ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, backgroundColor: pressed ? colors.primarySoft : colors.card })}
-      >
-        <Icon name="create-outline" size={18} color={colors.muted} />
-      </Pressable>
+      <EditIconButton label={`${p.fullName} düzenle`} onPress={onPress} />
     </View>
   );
 }

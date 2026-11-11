@@ -8,10 +8,10 @@ import { TicketRow } from '../src/support.tsx';
 import { colors } from '../src/theme.ts';
 import { Button, Empty, ErrorNote, Loading, Screen, T } from '../src/ui.tsx';
 
-/** Platforma yaz: okul müdürü ve yöneticiler Okul Yayın ekibine sorun, öneri ya da soru iletir */
+/** Platforma yaz: okul müdürü, müdür yardımcıları ve yetki verilenler Okul Yayın ekibine sorun, öneri ya da soru iletir */
 export default function PlatformaYaz() {
-  const { school, role } = useAuth();
-  const allowed = role === 'owner' || role === 'admin';
+  const { school, role, can } = useAuth();
+  const allowed = role === 'owner' || role === 'admin' || can('support.contact');
   const path = useSchoolPath('support');
   const { id } = useLocalSearchParams<{ id?: string }>();
   const q = useQuery({ queryKey: [school?.id, 'support'], queryFn: () => api<SupportTicket[]>(path), enabled: Boolean(school) && allowed, refetchInterval: 60_000 });
@@ -21,7 +21,7 @@ export default function PlatformaYaz() {
   if (!allowed) {
     return (
       <Screen back title="Platforma yaz">
-        <Empty icon="lock-closed-outline" title="Yalnızca okul müdürü ve yöneticiler" text="Bir sorun görürseniz okul idarenize “Sorun bildir” ile iletin." />
+        <Empty icon="lock-closed-outline" title="Yalnızca müdür, müdür yardımcıları ve yetkililer" text="Bir sorun görürseniz okul idarenize “Sorun bildir” ile iletin." />
       </Screen>
     );
   }

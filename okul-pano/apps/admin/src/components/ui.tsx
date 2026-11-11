@@ -1,6 +1,6 @@
 import { WEEKDAY_SHORT } from '@okulpano/shared';
 import clsx from 'clsx';
-import { AlertTriangle, Check, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, Loader2, Trash2, X } from './icons.tsx';
+import { AlertTriangle, Check, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, Loader2, Pencil, Trash2, X } from './icons.tsx';
 import {
   Children,
   Fragment,
@@ -36,6 +36,13 @@ type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'delete' | 'succes
  * Onay penceresindeki son "Sil" dolu kırmızıdır (variant="danger").
  */
 export const DELETE_TONE = 'bg-rose-50 text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100 hover:text-rose-800';
+/** Düzenle düğmesinin rengi (gri zemin, ince çerçeve); sil düğmesiyle aynı biçimde */
+export const EDIT_TONE = 'bg-slate-100 text-slate-600 ring-1 ring-slate-200 hover:bg-slate-200 hover:text-ink';
+/**
+ * Satır işlemleri (düzenle / sil) her yerde aynı biçimdedir: 32 px yuvarlatılmış kare, yan yana. Özel düğmede
+ * ACTION_SHAPE + EDIT_TONE ya da DELETE_TONE kullanılır; tek tek boyut ve renk verilmez.
+ */
+export const ACTION_SHAPE = 'inline-flex size-8 shrink-0 items-center justify-center rounded-[10px] transition-colors disabled:opacity-40';
 
 const variants: Record<Variant, string> = {
   // Düz mürekkep hap düğme (bento): gölge ve geçiş yok
@@ -82,7 +89,7 @@ export function IconButton({
   ref,
   tone = 'default',
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; ref?: Ref<HTMLButtonElement>; tone?: 'default' | 'delete' }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; ref?: Ref<HTMLButtonElement>; tone?: 'default' | 'edit' | 'delete' }) {
   return (
     <button
       ref={ref}
@@ -90,8 +97,9 @@ export function IconButton({
       title={label}
       aria-label={label}
       className={clsx(
-        'inline-flex size-9 items-center justify-center rounded-full transition-colors disabled:opacity-40',
-        tone === 'delete' ? DELETE_TONE : 'text-slate-500 hover:bg-slate-100 hover:text-ink',
+        tone === 'default'
+          ? 'inline-flex size-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-ink disabled:opacity-40'
+          : [ACTION_SHAPE, tone === 'delete' ? DELETE_TONE : EDIT_TONE],
         className,
       )}
       {...rest}
@@ -619,6 +627,15 @@ export function Modal({
       </div>
     </div>,
     document.body,
+  );
+}
+
+/** Düzenle düğmesi (kalem): sil düğmesiyle aynı boyda ve biçimde, gri */
+export function EditButton({ label = 'Düzenle', ...rest }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> & { label?: string }) {
+  return (
+    <IconButton label={label} tone="edit" {...rest}>
+      <Pencil className="size-4" />
+    </IconButton>
   );
 }
 

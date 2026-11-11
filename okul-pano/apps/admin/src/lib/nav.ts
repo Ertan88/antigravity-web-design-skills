@@ -118,8 +118,8 @@ export const NAV: NavGroup[] = [
     items: [
       // Herkes bildirir; idare pano görünümünde yönetir
       { to: '/sorunlar', label: 'Okul Sorunları', icon: AlertTriangle },
-      // Okul müdürü ve yöneticiler (kullanıcı yönetimi yetkisi yalnız onlarda) platforma yazar
-      { to: '/platforma-yaz', label: 'Platforma Yaz', icon: Lifebuoy2, permission: 'users.manage' },
+      // Okul müdürü, müdür yardımcıları ve "Platforma yazar" yetkisi verilenler
+      { to: '/platforma-yaz', label: 'Platforma Yaz', icon: Lifebuoy2, permission: 'support.contact' },
     ],
   },
   {

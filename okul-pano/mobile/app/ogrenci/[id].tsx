@@ -114,7 +114,7 @@ export default function StudentCard() {
                     </View>
                     <Text style={{ fontSize: 11, color: colors.subtle, fontWeight: '600' }}>{shortStamp(e.createdAt)}</Text>
                     {e.mine && (
-                      <DeleteIconButton label="Kaydı sil" size={32} onPress={() => void remove(e.id)} />
+                      <DeleteIconButton label="Kaydı sil" onPress={() => void remove(e.id)} />
                     )}
                   </View>
                 );

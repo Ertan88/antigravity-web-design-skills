@@ -279,7 +279,7 @@ export default function Menu() {
       managerial
         ? { title: 'Okul sorunları', subtitle: 'Öğretmenlerin bildirdiği arıza, temizlik, ısınma…', icon: 'alert-triangle', to: '/sorunlar' }
         : { title: 'Sorun bildir', subtitle: 'Arıza, temizlik, ısınma… idareye iletin', icon: 'alert-triangle', to: '/sorunlar' },
-      managerial && { title: 'Platforma yaz', subtitle: 'Okul Yayın ekibine sorun, öneri ya da soru', icon: 'lifebuoy', to: '/platforma-yaz' },
+      (managerial || can('support.contact')) && { title: 'Platforma yaz', subtitle: 'Okul Yayın ekibine sorun, öneri ya da soru', icon: 'lifebuoy', to: '/platforma-yaz' },
     ]);
     add('Yönetim', [
       can('directory.manage') && { title: 'Öğretmen kadrosu', subtitle: 'Ad, branş, ünvan, iletişim · ekle, düzenle', icon: 'school-outline', to: '/kadro' },

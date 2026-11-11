@@ -23,9 +23,9 @@ import {
 } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { BellRing, Check, ChevronDown, ChevronLeft, ChevronRight, Coffee, CopyPlus, Minus, Pencil, Plus, Trash2, Utensils, Wand2 } from '../components/icons.tsx';
+import { BellRing, Check, ChevronDown, ChevronLeft, ChevronRight, Coffee, CopyPlus, Minus, Plus, Trash2, Utensils, Wand2 } from '../components/icons.tsx';
 import { useMemo, useState } from 'react';
-import { Alert, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Spinner } from '../components/ui.tsx';
+import { Alert, Button, Card, DeleteButton, EditButton, EmptyState, Field, IconButton, Input, Modal, PageHeader, Segmented, Spinner } from '../components/ui.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
@@ -691,10 +691,8 @@ export function BellSchedules() {
                             ))}
                             {!used.length && <span className="text-[11px] text-slate-400">Bu hafta çalmıyor</span>}
                             {editable && (
-                              <span className="ml-auto flex items-center gap-1">
-                                <IconButton label="Düzenle" onClick={() => openEditor(s)}>
-                                  <Pencil className="size-3.5" />
-                                </IconButton>
+                              <span className="ml-auto flex items-center gap-1.5">
+                                <EditButton onClick={() => openEditor(s)} />
                                 <IconButton label="Kopyala" onClick={() => openCopy(s)}>
                                   <CopyPlus className="size-3.5" />
                                 </IconButton>

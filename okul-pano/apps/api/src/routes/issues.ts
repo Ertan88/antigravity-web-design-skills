@@ -277,7 +277,9 @@ export async function issueRoutes(app: FastifyInstance) {
 
   const support = '/api/schools/:schoolId/support';
   const managerOnly = async (req: FastifyRequest) => {
-    if (!isManager(req.ctx.role) || req.ctx.isSupport) throw forbidden('Platforma yalnızca okul müdürü ve yöneticiler yazabilir.');
+    // Müdür, müdür yardımcıları ve "Platforma yazar" yetkisi verilenler
+    if (req.ctx.isSupport || !(isManager(req.ctx.role) || req.ctx.permissions.includes('support.contact')))
+      throw forbidden('Platforma yalnızca okul müdürü, müdür yardımcıları ve yetki verilen kişiler yazabilir.');
   };
   const supportGuard = { preHandler: [app.authenticate, schoolGuard(), managerOnly] };
 

@@ -1,13 +1,13 @@
 import type { Permission } from '@okulpano/shared';
 import clsx from 'clsx';
-import { ArrowDown, ArrowUp, Pencil, Plus, Search } from './icons.tsx';
+import { ArrowDown, ArrowUp, Plus, Search } from './icons.tsx';
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { ZodType } from 'zod';
 import { useAuth } from '../lib/auth.tsx';
 import { useList, useResource } from '../lib/data.ts';
 import { useForm } from '../lib/form.ts';
-import { Alert, Button, Card, DeleteButton, EmptyState, IconButton, Modal, PageHeader, Spinner, Table, Td, Toggle } from './ui.tsx';
+import { Alert, Button, Card, DeleteButton, EditButton, EmptyState, IconButton, Modal, PageHeader, Spinner, Table, Td, Toggle } from './ui.tsx';
 
 export interface Column<T> {
   header: string;
@@ -144,7 +144,7 @@ export function CrudPage<T extends { id: string; isActive?: boolean }, F extends
   };
 
   const actions = (row: T, i: number) => (
-    <div className="flex items-center justify-end gap-0.5">
+    <div className="flex items-center justify-end gap-1.5">
       {p.rowActions?.(row)}
       {editable && p.reorderable && (
         <>
@@ -158,9 +158,7 @@ export function CrudPage<T extends { id: string; isActive?: boolean }, F extends
       )}
       {editable && (
         <>
-          <IconButton label="Düzenle" onClick={() => openEdit(row)}>
-            <Pencil className="size-4" />
-          </IconButton>
+          <EditButton onClick={() => openEdit(row)} />
           <DeleteButton onConfirm={() => ops.remove.mutate(row.id)} />
         </>
       )}
