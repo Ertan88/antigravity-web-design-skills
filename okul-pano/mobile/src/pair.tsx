@@ -44,6 +44,8 @@ export function PairCard({ initialCode, onDone }: { initialCode?: string; onDone
     try {
       await api(path, { method: 'POST', body: { code, name } });
       await qc.invalidateQueries({ queryKey: [school?.id, 'screens'] });
+      // Pano eşleşince birkaç saniye içinde bağlanır: liste kısa aralarla yeniden sorulur, "çevrimiçi" hemen görünür
+      for (const ms of [2000, 5000, 10_000]) setTimeout(() => void qc.invalidateQueries({ queryKey: [school?.id, 'screens'] }), ms);
       setOpen(false);
       setCode('');
       setName('');

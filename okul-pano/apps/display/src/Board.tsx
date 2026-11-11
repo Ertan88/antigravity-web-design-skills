@@ -263,6 +263,12 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
     : (state.scheduledExams ?? [])
         .filter((e) => e.date === today.isoDate && (!screenClasses.size || screenClasses.has(e.classId)) && !(e.end && e.end <= nowClock))
         .sort((a, b) => a.periodNo - b.periodNo || compareClassNames(a.className, b.className));
+  // Günün ilk sınavı başladı mı (bitenler dahil): kartın altındaki başlık buna göre değişir
+  const examsStartedToday =
+    !day.holiday &&
+    (state.scheduledExams ?? []).some(
+      (e) => e.date === today.isoDate && (!screenClasses.size || screenClasses.has(e.classId)) && Boolean(e.start && e.start <= nowClock),
+    );
   // Panoda kısa sınıf adıyla; "Şu an derste" kartında sınıf + ders saatine göre bulunur
   const examsShown = todayExams.map((e) => ({ ...e, classLabel: shortClass(e.className) }));
   const examsBySlot = new Map(examsShown.map((e) => [`${e.classId}|${e.periodNo}`, e]));
@@ -360,6 +366,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
             examsBySlot={examsBySlot}
             laterExams={laterExams}
             nowClock={nowClock}
+            examsStarted={examsStartedToday}
             heading={bell.kind === 'lesson' || !lessonPeriod ? 'Şu An Derste' : 'Sıradaki Ders'}
             periodTitle={
               !lessonPeriod ? 'Ek ders saati' : bell.kind === 'lesson' ? periodLabel(lessonPeriod) : `${periodLabel(lessonPeriod)} · ${lessonPeriod.start}`

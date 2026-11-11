@@ -138,6 +138,7 @@ export function LessonsCard({
   examsBySlot,
   laterExams = [],
   nowClock,
+  examsStarted = false,
 }: {
   entries: DisplayState['timetable'];
   heading: string;
@@ -146,6 +147,8 @@ export function LessonsCard({
   examsBySlot?: ReadonlyMap<string, ScheduledExam>;
   /** Kartın altında gösterilecek, daha sonraki sınavlar */
   laterExams?: ScheduledExam[];
+  /** Bugünün ilk sınavı başladı mı: başlamadıysa başlık "Bugünkü sınavlar", başladıysa "Bugün sonraki sınavlar" */
+  examsStarted?: boolean;
   nowClock?: string;
 }) {
   const examOf = (e: DisplayState['timetable'][number]) => (e.classId ? examsBySlot?.get(`${e.classId}|${e.periodNo}`) : undefined);
@@ -156,7 +159,7 @@ export function LessonsCard({
     .sort((a, b) => a - b)
     .map((periodNo) => {
       const items = laterExams.filter((e) => e.periodNo === periodNo);
-      return { periodNo, start: items[0]!.start, groups: groupExams(items) };
+      return { periodNo, groups: groupExams(items) };
     });
   return (
     <section className="card list-card lessons-card">
@@ -192,12 +195,11 @@ export function LessonsCard({
       />
       {later.length > 0 && (
         <div className="exam-later">
-          <div className="exam-later-title">Bugün sonraki sınavlar</div>
+          <div className="exam-later-title">{examsStarted ? 'Bugün sonraki sınavlar' : 'Bugünkü sınavlar'}</div>
           {later.slice(0, 2).map((p) => (
             <div key={p.periodNo} className="exam-later-row">
-              <span className="exam-later-time">
-                {p.periodNo}. ders{p.start ? ` ${p.start}` : ''}
-              </span>
+              {/* Saat yazılmaz: ders saati yeterli (saat zil kartında) */}
+              <span className="exam-later-time">{p.periodNo}. ders</span>
               <span className="exam-later-list">
                 {p.groups.map((g) => (
                   <span key={g.key}>

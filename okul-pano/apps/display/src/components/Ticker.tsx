@@ -25,15 +25,23 @@ export function Ticker({ items, speed }: { items: TickerEntry[]; speed: number }
   const probe = useRef<HTMLDivElement>(null);
   const [reps, setReps] = useState(1);
   const [copyWidth, setCopyWidth] = useState(0);
+  // Pano her saniye yeniden çizilir (saat): yazı yalnızca metin değişince ölçülür. Her saniye ölçmek tarayıcıyı
+  // yerleşimi yeniden hesaplamaya zorlar ve TV'de kayan yazı her saniye bir an takılır.
+  const signature = items.map(textOf).join('|');
 
   useLayoutEffect(() => {
-    const single = probe.current?.scrollWidth ?? 0;
-    const available = viewport.current?.clientWidth ?? 0;
-    if (!single) return;
-    const r = Math.max(1, Math.ceil(available / single));
-    setReps(r);
-    setCopyWidth(single * r);
-  }, [items]);
+    const measure = () => {
+      const single = probe.current?.scrollWidth ?? 0;
+      const available = viewport.current?.clientWidth ?? 0;
+      if (!single) return;
+      const r = Math.max(1, Math.ceil(available / single));
+      setReps(r);
+      setCopyWidth(single * r);
+    };
+    measure();
+    // Yazı tipi geç yüklenirse genişlik değişir
+    void document.fonts?.ready.then(measure);
+  }, [signature]);
 
   const copy = (hidden: boolean) => (
     <div className="ticker-copy" aria-hidden={hidden || undefined}>
@@ -61,7 +69,7 @@ export function Ticker({ items, speed }: { items: TickerEntry[]; speed: number }
         </div>
         <div
           className="ticker-track"
-          key={`${items.map(textOf).join('|')}-${reps}`}
+          key={`${signature}-${reps}`}
           style={{ animationDuration: `${Math.max(10, copyWidth / speed)}s` }}
         >
           {copy(false)}

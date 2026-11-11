@@ -1127,7 +1127,7 @@ p {
   position: relative;
   display: flex;
   align-items: center;
-  mask-image: linear-gradient(90deg, transparent, #000 40px, #000 calc(100% - 40px), transparent);
+  /* Kenar solması (mask-image) yok: maske, kaymanın ekran kartında yapılmasını engelliyor, TV'de takılmaya yol açıyordu */
 }
 
 .ticker-probe {
@@ -1142,6 +1142,9 @@ p {
   width: max-content;
   animation: ticker linear infinite;
   will-change: transform;
+  /* Kendi katmanında, ekran kartında kayar (sayfanın geri kalanı her saniye yeniden çizilse de etkilenmez) */
+  backface-visibility: hidden;
+  transform: translate3d(0, 0, 0);
 }
 
 .ticker-copy {
@@ -1380,10 +1383,10 @@ p {
 
 @keyframes ticker {
   from {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
   to {
-    transform: translateX(-50%);
+    transform: translate3d(-50%, 0, 0);
   }
 }
 
@@ -3550,6 +3553,11 @@ body.cursor-hidden * {
 }
 
 .exam-slide-chip i {
+  /* Bütün sınıf etiketleri aynı genişlikte: alt alta gelen sınav adları aynı hizadan başlar */
+  flex: none;
+  min-width: 112px;
+  text-align: center;
+  white-space: nowrap;
   font-style: normal;
   font-size: 16px;
   font-weight: 800;

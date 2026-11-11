@@ -193,7 +193,9 @@ export const useSchoolInfo = () => useSchoolQuery<SchoolInfo>('');
 export const useExamSchedule = () => useSchoolQuery<{ today: string; exams: ScheduledExam[] }>('exam-schedule', { refetchInterval: 10 * 60_000 });
 export const useMeToday = () => useSchoolQuery<MeToday>('me/today', { refetchInterval: 5 * 60_000 });
 export const useControlCenter = (enabled = true) => useSchoolQuery<ControlCenter>('control-center', { refetchInterval: 30_000, enabled });
-export const useScreens = (fast = false) => useSchoolQuery<Screen[]>('screens', { refetchInterval: fast ? 3000 : 30_000 });
+/** Panolar: fast = kumanda ekranı (3 sn); ekran açıkken 5 sn (yeni eşleşen pano hemen çevrimiçi görünür); arkada 30 sn */
+export const useScreens = (fast: boolean | 'visible' = false) =>
+  useSchoolQuery<Screen[]>('screens', { refetchInterval: fast === true ? 3000 : fast === 'visible' ? 5000 : 30_000 });
 export const useAnnouncements = () => useSchoolQuery<Announcement[]>('announcements', { refetchInterval: 60_000 });
 export interface Exam {
   id: string;
