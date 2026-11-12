@@ -2,7 +2,7 @@ import { errorText } from '@okulpano/shared';
 import { router, usePathname, useRoute } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ComponentRef, type ReactNode } from 'react';
 import { ActivityIndicator, Animated, Easing, Keyboard, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, TextInput as NativeTextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
-import { Text, TextInput } from './text.tsx';
+import { centeredText, Text, TextInput } from './text.tsx';
 import { ICONS, type IconName } from './icons.tsx';
 import { openConfirm, type ConfirmOptions } from './confirm.tsx';
 import { SpecialDayStrip } from './specialDay.tsx';
@@ -514,7 +514,7 @@ export function Segmented<V extends string>({ options, value, onChange }: { opti
             <Text style={{ fontSize: 14, fontWeight: on ? '700' : '600', color: on ? colors.ink : colors.muted }}>{o.label}</Text>
             {Boolean(o.badge) && (
               <View style={{ minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, backgroundColor: '#e11d48', alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: '#ffffff' }}>{o.badge}</Text>
+                <Text style={[centeredText(11), { fontWeight: '800', color: '#ffffff' }]}>{o.badge}</Text>
               </View>
             )}
           </Pressable>
@@ -685,7 +685,7 @@ export function Badge({ children, tone = 'muted' }: { children: ReactNode; tone?
   const t = { muted: [colors.primarySoft, colors.muted], success: [colors.successSoft, colors.success], warning: [colors.warningSoft, colors.warning], danger: [colors.dangerSoft, colors.danger], primary: [colors.infoSoft, colors.info] }[tone];
   return (
     <View style={{ backgroundColor: t[0], borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start' }}>
-      <Text style={{ color: t[1], fontSize: 12, fontWeight: '700' }}>{children}</Text>
+      <Text style={[centeredText(12), { color: t[1], fontWeight: '700' }]}>{children}</Text>
     </View>
   );
 }
@@ -962,8 +962,8 @@ export function HeaderButton({ icon, label, onPress, badge }: { icon: IconName; 
             borderColor: colors.bg,
           }}
         >
-          {/* Yazı tipinin üst / alt boşluğu sayıyı aşağı itmesin: satır yüksekliği sabit, dikey ortalama */}
-          <Text style={{ color: '#fff', fontSize: 12, lineHeight: 14, fontWeight: '800', textAlign: 'center', includeFontPadding: false, textAlignVertical: 'center' }}>
+          {/* Sayı tam ortada (centeredText: Android yazı boşluğu kapalı, yazı tipinin kayması telafi edilir) */}
+          <Text style={[centeredText(12), { color: '#fff', fontWeight: '800' }]}>
             {badge > 9 ? '9+' : badge}
           </Text>
         </View>

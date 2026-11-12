@@ -157,13 +157,22 @@ function ExamSlide({ title, rows, durationSec }: { title: string; rows: ExamSlid
 interface YTPlayer {
   destroy(): void;
   mute(): void;
+  unMute(): void;
   playVideo(): void;
+  seekTo(seconds: number, allowSeekAhead: boolean): void;
   getCurrentTime(): number;
 }
 interface YTNamespace {
   Player: new (el: HTMLElement, opts: Record<string, unknown>) => YTPlayer;
-  PlayerState: { ENDED: number; PLAYING: number };
+  PlayerState: { ENDED: number; PLAYING: number; PAUSED: number };
 }
+
+/**
+ * YouTube'un oynatıcısı video başlayınca birkaç saniye ortada duraklat simgesi ve ince bir çizgi gösterir (kontroller
+ * kapalıyken de). Çerçevenin içine erişilemediği için gizlenemez: video bu süre kapak görselinin arkasında sessiz
+ * oynar, sonra başa sarılır ve kapak kalkar (ses açıksa o an açılır). İzleyici videoyu baştan, simgesiz görür.
+ */
+const YT_OVERLAY_SEC = 4.5;
 declare global {
   interface Window {
     YT?: YTNamespace;
@@ -204,8 +213,31 @@ function VideoSlide({ url, sound, maxSec, onEnd }: { url: string; sound: boolean
     let player: YTPlayer | null = null;
     let cancelled = false;
     let watch: ReturnType<typeof setInterval> | null = null;
-    // Video takılırsa ya da internet yoksa pano kilitlenmesin diye üst sınır
-    const cap = setTimeout(end, (maxSec ?? 900) * 1000);
+    // 'warm': kapak arkasında sessiz ısınma; 'reveal': başa sarıldı, ilerleyince kapak kalkar; 'shown': görünüyor
+    let phase: 'warm' | 'reveal' | 'shown' = 'warm';
+    const startAt = ref.start ?? 0;
+    // Video takılırsa ya da internet yoksa pano kilitlenmesin diye üst sınır (ısınma süresi eklenir)
+    const cap = setTimeout(end, ((maxSec ?? 900) + YT_OVERLAY_SEC + 2) * 1000);
+    const stopWatch = () => {
+      if (watch) clearInterval(watch);
+      watch = null;
+    };
+    const reveal = (p: YTPlayer) => {
+      phase = 'reveal';
+      stopWatch();
+      p.seekTo(startAt, true);
+      if (sound) p.unMute();
+      p.playVideo();
+      watch = setInterval(() => {
+        if (cancelled) return;
+        // Başa sarma yapıldı ve video yeniden ilerliyor: kapak kalkar
+        if (p.getCurrentTime() >= startAt + 0.3) {
+          stopWatch();
+          phase = 'shown';
+          setPlaying(true);
+        }
+      }, 150);
+    };
     loadYouTube()
       .then((YT) => {
         if (cancelled || !host.current) return;
@@ -218,7 +250,8 @@ function VideoSlide({ url, sound, maxSec, onEnd }: { url: string; sound: boolean
           host: 'https://www.youtube-nocookie.com',
           playerVars: {
             autoplay: 1,
-            mute: sound ? 0 : 1,
+            // Isınma sessiz yapılır: ses (açıksa) kapak kalkınca açılır
+            mute: 1,
             controls: 0,
             rel: 0,
             fs: 0,
@@ -232,23 +265,28 @@ function VideoSlide({ url, sound, maxSec, onEnd }: { url: string; sound: boolean
           },
           events: {
             onReady: (e: { target: YTPlayer }) => {
-              if (!sound) e.target.mute();
+              e.target.mute();
               e.target.playVideo();
             },
             onStateChange: (e: { data: number; target: YTPlayer }) => {
-              // "Oynuyor" bilgisi ilk kare çizilmeden gelebilir (zayıf TV): kapak hemen kalkarsa arkada YouTube'un
-              // oynat simgesi bir an görünür. Kapak, video gerçekten ilerleyince (yarım saniye) kalkar.
-              if (e.data === YT.PlayerState.PLAYING && !watch) {
-                const from = e.target.getCurrentTime();
+              const p = e.target;
+              // Isınma: video gerçekten ilerlemeye başlayınca sayılır (yükleme süresi sayılmaz)
+              if (e.data === YT.PlayerState.PLAYING && phase === 'warm' && !watch) {
+                const from = p.getCurrentTime();
                 watch = setInterval(() => {
-                  if (cancelled) return;
-                  if (e.target.getCurrentTime() - from >= 0.5) {
-                    if (watch) clearInterval(watch);
-                    setPlaying(true);
-                  }
+                  if (!cancelled && p.getCurrentTime() - from >= YT_OVERLAY_SEC) reveal(p);
                 }, 200);
               }
-              if (e.data === YT.PlayerState.ENDED) end();
+              // Ses açılınca tarayıcı videoyu durdurabilir (kullanıcı etkileşimi yok): sessiz sürdürülür
+              if (e.data === YT.PlayerState.PAUSED && phase !== 'warm') {
+                p.mute();
+                p.playVideo();
+              }
+              if (e.data === YT.PlayerState.ENDED) {
+                // Isınmadan kısa video: başa sarılıp gösterilir
+                if (phase === 'warm') reveal(p);
+                else end();
+              }
             },
             onError: () => setTimeout(end, 1500),
           },
@@ -258,7 +296,7 @@ function VideoSlide({ url, sound, maxSec, onEnd }: { url: string; sound: boolean
     return () => {
       cancelled = true;
       clearTimeout(cap);
-      if (watch) clearInterval(watch);
+      stopWatch();
       try {
         player?.destroy();
       } catch {

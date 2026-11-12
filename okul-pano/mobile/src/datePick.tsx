@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Sheet } from './sheet.tsx';
-import { Text } from './text.tsx';
+import { centeredText, Text } from './text.tsx';
 import { colors } from './theme.ts';
 import { Button, Icon } from './ui.tsx';
 
@@ -87,7 +87,7 @@ export function DatePickSheet({
                     borderColor: colors.borderStrong,
                   }}
                 >
-                  <Text style={{ fontSize: 15, fontWeight: selected ? '800' : '600', color: selected ? colors.onPrimary : disabled ? colors.subtle : colors.ink, opacity: disabled ? 0.5 : 1 }}>{d.getDate()}</Text>
+                  <Text style={{ ...centeredText(15), fontWeight: selected ? '800' : '600', color: selected ? colors.onPrimary : disabled ? colors.subtle : colors.ink, opacity: disabled ? 0.5 : 1 }}>{d.getDate()}</Text>
                 </Pressable>
               </View>
             );

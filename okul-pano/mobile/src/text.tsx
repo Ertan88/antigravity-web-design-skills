@@ -29,6 +29,23 @@ function fontStyle(style: TextProps['style'], inherit: boolean) {
   return [style, { fontFamily: fontFor(flat.fontWeight), fontWeight: '400' as const }];
 }
 
+/**
+ * Baloncuk ve rozet içindeki yazıyı (sayı) dikeyde tam ortalar:
+ * - Android'in yazıya eklediği üst / alt boşluk kapatılır (includeFontPadding), yoksa sayı ~%10 aşağı kayar;
+ * - satır yüksekliği yazı tipinin gövdesi kadardır (Plus Jakarta Sans: 1,038 + 0,222 = 1,26 em).
+ * Tarayıcıda ölçüldü: 20 px baloncukta rakamın merkezi baloncuğun merkezinden 0,1 px'ten az sapar.
+ * Kapsayan kutu alignItems / justifyContent 'center' olmalıdır.
+ */
+export function centeredText(fontSize: number): TextStyle {
+  return {
+    fontSize,
+    lineHeight: Math.round(fontSize * 1.26),
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+    textAlign: 'center',
+  };
+}
+
 const Nested = createContext(false);
 
 export function Text(props: TextProps) {

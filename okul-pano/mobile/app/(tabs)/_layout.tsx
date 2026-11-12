@@ -263,6 +263,9 @@ export default function TabsLayout() {
             backgroundColor: colors.danger,
             fontSize: 10,
             fontFamily: fontFor("800"),
+            // Sayı baloncuğun ortasında: Android'in yazı boşluğu kapalı (satır yüksekliği kitaplıkta boy - 1)
+            includeFontPadding: false,
+            textAlignVertical: "center",
           },
           tabBarStyle: {
             height: 74 + insets.bottom,

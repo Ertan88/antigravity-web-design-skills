@@ -5,7 +5,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { api } from './api.ts';
 import { useAuth, useSchoolPath } from './auth.tsx';
 import { Sheet } from './sheet.tsx';
-import { Text } from './text.tsx';
+import { centeredText, Text } from './text.tsx';
 import { colors, dark } from './theme.ts';
 import { Button, Field, Icon, T } from './ui.tsx';
 
@@ -91,7 +91,7 @@ export function LegendBand() {
         return (
           <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 999, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
             <View style={{ minWidth: 18, height: 18, borderRadius: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: t.bg, borderWidth: t.border ? 1 : 0, borderColor: t.border }}>
-              <Text style={{ fontSize: 10.5, fontWeight: '800', color: t.fg }}>{k}</Text>
+              <Text style={[centeredText(10.5), { fontWeight: '800', color: t.fg }]}>{k}</Text>
             </View>
             <Text style={{ fontSize: 12, fontWeight: '600', color: colors.muted }}>{text}</Text>
           </View>
