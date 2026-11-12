@@ -158,6 +158,7 @@ interface YTPlayer {
   destroy(): void;
   mute(): void;
   playVideo(): void;
+  getCurrentTime(): number;
 }
 interface YTNamespace {
   Player: new (el: HTMLElement, opts: Record<string, unknown>) => YTPlayer;
@@ -202,6 +203,7 @@ function VideoSlide({ url, sound, maxSec, onEnd }: { url: string; sound: boolean
     }
     let player: YTPlayer | null = null;
     let cancelled = false;
+    let watch: ReturnType<typeof setInterval> | null = null;
     // Video takılırsa ya da internet yoksa pano kilitlenmesin diye üst sınır
     const cap = setTimeout(end, (maxSec ?? 900) * 1000);
     loadYouTube()
@@ -233,8 +235,19 @@ function VideoSlide({ url, sound, maxSec, onEnd }: { url: string; sound: boolean
               if (!sound) e.target.mute();
               e.target.playVideo();
             },
-            onStateChange: (e: { data: number }) => {
-              if (e.data === YT.PlayerState.PLAYING) setPlaying(true);
+            onStateChange: (e: { data: number; target: YTPlayer }) => {
+              // "Oynuyor" bilgisi ilk kare çizilmeden gelebilir (zayıf TV): kapak hemen kalkarsa arkada YouTube'un
+              // oynat simgesi bir an görünür. Kapak, video gerçekten ilerleyince (yarım saniye) kalkar.
+              if (e.data === YT.PlayerState.PLAYING && !watch) {
+                const from = e.target.getCurrentTime();
+                watch = setInterval(() => {
+                  if (cancelled) return;
+                  if (e.target.getCurrentTime() - from >= 0.5) {
+                    if (watch) clearInterval(watch);
+                    setPlaying(true);
+                  }
+                }, 200);
+              }
               if (e.data === YT.PlayerState.ENDED) end();
             },
             onError: () => setTimeout(end, 1500),
@@ -245,6 +258,7 @@ function VideoSlide({ url, sound, maxSec, onEnd }: { url: string; sound: boolean
     return () => {
       cancelled = true;
       clearTimeout(cap);
+      if (watch) clearInterval(watch);
       try {
         player?.destroy();
       } catch {

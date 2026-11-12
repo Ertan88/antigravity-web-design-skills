@@ -3624,3 +3624,8 @@ body.cursor-hidden * {
 .tv-lite .slide-dots span {
   transition: none;
 }
+
+/* Video kapağı solmadan kalkar: videonun üstünde yarı saydam katman çizilmez */
+.tv-lite .video-poster {
+  transition: none;
+}
