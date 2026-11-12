@@ -1,14 +1,14 @@
 import { Tabs } from "expo-router";
-import type { ReactElement } from "react";
+import { useEffect, useState, type ComponentProps, type ReactElement } from "react";
 import { useDutyReminders, useExamReminders } from "../../src/reminders.ts";
 import { SpecialDayPopup } from "../../src/specialDay.tsx";
-import { fontFor, Text } from "../../src/text.tsx";
+import { centeredText, Text } from "../../src/text.tsx";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth, type AppRole } from "../../src/auth.tsx";
 import { visibleTabs, type TabName } from "../../src/tabs.ts";
 import { useControlCenter, useInbox } from "../../src/data.ts";
 import { colors, dark } from "../../src/theme.ts";
-import { Platform, View } from "react-native";
+import { Keyboard, Pressable, View } from "react-native";
 import { Icon, TabBarInset, type IconName } from "../../src/ui.tsx";
 
 // Sekme ekranlarında beklenmeyen bir hata olursa uygulama kapanmaz, "Yeniden dene" görünür
@@ -29,25 +29,105 @@ const HOME_ICON: Record<AppRole, [IconName, IconName]> = {
   teacher: ["home-outline", "home"],
 };
 
-const BAR_HEIGHT = 72;
+const BAR_HEIGHT = 60;
+
+type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>>[0];
 
 /**
- * Menünün zemini: buzlu cam. Web sürümünde arkadaki içerik gerçekten bulanıklaşır (tarayıcının bulanıklık
- * süzgeci). Android uygulamasında gerçek bulanıklık, menünün arkasındaki her sayfanın ayrıca sarılmasını ister ve
- * zayıf telefonlarda kaydırmayı ağırlaştırır; orada aynı renkte, biraz daha koyu (daha az saydam) bir zemin kullanılır.
+ * Yüzer alt menü (tasarım B): ortada koyu kapsül; seçili sekme açık zeminli hap içinde simge ve adıyla, diğerleri
+ * yalnızca simge. Simgeye uzun basınca adı kısa süre görünür (yeni kullanıcı simgeleri ezberlemek zorunda kalmasın).
+ * Koyu temada kapsül açık renkli olur (arkadaki koyu sayfadan ayrışır). Klavye açıkken gizlenir.
  */
-function GlassBackground() {
-  const web = Platform.OS === "web";
-  const alpha = web ? 0.72 : 0.9;
-  // Koyu temada üst katman yüzeyi (colors.elevated, #2b2723) kullanılır: menü arkadaki kartlardan ayrışır
-  const tint = dark ? `rgba(43,39,35,${alpha})` : `rgba(255,255,255,${alpha})`;
+function FloatingTabBar({ state, descriptors, emitter, navigateToTab, bottom }: TabBarProps & { bottom: number }) {
+  const [keyboard, setKeyboard] = useState(false);
+  const [hint, setHint] = useState<string | null>(null);
+  useEffect(() => {
+    const a = Keyboard.addListener("keyboardDidShow", () => setKeyboard(true));
+    const b = Keyboard.addListener("keyboardDidHide", () => setKeyboard(false));
+    return () => {
+      a.remove();
+      b.remove();
+    };
+  }, []);
+  useEffect(() => {
+    if (!hint) return;
+    const t = setTimeout(() => setHint(null), 1600);
+    return () => clearTimeout(t);
+  }, [hint]);
+  if (keyboard) return null;
+  const items = state.routes
+    .map((route, index) => ({ route, index, options: descriptors[route.key]!.options }))
+    // Rolde olmayan sekmeler (tabBarButton gizli) çizilmez
+    .filter((x) => typeof x.options.tabBarButton !== "function");
+  const dim = dark ? "rgba(28,25,23,0.55)" : "rgba(255,255,255,0.6)";
   return (
-    <View
-      style={[
-        { flex: 1, backgroundColor: tint },
-        web ? ({ backdropFilter: "blur(18px) saturate(160%)", WebkitBackdropFilter: "blur(18px) saturate(160%)" } as object) : null,
-      ]}
-    />
+    <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom, alignItems: "center" }}>
+      {hint && (
+        <View style={{ marginBottom: 8, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5, backgroundColor: colors.elevated, borderWidth: 1, borderColor: colors.elevatedBorder }}>
+          <Text style={{ fontSize: 12.5, fontWeight: "700", color: colors.ink }}>{hint}</Text>
+        </View>
+      )}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 2,
+          height: BAR_HEIGHT,
+          paddingHorizontal: 7,
+          borderRadius: BAR_HEIGHT / 2,
+          backgroundColor: colors.primary,
+          borderWidth: dark ? 1 : 0,
+          borderColor: "rgba(255,255,255,0.25)",
+          shadowColor: "#000",
+          shadowOpacity: dark ? 0.6 : 0.25,
+          shadowRadius: 16,
+          shadowOffset: { width: 0, height: 8 },
+          elevation: 10,
+        }}
+      >
+        {items.map(({ route, index, options }) => {
+          const focused = state.index === index;
+          const label = typeof options.title === "string" ? options.title : route.name;
+          const badge = options.tabBarBadge;
+          const color = focused ? colors.primary : dim;
+          const onPress = () => {
+            const e = emitter.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
+            if (!focused && !e.defaultPrevented) navigateToTab(route.key);
+          };
+          return (
+            <Pressable
+              key={route.key}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: focused }}
+              accessibilityLabel={badge ? `${label}, ${badge}` : label}
+              onPress={onPress}
+              onLongPress={() => setHint(label)}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 7,
+                height: 46,
+                minWidth: 50,
+                justifyContent: "center",
+                paddingHorizontal: focused ? 16 : 12,
+                borderRadius: 23,
+                backgroundColor: focused ? colors.onPrimary : "transparent",
+              }}
+            >
+              <View>
+                {options.tabBarIcon?.({ focused, color, size: 22 })}
+                {badge != null && badge !== "" && (
+                  <View style={{ position: "absolute", top: -6, right: -9, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: colors.danger, alignItems: "center", justifyContent: "center" }}>
+                    <Text style={{ ...centeredText(10), fontWeight: "800", color: "#fff" }}>{String(badge)}</Text>
+                  </View>
+                )}
+              </View>
+              {focused && <Text style={{ fontSize: 14, fontWeight: "800", color: colors.primary }}>{label}</Text>}
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
   );
 }
 
@@ -61,7 +141,7 @@ export default function TabsLayout() {
   // Yüzer alt menü: kenarlardan boşluklu, yuvarlak köşeli, yarı saydam kart. Sayfalar menünün altından akar;
   // son satırlar menünün arkasında kalmasın diye Screen alta bu kadar boşluk bırakır (TabBarInset)
   const barBottom = Math.max(insets.bottom, 8) + 10;
-  const barInset = BAR_HEIGHT + barBottom + 8;
+  const barInset = BAR_HEIGHT + barBottom + 12;
   const center = useControlCenter(isManager && role !== "platform");
   const inbox = useInbox("unread");
   const pending =
@@ -79,23 +159,8 @@ export default function TabsLayout() {
         };
   const icon = (name: IconName, active: IconName) =>
     function TabIcon({ focused, color }: { focused: boolean; color: unknown }) {
-      // Seçili sekmede simge dolu ve koyu, arkasında yumuşak zemin; diğerlerinde ince çizgili ve soluk
-      return (
-        <View
-          style={{
-            paddingHorizontal: 14,
-            paddingVertical: 3,
-            borderRadius: 14,
-            backgroundColor: focused ? colors.primarySoft : "transparent",
-          }}
-        >
-          <Icon
-            name={focused ? active : name}
-            size={22}
-            color={typeof color === "string" ? color : colors.subtle}
-          />
-        </View>
-      );
+      // Seçili sekmede simge dolu, diğerlerinde ince çizgili (zemin ve renk FloatingTabBar'da)
+      return <Icon name={focused ? active : name} size={22} color={typeof color === "string" ? color : colors.subtle} />;
     };
   // Sekmeler alt menüde rolün sırasıyla dizilir (önce görünenler, sonra gizli rotalar)
   const screens: Record<TabName, ReactElement> = {
@@ -288,47 +353,9 @@ export default function TabsLayout() {
       <Tabs
         backBehavior="history"
         safeAreaInsets={{ bottom: 0 }}
+        tabBar={(props) => <FloatingTabBar {...props} bottom={barBottom} />}
         screenOptions={{
-          tabBarHideOnKeyboard: true,
-          tabBarBackground: () => <GlassBackground />,
           headerShown: false,
-          tabBarActiveTintColor: colors.ink,
-          tabBarInactiveTintColor: colors.subtle,
-          tabBarLabelStyle: {
-            fontSize: 11,
-            fontFamily: fontFor("700"),
-            marginTop: 2,
-          },
-          tabBarBadgeStyle: {
-            backgroundColor: colors.danger,
-            fontSize: 10,
-            fontFamily: fontFor("800"),
-            // Sayı baloncuğun ortasında: Android'in yazı boşluğu kapalı (satır yüksekliği kitaplıkta boy - 1)
-            includeFontPadding: false,
-            textAlignVertical: "center",
-          },
-          tabBarItemStyle: { paddingVertical: 2 },
-          tabBarStyle: {
-            position: "absolute",
-            left: 12,
-            right: 12,
-            bottom: barBottom,
-            height: BAR_HEIGHT,
-            paddingTop: 6,
-            paddingBottom: 6,
-            borderRadius: 24,
-            borderWidth: 1,
-            borderTopWidth: 1,
-            borderColor: dark ? "rgba(255,255,255,0.14)" : colors.border,
-            borderTopColor: dark ? "rgba(255,255,255,0.14)" : colors.border,
-            backgroundColor: "transparent",
-            overflow: "hidden",
-            elevation: 0,
-            shadowColor: "#000",
-            shadowOpacity: dark ? 0.5 : 0.14,
-            shadowRadius: 18,
-            shadowOffset: { width: 0, height: 8 },
-          },
           sceneStyle: { backgroundColor: colors.bg },
         }}
       >
