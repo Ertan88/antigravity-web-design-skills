@@ -27,6 +27,16 @@ object Prefs {
 
     fun setAskedOverlay(c: Context) = sp(c).edit().putBoolean("askedOverlay", true).apply()
 
+    /** Pano ön plandan çıkarsa (Ana ekran ya da kaynak tuşu) birkaç dakika sonra kendiliğinden geri gelir */
+    fun returnToBoard(c: Context): Boolean = sp(c).getBoolean("returnToBoard", true)
+
+    fun setReturnToBoard(c: Context, v: Boolean) = sp(c).edit().putBoolean("returnToBoard", v).apply()
+
+    /** Gizli ayarlardan TV ayarları açılınca geri dönüş bu zamana kadar bekler (bakım için) */
+    fun returnPausedUntil(c: Context): Long = sp(c).getLong("returnPausedUntil", 0L)
+
+    fun setReturnPausedUntil(c: Context, v: Long) = sp(c).edit().putLong("returnPausedUntil", v).apply()
+
     /** Eski tarayıcı motoru uyarısı her motor sürümü için bir kez gösterilir */
     fun warnedWebView(c: Context): String? = sp(c).getString("warnedWebView", null)
 

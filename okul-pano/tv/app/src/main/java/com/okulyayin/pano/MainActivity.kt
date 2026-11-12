@@ -2,11 +2,17 @@ package com.okulyayin.pano
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.ActivityManager
+import android.app.ActivityOptions
+import android.app.AlarmManager
 import android.app.AlertDialog
+import android.app.PendingIntent
+import android.app.admin.DevicePolicyManager
 import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.ConnectivityManager
@@ -63,6 +69,10 @@ class MainActivity : Activity() {
     private var web: WebView? = null
     private val handler = Handler(Looper.getMainLooper())
     private val retry = Runnable { load() }
+    /** Pano ön plandan çıkınca birkaç dakika sonra geri getirilir (gizli ayarlardan çıkılmadıysa) */
+    private val bringBack = Runnable { bringToFront() }
+    /** Gizli ayarlardan "Uygulamadan çık" seçildi: geri dönüş kurulmaz */
+    private var leaving = false
     private var dialogOpen = false
     private var longPressHandled = false
     /** Ağ hatasında önce son kaydedilen pano açılır; bu açılışta da hata olursa hata ekranı gösterilir */
@@ -95,9 +105,21 @@ class MainActivity : Activity() {
         handler.postDelayed({ firstRunChecks() }, 2500)
     }
 
+    override fun onStart() {
+        super.onStart()
+        cancelReturn()
+    }
+
     override fun onResume() {
         super.onResume()
         hideSystemUi()
+        applyKiosk()
+    }
+
+    // Ana ekran ya da kaynak tuşuyla panodan çıkıldı: pano birkaç dakika sonra kendiliğinden geri gelir
+    override fun onStop() {
+        super.onStop()
+        if (!leaving && !isChangingConfigurations && Prefs.returnToBoard(this)) scheduleReturn()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -353,33 +375,189 @@ class MainActivity : Activity() {
 
     private fun showMenu() {
         val auto = Prefs.autostart(this)
-        val home = isHomeEnabled()
-        val items = arrayOf(
-            "Panoyu yenile",
-            "Bağlantı testi",
-            "Sunucu adresi: ${Prefs.server(this)}",
-            "Eşleştirmeyi sıfırla",
-            "Açılışta başlat: ${if (auto) "Açık" else "Kapalı"}${if (auto && needsOverlay()) " (izin gerekli)" else ""}",
-            "Ana ekran uygulaması: ${if (home) "Açık" else "Kapalı"}",
-            "Uygulama bilgisi",
-            "Uygulamadan çık",
+        val kiosk = isKiosk()
+        val needsPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !Settings.canDrawOverlays(this) && !kiosk
+        val back = Prefs.returnToBoard(this)
+        val entries = mutableListOf<Pair<String, () -> Unit>>(
+            "Panoyu yenile" to { load() },
+            "Bağlantı testi" to { connectionTest() },
+            "Sunucu adresi: ${Prefs.server(this)}" to { editServer() },
+            "Eşleştirmeyi sıfırla" to { confirmReset() },
+            "Açılışta başlat: ${if (auto) "Açık" else "Kapalı"}${if (auto && needsOverlay()) " (izin gerekli)" else ""}" to { toggleAutostart() },
         )
+        if (!kiosk) entries += "Ana ekran uygulaması: ${if (isHomeEnabled()) "Açık" else "Kapalı"}" to { toggleHome() }
+        entries += "Panoya geri dönüş (2 dk): ${if (back) "Açık" else "Kapalı"}${if (back && needsPermission) " (izin gerekli)" else ""}" to { toggleReturn() }
+        entries += "Kiosk modu: ${if (kiosk) "Açık" else "Kapalı"}" to { if (kiosk) confirmKioskOff() else showKioskHelp() }
+        entries += "TV ayarlarını aç (bakım, 15 dk)" to { openTvSettings() }
+        entries += "Uygulama bilgisi" to { showInfo() }
+        entries += "Uygulamadan çık" to { exitApp() }
         dialog()
             .setTitle("Pano ayarları")
-            .setItems(items) { _, which ->
-                when (which) {
-                    0 -> load()
-                    1 -> connectionTest()
-                    2 -> editServer()
-                    3 -> confirmReset()
-                    4 -> toggleAutostart()
-                    5 -> toggleHome()
-                    6 -> showInfo()
-                    7 -> finishAndRemoveTask()
-                }
-            }
+            .setItems(entries.map { it.first }.toTypedArray()) { _, which -> entries[which].second() }
             .setNegativeButton("Kapat", null)
             .showTracked()
+    }
+
+    /** Gizli ayarlardan çıkış: geri dönüş kurulmaz; kiosk modunda pano Ana ekran tuşuyla yeniden açılır */
+    private fun exitApp() {
+        leaving = true
+        cancelReturn()
+        if (isKiosk()) {
+            try {
+                stopLockTask()
+            } catch (_: Exception) {
+            }
+        }
+        finishAndRemoveTask()
+    }
+
+    /* ---------------- Panoya geri dönüş ---------------- */
+
+    private fun toggleReturn() {
+        val next = !Prefs.returnToBoard(this)
+        Prefs.setReturnToBoard(this, next)
+        if (next && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !Settings.canDrawOverlays(this) && !isKiosk()) {
+            // Android 10 ve sonrası arka plandan uygulama açmaya yalnızca bu izinle izin verir
+            requestOverlay()
+        } else {
+            toast(if (next) "Pano, çıkıldıktan 2 dakika sonra kendiliğinden geri gelir" else "Panoya geri dönüş kapatıldı")
+        }
+    }
+
+    private fun returnIntent() =
+        Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+
+    private fun returnPending(): PendingIntent {
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        // Android 14 ve sonrası: zamanlayıcının açtığı ekranın arka plandan öne gelmesine açıkça izin verilir
+        return if (Build.VERSION.SDK_INT >= 34) {
+            val options = ActivityOptions.makeBasic().setPendingIntentCreatorBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
+            PendingIntent.getActivity(this, RETURN_REQUEST, returnIntent(), flags, options.toBundle())
+        } else {
+            PendingIntent.getActivity(this, RETURN_REQUEST, returnIntent(), flags)
+        }
+    }
+
+    /**
+     * İki yoldan kurulur: uygulama çalışıyorsa zamanlayıcı (Handler), Android uygulamayı kapatırsa sistem alarmı.
+     * Gizli ayarlardan TV ayarları açıldıysa bakım süresi bitene kadar beklenir.
+     */
+    private fun scheduleReturn() {
+        val delay = maxOf(RETURN_MS, Prefs.returnPausedUntil(this) - System.currentTimeMillis())
+        handler.removeCallbacks(bringBack)
+        handler.postDelayed(bringBack, delay)
+        try {
+            val alarms = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + delay + 5_000, returnPending())
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun cancelReturn() {
+        handler.removeCallbacks(bringBack)
+        try {
+            (getSystemService(Context.ALARM_SERVICE) as AlarmManager).cancel(returnPending())
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun bringToFront() {
+        try {
+            startActivity(returnIntent())
+        } catch (_: Exception) {
+            // İzin yoksa Android engeller; sistem alarmı yine dener
+        }
+    }
+
+    private fun openTvSettings() {
+        Prefs.setReturnPausedUntil(this, System.currentTimeMillis() + MAINTENANCE_MS)
+        if (isKiosk()) {
+            try {
+                stopLockTask()
+            } catch (_: Exception) {
+            }
+        }
+        try {
+            startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            toast("Pano 15 dakika sonra kendiliğinden geri gelir")
+        } catch (_: Exception) {
+            toast("Bu TV'de ayarlar buradan açılamıyor")
+        }
+    }
+
+    /* ---------------- Kiosk modu ---------------- */
+
+    private fun dpm() = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+
+    private fun adminComponent() = ComponentName(this, AdminReceiver::class.java)
+
+    /** TV bilgisayardan bu uygulamanın "cihaz sahibi" yapıldıysa kiosk modu açıktır */
+    private fun isKiosk(): Boolean = try {
+        dpm().isDeviceOwnerApp(packageName)
+    } catch (_: Exception) {
+        false
+    }
+
+    /**
+     * Kiosk modunda pano kilitli görev modunda açılır: Ana ekran ve son uygulamalar tuşları panodan çıkaramaz.
+     * Ana ekran tuşu da kalıcı olarak panoyu açar (TV'nin sorusu ya da seçimi ne olursa olsun).
+     */
+    private fun applyKiosk() {
+        if (leaving || !isKiosk()) return
+        try {
+            val dpm = dpm()
+            dpm.setLockTaskPackages(adminComponent(), arrayOf(packageName))
+            packageManager.setComponentEnabledSetting(homeAlias(), PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP)
+            val home = IntentFilter(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_HOME)
+                addCategory(Intent.CATEGORY_DEFAULT)
+            }
+            dpm.addPersistentPreferredActivity(adminComponent(), home, homeAlias())
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            if (am.lockTaskModeState == ActivityManager.LOCK_TASK_MODE_NONE) startLockTask()
+        } catch (_: Exception) {
+            // Kilitli görev modu açılamazsa pano yine çalışır; geri dönüş önlemi devrededir
+        }
+    }
+
+    private fun showKioskHelp() {
+        dialog()
+            .setTitle("Kiosk modu")
+            .setMessage(
+                "Kiosk modunda Ana ekran ve son uygulamalar tuşları panodan çıkaramaz. Bir bilgisayardan bir kez açılır:\n\n" +
+                    "1) TV'de Geliştirici seçenekleri › USB (ya da ağ) hata ayıklamayı açın.\n" +
+                    "2) TV'de Google hesabı varsa kaldırın (hesap varken Android izin vermez).\n" +
+                    "3) Bilgisayarda:\nadb connect TV_IP_ADRESI\nadb shell dpm set-device-owner $packageName/.AdminReceiver\n\n" +
+                    "Ayrıntılı anlatım kurulum belgesindedir (TV uygulaması › Kiosk modu).",
+            )
+            .setPositiveButton("Tamam", null)
+            .showTracked()
+    }
+
+    private fun confirmKioskOff() {
+        dialog()
+            .setTitle("Kiosk modu kapatılsın mı?")
+            .setMessage("Ana ekran tuşu yeniden TV'nin ana ekranına götürür ve uygulama kaldırılabilir olur. Kiosk modunu yeniden açmak için TV'yi bilgisayardan bir kez daha kiosk moduna almak gerekir.")
+            .setPositiveButton("Kapat") { _, _ -> kioskOff() }
+            .setNegativeButton("Vazgeç", null)
+            .showTracked()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun kioskOff() {
+        try {
+            stopLockTask()
+        } catch (_: Exception) {
+        }
+        try {
+            val dpm = dpm()
+            dpm.clearPackagePersistentPreferredActivities(adminComponent(), packageName)
+            dpm.setLockTaskPackages(adminComponent(), arrayOf())
+            dpm.clearDeviceOwnerApp(packageName)
+            toast("Kiosk modu kapatıldı")
+        } catch (e: Exception) {
+            toast("Kiosk modu kapatılamadı: ${e.message ?: e.javaClass.simpleName}")
+        }
     }
 
     /* ---------------- Bağlantı testi ---------------- */
@@ -560,6 +738,8 @@ class MainActivity : Activity() {
     private fun needsOverlay(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !Settings.canDrawOverlays(this) && !isHomeEnabled()
 
     private fun requestOverlay() {
+        // İzin ekranında geçen süre panoya geri dönüşü tetiklemesin
+        Prefs.setReturnPausedUntil(this, System.currentTimeMillis() + 10 * 60_000L)
         val withPackage = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
         try {
             startActivity(withPackage)
@@ -619,6 +799,11 @@ class MainActivity : Activity() {
         private const val LOADING = "Okul Yayın Pano açılıyor…"
         /** Panonun kullandığı tarayıcı özellikleri (color-mix vb.) için en düşük motor sürümü */
         private const val MIN_WEBVIEW = 111
+        /** Panodan çıkıldıktan sonra geri gelme süresi */
+        private const val RETURN_MS = 2 * 60_000L
+        /** Gizli ayarlardan TV ayarları açılınca geri dönüş bu kadar bekler */
+        private const val MAINTENANCE_MS = 15 * 60_000L
+        private const val RETURN_REQUEST = 41
         private const val RENDER_JS = "(function(){var r=document.getElementById('root');return !!(r&&r.childElementCount>0)})()"
         private const val SSL_TEXT = "Güvenli bağlantı kurulamadı. Okul ağı (MEB) bağlantıyı kendi sertifikasıyla açıyor olabilir; o sertifika TV'ye yüklü olmalı. TV'nin tarih ve saati yanlışsa da bu hata görülür (Ayarlar › Tarih ve saat › Otomatik)."
     }
