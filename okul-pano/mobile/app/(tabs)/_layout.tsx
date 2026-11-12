@@ -8,7 +8,7 @@ import { useAuth, type AppRole } from "../../src/auth.tsx";
 import { visibleTabs, type TabName } from "../../src/tabs.ts";
 import { useControlCenter, useInbox } from "../../src/data.ts";
 import { colors, dark } from "../../src/theme.ts";
-import { Keyboard, Pressable, View } from "react-native";
+import { Keyboard, Platform, Pressable, View } from "react-native";
 import { Icon, TabBarInset, type IconName } from "../../src/ui.tsx";
 
 // Sekme ekranlarında beklenmeyen bir hata olursa uygulama kapanmaz, "Yeniden dene" görünür
@@ -34,9 +34,9 @@ const BAR_HEIGHT = 60;
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>>[0];
 
 /**
- * Yüzer alt menü (tasarım B): ortada koyu kapsül; seçili sekme açık zeminli hap içinde simge ve adıyla, diğerleri
- * yalnızca simge. Simgeye uzun basınca adı kısa süre görünür (yeni kullanıcı simgeleri ezberlemek zorunda kalmasın).
- * Koyu temada kapsül açık renkli olur (arkadaki koyu sayfadan ayrışır). Klavye açıkken gizlenir.
+ * Yüzer alt menü (tasarım B): ortada kapsül; seçili sekme hap içinde simge ve adıyla, diğerleri yalnızca simge.
+ * Kapsül temanın renginde ve yarı saydam (açık temada beyaz, koyu temada koyu; web sürümünde arkası bulanık), ince
+ * çerçeve ve gölgeyle sayfadan ayrışır. Simgeye uzun basınca adı kısa süre görünür. Klavye açıkken gizlenir.
  */
 function FloatingTabBar({ state, descriptors, emitter, navigateToTab, bottom }: TabBarProps & { bottom: number }) {
   const [keyboard, setKeyboard] = useState(false);
@@ -59,7 +59,9 @@ function FloatingTabBar({ state, descriptors, emitter, navigateToTab, bottom }: 
     .map((route, index) => ({ route, index, options: descriptors[route.key]!.options }))
     // Rolde olmayan sekmeler (tabBarButton gizli) çizilmez
     .filter((x) => typeof x.options.tabBarButton !== "function");
-  const dim = dark ? "rgba(28,25,23,0.55)" : "rgba(255,255,255,0.6)";
+  const web = Platform.OS === "web";
+  // Yarı saydam zemin: web'de arkası gerçekten bulanır; Android'de bulanıklık yok, biraz daha az saydam
+  const glass = dark ? `rgba(43,39,35,${web ? 0.7 : 0.86})` : `rgba(255,255,255,${web ? 0.7 : 0.86})`;
   return (
     <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom, alignItems: "center" }}>
       {hint && (
@@ -75,11 +77,12 @@ function FloatingTabBar({ state, descriptors, emitter, navigateToTab, bottom }: 
           height: BAR_HEIGHT,
           paddingHorizontal: 7,
           borderRadius: BAR_HEIGHT / 2,
-          backgroundColor: colors.primary,
-          borderWidth: dark ? 1 : 0,
-          borderColor: "rgba(255,255,255,0.25)",
+          backgroundColor: glass,
+          borderWidth: 1,
+          borderColor: dark ? "rgba(255,255,255,0.14)" : "rgba(28,25,23,0.08)",
+          ...(web ? ({ backdropFilter: "blur(18px) saturate(160%)", WebkitBackdropFilter: "blur(18px) saturate(160%)" } as object) : {}),
           shadowColor: "#000",
-          shadowOpacity: dark ? 0.6 : 0.25,
+          shadowOpacity: dark ? 0.5 : 0.14,
           shadowRadius: 16,
           shadowOffset: { width: 0, height: 8 },
           elevation: 10,
@@ -89,7 +92,7 @@ function FloatingTabBar({ state, descriptors, emitter, navigateToTab, bottom }: 
           const focused = state.index === index;
           const label = typeof options.title === "string" ? options.title : route.name;
           const badge = options.tabBarBadge;
-          const color = focused ? colors.primary : dim;
+          const color = focused ? colors.onPrimary : colors.muted;
           const onPress = () => {
             const e = emitter.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
             if (!focused && !e.defaultPrevented) navigateToTab(route.key);
@@ -111,7 +114,7 @@ function FloatingTabBar({ state, descriptors, emitter, navigateToTab, bottom }: 
                 justifyContent: "center",
                 paddingHorizontal: focused ? 16 : 12,
                 borderRadius: 23,
-                backgroundColor: focused ? colors.onPrimary : "transparent",
+                backgroundColor: focused ? colors.primary : "transparent",
               }}
             >
               <View>
@@ -122,7 +125,7 @@ function FloatingTabBar({ state, descriptors, emitter, navigateToTab, bottom }: 
                   </View>
                 )}
               </View>
-              {focused && <Text style={{ fontSize: 14, fontWeight: "800", color: colors.primary }}>{label}</Text>}
+              {focused && <Text style={{ fontSize: 14, fontWeight: "800", color: colors.onPrimary }}>{label}</Text>}
             </Pressable>
           );
         })}
