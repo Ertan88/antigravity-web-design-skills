@@ -108,6 +108,8 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   app.get('/api/health', async () => ({ ok: true, driver: database.driver, time: new Date().toISOString() }));
   // TV'de kumandayla yazması kolay kısa adres: Okul Yayın Pano uygulamasını indirir ("Downloader" uygulamasıyla)
   app.get('/tv', (_req, reply) => reply.redirect(env.TV_APK_URL));
+  // Telefon uygulamasını indirme bağlantısı (panelde ve uygulamanın web sürümünde "İndir")
+  app.get('/indir', (_req, reply) => reply.redirect(env.APP_APK_URL));
 
   await app.register(authRoutes);
   await app.register(schoolRoutes);

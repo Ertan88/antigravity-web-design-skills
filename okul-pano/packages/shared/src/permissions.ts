@@ -62,3 +62,32 @@ export function effectivePermissions(role: Role, granted: readonly string[]): Pe
 export function hasPermission(role: Role, granted: readonly string[], permission: Permission): boolean {
   return effectivePermissions(role, granted).includes(permission);
 }
+
+/**
+ * İçerik ve yönetim yetkileri: öğretmen kaydı olmayan kişide bunlardan biri varsa uygulamada "editör" (görevli)
+ * görünümü açılır. Mobil uygulama ve panelin telefon görünümü aynı kuralı kullanır.
+ */
+export const CONTENT_PERMISSIONS: readonly Permission[] = [
+  'announcements.manage',
+  'highlights.manage',
+  'ticker.manage',
+  'exams.manage',
+  'students.manage',
+  'announcements.approve',
+  'board.control',
+  'screens.manage',
+  'emergency.manage',
+  'duties.manage',
+  'leaves.manage',
+];
+
+/**
+ * Kişinin uygulamadaki görünümü: okul müdürü ve müdür yardımcısı "manager"; öğretmen kaydı olan herkes, görevi olsa
+ * da "teacher" (görevi alt menüye ve Menü'ye eklenir); kadroda olmayıp içerik ya da yönetim görevi olan "editor";
+ * kadroda olmayan ve görevi olmayan "teacher" (yalnızca ana sayfa ve Menü).
+ */
+export function appView(m: { role: Role; permissions: readonly string[]; teacherId?: string | null }): 'manager' | 'editor' | 'teacher' {
+  if (m.role === 'owner' || m.role === 'admin') return 'manager';
+  if (!m.teacherId && CONTENT_PERMISSIONS.some((p) => m.permissions.includes(p))) return 'editor';
+  return 'teacher';
+}

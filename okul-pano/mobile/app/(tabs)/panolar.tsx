@@ -6,11 +6,13 @@ import { timeAgo } from '../../src/day.ts';
 import { PairCard } from '../../src/pair.tsx';
 import { colors } from '../../src/theme.ts';
 import { Card, Empty, ErrorNote, Icon, Loading, Screen, T } from '../../src/ui.tsx';
+import { useTabBack } from '../../src/tabs.ts';
 
 const MODE_LABEL = { board: 'Tam pano', slides: 'Yalnızca duyurular', clock: 'Tam ekran saat' } as const;
 
 /** Panolar (tasarım 5): canlı durum, bağlantısı kopan pano öne çıkar; dokununca uzaktan kumanda */
 export default function Panolar() {
+  const back = useTabBack('panolar');
   const { can } = useAuth();
   // Sekme açıkken liste sık yenilenir: yeni eşleşen ya da bağlantısı gelen pano hemen çevrimiçi görünür
   const focused = useIsFocused();
@@ -18,7 +20,7 @@ export default function Panolar() {
   const list = [...(screens.data ?? [])].sort((a, b) => Number(a.online) - Number(b.online) || a.name.localeCompare(b.name, 'tr'));
   const online = list.filter((s) => s.online).length;
   return (
-    <Screen
+    <Screen back={back}
       title="Panolar"
       subtitle={screens.data ? `${list.length} pano · ${online} çevrimiçi` : undefined}
       refreshing={screens.isRefetching}

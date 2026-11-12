@@ -11,6 +11,7 @@ import { PUSH_TEXT, pushStatus, registerForPush, type PushState } from '../../sr
 import { colors, radius, tiles, type TileTone } from '../../src/theme.ts';
 import { Avatar, Badge, BentoRow, Card, Chip, Icon, ListRow, Screen, SectionTitle, Segmented, T, type IconName } from '../../src/ui.tsx';
 import { useThemeMode } from '../../src/themeMode.tsx';
+import { useTabBack, useVisibleTabs } from '../../src/tabs.ts';
 
 interface Item {
   title: string;
@@ -169,6 +170,10 @@ function MenuTile({ item, tone }: { item: Item; tone: TileTone }) {
  */
 export default function Menu() {
   const { me, school, role, can, isTeacher, selectSchool, setPlatformMode, signOut } = useAuth();
+  const back = useTabBack('profil');
+  // Menü alt menüde olmayan ekranları listeler (alt menüdekiler burada tekrar edilmez)
+  const tabs = useVisibleTabs();
+  const notTab = (t: Parameters<typeof tabs.includes>[0]) => !tabs.includes(t);
   const openSchool = useOpenSchool();
   const theme = useThemeMode();
   const inbox = useInbox('unread');
@@ -236,13 +241,22 @@ export default function Menu() {
       if (list.length) sections.push({ title, items: list });
     };
     const counsel = can('conduct.counsel') || can('conduct.manage');
-    const content = role === 'teacher' ? [] : CONTENT.filter((c) => can(c.permission)).map((c): Item => ({ title: c.title, subtitle: c.subtitle, icon: c.icon, to: `/icerik/${c.tur}` }));
+    const content = CONTENT.filter((c) => can(c.permission)).map((c): Item => ({ title: c.title, subtitle: c.subtitle, icon: c.icon, to: `/icerik/${c.tur}` }));
+    // Dersi ve nöbeti olan müdür / müdür yardımcısı: kendi programı ve nöbetleri Menü'nün başında
+    const mine = managerial && isTeacher;
+    if (mine)
+      add('Derslerim ve nöbetlerim', [
+        { title: 'Ders programım', subtitle: 'Haftalık ders programı', icon: 'time-outline', to: '/programim' },
+        { title: 'Nöbetlerim', subtitle: 'Bu hafta ve yerine görevlendirmeler', icon: 'shield-checkmark-outline', to: '/nobet' },
+      ]);
     add('Pano', [
-      role !== 'teacher' && can('announcements.manage') && { title: 'Duyurular', subtitle: 'Yayındakiler, onay bekleyenler, taslaklar', icon: 'megaphone-outline', to: '/duyurular' },
+      (can('announcements.approve') || can('leaves.manage')) && notTab('onaylar') && { title: 'Onaylar', subtitle: 'Onay bekleyen duyurular ve izinler', icon: 'checkmark-done-outline', to: '/onaylar' },
+      (can('board.control') || can('screens.manage')) && notTab('panolar') && { title: 'Panolar', subtitle: 'Açık / kapalı panolar, uzaktan komut', icon: 'tv-outline', to: '/panolar' },
+      can('announcements.manage') && notTab('duyurular') && { title: 'Duyurular', subtitle: 'Yayındakiler, onay bekleyenler, taslaklar', icon: 'megaphone-outline', to: '/duyurular' },
       ...content,
     ]);
     add('Takvim ve Ders', [
-      isTeacher && { title: 'Ders programım', subtitle: 'Haftalık ders programı', icon: 'time-outline', to: '/programim' },
+      isTeacher && !mine && notTab('program') && { title: 'Ders programım', subtitle: 'Haftalık ders programı', icon: 'time-outline', to: '/programim' },
       (managerial || isTeacher) && {
         title: 'Sınav takvimi',
         subtitle: isTeacher && !managerial ? 'Gözetmen olduğunuz ve dersinizin sınavları' : 'Sınıfların yazılı ve ortak sınavları',
@@ -254,8 +268,11 @@ export default function Menu() {
       isTeacher && { title: 'Telefon takvimine ekle', subtitle: 'Nöbetler ve sınavlar takviminize', icon: 'calendar-outline', to: '/takvime-ekle' },
     ]);
     add('Personel', [
-      role === 'editor' && isTeacher && { title: 'Nöbetlerim', subtitle: 'Bu hafta ve yerine görevlendirmeler', icon: 'shield-checkmark-outline', to: '/nobet' },
-      can('duties.manage') && { title: 'Ders görevlendirme', subtitle: 'İzinli öğretmenin dersleri ve nöbet yeri', icon: 'people-outline', to: '/gorevlendirme' },
+      notTab('nobet') &&
+        (isTeacher && !mine
+          ? { title: 'Nöbetlerim', subtitle: 'Bu hafta ve yerine görevlendirmeler', icon: 'shield-checkmark-outline', to: '/nobet' }
+          : can('duties.manage') && { title: 'Nöbet çizelgesi', subtitle: 'Bugünkü nöbetçiler ve haftalık çizelge', icon: 'shield-checkmark-outline', to: '/nobet' }),
+      can('duties.manage') && notTab('gorevlendirme') && { title: 'Ders görevlendirme', subtitle: 'İzinli öğretmenin dersleri ve nöbet yeri', icon: 'people-outline', to: '/gorevlendirme' },
       isTeacher && { title: 'Nöbet hatırlatmaları', subtitle: reminderSummary(reminders), icon: 'notifications-outline', to: '/hatirlatmalar' },
       isTeacher && {
         title: role === 'teacher' ? 'İzinlerim' : 'İzin bildir',
@@ -265,9 +282,8 @@ export default function Menu() {
       },
     ]);
     add('Öğrenciler', [
-      // Öğretmen görünümünde Gözlem alt menüde
-      role !== 'teacher' && (managerial || isTeacher || counsel) && { title: 'Gözlem', subtitle: 'Öğrencilere artı / eksi, öğrenci kartları', icon: 'clipboard-outline', to: '/gozlem' },
-      (managerial || (role === 'editor' && counsel)) && { title: 'Rehberlik uyarıları', subtitle: 'Kısa sürede çok eksi alan öğrenciler', icon: 'heart-outline', to: '/rehberlik' },
+      (managerial || isTeacher || counsel) && notTab('gozlem') && { title: 'Gözlem', subtitle: 'Öğrencilere artı / eksi, öğrenci kartları', icon: 'clipboard-outline', to: '/gozlem' },
+      (managerial || counsel) && { title: 'Rehberlik uyarıları', subtitle: 'Kısa sürede çok eksi alan öğrenciler', icon: 'heart-outline', to: '/rehberlik' },
       { title: 'Doğum günleri', subtitle: 'Bugün doğum günü olan öğrenciler', icon: 'gift-outline', to: '/dogum-gunleri' },
     ]);
     // Yönetim, işaretli koordinatör öğretmen ve alan şefi görür; diğer öğretmenler görmez
@@ -335,14 +351,14 @@ export default function Menu() {
   const [featured, ...rest] = sections;
 
   return (
-    <Screen title="Menü" back={role !== 'teacher'}>
+    <Screen title="Menü" back={back}>
       <ProfileTile
         name={me?.user.fullName ?? ''}
         email={me?.user.email ?? ''}
         school={role !== 'platform' ? school?.name : null}
         badges={[
           // Öğretmen kaydı bağlıysa kadrodaki ünvan (Müdür Yardımcısı, Uzman Öğretmen…), değilse rol
-          role !== 'platform' && school?.teacherTitle ? school.teacherTitle : ROLE_LABEL[role],
+          role !== 'platform' && school ? membershipLabel(school) : ROLE_LABEL[role],
           ...(isTeacher && role !== 'teacher' && role !== 'platform' && !school?.teacherTitle ? ['Öğretmen'] : []),
           ...(school?.support && role !== 'platform' ? ['Destek erişimi'] : []),
         ]}

@@ -1,4 +1,4 @@
-import type { Permission, Role } from '@okulpano/shared/permissions';
+import { appView, type Permission, type Role } from '@okulpano/shared/permissions';
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, login, logout, session } from './api.ts';
@@ -35,8 +35,6 @@ export interface Me {
 
 /** Yönetici ekranlarını (kontrol merkezi, onaylar, pano kumandası) açan yetkiler */
 const MANAGER_PERMISSIONS: Permission[] = ['announcements.approve', 'board.control', 'screens.manage', 'emergency.manage', 'duties.manage', 'leaves.manage'];
-/** Editörü öğretmenden ayıran içerik yetkileri */
-const CONTENT_PERMISSIONS: Permission[] = ['announcements.manage', 'highlights.manage', 'ticker.manage', 'exams.manage', 'students.manage', ...MANAGER_PERMISSIONS];
 
 /**
  * Uygulamadaki rol: menüler buna göre kurulur.
@@ -138,8 +136,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ? 'owner'
           : school?.role === 'admin'
             ? 'admin'
-            : // Duyuru göndermek öğretmenlerde yaygın: öğretmen kaydı olan ve yalnızca duyuru yetkisi olan kişi öğretmen görünümünde kalır
-              CONTENT_PERMISSIONS.some((p) => can(p) && (p !== 'announcements.manage' || !school?.teacherId))
+            : // Öğretmen kaydı olan herkes görevi olsa da öğretmen görünümünde kalır (görevi alt menüde ve Menü'de);
+              // editör görünümü yalnızca kadroda olmayan görevliler içindir (ör. memur). Kural panelle ortak.
+              school && appView(school) === 'editor'
               ? 'editor'
               : 'teacher';
     return {
@@ -191,7 +190,8 @@ export function membershipLabel(s: SchoolAccess): string {
   if (s.teacherTitle) return s.teacherTitle;
   if (s.role === 'owner') return 'Okul müdürü';
   if (s.role === 'admin') return 'Yönetici';
-  return s.teacherId ? 'Öğretmen' : 'Editör';
+  // Kadroda olmayan kişi (ör. memur) panelde olduğu gibi "Görevli"
+  return s.teacherId ? 'Öğretmen' : 'Görevli';
 }
 
 export function useAuth(): AuthValue {

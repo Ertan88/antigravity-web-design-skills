@@ -76,6 +76,7 @@ import IconClock from '@tabler/icons-react-native/IconClock';
 import IconCode from '@tabler/icons-react-native/IconCode';
 import IconCoffee from '@tabler/icons-react-native/IconCoffee';
 import IconDeviceMobile from '@tabler/icons-react-native/IconDeviceMobile';
+import IconDownload from '@tabler/icons-react-native/IconDownload';
 import IconDeviceTv from '@tabler/icons-react-native/IconDeviceTv';
 import IconExternalLink from '@tabler/icons-react-native/IconExternalLink';
 import IconEye from '@tabler/icons-react-native/IconEye';
@@ -222,6 +223,7 @@ export const ICONS = {
   'person-add-outline': IconUserPlus,
   'person-circle-outline': IconUserCircle,
   'phone-portrait-outline': IconDeviceMobile,
+  'download-outline': IconDownload,
   'play': IconPlayerPlayFilled,
   'play-circle-outline': IconPlayerPlay,
   'play-skip-back': IconPlayerSkipBack,

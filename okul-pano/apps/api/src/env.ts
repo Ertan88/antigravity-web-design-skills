@@ -21,6 +21,8 @@ const schema = z.object({
   MOBILE_DIST: z.string().default('../../mobile/dist'),
   /** Okul Yayın Pano TV uygulamasının indirme adresi: TV'de kısa "/tv" adresi buraya yönlendirir */
   TV_APK_URL: z.string().default('https://github.com/Ertan88/antigravity-web-design-skills/releases/download/okul-pano-tv/Okul-Yayin-Pano.apk'),
+  /** Okul Yayın telefon uygulamasının (Android) indirme adresi: panelin ve /app'in "İndir" bağlantısı kısa "/indir" adresinden buraya gider */
+  APP_APK_URL: z.string().default('https://github.com/Ertan88/antigravity-web-design-skills/releases/download/okul-pano-android/Okul-Yayin.apk'),
   /**
    * Web'den kayıt: 'open' e-posta doğrulanınca okul açılır, 'approval' doğrulama sonrası platform yöneticisinin
    * onayını bekler (okul askıda açılır), 'closed' kayıt kapalı (okulları yalnızca platform yöneticisi açar).

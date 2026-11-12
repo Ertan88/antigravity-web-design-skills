@@ -82,6 +82,26 @@ export async function authRoutes(app: FastifyInstance) {
     };
   });
 
+  /**
+   * Panelden uygulamanın web sürümüne (/app) geçiş: paneldeki oturumla (yalnızca çerez) aynı kişiye ayrı bir
+   * oturum açılır ve yenileme anahtarı döner; /app bunu kendi deposuna yazar, kişi ikinci kez giriş yapmaz.
+   * Çerez SameSite=lax olduğu için başka sitelerden gelen istekte gönderilmez; özel başlık da ön kontrol (CORS)
+   * gerektirir ve sunucu başka kökene izin vermez. Paneldeki oturum değişmez.
+   */
+  app.post('/api/auth/app-session', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req) => {
+    if (req.headers['x-okul-handoff'] !== '1') throw unauthorized();
+    const token = req.cookies[COOKIE];
+    if (!token) throw unauthorized();
+    const [session] = await db
+      .select()
+      .from(sessions)
+      .where(and(eq(sessions.tokenHash, sha256(token)), gt(sessions.expiresAt, new Date())));
+    if (!session) throw unauthorized('Oturumun süresi doldu, lütfen yeniden giriş yapın.');
+    const [user] = await db.select().from(users).where(eq(users.id, session.userId));
+    if (!user) throw unauthorized();
+    return { userId: user.id, refreshToken: await issueSession(req, user.id) };
+  });
+
   app.post('/api/auth/logout', async (req, reply) => {
     const fromBody = (req.body as { refreshToken?: unknown } | undefined)?.refreshToken;
     const token = typeof fromBody === 'string' ? fromBody : req.cookies[COOKIE];

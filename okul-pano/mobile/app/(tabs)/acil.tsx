@@ -11,6 +11,7 @@ import { useControlCenter } from '../../src/data.ts';
 import { clock } from '../../src/day.ts';
 import { colors } from '../../src/theme.ts';
 import { Card, Chip, Field, Icon, Screen, T, ToggleRow } from '../../src/ui.tsx';
+import { useTabBack } from '../../src/tabs.ts';
 
 const HOLD_MS = 3000;
 
@@ -19,6 +20,7 @@ const HOLD_MS = 3000;
  * Bütün panolar kırmızı uyarıya geçer, siren çalar, okuldaki herkesin telefonuna bildirim gider.
  */
 export default function Acil() {
+  const back = useTabBack('acil');
   const { school, can } = useAuth();
   const qc = useQueryClient();
   const path = useSchoolPath('emergency');
@@ -52,7 +54,7 @@ export default function Acil() {
 
   if (!can('emergency.manage')) {
     return (
-      <Screen title="Acil durum" tone="danger">
+      <Screen back={back} title="Acil durum" tone="danger">
         <Card>
           <T>Acil durum uyarısını yalnızca yetkili kişiler başlatabilir.</T>
         </Card>
@@ -62,7 +64,7 @@ export default function Acil() {
 
   if (active) {
     return (
-      <Screen title="Acil durum" tone="danger">
+      <Screen back={back} title="Acil durum" tone="danger">
         <Card style={{ backgroundColor: colors.danger, borderColor: colors.danger, gap: 6 }}>
           <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800', letterSpacing: 0.6 }}>UYARI SÜRÜYOR</Text>
           <Text style={{ color: '#fff', fontSize: 26, fontWeight: '800' }}>{EMERGENCY_INFO[active.type].label}</Text>
@@ -83,7 +85,7 @@ export default function Acil() {
   }
 
   return (
-    <Screen title="Acil durum" tone="danger">
+    <Screen back={back} title="Acil durum" tone="danger">
       <T color={colors.muted} size={14}>
         Tür seçin. Bütün panolar anında kırmızı uyarıya geçer ve siren çalar.
       </T>

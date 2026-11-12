@@ -9,13 +9,15 @@ import { CoverTag } from '../../src/lesson.tsx';
 import { addDays, dayTitle } from '../../src/day.ts';
 import { colors, tiles } from '../../src/theme.ts';
 import { Badge, Banner, Button, Card, Empty, ErrorNote, HolidayCard, Icon, Label, Loading, Screen, Segmented, T } from '../../src/ui.tsx';
+import { useTabBack } from '../../src/tabs.ts';
 
 /** Nöbet (tasarım 2 ve 10): kendi nöbetlerim ve bugün kim nerede; yetkisi olan boş yere görevlendirir */
 export default function Nobet() {
+  const back = useTabBack('nobet');
   const { isTeacher } = useAuth();
   const [tab, setTab] = useState<'mine' | 'all'>(isTeacher ? 'mine' : 'all');
   return (
-    <Screen title={isTeacher ? 'Nöbetlerim' : 'Nöbetler'}>
+    <Screen back={back} title={isTeacher ? 'Nöbetlerim' : 'Nöbetler'}>
       {isTeacher && (
         <Segmented
           value={tab}

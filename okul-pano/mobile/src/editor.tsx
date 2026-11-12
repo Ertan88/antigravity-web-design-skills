@@ -3,11 +3,12 @@ import { router } from 'expo-router';
 import { View } from 'react-native';
 import { membershipLabel, useAuth } from './auth.tsx';
 import { useAnnouncements, useMeToday, type Announcement } from './data.ts';
-import { MenuButton, QuickAdd } from './quick.tsx';
+import { QuickAdd } from './quick.tsx';
 import { LiveLesson } from './lesson.tsx';
 import { DayBanner, NotificationsButton, TodayDutyCard } from './teacher.tsx';
 import { colors } from './theme.ts';
 import { Badge, BentoRow, Card, Empty, HomeHeader, ListRow, Loading, Screen, SectionTitle, T, Tile } from './ui.tsx';
+import { WebAppStrips } from './webStrips.tsx';
 
 function status(a: Announcement): { label: string; tone: 'success' | 'warning' | 'danger' | 'muted' } {
   if (a.approvalStatus === 'pending') return { label: 'Onay bekliyor', tone: 'warning' };
@@ -33,8 +34,8 @@ export function EditorHome() {
     <Screen refreshing={list.isRefetching} onRefresh={() => void list.refetch()}>
       <HomeHeader name={me?.user.fullName} school={school?.name} schoolType={school?.schoolType} role={school ? membershipLabel(school) : 'Editör'}>
         <NotificationsButton />
-        <MenuButton />
       </HomeHeader>
+      <WebAppStrips />
       {today.data ? <DayBanner data={today.data} /> : null}
       {today.data ? <LiveLesson data={today.data} link /> : null}
 

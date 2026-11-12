@@ -3,12 +3,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { relativeDayWord } from '@okulpano/shared/coverText';
 import { Pressable, View } from 'react-native';
-import { api } from '../src/api.ts';
-import { useAuth, useSchoolPath } from '../src/auth.tsx';
-import { addDays, dayTitle } from '../src/day.ts';
-import { colors } from '../src/theme.ts';
-import { Text } from '../src/text.tsx';
-import { Badge, Button, Card, confirm, DeleteIconButton, Empty, ErrorNote, Loading, Screen, T } from '../src/ui.tsx';
+import { api } from '../../src/api.ts';
+import { useAuth, useSchoolPath } from '../../src/auth.tsx';
+import { addDays, dayTitle } from '../../src/day.ts';
+import { colors } from '../../src/theme.ts';
+import { Text } from '../../src/text.tsx';
+import { Badge, Button, Card, confirm, DeleteIconButton, Empty, ErrorNote, Loading, Screen, T } from '../../src/ui.tsx';
+import { useTabBack } from '../../src/tabs.ts';
 
 /*
  * İzinli öğretmen yerine görevlendirme (yönetim): günün boş dersleri ve nöbet yerleri. Her satırda o gün okulda olup
@@ -88,6 +89,7 @@ function Candidates({ list, busy, onPick, freeTag = false }: { list: Candidate[]
 }
 
 export default function Gorevlendirme() {
+  const back = useTabBack('gorevlendirme');
   const { school, can } = useAuth();
   // Tarih seçilmediyse sunucunun gösterdiği gün: okul günü bitmediyse bugün, bittiyse sonraki okul günü
   const [date, setDate] = useState<string | null>(null);
@@ -116,13 +118,13 @@ export default function Gorevlendirme() {
 
   if (!can('duties.manage')) {
     return (
-      <Screen back title="Ders görevlendirme">
+      <Screen back={back} title="Ders görevlendirme">
         <Empty icon="lock-closed-outline" title="Nöbet yetkisi gerekli" text="İzinli öğretmen yerine görevlendirmeyi nöbet çizelgesini yöneten kişiler yapar." />
       </Screen>
     );
   }
   return (
-    <Screen back title="Ders görevlendirme" subtitle="İzinli öğretmenin dersleri ve nöbet yeri" refreshing={q.isRefetching} onRefresh={() => void q.refetch()}>
+    <Screen back={back} title="Ders görevlendirme" subtitle="İzinli öğretmenin dersleri ve nöbet yeri" refreshing={q.isRefetching} onRefresh={() => void q.refetch()}>
       {shown && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Button variant="secondary" size="sm" icon="chevron-back" accessibilityLabel="Önceki gün" onPress={() => setDate(addDays(shown, -1))} />

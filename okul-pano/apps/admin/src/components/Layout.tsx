@@ -1,11 +1,13 @@
 import clsx from 'clsx';
-import { Building2, Lifebuoy2, ChevronDown, Mail, ChevronRight, ChevronsUpDown, LogOut, Menu, Moon, School, Sun, X } from './icons.tsx';
+import { appView } from '@okulpano/shared';
+import { Building2, Download, Lifebuoy2, ChevronDown, Mail, ChevronRight, ChevronsUpDown, LogOut, Menu, Moon, MonitorSmartphone, School, Sun, X } from './icons.tsx';
 import { Suspense, useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth.tsx';
 import { useInternshipAccess, useSchool } from '../lib/data.ts';
 import { openCount, useCoverDay } from '../pages/covers/Covers.tsx';
-import { findNav, NAV } from '../lib/nav.ts';
+import { findNav, NAV, type NavItem } from '../lib/nav.ts';
+import { isPhoneWidth, openAppView, panelChosenOnPhone } from '../lib/appView.ts';
 import { useTheme } from '../lib/theme.ts';
 import { BrandMark, BrandName } from './Brand.tsx';
 import { EmergencyBanner, EmergencyButton } from './Emergency.tsx';
@@ -128,6 +130,14 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <SchoolSwitcher />
       </div>
       <nav className="relative flex-1 space-y-3 overflow-y-auto px-3 pb-4 [scrollbar-width:thin]">
+        {/* Telefonda açılan menü: uygulama şeridi ve en sık kullanılan sayfaların kısayolları, altında tam liste */}
+        {onNavigate && (
+          <PhoneShortcuts
+            items={NAV.flatMap((g) => g.items).filter((i) => (!i.permission || can(i.permission)) && (!i.when || i.when(settings, who)))}
+            badges={badges}
+            onNavigate={onNavigate}
+          />
+        )}
         {NAV.map((group) => {
           const items = group.items.filter((i) => (!i.permission || can(i.permission)) && (!i.when || i.when(settings, who)));
           if (!items.length) return null;
@@ -269,6 +279,25 @@ export function Layout() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
   useEffect(() => setOpen(false), [location.pathname]);
+  // Telefonda öğretmen görünümündeki kişi uygulamanın web sürümüne geçer (kural mobil uygulamayla ortak: appView)
+  const { me, school } = useAuth();
+  const [leaving, setLeaving] = useState(false);
+  useEffect(() => {
+    if (!me || !school || school.support || me.user.isSuperAdmin) return;
+    if (appView(school) !== 'teacher' || !isPhoneWidth() || panelChosenOnPhone()) return;
+    setLeaving(true);
+    void openAppView(me.user.id, school.id).then((ok) => {
+      if (!ok) setLeaving(false);
+    });
+  }, [me, school]);
+  if (leaving) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 px-6 text-center">
+        <Spinner />
+        <p className="text-sm font-semibold text-slate-500">Telefon için uygulama görünümü açılıyor…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-dvh lg:pl-72">
@@ -306,6 +335,71 @@ export function Layout() {
         </Suspense>
       </main>
       <WelcomeDialog />
+    </div>
+  );
+}
+
+/** Telefondaki menünün başı: önce uygulama şeridi, sonra en çok dört kısayol (kişinin görebildiği sayfalardan) */
+const SHORTCUT_ORDER = ['/', '/duyurular', '/gorevlendirme', '/nobet', '/izinler', '/ekranlar', '/sinav-takvimi', '/sorunlar'];
+
+function PhoneShortcuts({ items, badges, onNavigate }: { items: NavItem[]; badges: Record<'coverOpen', number>; onNavigate: () => void }) {
+  const { me, school } = useAuth();
+  const [opening, setOpening] = useState(false);
+  const shortcuts = SHORTCUT_ORDER.map((to) => items.find((i) => i.to === to)).filter((i): i is NavItem => Boolean(i)).slice(0, 4);
+  return (
+    <div className="space-y-3">
+      <div className="space-y-2.5 rounded-2xl bg-[#0E5E66] p-3 text-white">
+        <div className="flex items-center gap-2">
+          <MonitorSmartphone className="size-5 shrink-0" />
+          <span className="text-sm font-extrabold">Telefonda uygulamada daha kolay</span>
+        </div>
+        <div className="flex gap-2">
+          <a href="/indir" className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-white px-3 py-2 text-xs font-extrabold text-[#0E5E66]">
+            <Download className="size-3.5" />
+            İndir
+          </a>
+          <button
+            type="button"
+            disabled={opening || !me}
+            onClick={() => {
+              if (!me) return;
+              setOpening(true);
+              void openAppView(me.user.id, school?.id ?? null).then((ok) => !ok && setOpening(false));
+            }}
+            className="flex-1 rounded-xl bg-white/15 px-3 py-2 text-xs font-extrabold text-white ring-1 ring-white/30 disabled:opacity-60"
+          >
+            {opening ? 'Açılıyor…' : 'Tarayıcıda aç'}
+          </button>
+        </div>
+      </div>
+      {shortcuts.length > 1 && (
+        <div>
+          <div className="px-3.5 pb-1.5 text-xs font-bold text-slate-400">Kısayollar</div>
+          <div className="grid grid-cols-2 gap-2">
+            {shortcuts.map((item) => {
+              const badge = item.badge ? badges[item.badge] : 0;
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === '/'}
+                  onClick={onNavigate}
+                  className={({ isActive }) =>
+                    clsx(
+                      'relative flex flex-col gap-1.5 rounded-2xl p-2.5 text-[13px] font-bold ring-1 transition',
+                      isActive ? 'bg-ink text-white ring-ink dark:text-[#1c1917]' : 'bg-surface text-ink ring-slate-200 hover:ring-slate-300',
+                    )
+                  }
+                >
+                  <item.icon className="size-5" />
+                  <span className="truncate">{item.label}</span>
+                  {badge > 0 && <span className="absolute top-2 right-2 rounded-full bg-rose-600 px-1.5 text-[10.5px] font-extrabold text-white tabular-nums">{badge}</span>}
+                </NavLink>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

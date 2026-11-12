@@ -13,6 +13,7 @@ import { Text, TextInput } from '../../src/text.tsx';
 import { colors, radius, tiles } from '../../src/theme.ts';
 import { Sheet } from '../../src/sheet.tsx';
 import { Avatar, Empty, ErrorNote, HeaderButton, Icon, Loading, Screen, T } from '../../src/ui.tsx';
+import { useTabBack } from '../../src/tabs.ts';
 
 /** Kaydettikten sonra "Geri al" bu kadar görünür */
 const UNDO_MS = 10_000;
@@ -25,6 +26,7 @@ const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0');
  * Kutulardaki rakam öğrencinin bu ayki net puanıdır (yalnızca öğretmenler, rehber ve idare görür).
  */
 export default function Gozlem() {
+  const back = useTabBack('gozlem');
   const { me, can } = useAuth();
   const counsel = can('conduct.counsel') || can('conduct.manage');
   const alerts = useConductAlerts('open', counsel);
@@ -74,7 +76,7 @@ export default function Gozlem() {
 
   return (
     <View style={{ flex: 1 }}>
-    <Screen
+    <Screen back={back}
       title="Gözlem"
       subtitle={me?.user.fullName}
       right={

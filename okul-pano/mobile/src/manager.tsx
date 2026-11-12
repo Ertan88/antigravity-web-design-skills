@@ -4,13 +4,14 @@ import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import { Text } from './text.tsx';
 import { membershipLabel, useAuth } from './auth.tsx';
-import { useControlCenter, useMeToday, useSchoolQuery, type ControlCenter } from './data.ts';
+import { useControlCenter, useDutyDay, useMeToday, useSchoolQuery, type ControlCenter, type DutyDay } from './data.ts';
 import { clock, timeAgo } from './day.ts';
 import { LiveLesson } from './lesson.tsx';
-import { MenuButton, QuickAdd } from './quick.tsx';
+import { QuickAdd } from './quick.tsx';
 import { AssignmentNotice, DayBanner, MyDayCard, NotificationsButton } from './teacher.tsx';
 import { tiles } from './theme.ts';
 import { Banner, BentoRow, Card, ErrorNote, HomeHeader, ListRow, Loading, Screen, SectionTitle, Tile } from './ui.tsx';
+import { WebAppStrips } from './webStrips.tsx';
 
 /** Koyu pano kutusu: kaç pano açık, kapalı olanlar adlarıyla ve en son ne zaman görüldükleriyle */
 function ScreensTile({ screens }: { screens: ControlCenter['screens'] }) {
@@ -64,6 +65,8 @@ export function ManagerHome() {
   const openLessons = cover.data && !cover.data.holiday ? cover.data.lessons.filter((l) => !l.cover).length : 0;
   const openDuties = cover.data && !cover.data.holiday ? cover.data.duties.filter((d) => !d.substitute).length : 0;
   const me = useMeToday();
+  // Nöbet alt menüde değil: bugünkü nöbetçi sayısı ve boş yer Merkez'deki Nöbet kutusunda
+  const duty = useDutyDay();
   const c = center.data;
   const pending = c ? c.pending.announcements + c.pending.leaves : 0;
 
@@ -100,8 +103,8 @@ export function ManagerHome() {
     <Screen refreshing={center.isRefetching} onRefresh={() => void center.refetch()}>
       <HomeHeader name={account?.user.fullName} school={school?.name} schoolType={school?.schoolType} role={school?.support ? 'Destek erişimi' : school ? membershipLabel(school) : 'Yönetici'}>
         <NotificationsButton />
-        <MenuButton />
       </HomeHeader>
+      <WebAppStrips />
       <ErrorNote error={center.error} />
       {!c ? (
         <Loading />
@@ -142,6 +145,20 @@ export function ManagerHome() {
             </View>
           </BentoRow>
 
+          <BentoRow>
+            <DutyTile day={duty.data} style={{ flex: 1 }} />
+            <Tile
+              tone={cover.data?.absent.length ? 'sun' : 'paper'}
+              icon="people-outline"
+              label="İzinli"
+              value={cover.data?.holiday ? '–' : (cover.data?.absent.length ?? '–')}
+              // Son zilden sonra görevlendirme ertesi okul gününe geçer; kutu da hangi günü gösterdiğini yazar
+              caption={!cover.data ? null : `${relativeDayWord(cover.data.date, cover.data.today)}: ${cover.data.holiday ? 'tatil' : cover.data.absent.length ? cover.data.absent.map((a) => a.fullName).slice(0, 2).join(', ') : 'izinli yok'}`}
+              onPress={() => router.push(can('duties.manage') ? '/gorevlendirme' : '/nobet')}
+              style={{ flex: 1 }}
+            />
+          </BentoRow>
+
           {attention.length > 0 && (
             <>
               <SectionTitle>İlgilenmeniz gerekenler</SectionTitle>
@@ -164,5 +181,22 @@ export function ManagerHome() {
         </>
       )}
     </Screen>
+  );
+}
+
+/** Merkez'deki Nöbet kutusu: bugün kaç kişi nöbette, boş yer varsa sayısı; dokununca nöbet çizelgesi */
+function DutyTile({ day, style }: { day: DutyDay | undefined; style?: object }) {
+  const people = day ? new Set(day.entries.map((e) => (e.onLeave ? e.substitute?.teacherId : e.teacherId)).filter(Boolean)).size : 0;
+  const open = day ? day.entries.filter((e) => e.onLeave && !e.substitute).length : 0;
+  return (
+    <Tile
+      tone={open ? 'peach' : 'mint'}
+      icon="shield-checkmark-outline"
+      label="Nöbet"
+      value={!day || day.holiday ? '–' : people}
+      caption={!day ? null : day.holiday ? 'Bugün tatil' : !day.entries.length ? 'Bugün nöbet girilmemiş' : open ? `nöbetçi · ${open} yer boş` : 'nöbetçi · yerler dolu'}
+      onPress={() => router.push('/nobet')}
+      style={style}
+    />
   );
 }

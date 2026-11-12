@@ -13,6 +13,7 @@ import { Sheet } from '../../src/sheet.tsx';
 import { Text } from '../../src/text.tsx';
 import { colors } from '../../src/theme.ts';
 import { Badge, Button, Card, confirm, DeleteIconButton, Empty, Icon, Loading, Screen, Segmented, T, switchColors, type IconName } from '../../src/ui.tsx';
+import { useTabBack } from '../../src/tabs.ts';
 
 /*
  * Duyurular (tasarım B): duruma göre bölümler. Önce "İlgilenmeniz gerekenler" (kendi onay bekleyen ve düzeltme istenen
@@ -275,9 +276,8 @@ function OnAir({ list }: { list: Announcement[] }) {
 }
 
 export default function Duyurular() {
-  const { me, can: canRaw, role, school } = useAuth();
-  // Öğretmen görünümünde duyurular her zaman yalnızca okunur (yetkisi olsa da): yayındaki duyurular ve içerikleri
-  const can = (p: Parameters<typeof canRaw>[0]) => role !== 'teacher' && canRaw(p);
+  const { me, can, school } = useAuth();
+  const back = useTabBack('duyurular');
   const manages = can('announcements.manage');
   const approver = can('announcements.approve');
   const list = useAnnouncements();
@@ -352,8 +352,8 @@ export default function Duyurular() {
   return (
     <Screen
       title="Duyurular"
-      // Alt menüde Duyurular sekmesi yalnızca editörde var; ötekiler buraya Menü'den ya da ana ekrandan gelir
-      back={!(role === 'editor' && canRaw('announcements.manage'))}
+      // Duyurular alt menüde değilse (ör. yetkisiz öğretmen ana ekrandan gelir) geri düğmesi görünür
+      back={back}
       refreshing={list.isRefetching}
       onRefresh={() => void Promise.all([list.refetch(), manages ? drafts.refetch() : null])}
       right={

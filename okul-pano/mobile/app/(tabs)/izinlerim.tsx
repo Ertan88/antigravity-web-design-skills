@@ -4,6 +4,7 @@ import { useMyLeaves } from '../../src/data.ts';
 import { dayTitle } from '../../src/day.ts';
 import { colors } from '../../src/theme.ts';
 import { Badge, Button, Card, Empty, Loading, Screen, T } from '../../src/ui.tsx';
+import { useTabBack } from '../../src/tabs.ts';
 
 const STATUS = {
   approved: { label: 'Onaylandı', tone: 'success' },
@@ -13,10 +14,11 @@ const STATUS = {
 
 /** Öğretmenin izinleri: bildirdikleri ve durumları; yeni izin bildirimi */
 export default function Izinlerim() {
+  const back = useTabBack('izinlerim');
   const leaves = useMyLeaves();
   const list = leaves.data ?? [];
   return (
-    <Screen
+    <Screen back={back}
       title="İzinlerim"
       refreshing={leaves.isRefetching}
       onRefresh={() => void leaves.refetch()}

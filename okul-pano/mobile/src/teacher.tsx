@@ -10,6 +10,7 @@ import { classDayPeriods, classLabel, clock, dative, dayTitle, localIso, schoolD
 import { colors, tiles, type TileTone } from './theme.ts';
 import { CoverTag, LiveLesson } from './lesson.tsx';
 import { Banner, Card, HeaderButton, HomeHeader, Icon, ListRow, Loading, Screen, SectionTitle, T, Tile, type IconName } from './ui.tsx';
+import { WebAppStrips } from './webStrips.tsx';
 
 /** Sağ üstteki bildirim zili (okunmamış sayısıyla) */
 export function NotificationsButton() {
@@ -78,10 +79,11 @@ export function TeacherHome() {
   const now = useNow(60_000);
   const day = today.data ? teacherDay(today.data, now) : null;
   const linked = Boolean(today.data?.teacher);
+  // Kadroda olmayan kişide (ör. memur) gözlem ve izin bildirme yok; rehber öğretmen gözlemi yine görür
   const quick: { label: string; icon: IconName; tone: TileTone; to: string }[] = [
-    { label: 'Gözlem', icon: 'clipboard-text', tone: 'mint', to: '/gozlem' },
-    { label: 'İzin bildir', icon: 'calendar-plus', tone: 'peach', to: '/izin' },
-    // Öğretmen görünümünde duyurular yalnızca okunur (yayındakiler)
+    ...(linked || can('conduct.counsel') ? [{ label: 'Gözlem', icon: 'clipboard-text' as IconName, tone: 'mint' as TileTone, to: '/gozlem' }] : []),
+    ...(linked ? [{ label: 'İzin bildir', icon: 'calendar-plus' as IconName, tone: 'peach' as TileTone, to: '/izin' }] : []),
+    // Duyurular: yetkisi olan yönetir, olmayan yayındakileri görür
     { label: 'Duyurular', icon: 'megaphone-outline', tone: 'sky', to: '/duyurular' },
     ...(linked ? [{ label: 'Hatırlatma', icon: 'alarm' as IconName, tone: 'sun' as TileTone, to: '/hatirlatmalar' }] : []),
   ];
@@ -90,6 +92,7 @@ export function TeacherHome() {
       <HomeHeader name={me?.user.fullName} school={school?.name} schoolType={school?.schoolType} role={school ? membershipLabel(school) : 'Öğretmen'}>
         <NotificationsButton />
       </HomeHeader>
+      <WebAppStrips />
       {today.isLoading || !today.data || !day ? (
         <Loading />
       ) : (
@@ -100,7 +103,7 @@ export function TeacherHome() {
             <Card tone="warning">
               <T weight="700">Hesabınız bir öğretmen kaydına bağlı değil</T>
               <T size={13} color={colors.muted}>
-                Kendi nöbetlerinizi ve ders programınızı görmek için okul yöneticiniz panelde Kullanıcılar sayfasından hesabınızı öğretmen kaydınızla eşleştirsin.
+                Öğretmenseniz, kendi nöbetlerinizi ve ders programınızı görmek için okul yöneticiniz Kişiler ve Yetkiler sayfasında hesabınızı öğretmen kaydınızla eşleştirsin.
               </T>
             </Card>
           ) : !day.holiday ? (

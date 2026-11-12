@@ -11,6 +11,7 @@ import { scrollMemory, scrollRestore } from './scroll.ts';
 import { colors, dark, radius, space, tiles, type TileTone } from './theme.ts';
 import { shortSchoolName } from '@okulpano/shared/schoolName';
 import { dayTitle, greeting, localIso } from './day.ts';
+import { useEmergencyInHeader } from './tabs.ts';
 
 export type { IconName } from './icons.tsx';
 
@@ -258,6 +259,7 @@ export function Screen({
             {subtitle ? typeof subtitle === 'string' ? <Text style={styles.subtitle}>{subtitle}</Text> : subtitle : null}
           </View>
           {right}
+          <EmergencyButton compact />
         </View>
       )}
       {/* Klavye açılınca içerik kısalır (Android kenardan kenara çizimde pencere küçülmez) ve odaktaki kutu görünür kalır */}
@@ -876,6 +878,7 @@ export function HomeHeader({ name, school, schoolType, role, children }: { name?
             {role}
           </Text>
         </View>
+        <EmergencyButton />
         {children ? <View style={{ flexDirection: 'row', gap: 8 }}>{children}</View> : null}
       </View>
       <View style={{ gap: 2 }}>
@@ -888,6 +891,38 @@ export function HomeHeader({ name, school, schoolType, role, children }: { name?
         </Text>
       </View>
     </View>
+  );
+}
+
+/**
+ * Acil durum düğmesi: alt menüde Acil sekmesi olmayan yetkili kişide (okul müdürü, müdür yardımcısı, görevli öğretmen)
+ * her ekranın başlığında kırmızı durur. Ana sayfada yazılı, diğer ekranlarda yalnızca simge; Acil ekranının kendisinde görünmez.
+ */
+export function EmergencyButton({ compact }: { compact?: boolean }) {
+  const show = useEmergencyInHeader();
+  const pathname = usePathname();
+  if (!show || pathname === '/acil') return null;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Acil durum"
+      onPress={() => router.push('/acil')}
+      style={({ pressed }) => ({
+        height: 44,
+        minWidth: 44,
+        borderRadius: 22,
+        backgroundColor: pressed ? '#be123c' : '#e11d48',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingHorizontal: compact ? 0 : 14,
+        marginLeft: compact ? 8 : 0,
+      })}
+    >
+      <Icon name="warning-outline" size={20} color="#fff" />
+      {compact ? null : <Text style={{ color: '#fff', fontSize: 14.5, fontWeight: '800' }}>Acil</Text>}
+    </Pressable>
   );
 }
 

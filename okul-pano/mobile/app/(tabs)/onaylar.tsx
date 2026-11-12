@@ -9,9 +9,11 @@ import { dayTitle, timeAgo } from '../../src/day.ts';
 import { AnnouncementPreview } from '../../src/preview.tsx';
 import { colors } from '../../src/theme.ts';
 import { Button, Card, Empty, Field, Loading, Screen, SectionTitle, T } from '../../src/ui.tsx';
+import { useTabBack } from '../../src/tabs.ts';
 
 /** Onay kutusu (tasarım 4): onaya düşen duyurular ve öğretmenlerin bildirdiği izinler */
 export default function Onaylar() {
+  const back = useTabBack('onaylar');
   const { can, school } = useAuth();
   const qc = useQueryClient();
   const canAnn = can('announcements.approve');
@@ -30,7 +32,7 @@ export default function Onaylar() {
     ]);
 
   return (
-    <Screen
+    <Screen back={back}
       title="Onay bekleyenler"
       subtitle={total ? `${total} içerik onayınızı bekliyor` : 'Bekleyen içerik yok'}
       refreshing={ann.isRefetching}
