@@ -419,13 +419,15 @@ export async function displayRoutes(app: FastifyInstance) {
     const offline = screenId ? bus.screenConnected(screenId) : () => {};
     // Bağlantı açık kaldıkça son görülme dakikada bir yazılır (kopma bildirimi veritabanındaki bu zamana bakar)
     let touched = Date.now();
+    // Sinyal adlı olay olarak gider: pano bağlantının yaşadığını görür (yorum satırını tarayıcı panoya iletmez).
+    // 20 saniye: okul ağlarındaki filtreler sessiz bağlantıları çoğunlukla 30–60 saniyede keser.
     const ping = setInterval(() => {
-      raw.write(`: ping ${Date.now()}\n\n`);
+      raw.write(`event: ping\ndata: ${Date.now()}\n\n`);
       if (screenId && Date.now() - touched >= 60_000) {
         touched = Date.now();
         void touchScreen(app.deps, screenId).catch(() => {});
       }
-    }, 25_000);
+    }, 20_000);
 
     req.raw.on('close', () => {
       clearInterval(ping);

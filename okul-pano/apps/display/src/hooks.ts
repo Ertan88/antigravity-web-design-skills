@@ -5,6 +5,10 @@ import { AuthError, cachedState, cacheState, fetchState, fetchWeather, postStatu
 export type Connection = 'loading' | 'live' | 'offline' | 'unauthorized';
 
 const REFRESH_MS = 5 * 60 * 1000;
+/** Canlı bağlantıdan bu süre hiç haber gelmezse (sunucu 20 saniyede bir sinyal yollar) bağlantı ölü sayılır */
+const STREAM_SILENT_MS = 70_000;
+/** Canlı bağlantı sağlıksızken (okul ağı kesiyor ya da tamponluyor) veri bu aralıkla yoklanır */
+const FALLBACK_POLL_MS = 60_000;
 /** "Uyandır" komutu panoyu bu kadar süre uyku saatine rağmen açık tutar */
 const WAKE_MS = 2 * 3600 * 1000;
 
@@ -28,7 +32,8 @@ const timeTravelOffset = (() => {
 })();
 
 /**
- * Pano verisini yönetir: ilk yükleme, SSE ile anlık güncelleme, 5 dakikalık yedek yoklama,
+ * Pano verisini yönetir: ilk yükleme, SSE ile anlık güncelleme, 5 dakikalık yedek yoklama (canlı bağlantı
+ * sessizse dakikada bir),
  * internet kesilirse son kayıtlı veriyle çalışmaya devam etme ve uzaktan komutlar.
  */
 export function useDisplayData(auth: DisplayAuth, onUnauthorized: () => void) {
@@ -41,6 +46,8 @@ export function useDisplayData(auth: DisplayAuth, onUnauthorized: () => void) {
   const [remote, setRemote] = useState<RemoteControl>({ nav: { seq: 0, step: 1 }, paused: false, power: null });
   const inflight = useRef<Promise<void> | null>(null);
   const version = useRef<string | null>(null);
+  /** Canlı bağlantıdan son haber (olay ya da sinyal) */
+  const streamAlive = useRef(0);
 
   const load = useCallback(() => {
     if (inflight.current) return inflight.current;
@@ -80,25 +87,43 @@ export function useDisplayData(auth: DisplayAuth, onUnauthorized: () => void) {
   useEffect(() => {
     void load();
     const timer = setInterval(load, REFRESH_MS);
-    return () => clearInterval(timer);
+    // Canlı bağlantı sessizse (ağ kesiyor ya da olayları tamponluyor) değişiklikler dakikada bir yoklamayla gelir
+    const fallback = setInterval(() => {
+      if (Date.now() - streamAlive.current > STREAM_SILENT_MS) void load();
+    }, FALLBACK_POLL_MS);
+    return () => {
+      clearInterval(timer);
+      clearInterval(fallback);
+    };
   }, [load]);
 
   useEffect(() => {
     let source: EventSource | null = null;
     let retry: ReturnType<typeof setTimeout> | undefined;
     let debounce: ReturnType<typeof setTimeout> | undefined;
+    let failures = 0;
+    let openedAt = 0;
+    const alive = () => {
+      streamAlive.current = Date.now();
+    };
 
     const connect = () => {
+      openedAt = Date.now();
       source = new EventSource(`/api/display/stream?token=${encodeURIComponent(auth.token)}`);
       source.addEventListener('hello', () => {
+        alive();
+        failures = 0;
         // Bağlantı koptuysa arada kaçan değişiklikleri al
         void load();
       });
+      source.addEventListener('ping', alive);
       source.addEventListener('content', () => {
+        alive();
         clearTimeout(debounce);
         debounce = setTimeout(load, 400);
       });
       source.addEventListener('command', (e) => {
+        alive();
         const event = JSON.parse((e as MessageEvent).data) as DisplayEvent;
         if (event.type !== 'command') return;
         if (event.command === 'reload' && !auth.preview) location.reload();
@@ -114,18 +139,29 @@ export function useDisplayData(auth: DisplayAuth, onUnauthorized: () => void) {
       });
       source.onerror = () => {
         source?.close();
-        setConnection((c) => (c === 'unauthorized' ? c : 'offline'));
-        retry = setTimeout(() => {
-          void load();
-          connect();
-        }, 10_000);
+        // Canlı bağlantının kopması tek başına "Çevrimdışı" demek değil (okul ağları uzun bağlantıları sık keser):
+        // veri yeniden çekilir; o da alınamazsa pano çevrimdışı görünür. Yeniden bağlanma giderek seyrekleşir.
+        void load();
+        failures += 1;
+        clearTimeout(retry);
+        retry = setTimeout(connect, Math.min(60_000, 2_000 * 2 ** Math.min(failures - 1, 5)));
       };
     };
     connect();
+    // Bağlantı açık görünüp sessiz kaldıysa (ağ ölü bağlantıyı kapatmadı) yeniden kurulur
+    const watchdog = setInterval(() => {
+      const now = Date.now();
+      if (source && source.readyState === EventSource.OPEN && now - streamAlive.current > STREAM_SILENT_MS && now - openedAt > STREAM_SILENT_MS) {
+        source.close();
+        void load();
+        connect();
+      }
+    }, 30_000);
     return () => {
       source?.close();
       clearTimeout(retry);
       clearTimeout(debounce);
+      clearInterval(watchdog);
     };
   }, [auth.token, auth.preview, load]);
 

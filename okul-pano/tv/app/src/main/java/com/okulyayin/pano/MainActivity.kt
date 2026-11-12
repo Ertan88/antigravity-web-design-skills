@@ -12,6 +12,7 @@ import android.graphics.Color
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
+import android.net.http.SslError
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -25,9 +26,11 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.webkit.JavascriptInterface
 import android.webkit.RenderProcessGoneDetail
+import android.webkit.SslErrorHandler
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -36,6 +39,15 @@ import android.widget.FrameLayout
 import android.widget.TextView
 import android.widget.Toast
 import org.json.JSONObject
+import java.net.ConnectException
+import java.net.HttpURLConnection
+import java.net.InetAddress
+import java.net.SocketTimeoutException
+import java.net.URL
+import java.net.UnknownHostException
+import java.text.SimpleDateFormat
+import java.util.Locale
+import javax.net.ssl.SSLException
 
 /**
  * Okul Yayın Pano: sunucudaki panoyu (/display/) tam ekran açar. Ekran hep açık kalır, Geri tuşu panodan
@@ -53,6 +65,10 @@ class MainActivity : Activity() {
     private val retry = Runnable { load() }
     private var dialogOpen = false
     private var longPressHandled = false
+    /** Ağ hatasında önce son kaydedilen pano açılır; bu açılışta da hata olursa hata ekranı gösterilir */
+    private var triedCache = false
+    private var pageFailed = false
+    private var failReason: String? = null
     private val backPresses = ArrayDeque<Long>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -123,11 +139,28 @@ class MainActivity : Activity() {
             }
 
             override fun onPageFinished(view: WebView, url: String) {
-                if (status.text.toString() == LOADING) status.visibility = View.GONE
+                if (pageFailed) return
+                // Sayfa açıldı (ağdan ya da önbellekten): panonun kendi istekleri yine ağa gider
+                view.settings.cacheMode = WebSettings.LOAD_DEFAULT
+                status.visibility = View.GONE
+                handler.removeCallbacks(retry)
             }
 
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-                if (request.isForMainFrame) showOffline()
+                if (request.isForMainFrame) mainFrameFailed(webErrorText(error.errorCode, error.description))
+            }
+
+            // Sunucu yeniden başlarken ya da uyanırken 502/503 döner: hata sayfası panonun yerine geçmesin
+            override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, response: WebResourceResponse) {
+                if (request.isForMainFrame && response.statusCode >= 500) {
+                    mainFrameFailed("Sunucu şu an yanıt vermiyor (HTTP ${response.statusCode}). Sunucu yeniden başlıyor ya da uykudan uyanıyor olabilir.")
+                }
+            }
+
+            // Güvenli bağlantı kurulamazsa bağlantıya asla izin verilmez; nedeni ekranda yazar
+            override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {
+                handler.cancel()
+                if (Uri.parse(error.url).host == Uri.parse(Prefs.server(this@MainActivity)).host) mainFrameFailed(SSL_TEXT)
             }
 
             // TV'de bellek azalınca WebView'in çizim süreci kapanabilir: uygulama çökmez, pano yeniden açılır
@@ -147,20 +180,57 @@ class MainActivity : Activity() {
     private fun displayUrl(): String = Prefs.server(this).trimEnd('/') + "/display/"
 
     private fun load() {
+        triedCache = false
+        failReason = null
+        // İnternet yoksa önceden kaydedilen sayfa açılır; pano son kaydettiği bilgiyle çalışmaya devam eder
+        open(if (online()) WebSettings.LOAD_DEFAULT else WebSettings.LOAD_CACHE_ELSE_NETWORK)
+    }
+
+    private fun open(cacheMode: Int) {
         handler.removeCallbacks(retry)
         val w = web ?: return
-        // İnternet yoksa önceden kaydedilen sayfa açılır; pano son kaydettiği bilgiyle çalışmaya devam eder
-        w.settings.cacheMode = if (online()) WebSettings.LOAD_DEFAULT else WebSettings.LOAD_CACHE_ELSE_NETWORK
+        pageFailed = false
+        w.settings.cacheMode = cacheMode
         status.text = LOADING
         status.visibility = View.VISIBLE
         w.loadUrl(displayUrl())
     }
 
-    private fun showOffline() {
-        status.text = "Sunucuya bağlanılamıyor\n\nİnternet bağlantısını kontrol edin. 15 saniye sonra yeniden denenecek.\n\n${displayUrl()}"
+    /**
+     * Pano sayfası açılamadı: önce son kaydedilen pano önbellekten açılır (pano son verisiyle çalışır, ağ gelince
+     * kendisi toparlanır). Önbellek de yoksa nedeniyle birlikte hata ekranı gösterilir ve 15 saniyede bir denenir.
+     */
+    private fun mainFrameFailed(reason: String) {
+        if (pageFailed) return
+        pageFailed = true
+        if (failReason == null) failReason = reason
+        // Kısa gecikme: başarısız açılışın "sayfa bitti" bildirimi önce gelsin, önbellekten açılışı karıştırmasın
+        handler.postDelayed({
+            if (!triedCache) {
+                triedCache = true
+                open(WebSettings.LOAD_CACHE_ONLY)
+            } else {
+                showOffline(failReason ?: reason)
+            }
+        }, 300)
+    }
+
+    private fun showOffline(reason: String) {
+        web?.settings?.cacheMode = WebSettings.LOAD_DEFAULT
+        status.text = "Sunucuya bağlanılamıyor\n\n$reason\n\n15 saniye sonra yeniden denenecek. Nedenini görmek için gizli ayarlardaki “Bağlantı testi”ni açın.\n\n${displayUrl()}"
         status.visibility = View.VISIBLE
         handler.removeCallbacks(retry)
         handler.postDelayed(retry, 15_000)
+    }
+
+    private fun webErrorText(code: Int, description: CharSequence?): String = when (code) {
+        WebViewClient.ERROR_HOST_LOOKUP -> "Sunucu adı çözülemedi (DNS). İnternet yok ya da okul ağı bu adresi engelliyor olabilir."
+        WebViewClient.ERROR_CONNECT -> "Sunucuyla bağlantı kurulamadı."
+        WebViewClient.ERROR_TIMEOUT -> "Sunucu zamanında yanıt vermedi."
+        WebViewClient.ERROR_FAILED_SSL_HANDSHAKE -> SSL_TEXT
+        WebViewClient.ERROR_PROXY_AUTHENTICATION -> "Ağdaki vekil sunucu (proxy) giriş istiyor."
+        WebViewClient.ERROR_IO -> "Bağlantı yarıda kesildi."
+        else -> "Bağlantı hatası (${description ?: "kod $code"})."
     }
 
     private fun online(): Boolean {
@@ -247,6 +317,7 @@ class MainActivity : Activity() {
         val home = isHomeEnabled()
         val items = arrayOf(
             "Panoyu yenile",
+            "Bağlantı testi",
             "Sunucu adresi: ${Prefs.server(this)}",
             "Eşleştirmeyi sıfırla",
             "Açılışta başlat: ${if (auto) "Açık" else "Kapalı"}${if (auto && needsOverlay()) " (izin gerekli)" else ""}",
@@ -259,16 +330,82 @@ class MainActivity : Activity() {
             .setItems(items) { _, which ->
                 when (which) {
                     0 -> load()
-                    1 -> editServer()
-                    2 -> confirmReset()
-                    3 -> toggleAutostart()
-                    4 -> toggleHome()
-                    5 -> showInfo()
-                    6 -> finishAndRemoveTask()
+                    1 -> connectionTest()
+                    2 -> editServer()
+                    3 -> confirmReset()
+                    4 -> toggleAutostart()
+                    5 -> toggleHome()
+                    6 -> showInfo()
+                    7 -> finishAndRemoveTask()
                 }
             }
             .setNegativeButton("Kapat", null)
             .showTracked()
+    }
+
+    /* ---------------- Bağlantı testi ---------------- */
+
+    /** Ağ, sunucu adı (DNS), sunucu, TV saati ve genel internet tek ekranda: okul ağı engeli hemen anlaşılır */
+    private fun connectionTest() {
+        val server = Prefs.server(this).trimEnd('/')
+        val host = Uri.parse(server).host ?: server
+        val box = dialog()
+            .setTitle("Bağlantı testi")
+            .setMessage("Sınanıyor…")
+            .setPositiveButton("Kapat", null)
+            .showTracked()
+        Thread {
+            val lines = mutableListOf<String>()
+            lines += if (online()) "Ağ bağlantısı: Tamam" else "Ağ bağlantısı: SORUN. TV bir ağa bağlı görünmüyor."
+            lines += step("Sunucu adı ($host)") { "Tamam (${InetAddress.getByName(host).hostAddress})" }
+            lines += step("Sunucu") {
+                val (code, date) = httpGet("$server/api/health")
+                val clock = date?.let { clockNote(it) } ?: ""
+                (if (code in 200..299) "Tamam" else "SORUN. Yanıt kodu $code") + clock
+            }
+            lines += step("Genel internet") {
+                val (code, _) = httpGet("https://www.google.com/generate_204")
+                if (code in 200..399) "Tamam" else "SORUN. Yanıt kodu $code"
+            }
+            runOnUiThread { if (!isFinishing) box.setMessage(lines.joinToString("\n\n")) }
+        }.start()
+    }
+
+    private fun step(label: String, run: () -> String): String =
+        try {
+            "$label: ${run()}"
+        } catch (e: Exception) {
+            "$label: SORUN. ${networkErrorText(e)}"
+        }
+
+    private fun httpGet(url: String): Pair<Int, String?> {
+        val c = URL(url).openConnection() as HttpURLConnection
+        c.connectTimeout = 8_000
+        c.readTimeout = 8_000
+        c.instanceFollowRedirects = false
+        try {
+            return c.responseCode to c.getHeaderField("Date")
+        } finally {
+            c.disconnect()
+        }
+    }
+
+    /** TV saati sunucudan 5 dakikadan çok farklıysa güvenli bağlantı kurulamayabilir */
+    private fun clockNote(httpDate: String): String =
+        try {
+            val server = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US).parse(httpDate)?.time ?: return ""
+            val diffMin = Math.abs(System.currentTimeMillis() - server) / 60_000
+            if (diffMin >= 5) "\nTV saati sunucudan $diffMin dakika farklı. TV ayarlarında tarih ve saati “Otomatik” yapın." else ""
+        } catch (_: Exception) {
+            ""
+        }
+
+    private fun networkErrorText(e: Exception): String = when (e) {
+        is UnknownHostException -> "Ad çözülemedi (DNS). İnternet yok ya da okul ağı bu adresi engelliyor olabilir."
+        is SSLException -> "Güvenli bağlantı kurulamadı. TV saati yanlış olabilir ya da ağ bağlantının arasına giriyor."
+        is SocketTimeoutException -> "Zaman aşımı. Ağ çok yavaş ya da bağlantı engelleniyor."
+        is ConnectException -> "Bağlantı reddedildi."
+        else -> e.message ?: e.javaClass.simpleName
     }
 
     private fun editServer() {
@@ -443,5 +580,6 @@ class MainActivity : Activity() {
         private const val LOADING = "Okul Yayın Pano açılıyor…"
         /** Panonun kullandığı tarayıcı özellikleri (color-mix vb.) için en düşük motor sürümü */
         private const val MIN_WEBVIEW = 111
+        private const val SSL_TEXT = "Güvenli bağlantı kurulamadı. TV'nin tarih ve saatini kontrol edin (Ayarlar › Tarih ve saat › Otomatik)."
     }
 }

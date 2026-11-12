@@ -700,6 +700,8 @@ p {
   background-size: cover;
   background-position: center;
   filter: blur(40px) brightness(0.55) saturate(1.2);
+  /* Bulanık arka plan bir kez çizilir ve katman olarak tutulur (üstündeki çubuk ya da yazı onu yeniden çizdirmez) */
+  will-change: transform;
 }
 
 .slide-img {
@@ -831,8 +833,9 @@ p {
   gap: 8px;
   padding: 8px 12px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(6px);
+  /* Arka plan bulanıklığı (backdrop-filter) yok: altındaki slayt her değiştiğinde yeniden hesaplanıyor, zayıf TV'de
+     kayan yazıyı takıltıyordu; biraz daha koyu düz zemin aynı okunurluğu verir */
+  background: rgba(0, 0, 0, 0.45);
 }
 
 .slide-dots span {
@@ -846,6 +849,8 @@ p {
   bottom: 0;
   height: 5px;
   background: transparent;
+  /* Çubuk kendi katmanında: dolması ortadaki alanı (bulanık görsel arka planı dahil) her karede yeniden çizdirmez */
+  contain: strict;
 }
 
 .slide-progress div {
@@ -853,6 +858,8 @@ p {
   background: var(--primary);
   transform-origin: left center;
   animation: progress linear both;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 .slideshow-empty {
