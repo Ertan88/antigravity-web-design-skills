@@ -267,7 +267,12 @@ export function useInboxActions() {
   const read = useMutation({ mutationFn: (body: { ids?: string[]; all?: true; schoolId?: string }) => api('/api/me/inbox/read', { method: 'POST', body }), onSuccess: refresh });
   const unread = useMutation({ mutationFn: (id: string) => api(`/api/me/inbox/${id}/unread`, { method: 'POST' }), onSuccess: refresh });
   const remove = useMutation({ mutationFn: (id: string) => api(`/api/me/inbox/${id}`, { method: 'DELETE' }), onSuccess: refresh });
-  return { read, unread, remove, readAll: () => read.mutate({ all: true, ...(school ? { schoolId: school.id } : {}) }) };
+  // Okunmuş bildirimleri kutudan kaldırır (okunmamışlar kalır)
+  const clearRead = useMutation({
+    mutationFn: () => api<{ deleted: number }>('/api/me/inbox/clear', { method: 'POST', body: school ? { schoolId: school.id } : {} }),
+    onSuccess: refresh,
+  });
+  return { read, unread, remove, clearRead, readAll: () => read.mutate({ all: true, ...(school ? { schoolId: school.id } : {}) }) };
 }
 export const useTeachers = (enabled = true) => useSchoolQuery<{ id: string; fullName: string; isActive: boolean }[]>('teachers', { enabled });
 

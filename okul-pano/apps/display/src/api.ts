@@ -22,9 +22,14 @@ function safeSet(key: string, value: string | null) {
   }
 }
 
-/** Panelin içindeki küçük önizleme (iframe) mi */
+/**
+ * Panelin içindeki küçük önizleme (iframe) ya da mobil uygulamanın pano ekranındaki canlı önizleme (WebView) mi.
+ * Gömülü önizlemede "ÖNİZLEME · TV için panoyu eşleştirin" rozeti görünmez; uygulama anahtarı kendisi yeniler.
+ */
 export const embedded = (() => {
   try {
+    if ((window as { ReactNativeWebView?: unknown }).ReactNativeWebView) return true;
+    if (new URLSearchParams(location.search).get('embed') === '1') return true;
     return window.self !== window.top;
   } catch {
     return true;
@@ -32,7 +37,7 @@ export const embedded = (() => {
 })();
 
 /** Önizleme bağlantısına özgü adres parametreleri (anahtar, seçili pano, zaman makinesi) */
-const PREVIEW_PARAMS = ['preview', 'screen', 'at'];
+const PREVIEW_PARAMS = ['preview', 'screen', 'at', 'embed'];
 
 /** Önizleme parametrelerini adresten siler (sayfa yenilenmez) */
 export function dropPreviewParams() {

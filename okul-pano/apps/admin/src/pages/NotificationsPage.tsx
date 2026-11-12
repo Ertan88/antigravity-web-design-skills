@@ -2,6 +2,7 @@ import clsx from 'clsx';
 import { BellOff, CheckCheck, Mail, MailOpen, Trash2 } from '../components/icons.tsx';
 import { useState } from 'react';
 import { Badge, Button, ACTION_SHAPE, Card, DELETE_TONE, EmptyState, PageHeader, Segmented, Spinner } from '../components/ui.tsx';
+import { confirm } from '../components/confirm.tsx';
 import { kindStyle, useInboxActions, useInboxList, useOpenNotification, type InboxFilter, type InboxItem } from '../lib/inbox.tsx';
 
 const dayKey = (iso: string) => new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' });
@@ -24,12 +25,22 @@ const timeOf = (iso: string) => new Intl.DateTimeFormat('tr-TR', { hour: '2-digi
 export function NotificationsPage() {
   const [filter, setFilter] = useState<InboxFilter>('all');
   const list = useInboxList(filter);
-  const { read, unread, remove, readAll } = useInboxActions();
+  const { read, unread, remove, readAll, clearRead } = useInboxActions();
   const openItem = useOpenNotification();
   const pages = list.data?.pages ?? [];
   const items = pages.flatMap((p) => p.items);
   const first = pages[0];
   const unreadCount = first?.unread ?? 0;
+  const readCount = Math.max(0, (first?.total ?? 0) - unreadCount);
+  const clear = async () => {
+    const ok = await confirm({
+      title: 'Okunan bildirimler temizlensin mi?',
+      effects: [{ text: `${readCount} okunmuş bildirim kutudan kalkar` }, { text: 'Okunmamış bildirimler kalır', ok: true }],
+      confirmLabel: 'Temizle',
+      tone: 'danger',
+    });
+    if (ok) clearRead.mutate();
+  };
 
   // Günlere göre grupla
   const groups: { key: string; items: InboxItem[] }[] = [];
@@ -46,10 +57,19 @@ export function NotificationsPage() {
         title="Bildirimler"
         description="Okuduğunuz bildirimler de burada saklanır (son 180 gün). Okundu bilgisi bütün cihazlarınızda aynıdır."
         actions={
-          unreadCount > 0 && (
-            <Button variant="secondary" icon={<CheckCheck className="size-4" />} onClick={readAll} loading={read.isPending}>
-              Tümünü okundu say
-            </Button>
+          (unreadCount > 0 || readCount > 0) && (
+            <div className="flex flex-wrap gap-2">
+              {unreadCount > 0 && (
+                <Button variant="secondary" icon={<CheckCheck className="size-4" />} onClick={readAll} loading={read.isPending}>
+                  Tümünü okundu say
+                </Button>
+              )}
+              {readCount > 0 && (
+                <Button variant="delete" icon={<Trash2 className="size-4" />} onClick={() => void clear()} loading={clearRead.isPending}>
+                  Okunanları temizle
+                </Button>
+              )}
+            </div>
           )
         }
       />

@@ -92,7 +92,7 @@ export default function PanoKumanda() {
     );
   }
   const live = s.live;
-  const previewUrl = preview.data ? `${session.server}/display/?preview=${encodeURIComponent(preview.data.token)}&screen=${s.id}` : null;
+  const previewUrl = preview.data ? `${session.server}/display/?preview=${encodeURIComponent(preview.data.token)}&screen=${s.id}&embed=1` : null;
 
   return (
     <Screen

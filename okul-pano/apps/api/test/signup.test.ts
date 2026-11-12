@@ -179,6 +179,17 @@ describe('deneme süresi', () => {
     // Ücretli pakete geçince deneme bitişi kalkar
     const paid = (await root.patch(`/api/platform/schools/${schoolId}`, { plan: 'basic' })).json();
     expect(paid.trialEndsAt).toBeNull();
+
+    // Temizle: okunmuş bildirimler kutudan kalkar (satır gizlenir), okunmamışlar kalır
+    const unreadBefore = ((await root.get('/api/me/inbox')).json() as { unread: number }).unread;
+    expect((await root.post('/api/me/inbox/read', { ids: [granted.id] })).statusCode).toBe(204);
+    const cleared = await root.post('/api/me/inbox/clear', {});
+    expect(cleared.statusCode).toBe(200);
+    expect((cleared.json() as { deleted: number }).deleted).toBeGreaterThanOrEqual(1);
+    const afterClear = (await root.get('/api/me/inbox')).json() as { items: { id: string; readAt: string | null }[]; unread: number };
+    expect(afterClear.items.some((n) => n.id === granted.id)).toBe(false);
+    expect(afterClear.items.every((n) => n.readAt === null)).toBe(true);
+    expect(afterClear.unread).toBe(unreadBefore - 1);
   });
 
   it('hatırlatmalar 7, 3, 1 gün kala ve bitince birer kez gider', async () => {

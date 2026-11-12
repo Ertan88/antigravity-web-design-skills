@@ -247,7 +247,11 @@ export async function notificationRoutes(app: FastifyInstance) {
     );
     // Seyrek temizlik: 180 günden eski bildirimler
     await db.delete(notifications).where(and(eq(notifications.userId, userId), lt(notifications.createdAt, new Date(Date.now() - 180 * 86400_000))));
-    const scope = and(eq(notifications.userId, userId), schoolId ? or(eq(notifications.schoolId, schoolId), isNull(notifications.schoolId)) : isNull(notifications.schoolId));
+    const scope = and(
+      eq(notifications.userId, userId),
+      schoolId ? or(eq(notifications.schoolId, schoolId), isNull(notifications.schoolId)) : isNull(notifications.schoolId),
+      isNull(notifications.clearedAt),
+    );
     const rows = await db
       .select()
       .from(notifications)
@@ -337,11 +341,33 @@ export async function notificationRoutes(app: FastifyInstance) {
     return reply.status(204).send();
   });
 
+  /**
+   * Bildirim kutusunu temizle: okunmuş bildirimler silinir (okunmamışlar kalır, önemli bir şey kaybolmasın).
+   * Kapsam "Tümünü okundu say" ile aynı: seçili okulun ve platformun bildirimleri.
+   */
+  app.post('/api/me/inbox/clear', { preHandler: app.authenticate }, async (req) => {
+    const { sub } = accessUser(req);
+    const body = parse(z.object({ schoolId: z.uuid().optional() }), req.body ?? {});
+    const scope = body.schoolId ? or(eq(notifications.schoolId, body.schoolId), isNull(notifications.schoolId)) : undefined;
+    // Satır silinmez, gizlenir: anahtar kayıtta kalır, aynı hatırlatma ikinci kez gönderilmez
+    const rows = await db
+      .update(notifications)
+      .set({ clearedAt: new Date() })
+      .where(and(eq(notifications.userId, sub), isNotNull(notifications.readAt), isNull(notifications.clearedAt), scope))
+      .returning({ id: notifications.id });
+    return { deleted: rows.length };
+  });
+
   app.delete('/api/me/inbox/:id', { preHandler: app.authenticate }, async (req, reply) => {
     const { sub } = accessUser(req);
     const { id } = req.params as { id: string };
     if (!UUID_RE.test(id)) throw notFound();
-    const [row] = await db.delete(notifications).where(and(eq(notifications.id, id), eq(notifications.userId, sub))).returning({ id: notifications.id });
+    // Tek tek silmede de satır gizlenir (bkz. clearedAt): aynı bildirim yeniden yazılıp telefona gitmez
+    const [row] = await db
+      .update(notifications)
+      .set({ clearedAt: new Date() })
+      .where(and(eq(notifications.id, id), eq(notifications.userId, sub), isNull(notifications.clearedAt)))
+      .returning({ id: notifications.id });
     if (!row) throw notFound();
     return reply.status(204).send();
   });

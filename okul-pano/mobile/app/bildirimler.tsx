@@ -6,7 +6,7 @@ import { timeAgo } from '../src/day.ts';
 import { Sheet } from '../src/sheet.tsx';
 import { Text } from '../src/text.tsx';
 import { colors } from '../src/theme.ts';
-import { Badge, Button, Card, Empty, Icon, ListRow, Loading, Screen, Segmented, T, type IconName } from '../src/ui.tsx';
+import { Badge, Button, Card, confirm, Empty, Icon, ListRow, Loading, Screen, Segmented, T, type IconName } from '../src/ui.tsx';
 
 /** Paneldeki adresleri uygulamadaki ekranlara çevirir */
 const ROUTES: Record<string, string> = {
@@ -70,9 +70,19 @@ export default function Bildirimler() {
 export function InboxScreen({ back }: { back?: boolean }) {
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const inbox = useInbox(filter);
-  const { read, unread, readAll } = useInboxActions();
+  const { read, unread, readAll, clearRead } = useInboxActions();
   const list = inbox.data?.items ?? [];
   const unreadCount = inbox.data?.unread ?? 0;
+  const readCount = Math.max(0, (inbox.data?.total ?? 0) - unreadCount);
+  const clear = async () => {
+    const ok = await confirm({
+      title: 'Okunan bildirimler temizlensin mi?',
+      effects: [{ text: `${readCount} okunmuş bildirim kutudan kalkar` }, { text: 'Okunmamış bildirimler kalır', ok: true }],
+      confirmLabel: 'Temizle',
+      tone: 'danger',
+    });
+    if (ok) clearRead.mutate();
+  };
 
   const [detail, setDetail] = useState<InboxItem | null>(null);
   const open = (n: InboxItem) => {
@@ -102,9 +112,20 @@ export function InboxScreen({ back }: { back?: boolean }) {
           { value: 'unread', label: unreadCount ? `Okunmamış (${unreadCount})` : 'Okunmamış' },
         ]}
       />
-      {unreadCount > 0 && <Button variant="secondary" size="sm" icon="checkmark-done-outline" onPress={readAll}>
-          Tümünü okundu say
-        </Button>}
+      {(unreadCount > 0 || readCount > 0) && (
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {unreadCount > 0 && (
+            <Button variant="secondary" size="sm" icon="checkmark-done-outline" onPress={readAll} style={{ flex: 1 }}>
+              Tümünü okundu say
+            </Button>
+          )}
+          {readCount > 0 && (
+            <Button variant="delete" size="sm" icon="trash-outline" loading={clearRead.isPending} onPress={() => void clear()} style={{ flex: 1 }}>
+              Okunanları temizle
+            </Button>
+          )}
+        </View>
+      )}
       {inbox.isLoading ? (
         <Loading />
       ) : !list.length ? (

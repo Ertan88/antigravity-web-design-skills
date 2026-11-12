@@ -886,6 +886,11 @@ export const notifications = pgTable(
     readAt: timestamp('read_at', { withTimezone: true }),
     /** Durum ortadan kalktı (duyuru onaylandı, nöbet dolduruldu…) */
     resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+    /**
+     * Kişi kutusundan temizledi ("Okunanları temizle" ya da tek tek sil): kutuda görünmez. Satır silinmez, çünkü
+     * aynı bildirimin (ör. hatırlatma) ikinci kez yazılıp telefona gitmemesi anahtarın kayıtta kalmasına bağlı.
+     */
+    clearedAt: timestamp('cleared_at', { withTimezone: true }),
   },
   (t) => [uniqueIndex('notifications_user_key_uq').on(t.userId, t.key), index('notifications_user_created_idx').on(t.userId, t.createdAt)],
 );

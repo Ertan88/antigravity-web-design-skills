@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { embedded } from '../api.ts';
 
 /** Önizleme anahtarının bitiş zamanı (JWT'deki exp); okunamazsa null */
 function expiresAt(token: string): number | null {
@@ -24,7 +25,6 @@ export function PreviewBadge({ token, onExpired }: { token: string; onExpired: (
     const t = setInterval(() => setNow(Date.now()), 15_000);
     return () => clearInterval(t);
   }, []);
-  const embedded = window.self !== window.top;
   const left = until ? Math.max(0, Math.ceil((until - now) / 60_000)) : null;
   const expired = left === 0;
   // Tam ekranda süre dolunca eşleştirme ekranına geçilir (App)

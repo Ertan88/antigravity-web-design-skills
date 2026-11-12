@@ -129,7 +129,12 @@ export function useInboxActions() {
   const unread = useMutation({ mutationFn: (id: string) => api(`/api/me/inbox/${id}/unread`, { method: 'POST' }), onSuccess: refresh });
   const remove = useMutation({ mutationFn: (id: string) => api(`/api/me/inbox/${id}`, { method: 'DELETE' }), onSuccess: refresh });
   const readAll = () => read.mutate({ all: true, ...(schoolId ? { schoolId } : {}) });
-  return { read, unread, remove, readAll };
+  // Okunmuş bildirimleri kutudan kaldırır (okunmamışlar kalır)
+  const clearRead = useMutation({
+    mutationFn: () => api<{ deleted: number }>('/api/me/inbox/clear', { method: 'POST', body: schoolId ? { schoolId } : {} }),
+    onSuccess: refresh,
+  });
+  return { read, unread, remove, readAll, clearRead };
 }
 
 /** Bildirime tıklayınca: okundu say, gerekiyorsa okula geç, ilgili sayfayı aç */
