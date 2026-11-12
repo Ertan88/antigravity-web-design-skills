@@ -254,7 +254,9 @@ class MainActivity : Activity() {
 
     private fun showOffline(reason: String) {
         web?.settings?.cacheMode = WebSettings.LOAD_DEFAULT
-        status.text = "Sunucuya bağlanılamıyor\n\n$reason\n\n15 saniye sonra yeniden denenecek. Nedenini görmek için gizli ayarlardaki “Bağlantı testi”ni açın.\n\n${displayUrl()}"
+        // TV ağa hiç bağlı değilse asıl neden budur (ör. Wi-Fi koptu); güvenli bağlantı hatası gibi yan hatalar yanıltmasın
+        val shown = if (online()) reason else "TV'nin ağ bağlantısı yok (kablo ya da Wi-Fi). Bağlantı gelince pano kendiliğinden açılır."
+        status.text = "Sunucuya bağlanılamıyor\n\n$shown\n\n15 saniye sonra yeniden denenecek. Nedenini görmek için gizli ayarlardaki “Bağlantı testi”ni açın.\n\n${displayUrl()}"
         status.visibility = View.VISIBLE
         handler.removeCallbacks(retry)
         handler.postDelayed(retry, 15_000)
@@ -439,7 +441,7 @@ class MainActivity : Activity() {
 
     private fun networkErrorText(e: Exception): String = when (e) {
         is UnknownHostException -> "Ad çözülemedi (DNS). İnternet yok ya da okul ağı bu adresi engelliyor olabilir."
-        is SSLException -> "Güvenli bağlantı kurulamadı. TV saati yanlış olabilir ya da ağ bağlantının arasına giriyor."
+        is SSLException -> "Güvenli bağlantı kurulamadı. Okul ağı (MEB) bağlantıyı kendi sertifikasıyla açıyor olabilir; o sertifika TV'ye yüklü olmalı. TV'nin tarih ve saati yanlışsa da bu hata görülür."
         is SocketTimeoutException -> "Zaman aşımı. Ağ çok yavaş ya da bağlantı engelleniyor."
         is ConnectException -> "Bağlantı reddedildi."
         else -> e.message ?: e.javaClass.simpleName
@@ -618,6 +620,6 @@ class MainActivity : Activity() {
         /** Panonun kullandığı tarayıcı özellikleri (color-mix vb.) için en düşük motor sürümü */
         private const val MIN_WEBVIEW = 111
         private const val RENDER_JS = "(function(){var r=document.getElementById('root');return !!(r&&r.childElementCount>0)})()"
-        private const val SSL_TEXT = "Güvenli bağlantı kurulamadı. TV'nin tarih ve saatini kontrol edin (Ayarlar › Tarih ve saat › Otomatik)."
+        private const val SSL_TEXT = "Güvenli bağlantı kurulamadı. Okul ağı (MEB) bağlantıyı kendi sertifikasıyla açıyor olabilir; o sertifika TV'ye yüklü olmalı. TV'nin tarih ve saati yanlışsa da bu hata görülür (Ayarlar › Tarih ve saat › Otomatik)."
     }
 }
