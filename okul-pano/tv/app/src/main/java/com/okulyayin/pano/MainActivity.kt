@@ -69,6 +69,10 @@ class MainActivity : Activity() {
     private var triedCache = false
     private var pageFailed = false
     private var failReason: String? = null
+    /** Sayfa açıldı demek pano çizildi demek değil: panonun ekrana geldiği sayfanın içinden doğrulanır */
+    private val renderCheck = Runnable { checkRendered() }
+    private var renderChecks = 0
+    private var cacheCleared = false
     private val backPresses = ArrayDeque<Long>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -140,10 +144,10 @@ class MainActivity : Activity() {
 
             override fun onPageFinished(view: WebView, url: String) {
                 if (pageFailed) return
-                // Sayfa açıldı (ağdan ya da önbellekten): panonun kendi istekleri yine ağa gider
-                view.settings.cacheMode = WebSettings.LOAD_DEFAULT
-                status.visibility = View.GONE
-                handler.removeCallbacks(retry)
+                // Yazı ve önbellek ayarı ancak pano gerçekten çizilince değişir (bkz. checkRendered)
+                renderChecks = 0
+                handler.removeCallbacks(renderCheck)
+                handler.postDelayed(renderCheck, 1_500)
             }
 
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
@@ -188,6 +192,7 @@ class MainActivity : Activity() {
 
     private fun open(cacheMode: Int) {
         handler.removeCallbacks(retry)
+        handler.removeCallbacks(renderCheck)
         val w = web ?: return
         pageFailed = false
         w.settings.cacheMode = cacheMode
@@ -213,6 +218,38 @@ class MainActivity : Activity() {
                 showOffline(failReason ?: reason)
             }
         }, 300)
+    }
+
+    /** Panonun kök öğesi doldu mu? Dolduysa yazı kalkar ve panonun istekleri yeniden ağa gider. */
+    private fun checkRendered() {
+        val w = web ?: return
+        w.evaluateJavascript(RENDER_JS) { result ->
+            if (result == "true") {
+                w.settings.cacheMode = WebSettings.LOAD_DEFAULT
+                status.visibility = View.GONE
+                handler.removeCallbacks(retry)
+                cacheCleared = false
+            } else if (++renderChecks < 12) {
+                handler.postDelayed(renderCheck, 2_500)
+            } else {
+                pageBroken()
+            }
+        }
+    }
+
+    /**
+     * Sayfa açıldı ama pano 30 saniyede çizilmedi (dosyaları eksik ya da bozuk inmiş olabilir): önce tarayıcı
+     * önbelleği temizlenip yeniden açılır; yine olmazsa nedeniyle hata ekranı gösterilir ve yeniden denenir.
+     */
+    private fun pageBroken() {
+        web?.settings?.cacheMode = WebSettings.LOAD_DEFAULT
+        if (!cacheCleared) {
+            cacheCleared = true
+            web?.clearCache(true)
+            load()
+            return
+        }
+        showOffline("Pano sayfası açıldı ama görüntülenemedi. Sayfa dosyaları eksik ya da bozuk inmiş olabilir.")
     }
 
     private fun showOffline(reason: String) {
@@ -580,6 +617,7 @@ class MainActivity : Activity() {
         private const val LOADING = "Okul Yayın Pano açılıyor…"
         /** Panonun kullandığı tarayıcı özellikleri (color-mix vb.) için en düşük motor sürümü */
         private const val MIN_WEBVIEW = 111
+        private const val RENDER_JS = "(function(){var r=document.getElementById('root');return !!(r&&r.childElementCount>0)})()"
         private const val SSL_TEXT = "Güvenli bağlantı kurulamadı. TV'nin tarih ve saatini kontrol edin (Ayarlar › Tarih ve saat › Otomatik)."
     }
 }
