@@ -506,11 +506,15 @@ export function InternshipSheet() {
         />
       )}
       {undo && (
-        <div className="no-print fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-surface shadow-2xl">
-          {undo.label}
+        // Telefonda ekran genişliğine sığar; yazı iki satıra inerse köşeleri yuvarlak dikdörtgen olur (daireye dönmez)
+        <div
+          role="status"
+          className="no-print fixed bottom-4 left-1/2 z-50 flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-2xl bg-ink py-2.5 pr-2.5 pl-4 text-sm font-semibold text-surface shadow-2xl sm:bottom-6 sm:rounded-full sm:pl-5 dark:ring-1 dark:ring-white/15"
+        >
+          <span className="min-w-0 flex-1 leading-snug">{undo.label}</span>
           <button
             type="button"
-            className="flex items-center gap-1 rounded-full bg-white/15 px-3 py-1 font-bold hover:bg-white/25"
+            className="flex shrink-0 items-center gap-1 rounded-full bg-white/15 px-3 py-1.5 font-bold whitespace-nowrap hover:bg-white/25 dark:bg-black/10 dark:hover:bg-black/20"
             onClick={() => {
               save.mutate({ body: undo.body, undo: null });
               setUndo(null);
