@@ -2,7 +2,7 @@ import { errorText } from '@okulpano/shared';
 import type { ScreenCommand } from '@okulpano/shared/control';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
 import { api, session } from '../../src/api.ts';
@@ -11,7 +11,7 @@ import { BoardPreview } from '../../src/BoardPreview';
 import { useScreens } from '../../src/data.ts';
 import { timeAgo } from '../../src/day.ts';
 import { colors } from '../../src/theme.ts';
-import { Button, Card, Choice, Empty, Icon, Loading, Screen, SectionTitle, T, type IconName } from '../../src/ui.tsx';
+import { Button, Card, Choice, confirm, Empty, Icon, Loading, Screen, SectionTitle, T, type IconName } from '../../src/ui.tsx';
 
 /** Pano uzaktan kumanda (tasarım 8): canlı önizleme, sonraki / önceki / duraklat, ekran modu, uyut / uyandır */
 export default function PanoKumanda() {
@@ -31,6 +31,32 @@ export default function PanoKumanda() {
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const remote = can('board.control') || can('screens.manage');
+
+  // Silme web panelindeki gibi yalnızca panoları yönetme yetkisiyle; TV eşleştirme koduna döner, içerik silinmez
+  const remove = async (name: string) => {
+    const ok = await confirm({
+      title: 'Pano silinsin mi?',
+      subtitle: name,
+      effects: [
+        { text: 'Bu TV panodan çıkarılır ve eşleştirme kodu gösterir' },
+        { text: 'Duyurular, kayan yazı ve diğer içerikler silinmez', ok: true },
+      ],
+      confirmLabel: 'Panoyu sil',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setBusy('delete');
+    setMessage(null);
+    try {
+      await api(base, { method: 'DELETE' });
+      await qc.invalidateQueries({ queryKey: [school?.id, 'screens'] });
+      if (router.canGoBack()) router.back();
+      else router.replace('/panolar');
+    } catch (err) {
+      setMessage(errorText(err, 'Pano silinemedi'));
+      setBusy(null);
+    }
+  };
 
   const command = async (c: ScreenCommand, done?: string) => {
     setBusy(c);
@@ -144,6 +170,12 @@ export default function PanoKumanda() {
             Uyut: pano ertesi sabaha kadar ekran koruyucuda kalır. Uyandır: uyku saatinde de 2 saat açık tutar.
           </T>
         </>
+      )}
+
+      {can('screens.manage') && (
+        <Button variant="delete" icon="trash-outline" loading={busy === 'delete'} onPress={() => void remove(s.name)} style={{ marginTop: 8 }}>
+          Panoyu sil
+        </Button>
       )}
     </Screen>
   );
