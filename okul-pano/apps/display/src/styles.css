@@ -842,8 +842,31 @@ p {
   background: rgba(255, 255, 255, 0.35);
 }
 
-/* Duyuruların altındaki ilerleme çubuğu kaldırıldı: zayıf TV'lerde her karede yeniden çizim istiyor ve kayan yazıyı
-   takıltıyordu. Hangi duyuruda olunduğu sağ üstteki noktalardan anlaşılır. */
+/* Duyuruların altındaki ilerleme çubuğu. Hafif modda (pano ayarı "Animasyonlar") gösterilmez: zayıf TV'lerde her
+   karede yeniden çizim istiyor ve kayan yazıyı takıltıyordu. */
+.slide-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 5px;
+  background: transparent;
+  /* Çubuk kendi katmanında: dolması ortadaki alanı (bulanık görsel arka planı dahil) her karede yeniden çizdirmez */
+  contain: strict;
+}
+
+.slide-progress div {
+  height: 100%;
+  background: var(--primary);
+  transform-origin: left center;
+  animation: progress linear both;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+.tv-lite .slide-progress {
+  display: none;
+}
 
 .slideshow-empty {
   align-items: center;
@@ -3628,4 +3651,24 @@ body.cursor-hidden * {
 /* Video kapağı solmadan kalkar: videonun üstünde yarı saydam katman çizilmez */
 .tv-lite .video-poster {
   transition: none;
+}
+
+/* İkili eğitimde Zil Vakti kartında o anki grup (sabahçı / öğlenci) */
+.shift-pill {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.72em;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  vertical-align: 0.1em;
+}
+.shift-morning {
+  background: #fde68a;
+  color: #78350f;
+}
+.shift-afternoon {
+  background: #c7d2fe;
+  color: #312e81;
 }

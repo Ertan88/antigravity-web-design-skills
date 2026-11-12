@@ -2,14 +2,16 @@ import '@fontsource-variable/inter';
 import '@fontsource-variable/plus-jakarta-sans';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { isLiteMode } from '@okulpano/shared/client';
 import { App } from './App.tsx';
 import '@okulpano/slides/slides.css';
 import './styles.css';
 
-// TV hafif modu: Okul Yayın Pano TV uygulamasında (ya da adreste ?hafif=1) sürekli dönen süs animasyonları ve
-// duyuru geçiş efekti kapanır. Zayıf TV işlemcilerinde bunlar her karede yeniden çizim istiyor, kayan yazıyı ve
-// videoyu takıltıyordu (ölçüm: işlemci 6 kat yavaşken 30 saniyede ~110 takılan kare → ~8).
-if (/OkulYayinPano/.test(navigator.userAgent) || new URLSearchParams(location.search).get('hafif') === '1') {
+// TV hafif modu: sürekli dönen süs animasyonları, duyuru geçiş efekti ve ilerleme çubuğu kapanır. Zayıf TV
+// işlemcilerinde bunlar her karede yeniden çizim istiyor, kayan yazıyı ve videoyu takıltıyordu (ölçüm: işlemci 6 kat
+// yavaşken 30 saniyede ~110 takılan kare → ~8). Açılışta TV'nin WebView sürümüne göre karar verilir; pano verisi
+// gelince panonun "Animasyonlar" ayarı (Otomatik / Açık / Hafif) uygulanır (Board.tsx StatusReporter).
+if (isLiteMode('auto', navigator.userAgent) || new URLSearchParams(location.search).get('hafif') === '1') {
   document.documentElement.classList.add('tv-lite');
 }
 

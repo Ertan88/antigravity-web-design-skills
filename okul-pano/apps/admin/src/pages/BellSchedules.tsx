@@ -31,7 +31,7 @@ import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useList, useResource, useSchool, useSchoolPath, type BellSchedule, type ClassGroup, type TimetableEntry } from '../lib/data.ts';
 import { useForm } from '../lib/form.ts';
-import { BellClassSettings } from './bell/BellPlan.tsx';
+import { BellClassSettings, EducationModeCard, type ShiftSummary } from './bell/BellPlan.tsx';
 import { BellTag, DayFlow, NowCards, TimeBox, WeekStrip, type FlowBell, type OverrideRow } from './bell/DayFlow.tsx';
 import { useUpcomingHolidays, useWeekHolidays } from './bell/HolidaysCard.tsx';
 import { shortDate, useNow } from './bell/ScheduleView.tsx';
@@ -474,6 +474,22 @@ export function BellSchedules() {
   const maxAuto = Math.max(0, ...autoSchool.map(scheduleLessonCount));
   const missing = schoolCounts ? missingLessonCounts(schedules, schoolCounts, shift).filter((n) => n > maxAuto) : [];
 
+  /** Eğitim düzeni kartı: grubun bugünkü (yoksa en uzun) okul geneli zilinden saatler */
+  const shiftSummary = (sh: Shift): ShiftSummary => {
+    const todayBell = schoolDay(todayIso, cal, sh).holiday ? undefined : dayBells(todayIso, cal).find((b) => b.shift === sh && !b.classIds && b.periods.length);
+    const fallback = schedules
+      .filter((x) => shiftOfSchedule(x) === sh && !x.classIds?.length && x.periods.length)
+      .sort((a, b) => scheduleLessonCount(b) - scheduleLessonCount(a))[0];
+    const periods = todayBell?.periods ?? fallback?.periods ?? [];
+    const sorted = sortPeriods(periods);
+    const name = todayBell ? (schedules.find((x) => x.id === todayBell.scheduleId)?.name ?? null) : (fallback?.name ?? null);
+    return {
+      range: sorted.length ? `${sorted[0]!.start} – ${sorted.at(-1)!.end}` : null,
+      scheduleName: name ? (todayBell ? `Bugün: ${name}` : name) : null,
+      classCount: classList.filter((c) => !c.bellExempt && classShiftOf(c) === sh).length,
+    };
+  };
+
   const halfToday = upcoming.data?.halfDays.find((h) => h.date === todayIso);
   const todayNote = todayHoliday
     ? `Bugün ${todayHoliday}: panoda zil çalmaz, sıradaki ders olarak tatilden sonraki ilk ders günü görünür.`
@@ -597,18 +613,7 @@ export function BellSchedules() {
           <Alert tone="amber">{todayNote}</Alert>
         </div>
       )}
-      {dual && (
-        <div className="mb-4">
-          <Segmented
-            value={shiftTab}
-            onChange={setShiftTab}
-            options={[
-              { value: 'morning', label: 'Sabahçı' },
-              { value: 'afternoon', label: 'Öğlenci' },
-            ]}
-          />
-        </div>
-      )}
+      {!loading && <EducationModeCard classes={classList} dual={dual} editable={editable} shift={shift} onShift={setShiftTab} summary={{ morning: shiftSummary('morning'), afternoon: shiftSummary('afternoon') }} />}
       {loading ? (
         <Spinner />
       ) : !inShift.length ? (
@@ -625,7 +630,7 @@ export function BellSchedules() {
           <Card>
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
               <div>
-                <h2 className="text-lg font-semibold text-ink">Bu hafta zil</h2>
+                <h2 className="text-lg font-semibold text-ink">Bu hafta zil{shiftName}</h2>
                 <p className="text-sm text-slate-500">Her günün altında o gün çalan ziller. Bir güne tıklayınca akışı aşağıda açılır; oradan o güne elle müdahale edebilirsiniz.</p>
               </div>
               <div className="flex items-center gap-1">
@@ -757,7 +762,7 @@ export function BellSchedules() {
         </div>
       )}
 
-      {!loading && <BellClassSettings classes={classList} dual={dual} editable={editable} />}
+      {!loading && <BellClassSettings classes={classList} editable={editable} />}
 
       <Modal
         open={picking !== null}

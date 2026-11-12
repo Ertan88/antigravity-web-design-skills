@@ -144,7 +144,7 @@ export interface Screen {
   /** Ekran biçimi: yatay / dikey, yalnızca duyurular, video duvarı */
   display: ScreenDisplay;
   /** Panonun bildirdiği anlık durum (gösterilen içerik, duraklatma, uyku) */
-  live?: { slideIndex: number; slideCount: number; slideTitle: string | null; paused: boolean; sleeping: boolean; mode: string } | null;
+  live?: { slideIndex: number; slideCount: number; slideTitle: string | null; paused: boolean; sleeping: boolean; mode: string; webview?: number | null; lite?: boolean } | null;
   createdAt: string;
 }
 export interface School {

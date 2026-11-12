@@ -483,6 +483,12 @@ export function Slideshow({ announcements, now, defaultDurationSec, maxDurationS
           ))}
         </div>
       )}
+      {/* Slaytın kalan süresi (hafif modda gizli: zayıf TV'lerde kayan yazıyı takıltabiliyor) */}
+      {slide.kind !== 'video' && !paused && !single && (
+        <div className="slide-progress" aria-hidden="true">
+          <div key={key} style={{ animationDuration: `${duration}s` }} />
+        </div>
+      )}
     </section>
   );
 }

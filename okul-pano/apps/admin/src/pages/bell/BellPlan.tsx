@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import { Lock, Settings2 } from '../../components/icons.tsx';
 import { useState } from 'react';
 import { useToast } from '../../components/Toast.tsx';
-import { Badge, Button, Card, Modal, Toggle } from '../../components/ui.tsx';
+import { Badge, Button, Card, Modal, Segmented, Toggle } from '../../components/ui.tsx';
 import { api } from '../../lib/api.ts';
 import { useAuth } from '../../lib/auth.tsx';
 import { useSchoolPath, type BellSchedule, type ClassGroup, type School, type TimetableEntry } from '../../lib/data.ts';
@@ -223,51 +223,141 @@ export function ProfileCard({ schedule, usedOn, active, onSelect }: { schedule: 
   );
 }
 
-/** İkili öğretim ve zil hesabına katılmayan sınıflar */
-export function BellClassSettings({ classes, dual, editable }: { classes: ClassGroup[]; dual: boolean; editable: boolean }) {
+/** Bir grubun (sabahçı / öğlenci) özeti: saatler zilden okunur */
+export interface ShiftSummary {
+  range: string | null;
+  scheduleName: string | null;
+  classCount: number;
+}
+
+/**
+ * Eğitim düzeni (Zil Saatleri'nin üstünde): Tam gün / Yarım gün (ikili eğitim). Yarım günde iki grup kartı aynı
+ * zamanda sekmedir: seçilen grubun zil ayrıntısı sayfanın geri kalanında görünür. Saatler zil düzenlerinden okunur;
+ * ayrıca elle girilmez (tek kaynak).
+ */
+export function EducationModeCard({
+  classes,
+  dual,
+  editable,
+  shift,
+  onShift,
+  summary,
+}: {
+  classes: ClassGroup[];
+  dual: boolean;
+  editable: boolean;
+  shift: Shift;
+  onShift: (s: Shift) => void;
+  summary: Record<Shift, ShiftSummary>;
+}) {
   const { schoolId } = useAuth();
   const schoolPath = useSchoolPath();
   const qc = useQueryClient();
   const toast = useToast();
-  const [dialog, setDialog] = useState<'exempt' | 'shift' | null>(null);
+  const [picking, setPicking] = useState(false);
   const sorted = [...classes].sort((a, b) => compareClassNames(a.name, b.name));
-  const exempt = sorted.filter((c) => c.bellExempt);
   const afternoon = sorted.filter((c) => c.shift === 'afternoon');
   const saveDual = useMutation({
     mutationFn: (dualShift: boolean) => api<School>(schoolPath, { method: 'PATCH', body: { settings: { dualShift } } }),
-    onSuccess: (data) => qc.setQueryData([schoolId, 'school'], data),
+    onSuccess: (data) => {
+      qc.setQueryData([schoolId, 'school'], data);
+      if (!data.settings.dualShift) onShift('morning');
+    },
     onError: (e) => toast.error(e.message),
   });
+  const card = (s: Shift) => {
+    const m = s === 'morning';
+    const sum = summary[s];
+    const on = shift === s;
+    const names = m ? null : afternoon.slice(0, 4).map((c) => c.name).join(', ') + (afternoon.length > 4 ? '…' : '');
+    return (
+      <button
+        key={s}
+        type="button"
+        aria-pressed={on}
+        onClick={() => onShift(s)}
+        className={clsx(
+          'relative rounded-2xl p-4 text-left ring-2 transition',
+          m ? 'bg-amber-50' : 'bg-violet-50',
+          on ? (m ? 'ring-amber-500' : 'ring-violet-500') : 'ring-transparent hover:ring-slate-300',
+        )}
+      >
+        <span className={clsx('absolute top-3.5 right-3.5 rounded-full px-2.5 py-0.5 text-xs font-bold', on ? 'bg-ink text-surface' : 'bg-slate-100 text-slate-600')}>
+          {on ? 'Gösteriliyor' : 'Ayarla'}
+        </span>
+        <span className={clsx('block text-xs font-extrabold tracking-wide', m ? 'text-amber-700' : 'text-violet-700')}>
+          {m ? 'SABAHÇI GRUP' : 'ÖĞLENCİ GRUP'} · {sum.classCount} SINIF
+        </span>
+        <span className="mt-1 block text-2xl font-extrabold text-ink tabular-nums">{sum.range ?? 'Zil düzeni yok'}</span>
+        <span className="mt-1 block truncate pr-2 text-xs text-slate-500">
+          {[sum.scheduleName, names].filter(Boolean).join(' · ') || (m ? 'Öğlenci seçilmeyen bütün sınıflar' : 'Henüz öğlenci sınıf seçilmedi')}
+        </span>
+      </button>
+    );
+  };
 
   return (
-    <div className="mt-5 grid gap-5 lg:grid-cols-2">
-      <Card>
-        <div className="space-y-4 p-5 sm:p-6">
-          <Toggle
-            checked={dual}
-            onChange={(v) => editable && saveDual.mutate(v)}
-            disabled={!editable}
-            label="İkili öğretim"
-            description="Sabahçı ve öğlenci sınıfların zilleri ve ders sayıları ayrı hesaplanır; pano sabah sabahçı, sabahçı dersleri bitince öğlenci zilini gösterir."
+    <Card className="mb-5">
+      <div className="space-y-4 p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-ink">Eğitim düzeni</h2>
+            <p className="text-sm text-slate-500">Okul sabahçı ve öğlenci şeklinde ikili eğitim yapıyorsa Yarım gün'ü seçin.</p>
+          </div>
+          <Segmented
+            value={dual ? 'half' : 'full'}
+            onChange={(v) => editable && v !== (dual ? 'half' : 'full') && saveDual.mutate(v === 'half')}
+            options={[
+              { value: 'full', label: 'Tam gün' },
+              { value: 'half', label: 'Yarım gün (ikili eğitim)' },
+            ]}
           />
-          {dual && (
-            <div className="flex flex-wrap items-center gap-1.5 text-sm">
-              <span className="mr-1 font-semibold text-ink">Öğlenci sınıflar ({afternoon.length}):</span>
-              {afternoon.map((c) => (
-                <span key={c.id} className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-700">
-                  {c.name}
-                </span>
-              ))}
-              {!afternoon.length && <span className="text-xs text-slate-500">Henüz yok; bütün sınıflar sabahçı.</span>}
+        </div>
+        {dual && (
+          <>
+            <div className="grid gap-3 sm:grid-cols-2">{(['morning', 'afternoon'] as const).map(card)}</div>
+            <div className="flex flex-wrap items-center gap-3">
               {editable && (
-                <Button size="sm" variant="secondary" icon={<Settings2 className="size-3.5" />} onClick={() => setDialog('shift')}>
-                  Seç
+                <Button size="sm" variant="secondary" icon={<Settings2 className="size-3.5" />} onClick={() => setPicking(true)}>
+                  Öğlenci sınıfları seç
                 </Button>
               )}
+              <span className="text-xs text-slate-500">Pano sabah sabahçı zilini, sabahçı dersleri bitince öğlenci zilini gösterir.</span>
             </div>
-          )}
-        </div>
-      </Card>
+          </>
+        )}
+      </div>
+      <ClassPicker
+        open={picking}
+        title="Öğlenci sınıflar"
+        classes={sorted}
+        initial={new Set(afternoon.map((c) => c.id))}
+        onClose={() => setPicking(false)}
+        onSave={async (picked) => {
+          const path = `${schoolPath}/classes`;
+          await api(`${path}/shift`, { method: 'POST', body: { classIds: sorted.filter((c) => picked.has(c.id)).map((c) => c.id), shift: 'afternoon' } });
+          await api(`${path}/shift`, { method: 'POST', body: { classIds: sorted.filter((c) => !picked.has(c.id) && c.shift === 'afternoon').map((c) => c.id), shift: 'morning' } });
+          await qc.invalidateQueries({ queryKey: [schoolId, 'classes'] });
+          toast.success('Kaydedildi');
+          setPicking(false);
+        }}
+      />
+    </Card>
+  );
+}
+
+/** Zil hesabına katılmayan sınıflar (ikili eğitim ayarı üstteki Eğitim düzeni kartında) */
+export function BellClassSettings({ classes, editable }: { classes: ClassGroup[]; editable: boolean }) {
+  const { schoolId } = useAuth();
+  const schoolPath = useSchoolPath();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const sorted = [...classes].sort((a, b) => compareClassNames(a.name, b.name));
+  const exempt = sorted.filter((c) => c.bellExempt);
+
+  return (
+    <div className="mt-5">
       <Card>
         <div className="space-y-3 p-5 sm:p-6">
           <div>
@@ -282,7 +372,7 @@ export function BellClassSettings({ classes, dual, editable }: { classes: ClassG
             ))}
             {!exempt.length && <span className="text-xs text-slate-500">Yok.</span>}
             {editable && (
-              <Button size="sm" variant="secondary" icon={<Settings2 className="size-3.5" />} onClick={() => setDialog('exempt')}>
+              <Button size="sm" variant="secondary" icon={<Settings2 className="size-3.5" />} onClick={() => setOpen(true)}>
                 Düzenle
               </Button>
             )}
@@ -290,23 +380,18 @@ export function BellClassSettings({ classes, dual, editable }: { classes: ClassG
         </div>
       </Card>
       <ClassPicker
-        open={dialog !== null}
-        title={dialog === 'shift' ? 'Öğlenci sınıflar' : 'Zil hesabına katılmayan sınıflar'}
+        open={open}
+        title="Zil hesabına katılmayan sınıflar"
         classes={sorted}
-        initial={new Set((dialog === 'shift' ? afternoon : exempt).map((c) => c.id))}
-        onClose={() => setDialog(null)}
+        initial={new Set(exempt.map((c) => c.id))}
+        onClose={() => setOpen(false)}
         onSave={async (picked) => {
           const path = `${schoolPath}/classes`;
-          if (dialog === 'shift') {
-            await api(`${path}/shift`, { method: 'POST', body: { classIds: sorted.filter((c) => picked.has(c.id)).map((c) => c.id), shift: 'afternoon' } });
-            await api(`${path}/shift`, { method: 'POST', body: { classIds: sorted.filter((c) => !picked.has(c.id) && c.shift === 'afternoon').map((c) => c.id), shift: 'morning' } });
-          } else {
-            await api(`${path}/bell-exempt`, { method: 'POST', body: { classIds: sorted.filter((c) => picked.has(c.id) && !c.bellExempt).map((c) => c.id), exempt: true } });
-            await api(`${path}/bell-exempt`, { method: 'POST', body: { classIds: sorted.filter((c) => !picked.has(c.id) && c.bellExempt).map((c) => c.id), exempt: false } });
-          }
+          await api(`${path}/bell-exempt`, { method: 'POST', body: { classIds: sorted.filter((c) => picked.has(c.id) && !c.bellExempt).map((c) => c.id), exempt: true } });
+          await api(`${path}/bell-exempt`, { method: 'POST', body: { classIds: sorted.filter((c) => !picked.has(c.id) && c.bellExempt).map((c) => c.id), exempt: false } });
           await qc.invalidateQueries({ queryKey: [schoolId, 'classes'] });
           toast.success('Kaydedildi');
-          setDialog(null);
+          setOpen(false);
         }}
       />
     </div>

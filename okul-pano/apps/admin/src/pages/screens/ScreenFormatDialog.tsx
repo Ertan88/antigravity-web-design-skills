@@ -1,4 +1,4 @@
-import { compareClassNames, resolveScreenDisplay, type ScreenDisplay, errorText } from '@okulpano/shared';
+import { compareClassNames, MIN_SMOOTH_WEBVIEW, resolveScreenDisplay, type ScreenDisplay, errorText } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { Clock, Images, LayoutDashboard, RectangleHorizontal, RectangleVertical, type LucideIcon } from '../../components/icons.tsx';
@@ -15,6 +15,19 @@ const MODES: { value: ScreenDisplay['mode']; label: string; description: string;
   { value: 'slides', label: 'Yalnızca duyurular', description: 'Tam ekran slayt, köşede saat', icon: Images },
   { value: 'clock', label: 'Tam ekran saat', description: 'Büyük saat, tarih ve zil durumu', icon: Clock },
 ];
+
+const ANIMATIONS: { value: ScreenDisplay['animations']; label: string; description: string }[] = [
+  { value: 'auto', label: 'Otomatik', description: "TV'nin tarayıcı bileşeni güncelse açık, eskiyse hafif" },
+  { value: 'on', label: 'Açık', description: 'Her zaman bütün animasyonlar' },
+  { value: 'lite', label: 'Hafif', description: 'Kayan yazı ve video takılmasın diye kapalı' },
+];
+
+/** Panonun şu anki durumu: WebView sürümü ve hafif modda olup olmadığı (TV açıksa) */
+function animationNow(live: Screen['live']): string | null {
+  if (!live || live.lite === undefined) return null;
+  const v = live.webview ? `WebView ${live.webview}${live.webview < MIN_SMOOTH_WEBVIEW ? ' (eski)' : ''}` : 'WebView sürümü bilinmiyor';
+  return `Bu pano şu an: ${v} · animasyonlar ${live.lite ? 'kapalı (hafif mod)' : 'açık'}`;
+}
 
 /** Ekran biçimi özeti (pano kartında) */
 export function formatLabel(d: ScreenDisplay): string {
@@ -127,6 +140,28 @@ export function ScreenFormatDialog({ screen, onClose }: { screen: Screen | null;
                         <span className="block text-sm font-semibold text-ink">{m.label}</span>
                         <span className="block text-xs text-slate-500">{m.description}</span>
                       </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </Field>
+            <Field label="Animasyonlar" help={animationNow(screen.live) ?? 'Slayt ve kart geçişleri, "Şu an derste" çubuğundaki parıltı ve duyuruların altındaki ilerleme çubuğu.'}>
+              {() => (
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {ANIMATIONS.map((a) => (
+                    <button
+                      key={a.value}
+                      type="button"
+                      disabled={!editable}
+                      aria-pressed={d.animations === a.value}
+                      onClick={() => set({ animations: a.value })}
+                      className={clsx('rounded-xl p-3 text-left ring-1 transition', d.animations === a.value ? 'bg-brand-50 ring-2 ring-brand-500' : 'ring-slate-200 hover:ring-slate-300')}
+                    >
+                      <span className="block text-sm font-semibold text-ink">
+                        {a.label}
+                        {a.value === 'auto' && <span className="ml-1.5 rounded-full bg-emerald-100 px-1.5 py-px text-[10.5px] font-bold text-emerald-700 dark:bg-[#14301f] dark:text-[#4ade80]">önerilen</span>}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-slate-500">{a.description}</span>
                     </button>
                   ))}
                 </div>

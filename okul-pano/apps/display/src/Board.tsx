@@ -21,6 +21,9 @@ import {
   todayInHistory,
   resolveLayout,
   resolveScreenDisplay,
+  isLiteMode,
+  webViewVersion,
+  type ScreenDisplay,
   specialThemeFor,
   type BoardModule,
   type DisplayAnnouncement,
@@ -223,7 +226,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         : nextDay && nextFirst
           ? `${nextDay.date === tomorrow.date ? 'Yarın ilk ders' : `Sonraki ders günü: ${nextLabel}`} · ${nextFirst.start}`
           : null;
-  const bellDay = { holiday: day.holiday, halfDay: day.halfDay, endsAt: day.endsAt, upcoming, extras: bellExtras, owner: bellOwner };
+  const bellDay = { holiday: day.holiday, halfDay: day.halfDay, endsAt: day.endsAt, upcoming, extras: bellExtras, owner: bellOwner, shift: dual && !day.holiday ? mainBell.shift : null };
 
   // Yayın akışı: duyurunun günü, saat aralığı ve zilin durumu (ör. yalnızca teneffüste)
   const phase = bell.kind === 'lesson' ? 'lesson' : bell.kind === 'break' ? 'break' : 'other';
@@ -491,6 +494,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         sleeping,
         mode: state.emergency ? 'emergency' : display.mode,
       }}
+      animations={display.animations}
     />
   );
 
@@ -638,8 +642,14 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
 }
 
 /** Panonun anlık durumunu bildiren görünmez bileşen (her görünümde aynı kanca çalışsın diye) */
-function StatusReporter({ auth, status }: { auth: DisplayAuth; status: Omit<ScreenLiveStatus, 'at'> }) {
-  useStatusReport(auth, status);
+function StatusReporter({ auth, status, animations }: { auth: DisplayAuth; status: Omit<ScreenLiveStatus, 'at' | 'webview' | 'lite'>; animations: ScreenDisplay['animations'] }) {
+  // Hafif mod pano ayarına ve TV'nin WebView sürümüne göre (adreste ?hafif=1 her zaman hafif)
+  const forced = new URLSearchParams(location.search).get('hafif') === '1';
+  const lite = forced || isLiteMode(animations, navigator.userAgent);
+  useEffect(() => {
+    document.documentElement.classList.toggle('tv-lite', lite);
+  }, [lite]);
+  useStatusReport(auth, { ...status, webview: webViewVersion(navigator.userAgent), lite });
   return null;
 }
 

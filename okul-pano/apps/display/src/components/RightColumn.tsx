@@ -17,6 +17,8 @@ export interface BellDayContext {
   extras?: { label: string; text: string }[];
   /** Kart okul zili yerine bir sınıf grubunun zilini gösteriyorsa grubun adı (ör. okul zili bitti, 12'ler derste) */
   owner?: string | null;
+  /** İkili eğitimde kartın gösterdiği grup (tam günde yok) */
+  shift?: 'morning' | 'afternoon' | null;
 }
 
 export function describeBell(status: BellStatus, ctx: BellDayContext = {}) {
@@ -91,7 +93,10 @@ export function BellCard({ status, day }: { status: BellStatus; day?: BellDayCon
       <BellWatermarkIcon className="card-watermark watermark-bell" size={210} strokeWidth={1.4} />
       <div className="card-label">
         <Glyph size={22} /> {useLabel('bell')}
-        <span className="card-label-aside">{day?.owner ? `${day.owner} · ${d.title}` : d.title}</span>
+        <span className="card-label-aside">
+          {day?.shift && <span className={`shift-pill shift-${day.shift}`}>{day.shift === 'afternoon' ? 'ÖĞLENCİ' : 'SABAHÇI'}</span>}
+          {day?.owner ? `${day.owner} · ${d.title}` : d.title}
+        </span>
       </div>
       {d.remaining != null ? (
         <div className="bell-main">

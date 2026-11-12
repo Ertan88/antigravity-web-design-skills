@@ -700,6 +700,8 @@ export const screenDisplaySchema = z.object({
   mode: z.enum(['board', 'slides', 'clock']).default('board'),
   /** Bu panoda gösterilen sınıflar (dersler ve zil); boş: bütün okul */
   classIds: z.array(id).max(300).default([]),
+  /** Animasyonlar: otomatik (TV'ye göre), açık ya da hafif */
+  animations: z.enum(['auto', 'on', 'lite']).default('auto'),
 });
 
 export const screenSchema = z.object({
@@ -744,6 +746,9 @@ export const screenLiveStatusSchema = z.object({
   slideTitle: z.string().max(200).nullable(),
   /** Gösterilen slaytın kimliği: önizleme (mobil uzaktan kumanda) TV'de gösterilen slayda geçer */
   slideId: z.string().max(80).nullable().optional(),
+  /** TV'nin tarayıcı bileşeninin (WebView / Chrome) ana sürümü ve hafif modda olup olmadığı */
+  webview: z.number().int().min(0).max(1000).nullable().optional(),
+  lite: z.boolean().optional(),
   paused: z.boolean(),
   sleeping: z.boolean(),
   mode: z.enum(['board', 'slides', 'clock', 'emergency']),

@@ -15,6 +15,9 @@ export interface ScreenLiveStatus {
   slideTitle: string | null;
   /** Gösterilen slaytın kimliği (önizleme TV'yi izlerken kullanır; eski panolar göndermez) */
   slideId?: string | null;
+  /** TV'nin tarayıcı bileşeninin (WebView / Chrome) ana sürümü ve hafif modda olup olmadığı */
+  webview?: number | null;
+  lite?: boolean;
   paused: boolean;
   sleeping: boolean;
   mode: 'board' | 'slides' | 'clock' | 'emergency';
