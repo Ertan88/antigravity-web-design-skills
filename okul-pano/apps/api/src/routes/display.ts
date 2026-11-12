@@ -424,7 +424,10 @@ export async function displayRoutes(app: FastifyInstance) {
     }
 
     const unsubscribe = bus.subscribe(auth.schoolId, (e) => {
-      if (e.type === 'command' && e.screenId && e.screenId !== screenId) return;
+      // Önizleme, izlediği panonun ileri / geri / durdur komutlarını TV'yle aynı anda alır (beklemeden tepki verir;
+      // TV'nin bildirdiği durum ardından gelir ve gerekirse düzeltir). Yenileme, uyku gibi komutlar önizlemeye gitmez.
+      const forPreview = e.type === 'command' && followId !== null && e.screenId === followId && ['next', 'prev', 'pause', 'resume'].includes(e.command);
+      if (e.type === 'command' && e.screenId && e.screenId !== screenId && !forPreview) return;
       if (e.type === 'live') {
         if (e.screenId === followId) send('live', e);
         return;

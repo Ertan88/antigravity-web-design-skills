@@ -3,7 +3,7 @@ import type { ScreenCommand } from '@okulpano/shared/control';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
 import { api, session } from '../../src/api.ts';
 import { useAuth, useSchoolPath } from '../../src/auth.tsx';
@@ -58,14 +58,20 @@ export default function PanoKumanda() {
     }
   };
 
+  // Durdur / sürdür düğmesi basıldığı anda değişir; panonun bildirdiği durum gelince o geçerli olur
+  const [pausedNow, setPausedNow] = useState<boolean | null>(null);
+  const livePaused = screens.data?.find((x) => x.id === id)?.live?.paused;
+  useEffect(() => setPausedNow(null), [livePaused]);
   const command = async (c: ScreenCommand, done?: string) => {
+    if (c === 'pause' || c === 'resume') setPausedNow(c === 'pause');
     setBusy(c);
     setMessage(null);
     if (Platform.OS !== 'web') void Haptics.selectionAsync();
     try {
       const r = await api<{ delivered: boolean }>(`${base}/command`, { method: 'POST', body: { command: c } });
       setMessage(r.delivered ? (done ?? null) : 'Pano şu an çevrimdışı; komut iletilemedi.');
-      setTimeout(() => void qc.invalidateQueries({ queryKey: [school?.id, 'screens'] }), 2500);
+      // Pano gösterdiği slaytı yaklaşık yarım saniyede bildirir: "Şu an gösterilen" önce kısa, sonra bir kez daha tazelenir
+      for (const ms of [800, 2500]) setTimeout(() => void qc.invalidateQueries({ queryKey: [school?.id, 'screens'] }), ms);
     } catch (err) {
       setMessage(errorText(err, 'Komut gönderilemedi'));
     } finally {
@@ -92,6 +98,7 @@ export default function PanoKumanda() {
     );
   }
   const live = s.live;
+  const paused = pausedNow ?? Boolean(live?.paused);
   const previewUrl = preview.data ? `${session.server}/display/?preview=${encodeURIComponent(preview.data.token)}&screen=${s.id}&embed=1` : null;
 
   return (
@@ -121,10 +128,10 @@ export default function PanoKumanda() {
           </View>
           <RoundButton icon="play-skip-back" label="Önceki" onPress={() => void command('prev')} disabled={!s.online} />
           <RoundButton
-            icon={live?.paused ? 'play' : 'pause'}
-            label={live?.paused ? 'Sürdür' : 'Bu içerikte durdur'}
+            icon={paused ? 'play' : 'pause'}
+            label={paused ? 'Sürdür' : 'Bu içerikte durdur'}
             primary
-            onPress={() => void command(live?.paused ? 'resume' : 'pause')}
+            onPress={() => void command(paused ? 'resume' : 'pause')}
             disabled={!s.online}
           />
           <RoundButton icon="play-skip-forward" label="Sonraki" onPress={() => void command('next')} disabled={!s.online} />

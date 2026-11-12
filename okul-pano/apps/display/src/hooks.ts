@@ -205,7 +205,8 @@ export function useStatusReport(auth: DisplayAuth, status: Omit<ScreenLiveStatus
   }, [auth.preview]);
   useEffect(() => {
     if (auth.preview || !key) return;
-    const t = setTimeout(() => postStatus(auth.token, JSON.parse(key)).catch(() => undefined), 1500);
+    // Kısa bekleme: üst üste değişiklikler tek bildirimde gider, uzaktan kumanda da hızlı güncellenir
+    const t = setTimeout(() => postStatus(auth.token, JSON.parse(key)).catch(() => undefined), 300);
     return () => clearTimeout(t);
   }, [key, beat, auth.preview, auth.token]);
 }
