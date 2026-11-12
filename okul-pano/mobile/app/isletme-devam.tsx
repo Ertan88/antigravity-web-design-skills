@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSchoolQuery } from '../src/data.ts';
 import { FillSheet, HALF_SHORT, HALVES, LegendBand, letter, PendingStrip, pickable, prevCode, ReportSheet, SendSheet, shortDate, TONE, UndoBar, useMarks, type Cell, type Code, type Half, type PendingMark } from '../src/intern.tsx';
@@ -80,6 +80,20 @@ export default function IsletmeDevam() {
   const [scope, setScope] = useState<'half' | 'day'>('half');
   const [report, setReport] = useState<SheetStudent | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Gün sütunları: açılışta (ve ay değişince) bu haftanın pazartesisine kaydırılır; kullanıcı kaydırınca dokunulmaz
+  const daysRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  const scrolledFor = useRef<string | null>(null);
+  const scrollToWeek = () => {
+    const days = sheet.data?.days;
+    if (!days?.length || !daysRef.current || scrolledFor.current === sheet.data!.month) return;
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const ti = days.findIndex((x) => x.date === today);
+    // Bu ay değilse ayın başı
+    const idx = ti < 0 ? 0 : Math.max(0, ti - ((days[ti]!.weekday + 6) % 7));
+    scrolledFor.current = sheet.data!.month;
+    daysRef.current.scrollTo({ x: idx * (CELL_W + 2), animated: false });
+  };
   useEffect(() => {
     setSel(null);
   }, [d?.month]);
@@ -243,8 +257,14 @@ export default function IsletmeDevam() {
                 </View>
               ))}
             </View>
-            {/* Günler yana kayar */}
-            <ScrollView horizontal showsHorizontalScrollIndicator>
+            {/* Günler yana kayar; açılınca içinde bulunulan haftanın pazartesisi başta görünür */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator
+              ref={daysRef}
+              onLayout={() => scrollToWeek()}
+              onContentSizeChange={() => scrollToWeek()}
+            >
               <View>
                 <View style={{ flexDirection: 'row', height: HEAD_H, alignItems: 'center' }}>
                   {d.days.map((day) => (

@@ -539,8 +539,23 @@ function SheetTable({
   picked: Picked | null;
   onPick: (p: Picked) => void;
 }) {
+  // Dar ekranda çizelge, açılınca içinde bulunulan haftanın pazartesisine kaydırılır
+  const boxRef = useRef<HTMLDivElement>(null);
+  const firstDate = days[0]?.date;
+  useEffect(() => {
+    const box = boxRef.current;
+    if (!box || !days.length) return;
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const ti = days.findIndex((d) => d.date === today);
+    if (ti < 0) return;
+    const monday = days[Math.max(0, ti - ((days[ti]!.weekday + 6) % 7))]!;
+    const th = box.querySelector<HTMLElement>(`th[data-date="${monday.date}"]`);
+    if (th) box.scrollLeft = Math.max(0, th.offsetLeft - 12);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstDate]);
   return (
-    <div className="overflow-x-auto px-3 py-3">
+    <div ref={boxRef} className="overflow-x-auto px-3 py-3">
       <table className="border-separate border-spacing-0 text-xs">
         <thead>
           <tr className="text-slate-500">
@@ -560,6 +575,7 @@ function SheetTable({
             {days.map((d) => (
               <th
                 key={d.date}
+                data-date={d.date}
                 rowSpan={2}
                 className={clsx(
                   "w-[27px] px-px pb-1 text-center font-semibold",
