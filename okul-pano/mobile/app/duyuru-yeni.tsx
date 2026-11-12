@@ -2,6 +2,20 @@ import { errorText } from '@okulpano/shared';
 import { parseYouTubeUrl } from '@okulpano/shared/youtube';
 import { ANNOUNCEMENT_TEMPLATES, designFields, designTemplate, designTitle, type AnnouncementDesign } from '@okulpano/shared/designs';
 import { autoSlideSeconds } from '@okulpano/shared/slideDuration';
+import {
+  DEFAULT_UNTIL,
+  endOfDay,
+  hasAdvancedPlan,
+  normalizeTime,
+  PLAN_WEEKDAYS,
+  planConflict,
+  planSentence,
+  presetEnd,
+  UNTIL_PRESETS,
+  untilChoiceOf,
+  type PlanSchedule,
+  type UntilChoice,
+} from '@okulpano/shared/announcementPlan';
 import { useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -13,12 +27,11 @@ import { useAnnouncementDrafts, useAnnouncements, useScreens, useSchoolInfo, typ
 import { AnnouncementPreview } from '../src/preview.tsx';
 import { Text } from '../src/text.tsx';
 import { colors } from '../src/theme.ts';
-import { Button, Card, Chip, Choice, Field, Icon, Screen, SectionTitle, T, type IconName } from '../src/ui.tsx';
+import { DatePickSheet } from '../src/datePick.tsx';
+import { Button, Card, Chip, Field, Icon, Screen, SectionTitle, T, type IconName } from '../src/ui.tsx';
 
 type Kind = 'design' | 'image' | 'text' | 'video';
-/** 'keep': düzenlemede yayın planı (web panelinde ayrıntılı ayarlanmış olabilir) aynı kalır */
-type Until = '1' | '3' | '7' | 'none' | 'keep';
-type Phase = 'any' | 'break' | 'keep';
+const EMPTY_SCHEDULE: PlanSchedule = { days: [], from: null, to: null, phase: 'any' };
 
 /*
  * Adım adım duyuru (tasarım A): Tür → İçerik → Nerede ve ne zaman → Kontrol ve gönder. Üstte ilerleme çubuğu ve
@@ -34,8 +47,7 @@ const KINDS: { value: Kind; label: string; text: string; icon: IconName; bg: str
   { value: 'text', label: 'Yazı', text: 'Başlık ve kısa yazı', icon: 'text', bg: '#fef3c7' },
   { value: 'video', label: 'YouTube', text: 'Video bağlantısı', icon: 'play', bg: '#fee2e2' },
 ];
-const UNTIL_LABEL: Record<Until, string> = { keep: 'Aynı kalsın', '1': 'Bugün', '3': '3 gün', '7': '1 hafta', none: 'Süresiz' };
-const dateText = (iso: string) => new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+const dayText = (d: Date) => new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' }).format(d);
 
 interface State {
   kind: Kind;
@@ -46,28 +58,24 @@ interface State {
   imageUrl: string | null;
   youtubeUrl: string;
   screenIds: string[];
-  phase: Phase;
-  until: Until;
+  /** Yayın planı (web paneliyle aynı): ne zamana kadar, başlangıç, günler, saatler, zil durumu */
+  until: UntilChoice;
+  endDate: Date | null;
+  startDate: Date | null;
+  schedule: PlanSchedule;
   /** Panoda ekranda kalma süresi (sn); boşsa metnin uzunluğuna göre otomatik */
   duration: number | null;
 }
 
 const hasContent = (s: State) => Boolean(s.title.trim() || s.body.trim() || s.imageUrl || s.youtubeUrl.trim() || Object.values(s.fields).some((v) => v?.trim()));
 
-/** Seçilen gün sayısı sonunda gece yarısı (telefonun saatiyle) yayından kalkar */
-function endOf(until: Until): Date | null {
-  if (until === 'none' || until === 'keep') return null;
-  const end = new Date();
-  end.setHours(0, 0, 0, 0);
-  end.setDate(end.getDate() + Number(until));
-  return end;
-}
-const localInput = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T00:00`;
+const pad = (n: number) => String(n).padStart(2, '0');
+/** Web panelinin tarih kutusu biçimi (taslaklar ortak) */
+const localInput = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
 /** Taslak web paneliyle aynı biçimde saklanır (oradan da devam edilebilir) */
 function toDraftData(s: State): AnnouncementDraft['data'] {
   const t = designTemplate(s.templateId);
-  const end = endOf(s.until);
   return {
     kind: s.kind,
     design: { template: t.id, palette: t.palette, fields: s.fields },
@@ -76,9 +84,10 @@ function toDraftData(s: State): AnnouncementDraft['data'] {
     imageUrl: s.imageUrl,
     youtubeUrl: s.youtubeUrl,
     screenIds: s.screenIds,
-    schedule: { days: [], from: null, to: null, phase: s.phase === 'break' ? 'break' : 'any' },
-    endsAt: end ? localInput(end) : '',
-    until: s.until === 'keep' ? '7' : s.until,
+    schedule: s.schedule,
+    startsAt: s.startDate ? localInput(s.startDate) : '',
+    endsAt: s.endDate ? localInput(s.endDate) : '',
+    until: s.until,
     durationSec: s.duration ? String(s.duration) : '',
   };
 }
@@ -110,8 +119,15 @@ export default function DuyuruYeni() {
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [uploading, setUploading] = useState(false);
   const [screenIds, setScreenIds] = useState<string[]>([]);
-  const [phase, setPhase] = useState<Phase>('any');
-  const [until, setUntil] = useState<Until>('7');
+  // Ne zamana kadar: varsayılan 1 hafta (web paneliyle aynı)
+  const [until, setUntil] = useState<UntilChoice>(DEFAULT_UNTIL);
+  const [endDate, setEndDate] = useState<Date | null>(() => presetEnd(7));
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [schedule, setSchedule] = useState<PlanSchedule>(EMPTY_SCHEDULE);
+  const [advanced, setAdvanced] = useState(false);
+  const [picking, setPicking] = useState<'end' | 'start' | null>(null);
+  const [fromText, setFromText] = useState('');
+  const [toText, setToText] = useState('');
   const [duration, setDuration] = useState<number | null>(null);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -135,8 +151,18 @@ export default function DuyuruYeni() {
     setImageUrl(x.imageUrl ?? null);
     setYoutubeUrl(x.youtubeUrl ?? '');
     setScreenIds(x.screenIds ?? []);
-    setPhase(x.schedule?.phase === 'break' ? 'break' : 'any');
-    setUntil(x.until ?? (x.endsAt ? '7' : 'none'));
+    const sch = x.schedule ?? EMPTY_SCHEDULE;
+    setSchedule(sch);
+    setFromText(sch.from ?? '');
+    setToText(sch.to ?? '');
+    // Hazır süre taslağın açıldığı güne göre yeniden hesaplanır; elle tarih olduğu gibi kalır
+    const preset = UNTIL_PRESETS.find((p) => p.key === x.until);
+    const end = preset ? presetEnd(preset.days) : x.until === 'none' ? null : x.endsAt ? new Date(x.endsAt) : presetEnd(7);
+    setUntil(preset ? preset.key : x.until === 'none' ? 'none' : end ? untilChoiceOf(end) : DEFAULT_UNTIL);
+    setEndDate(end);
+    const start = x.startsAt ? new Date(x.startsAt) : null;
+    setStartDate(start);
+    setAdvanced(hasAdvancedPlan(start, sch));
     setDuration(x.durationSec ? Number(x.durationSec) || null : null);
     setStep(Math.min(3, Math.max(0, d.step)));
   }, [taslak, drafts.data]);
@@ -159,19 +185,28 @@ export default function DuyuruYeni() {
     setYoutubeUrl(a.youtubeUrl ?? '');
     setScreenIds(a.screenIds ?? []);
     setDuration(a.durationSec ?? null);
+    // Yayın planı web panelinde ayarlanmış olabilir: hepsi olduğu gibi yüklenir (günler, saatler, başlangıç, bitiş)
+    const sch = a.schedule ?? EMPTY_SCHEDULE;
+    setSchedule(sch);
+    setFromText(sch.from ?? '');
+    setToText(sch.to ?? '');
     if (duzenle) {
       setEditing(a);
-      setPhase('keep');
-      setUntil('keep');
+      const end = a.endsAt ? new Date(a.endsAt) : null;
+      setEndDate(end);
+      setUntil(untilChoiceOf(end));
+      const start = a.startsAt ? new Date(a.startsAt) : null;
+      setStartDate(start);
+      setAdvanced(hasAdvancedPlan(start, sch));
       setStep(3);
     } else {
-      setPhase(a.schedule?.phase === 'break' ? 'break' : 'any');
+      setAdvanced(hasAdvancedPlan(null, sch));
       setStep(1);
     }
   }, [duzenle, kopya, announcements.data]);
 
   // Ekrandan yarıda çıkılırsa taslak saklanır (geri düğmesi, telefonun geri tuşu, sekme değişimi)
-  const state: State = { kind, templateId, fields, title, body, imageUrl, youtubeUrl, screenIds, phase, until, duration };
+  const state: State = { kind, templateId, fields, title, body, imageUrl, youtubeUrl, screenIds, until, endDate, startDate, schedule, duration };
   const latest = useRef({ state, step: furthest, draftId, draftsPath, schoolId: school?.id, editing: Boolean(duzenle) });
   latest.current = { state, step: furthest, draftId, draftsPath, schoolId: school?.id, editing: Boolean(duzenle) };
   const submitted = useRef(false);
@@ -243,6 +278,8 @@ export default function DuyuruYeni() {
   const next = () => {
     setError(null);
     if (step === 1 && contentProblem) return setError(contentProblem);
+    // Birbirini dışlayan plan (duyuru hiç görünmez): uyarı kartı bu adımda görünür, düzeltilmeden ilerlenmez
+    if (step === 2 && planWarning) return setError(planWarning);
     setStep(step + 1);
   };
 
@@ -253,7 +290,6 @@ export default function DuyuruYeni() {
     }
     setBusy(true);
     setError(null);
-    const end = endOf(until);
     const payload =
       kind === 'design'
         ? { kind, title: designTitle(design), design }
@@ -262,16 +298,13 @@ export default function DuyuruYeni() {
           : kind === 'video'
             ? { kind, title: title.trim(), body: body.trim() || null, youtubeUrl: youtubeUrl.trim() }
             : { kind, title: title.trim(), body: body.trim() || null };
-    // Düzenlemede "Aynı kalsın" seçiliyse web panelinde ayarlanmış plan (günler, saatler, başlangıç) korunur
-    const schedule = phase === 'keep' ? (editing?.schedule ?? null) : phase === 'break' ? { days: [], from: null, to: null, phase: 'break' } : null;
-    const endsAt = until === 'keep' ? (editing?.endsAt ?? null) : end ? end.toISOString() : null;
     const request = {
       ...payload,
       screenIds: screenIds.length ? screenIds : null,
       schedule,
-      endsAt,
+      startsAt: startDate ? startDate.toISOString() : null,
+      endsAt: endDate ? endDate.toISOString() : null,
       durationSec: kind === 'video' ? (editing?.durationSec ?? null) : duration,
-      ...(editing ? { startsAt: editing.startsAt } : {}),
     };
     try {
       if (editing) await api(`${path}/${editing.id}`, { method: 'PUT', body: request });
@@ -298,6 +331,8 @@ export default function DuyuruYeni() {
   }
 
   const screenNames = screenIds.map((id) => screens.data?.find((s) => s.id === id)?.name ?? '?');
+  const planText = planSentence(startDate, endDate, schedule, screenNames);
+  const planWarning = planConflict(startDate, endDate, schedule);
   const shownTitle = kind === 'design' ? designTitle(design) : title;
   const preview = (
     <View style={{ borderRadius: 16, overflow: 'hidden' }}>
@@ -424,53 +459,184 @@ export default function DuyuruYeni() {
 
       {step === 2 && (
         <>
-          <SectionTitle>Hangi panolarda</SectionTitle>
+          {/* Tasarım A: üç kısa soru hazır seçeneklerle; seyrek ayarlar "Gelişmiş zamanlama"da; altta tek cümle */}
+          <SectionTitle>Nerede</SectionTitle>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            <Chip label="Tüm panolar" selected={!screenIds.length} onPress={() => setScreenIds([])} />
+            <Chip label="Bütün panolar" selected={!screenIds.length} onPress={() => setScreenIds([])} />
             {(screens.data ?? []).map((s) => {
               const on = screenIds.includes(s.id);
               return <Chip key={s.id} label={s.name} selected={on} onPress={() => setScreenIds(on ? screenIds.filter((x) => x !== s.id) : [...screenIds, s.id])} />;
             })}
           </View>
-          <SectionTitle>Ne zaman</SectionTitle>
-          <Choice
-            value={phase}
-            onChange={setPhase}
-            options={[
-              ...(editing ? [{ value: 'keep' as const, label: 'Aynı kalsın' }] : []),
-              { value: 'any' as const, label: 'Her zaman' },
-              { value: 'break' as const, label: 'Teneffüslerde' },
-            ]}
-          />
-          <SectionTitle>Ne kadar süre</SectionTitle>
-          <Choice
-            value={until}
-            onChange={setUntil}
-            columns={editing ? 3 : 4}
-            options={(Object.keys(UNTIL_LABEL) as Until[]).filter((u) => editing || u !== 'keep').map((u) => ({ value: u, label: UNTIL_LABEL[u] }))}
-          />
-          {kind !== 'video' && (
-            <>
-              <SectionTitle>Ekranda kalma süresi</SectionTitle>
-              <Choice
-                value={duration ?? 0}
-                onChange={(v) => setDuration(v || null)}
-                columns={3}
-                options={[
-                  { value: 0, label: `Otomatik (${autoSec} sn)` },
-                  ...[...new Set([20, 30, 45, maxSec, 90, ...(duration ? [duration] : [])])]
-                    .filter((n) => n > 0)
-                    .sort((x, y) => x - y)
-                    .map((n) => ({ value: n, label: !approver && n > maxSec ? `${n} sn · onaya düşer` : `${n} sn` })),
-                ]}
+
+          <SectionTitle>Ne zamana kadar</SectionTitle>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {UNTIL_PRESETS.map((p) => (
+              <Chip
+                key={p.key}
+                label={p.label}
+                selected={until === p.key}
+                onPress={() => {
+                  setUntil(p.key);
+                  setEndDate(presetEnd(p.days));
+                }}
               />
-              <T size={12} color={colors.muted}>
+            ))}
+            <Chip
+              label="Süresiz"
+              selected={until === 'none'}
+              onPress={() => {
+                setUntil('none');
+                setEndDate(null);
+              }}
+            />
+            <Chip
+              icon="calendar-outline"
+              label={until === 'date' && endDate ? dayText(new Date(endDate.getTime() - 1)) : 'Tarih seç'}
+              selected={until === 'date'}
+              onPress={() => setPicking('end')}
+            />
+          </View>
+
+          {kind !== 'video' ? (
+            <>
+              <SectionTitle>Ekranda kalma</SectionTitle>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                <Chip label={`Otomatik · ${autoSec} sn`} selected={!duration} onPress={() => setDuration(null)} />
+                {[...new Set([20, 30, 45, maxSec, ...(duration ? [duration] : [])])]
+                  .sort((x, y) => x - y)
+                  .map((n) => (
+                    <Chip key={n} label={!approver && n > maxSec ? `${n} sn · onaya düşer` : `${n} sn`} selected={duration === n} onPress={() => setDuration(n)} />
+                  ))}
+                {!approver && !(duration && duration > maxSec) && <Chip label={`${Math.min(300, maxSec + 30)} sn · onaya düşer`} onPress={() => setDuration(Math.min(300, maxSec + 30))} />}
+              </View>
+              <T size={12} color={tooLong ? colors.warning : colors.muted}>
                 {tooLong
                   ? `${maxSec} saniyeden uzun süre onaylayıcının onayına düşer; onaylanınca yayına girer.`
                   : `Otomatik: kısa duyuru ${defaultSec} sn kalır, uzun duyuru metne göre uzar (en çok ${maxSec} sn).`}
               </T>
             </>
+          ) : (
+            <T size={13} color={colors.muted}>
+              Video duyurusu panoda video bitene kadar kalır.
+            </T>
           )}
+
+          <Card style={{ paddingVertical: 4, gap: 0 }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: advanced }}
+              onPress={() => setAdvanced((x) => !x)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '800', color: colors.ink }}>Gelişmiş zamanlama</Text>
+                <Text style={{ fontSize: 12.5, color: colors.muted }}>Başlangıç, günler, saatler, yalnızca teneffüste</Text>
+              </View>
+              <Icon name={advanced ? 'chevron-down' : 'chevron-forward'} size={20} color={colors.faint} />
+            </Pressable>
+            {advanced && (
+              <View style={{ gap: 12, paddingBottom: 14, borderTopWidth: 1, borderTopColor: colors.divider, paddingTop: 12 }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.muted }}>Başlangıç</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  <Chip label="Hemen" selected={!startDate || startDate.getTime() <= Date.now()} onPress={() => setStartDate(null)} />
+                  <Chip
+                    icon="calendar-outline"
+                    label={startDate && startDate.getTime() > Date.now() ? dayText(startDate) : 'Tarih seç'}
+                    selected={Boolean(startDate && startDate.getTime() > Date.now())}
+                    onPress={() => setPicking('start')}
+                  />
+                </View>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.muted }}>Haftanın günleri</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {PLAN_WEEKDAYS.map((d, i) => {
+                    const on = schedule.days.includes(i + 1);
+                    return (
+                      <Chip
+                        key={d}
+                        label={d}
+                        selected={on}
+                        onPress={() => setSchedule({ ...schedule, days: on ? schedule.days.filter((x) => x !== i + 1) : [...schedule.days, i + 1].sort() })}
+                      />
+                    );
+                  })}
+                </View>
+                <T size={12} color={colors.muted}>
+                  Hiçbiri seçili değilse her gün.
+                </T>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.muted }}>Günün saatleri</Text>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={{ flex: 1 }}>
+                    <Field
+                      label="Şu saatten"
+                      value={fromText}
+                      onChangeText={setFromText}
+                      onBlur={() => {
+                        const v = normalizeTime(fromText);
+                        setFromText(v ?? '');
+                        setSchedule({ ...schedule, from: v });
+                      }}
+                      placeholder="08:30"
+                      keyboardType="numbers-and-punctuation"
+                      maxLength={5}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Field
+                      label="Şu saate kadar"
+                      value={toText}
+                      onChangeText={setToText}
+                      onBlur={() => {
+                        const v = normalizeTime(toText);
+                        setToText(v ?? '');
+                        setSchedule({ ...schedule, to: v });
+                      }}
+                      placeholder="16:00"
+                      keyboardType="numbers-and-punctuation"
+                      maxLength={5}
+                    />
+                  </View>
+                </View>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.muted }}>Zil durumu</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {(
+                    [
+                      ['any', 'Her zaman'],
+                      ['break', 'Yalnızca teneffüste'],
+                      ['lesson', 'Yalnızca derste'],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <Chip key={value} label={label} selected={schedule.phase === value} onPress={() => setSchedule({ ...schedule, phase: value })} />
+                  ))}
+                </View>
+              </View>
+            )}
+          </Card>
+
+          <Card tone={planWarning ? 'warning' : undefined}>
+            <T weight="700">{planWarning ?? planText}</T>
+            {!planWarning && kind !== 'video' && (
+              <T size={12} color={colors.muted}>
+                Her gösterimde {duration ? `${duration} saniye` : `${autoSec} saniye (metnin uzunluğuna göre)`} ekranda kalır.
+              </T>
+            )}
+          </Card>
+
+          <DatePickSheet
+            open={picking !== null}
+            title={picking === 'start' ? 'Yayın ne zaman başlasın' : 'Hangi günün sonuna kadar'}
+            value={picking === 'start' ? startDate : endDate ? new Date(endDate.getTime() - 1) : null}
+            min={picking === 'end' && startDate ? startDate : new Date()}
+            onClose={() => setPicking(null)}
+            onPick={(day) => {
+              if (picking === 'start') setStartDate(day);
+              else {
+                setUntil('date');
+                setEndDate(endOfDay(day));
+              }
+              setPicking(null);
+            }}
+          />
         </>
       )}
 
@@ -481,20 +647,12 @@ export default function DuyuruYeni() {
             {[
               { label: 'Tür', value: KINDS.find((k) => k.value === kind)!.label, to: 0 },
               { label: 'Başlık', value: shownTitle || '—', to: 1 },
-              { label: 'Panolar', value: screenNames.length ? screenNames.join(', ') : 'Tüm panolar', to: 2 },
-              {
-                label: 'Zaman',
-                value:
-                  phase === 'keep' && until === 'keep'
-                    ? `Plan aynı kalıyor${editing?.endsAt ? ` · ${dateText(editing.endsAt)} tarihine kadar` : ' · süresiz'}`
-                    : `${phase === 'break' ? 'Teneffüslerde' : phase === 'keep' ? 'Zamanlama aynı' : 'Her zaman'} · ${until === 'keep' ? (editing?.endsAt ? `${dateText(editing.endsAt)} tarihine kadar` : 'süresiz') : UNTIL_LABEL[until]}`,
-                to: 2,
-              },
+              { label: 'Yayın', value: planWarning ?? planText, to: 2 },
               ...(kind !== 'video' ? [{ label: 'Süre', value: duration ? `${duration} sn${tooLong ? ' · onaya düşer' : ''}` : `Otomatik (${autoSec} sn)`, to: 2 }] : []),
             ].map((r, i) => (
               <View key={r.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: colors.divider }}>
                 <Text style={{ width: 70, fontSize: 13, color: colors.muted }}>{r.label}</Text>
-                <Text style={{ flex: 1, fontSize: 14, fontWeight: '700', color: colors.ink }} numberOfLines={2}>
+                <Text style={{ flex: 1, fontSize: 14, fontWeight: '700', color: colors.ink }} numberOfLines={r.label === 'Yayın' ? undefined : 2}>
                   {r.value}
                 </Text>
                 <Pressable accessibilityRole="button" accessibilityLabel={`${r.label}: değiştir`} onPress={() => setStep(r.to)} hitSlop={8}>

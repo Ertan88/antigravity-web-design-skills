@@ -34,3 +34,4 @@ export * from './duties.ts';
 export * from './people.ts';
 export * from './coverText.ts';
 export * from './slideDuration.ts';
+export * from './announcementPlan.ts';

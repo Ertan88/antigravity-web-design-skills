@@ -1,14 +1,14 @@
-import { announcementSchema, autoSlideSeconds, designTemplate, designTitle, parseYouTubeUrl, youTubeThumbnail, type AnnouncementDesign } from '@okulpano/shared';
+import { announcementSchema, autoSlideSeconds, designTemplate, hasAdvancedPlan, PLAN_WEEKDAYS, planConflict, planSentence, presetEnd, UNTIL_PRESETS, untilChoiceOf, type UntilChoice, designTitle, parseYouTubeUrl, youTubeThumbnail, type AnnouncementDesign } from '@okulpano/shared';
 import clsx from 'clsx';
 import { useEffect, useState } from 'react';
 import type { ModalApi } from '../../components/CrudPage.tsx';
-import { ArrowLeft, ArrowRight, Check, Image as ImageIcon, LayoutTemplate, PlayCircle, Type } from '../../components/icons.tsx';
+import { ArrowLeft, ArrowRight, CalendarDays, Check, ChevronDown, Image as ImageIcon, LayoutTemplate, PlayCircle, Type } from '../../components/icons.tsx';
 import { ImageUpload } from '../../components/ImageUpload.tsx';
 import { Alert, Button, Field, Input, Modal, Textarea, Toggle } from '../../components/ui.tsx';
 import { useList, useSchool, type Announcement, type AnnouncementSchedule, type Screen } from '../../lib/data.ts';
-import { localInputToIso } from '../../lib/format.ts';
+import { isoToLocalInput, localInputToIso } from '../../lib/format.ts';
 import { DesignEditor, DesignThumb, emptyDesign } from './DesignEditor.tsx';
-import { emptySchedule, planSentence, ScheduleFields } from './ScheduleFields.tsx';
+import { emptySchedule } from './ScheduleFields.tsx';
 
 /*
  * Adım adım duyuru (tasarım A): Tür → İçerik → Nerede ve ne zaman → Kontrol ve gönder. Üstte adım çubuğu, 2. adımdan
@@ -43,7 +43,8 @@ export const emptyAnnouncementForm = (): AnnouncementForm => ({
   youtubeUrl: '',
   durationSec: '',
   startsAt: '',
-  endsAt: '',
+  // Varsayılan 1 hafta (süresiz unutulan duyurular panoda birikmesin); "Süresiz" seçilebilir
+  endsAt: isoToLocalInput(presetEnd(7).toISOString()),
   isActive: true,
 });
 
@@ -147,6 +148,8 @@ export function AnnouncementWizard({
   const next = () => {
     const bad = firstInvalid(step);
     if (bad >= 0 && bad <= step) return setStep(bad);
+    // Birbirini dışlayan plan (duyuru hiç görünmez): uyarı bu adımda görünür, düzeltilmeden ilerlenmez
+    if (step === 2 && planConflict(v.startsAt || null, v.endsAt || null, v.schedule)) return;
     go(step + 1);
   };
   const finish = async () => {
@@ -313,52 +316,182 @@ function autoDuration(v: AnnouncementForm, defaultDuration: number, maxDuration:
   return autoSlideSeconds({ title: v.kind === 'design' ? '' : v.title, body: v.kind === 'design' ? '' : v.body, design: v.kind === 'design' ? v.design : null }, defaultDuration, maxDuration);
 }
 
+const pill = (on: boolean) =>
+  clsx(
+    'inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-sm font-bold ring-1 transition',
+    on ? 'bg-ink text-surface ring-ink' : 'bg-surface text-slate-700 ring-slate-300 hover:ring-slate-400',
+  );
+
+/**
+ * "Nerede ve ne zaman" (tasarım A): üç kısa soru hazır seçeneklerle (Nerede · Ne zamana kadar · Ekranda kalma);
+ * başlangıç, günler, saatler ve zil durumu "Gelişmiş zamanlama"nın altında. Altta ne olacağını anlatan tek cümle.
+ * Mobil uygulamayla aynı kurallar (@okulpano/shared/announcementPlan).
+ */
 function WhereWhenStep({ api, defaultDuration, maxDuration, isApprover }: { api: ModalApi<Announcement, AnnouncementForm>; defaultDuration: number; maxDuration: number; isApprover: boolean }) {
   const { values: v, set, errors } = api.form;
+  const screens = useList<Screen>('screens');
+  const names = v.screenIds.map((id) => screens.data?.find((s) => s.id === id)?.name ?? '?');
+  const toggle = <T,>(list: T[], x: T) => (list.includes(x) ? list.filter((y) => y !== x) : [...list, x]);
+  const endDate = v.endsAt ? new Date(v.endsAt) : null;
+  const [until, setUntil] = useState<UntilChoice>(() => untilChoiceOf(endDate));
+  const [advanced, setAdvanced] = useState(() => hasAdvancedPlan(v.startsAt || null, v.schedule));
+  const [manualDuration, setManualDuration] = useState(() => Boolean(v.durationSec) && ![20, 30, 45, 60].includes(Number(v.durationSec)));
+  const auto = autoDuration(v, defaultDuration, maxDuration);
+  const conflict = planConflict(v.startsAt || null, v.endsAt || null, v.schedule);
+  const tooLong = !isApprover && Number(v.durationSec) > maxDuration;
+  const chooseUntil = (c: UntilChoice) => {
+    setUntil(c);
+    const preset = UNTIL_PRESETS.find((p) => p.key === c);
+    if (preset) set('endsAt', isoToLocalInput(presetEnd(preset.days).toISOString()));
+    if (c === 'none') set('endsAt', '');
+    if (c === 'date' && !v.endsAt) set('endsAt', isoToLocalInput(presetEnd(7).toISOString()));
+  };
+  const s = v.schedule;
   return (
-    <>
-      <ScheduleFields
-        screenIds={v.screenIds}
-        schedule={v.schedule}
-        startsAt={v.startsAt}
-        endsAt={v.endsAt}
-        onScreens={(ids) => set('screenIds', ids)}
-        onSchedule={(x) => set('schedule', x)}
-        onStartsAt={(x) => set('startsAt', x)}
-        onEndsAt={(x) => set('endsAt', x)}
-        error={errors.schedule}
-        endsError={errors.endsAt}
-      />
-      <Field
-        label="Slaytın ekranda kalma süresi (sn)"
-        error={errors.durationSec}
-        help={
-          v.kind === 'video'
-            ? 'Boş bırakılırsa video bitene kadar kalır.'
-            : `Boş bırakılırsa metnin uzunluğuna göre kalır (şu an ${autoDuration(v, defaultDuration, maxDuration)} sn). En çok ${maxDuration} sn${isApprover ? '' : '; daha uzun süre onaylayıcının onayına düşer'}.`
-        }
-      >
-        {(id) => (
-          <>
-            <Input
-              id={id}
-              type="number"
-              min={3}
-              max={300}
-              className="max-w-56"
-              value={v.durationSec}
-              onChange={(e) => set('durationSec', e.target.value)}
-              placeholder={v.kind === 'video' ? 'Video süresi' : `Otomatik (${autoDuration(v, defaultDuration, maxDuration)} sn)`}
-            />
-            {!isApprover && Number(v.durationSec) > maxDuration && (
-              <p className="mt-1.5 text-sm font-semibold text-amber-700 dark:text-amber-400">
-                {maxDuration} saniyeden uzun süre onaylayıcının onayına düşer; onaylanınca yayına girer.
-              </p>
-            )}
-          </>
+    <div className="space-y-5">
+      {(screens.data?.length ?? 0) > 0 && (
+        <div>
+          <div className="mb-2 text-sm font-extrabold text-ink">Nerede</div>
+          <div className="flex flex-wrap gap-1.5">
+            <button type="button" className={pill(!v.screenIds.length)} onClick={() => set('screenIds', [])}>
+              {!v.screenIds.length && <Check className="size-3.5" />}Bütün panolar
+            </button>
+            {screens.data!.map((x) => (
+              <button key={x.id} type="button" className={pill(v.screenIds.includes(x.id))} onClick={() => set('screenIds', toggle(v.screenIds, x.id))}>
+                {v.screenIds.includes(x.id) && <Check className="size-3.5" />}
+                {x.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <div className="mb-2 text-sm font-extrabold text-ink">Ne zamana kadar</div>
+        <div className="flex flex-wrap gap-1.5">
+          {UNTIL_PRESETS.map((p) => (
+            <button key={p.key} type="button" className={pill(until === p.key)} onClick={() => chooseUntil(p.key)}>
+              {until === p.key && <Check className="size-3.5" />}
+              {p.label}
+            </button>
+          ))}
+          <button type="button" className={pill(until === 'none')} onClick={() => chooseUntil('none')}>
+            {until === 'none' && <Check className="size-3.5" />}Süresiz
+          </button>
+          <button type="button" className={pill(until === 'date')} onClick={() => chooseUntil('date')}>
+            <CalendarDays className="size-3.5" />
+            Tarih seç
+          </button>
+        </div>
+        {until === 'date' && (
+          <div className="mt-3 max-w-72">
+            <Field label="Yayından kalkacağı an" error={errors.endsAt}>
+              {(id) => <Input id={id} type="datetime-local" value={v.endsAt} onChange={(e) => set('endsAt', e.target.value)} invalid={Boolean(errors.endsAt)} />}
+            </Field>
+          </div>
         )}
-      </Field>
-    </>
+      </div>
+
+      {v.kind !== 'video' ? (
+        <div>
+          <div className="mb-2 flex items-baseline gap-2 text-sm font-extrabold text-ink">
+            Ekranda kalma <span className="text-xs font-semibold text-slate-500">her gösterimde</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <button type="button" className={pill(!v.durationSec && !manualDuration)} onClick={() => (setManualDuration(false), set('durationSec', ''))}>
+              {!v.durationSec && !manualDuration && <Check className="size-3.5" />}Otomatik · {auto} sn
+            </button>
+            {[20, 30, 45, 60].map((n) => (
+              <button key={n} type="button" className={pill(!manualDuration && Number(v.durationSec) === n)} onClick={() => (setManualDuration(false), set('durationSec', String(n)))}>
+                {!manualDuration && Number(v.durationSec) === n && <Check className="size-3.5" />}
+                {n} sn
+              </button>
+            ))}
+            <button type="button" className={pill(manualDuration)} onClick={() => setManualDuration(true)}>
+              Elle gir
+            </button>
+          </div>
+          {manualDuration && (
+            <div className="mt-3 max-w-56">
+              <Field label="Saniye" error={errors.durationSec}>
+                {(id) => <Input id={id} type="number" min={3} max={300} value={v.durationSec} onChange={(e) => set('durationSec', e.target.value)} placeholder={`Otomatik (${auto})`} />}
+              </Field>
+            </div>
+          )}
+          <p className={clsx('mt-2 text-xs font-semibold', tooLong ? 'text-amber-700 dark:text-amber-400' : 'text-slate-500')}>
+            {tooLong
+              ? `${maxDuration} saniyeden uzun süre onaylayıcının onayına düşer; onaylanınca yayına girer.`
+              : `Otomatik: kısa duyuru ${defaultDuration} sn kalır, uzun duyuru metne göre uzar (en çok ${maxDuration} sn).`}
+          </p>
+        </div>
+      ) : (
+        <p className="text-sm font-semibold text-slate-500">Video duyurusu panoda video bitene kadar kalır.</p>
+      )}
+
+      <div className="overflow-hidden rounded-2xl ring-1 ring-slate-200">
+        <button type="button" aria-expanded={advanced} onClick={() => setAdvanced((x) => !x)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50">
+          <span className="flex-1">
+            <span className="block text-sm font-extrabold text-ink">Gelişmiş zamanlama</span>
+            <span className="block text-xs font-semibold text-slate-500">Başlangıç tarihi, haftanın günleri, saat aralığı, yalnızca teneffüste</span>
+          </span>
+          <ChevronDown className={clsx('size-4 text-slate-400 transition-transform', !advanced && '-rotate-90')} />
+        </button>
+        {advanced && (
+          <div className="space-y-4 border-t border-slate-100 px-4 py-4">
+            <div className="max-w-72">
+              <Field label="Yayın başlangıcı" help="Boşsa hemen">
+                {(id) => <Input id={id} type="datetime-local" value={v.startsAt} onChange={(e) => set('startsAt', e.target.value)} />}
+              </Field>
+            </div>
+            <Field label="Haftanın günleri" help="Hiçbiri seçili değilse her gün">
+              {() => (
+                <div className="flex flex-wrap gap-1.5">
+                  {PLAN_WEEKDAYS.map((d, i) => (
+                    <button key={d} type="button" className={pill(s.days.includes(i + 1))} onClick={() => set('schedule', { ...s, days: toggle(s.days, i + 1).sort() })}>
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </Field>
+            <div className="grid max-w-md gap-4 sm:grid-cols-2">
+              <Field label="Günün şu saatinden" error={errors.schedule}>
+                {(id) => <Input id={id} type="time" value={s.from ?? ''} onChange={(e) => set('schedule', { ...s, from: e.target.value || null })} />}
+              </Field>
+              <Field label="şu saatine kadar">
+                {(id) => <Input id={id} type="time" value={s.to ?? ''} onChange={(e) => set('schedule', { ...s, to: e.target.value || null })} />}
+              </Field>
+            </div>
+            <Field label="Zil durumu">
+              {() => (
+                <div className="flex flex-wrap gap-1.5">
+                  {(
+                    [
+                      ['any', 'Her zaman'],
+                      ['break', 'Yalnızca teneffüste'],
+                      ['lesson', 'Yalnızca derste'],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button key={value} type="button" className={pill(s.phase === value)} onClick={() => set('schedule', { ...s, phase: value })}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </Field>
+          </div>
+        )}
+      </div>
+
+      <div className={clsx('rounded-2xl px-4 py-3 text-sm font-bold', conflict ? 'bg-amber-50 text-amber-800 ring-1 ring-amber-200' : 'bg-slate-50 text-ink ring-1 ring-slate-200')}>
+        {conflict ?? planSentence(v.startsAt || null, v.endsAt || null, s, names)}
+        {!conflict && v.kind !== 'video' && (
+          <span className="mt-0.5 block text-xs font-semibold text-slate-500">
+            Her gösterimde {v.durationSec ? `${v.durationSec} saniye` : `${auto} saniye (metnin uzunluğuna göre)`} ekranda kalır.
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -370,8 +503,7 @@ function SummaryStep({ api, defaultDuration, maxDuration, onEdit }: { api: Modal
   const rows: { label: string; value: string; step: number }[] = [
     { label: 'Tür', value: KIND_LABEL[v.kind], step: 0 },
     { label: 'Başlık', value: title || '—', step: 1 },
-    { label: 'Panolar', value: names.length ? names.join(', ') : 'Tüm panolar', step: 2 },
-    { label: 'Yayın planı', value: planSentence(v.startsAt, v.endsAt, v.schedule, names), step: 2 },
+    { label: 'Yayın planı', value: planConflict(v.startsAt || null, v.endsAt || null, v.schedule) ?? planSentence(v.startsAt || null, v.endsAt || null, v.schedule, names), step: 2 },
     { label: 'Ekranda kalma süresi', value: v.durationSec ? `${v.durationSec} sn` : v.kind === 'video' ? 'Video süresi' : `Otomatik, metne göre (${autoDuration(v, defaultDuration, maxDuration)} sn)`, step: 2 },
   ];
   return (

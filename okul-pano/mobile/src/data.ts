@@ -210,9 +210,10 @@ export interface AnnouncementDraft {
     youtubeUrl?: string;
     screenIds?: string[];
     schedule?: { days: number[]; from: string | null; to: string | null; phase: 'any' | 'break' | 'lesson' };
+    startsAt?: string;
     endsAt?: string;
-    /** Mobilin süre seçimi (1, 3, 7 gün ya da süresiz) */
-    until?: '1' | '3' | '7' | 'none';
+    /** Ne zamana kadar seçimi (1, 3, 7 gün, süresiz ya da elle tarih); hazır süreler taslak açılınca yeniden hesaplanır */
+    until?: '1' | '3' | '7' | 'none' | 'date';
     /** Panoda ekranda kalma süresi (sn); boşsa metne göre otomatik (web formunda metin olarak tutulur) */
     durationSec?: string;
   };
