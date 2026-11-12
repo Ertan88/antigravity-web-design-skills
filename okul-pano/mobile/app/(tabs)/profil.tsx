@@ -263,6 +263,7 @@ export default function Menu() {
         icon: 'clipboard-check',
         to: '/sinav-takvimi',
       },
+      can('schedule.manage') && { title: 'Zil saatleri', subtitle: 'Eğitim düzeni, günün zili, zil düzenleri', icon: 'notifications-outline', to: '/zil-saatleri' },
       !managerial && { title: 'Sınavlar ve etkinlikler', subtitle: 'Yaklaşan sınav ve etkinlikler', icon: 'school-outline', to: '/yaklasanlar' },
       { title: 'Tatil takvimi', subtitle: 'MEB takvimi, ara tatil, bayramlar', icon: 'sunny-outline', to: '/tatiller' },
       isTeacher && { title: 'Telefon takvimine ekle', subtitle: 'Nöbetler ve sınavlar takviminize', icon: 'calendar-outline', to: '/takvime-ekle' },
