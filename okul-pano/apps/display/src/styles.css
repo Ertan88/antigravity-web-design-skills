@@ -842,25 +842,8 @@ p {
   background: rgba(255, 255, 255, 0.35);
 }
 
-.slide-progress {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 5px;
-  background: transparent;
-  /* Çubuk kendi katmanında: dolması ortadaki alanı (bulanık görsel arka planı dahil) her karede yeniden çizdirmez */
-  contain: strict;
-}
-
-.slide-progress div {
-  height: 100%;
-  background: var(--primary);
-  transform-origin: left center;
-  animation: progress linear both;
-  will-change: transform;
-  backface-visibility: hidden;
-}
+/* Duyuruların altındaki ilerleme çubuğu kaldırıldı: zayıf TV'lerde her karede yeniden çizim istiyor ve kayan yazıyı
+   takıltıyordu. Hangi duyuruda olunduğu sağ üstteki noktalardan anlaşılır. */
 
 .slideshow-empty {
   align-items: center;

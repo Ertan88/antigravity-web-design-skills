@@ -414,11 +414,6 @@ export function Slideshow({ announcements, now, defaultDurationSec, videoSound, 
           ))}
         </div>
       )}
-      {slide.kind !== 'video' && !paused && !single && (
-        <div className="slide-progress" aria-hidden="true">
-          <div key={key} style={{ animationDuration: `${duration}s` }} />
-        </div>
-      )}
     </section>
   );
 }
