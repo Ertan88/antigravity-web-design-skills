@@ -14,6 +14,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -156,7 +157,12 @@ class MainActivity : Activity() {
         w.isFocusable = true
         w.isFocusableInTouchMode = true
         w.addJavascriptInterface(Bridge(), "OkulYayinTV")
-        w.webChromeClient = WebChromeClient()
+        w.webChromeClient = object : WebChromeClient() {
+            // WebView, video ilk karesini çizene kadar kendi gri "oynat" simgesini gösterir (YouTube duyurusunun
+            // başında). Bu simge sayfanın üstünde çizildiği için panodaki kapak görseli onu örtemez: saydam
+            // 1x1 görselle hiç gösterilmez.
+            override fun getDefaultVideoPoster(): Bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        }
         w.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 // Yalnızca pano sunucusu içinde gezilir; başka sitelere açılan bağlantılar engellenir
