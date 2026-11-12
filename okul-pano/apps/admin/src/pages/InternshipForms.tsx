@@ -1,10 +1,12 @@
 import { mondayOf, trDate } from "@okulpano/shared";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, FileDown } from "../components/icons.tsx";
 import { useToast } from "../components/Toast.tsx";
-import { Alert, Button, Field, Input, Modal, MonthPicker, Spinner } from "../components/ui.tsx";
+import { Link, useNavigate } from "react-router-dom";
+import { choose } from "../components/confirm.tsx";
+import { Alert, Button, Modal, MonthPicker, Spinner } from "../components/ui.tsx";
 import { api, downloadFile } from "../lib/api.ts";
 import { useAuth } from "../lib/auth.tsx";
 import { useSchoolPath } from "../lib/data.ts";
@@ -68,13 +70,17 @@ interface FormItem {
   date?: string | null;
   holiday?: string | null;
   dates?: string[];
+  /** Devam çizelgesi: kontrol edilmemiş (?) yarım günler */
+  unchecked?: { halves: number; students: number } | null;
 }
 
 interface FormsData {
-  settings: { programName: string; district: string; city: string; canEdit: boolean };
+  settings: { programName: string; district: string; province: string; canEdit: boolean };
   monday?: string;
   friday?: string;
   month?: string;
+  today?: string;
+  monthOpen?: boolean;
   items: FormItem[];
 }
 
@@ -109,13 +115,16 @@ export function FormsDialog({ open, onClose }: { open: boolean; onClose: () => v
   const [week, setWeek] = useState(() => mondayOf(localToday()));
   const [month, setMonth] = useState(() => localToday().slice(0, 7));
   const daily = type === "daily";
+  const navigate = useNavigate();
+  const attendance = type === "attendance";
   const q = useQuery({
-    queryKey: [schoolId, "internship", "forms", daily ? "daily" : "monthly", daily ? week : month],
-    queryFn: () => api<FormsData>(`${path}/forms?type=${daily ? "daily" : "report"}&${daily ? `week=${week}` : `month=${month}`}`),
+    queryKey: [schoolId, "internship", "forms", type, daily ? week : month],
+    queryFn: () => api<FormsData>(`${path}/forms?type=${type}&${daily ? `week=${week}` : `month=${month}`}`),
     enabled: open,
   });
   const items = useMemo(() => q.data?.items ?? [], [q.data]);
-  const usable = (b: FormItem) => (daily ? Boolean(b.date) : Boolean(b.dates?.length));
+  // Devam çizelgesi görev gününe bağlı değildir: öğrencisi olan her işletme
+  const usable = (b: FormItem) => (daily ? Boolean(b.date) : attendance ? b.students > 0 : Boolean(b.dates?.length));
   const [picked, setPicked] = useState<Set<string>>(new Set());
   // Varsayılan seçim: görevi olan ve tatile denk gelmeyenler
   useEffect(() => {
@@ -123,13 +132,40 @@ export function FormsDialog({ open, onClose }: { open: boolean; onClose: () => v
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
   const shown = items.filter(usable).sort((a, b) => (daily ? (a.date ?? '').localeCompare(b.date ?? '') : 0));
-  const noDay = items.filter((b) => !b.visitWeekday).length;
+  const noDay = attendance ? 0 : items.filter((b) => !b.visitWeekday).length;
   const chosen = shown.filter((b) => picked.has(b.id));
   const formCount =
     type === "attendance" ? chosen.reduce((n, b) => n + Math.max(1, Math.ceil(b.students / 5)), 0) : chosen.length;
   const [busy, setBusy] = useState(false);
 
   const download = async () => {
+    // Devam çizelgesinde boş kalacak günler: kontrol edilmemişler ve ay bitmediyse bugünden sonrası
+    if (attendance) {
+      const halves = chosen.reduce((n, b) => n + (b.unchecked?.halves ?? 0), 0);
+      const open = Boolean(q.data?.monthOpen);
+      if (halves || open) {
+        const lines = [
+          halves ? `${chosen.filter((b) => b.unchecked).length} işletmede ${halves / 2 === Math.floor(halves / 2) ? halves / 2 : String(halves / 2).replace(".", ",")} gün kontrol edilmedi; bu günler çizelgede boş kalır.` : null,
+          open && q.data?.today ? `Ay henüz bitmedi: ${dayMonth(q.data.today)} sonrası boş kalır.` : null,
+        ].filter(Boolean);
+        const c = await choose({
+          title: "Çizelgede boş günler kalacak",
+          message: lines.join(" "),
+          tone: "warning",
+          cancelLabel: "Vazgeç",
+          choices: [
+            ...(halves ? [{ value: "go" as const, label: "İşletmede Devam'a git", kind: "secondary" as const }] : []),
+            { value: "print" as const, label: "Yine de yazdır", kind: "primary" as const },
+          ],
+        });
+        if (c === "go") {
+          onClose();
+          navigate(`/isletme-devam?ay=${month}`);
+          return;
+        }
+        if (c !== "print") return;
+      }
+    }
     setBusy(true);
     try {
       const period = daily ? `week=${week}` : `month=${month}`;
@@ -235,7 +271,12 @@ export function FormsDialog({ open, onClose }: { open: boolean; onClose: () => v
                         · {b.coordinatorName ?? "Koordinatör seçilmedi"} · {b.students} öğrenci
                       </span>
                       {b.holiday && <span className="block text-xs font-semibold text-red-700 dark:text-red-300">Tatil: {b.holiday}</span>}
-                      {!daily && (
+                      {attendance && b.unchecked && (
+                        <span className="block text-xs font-semibold text-amber-700 dark:text-amber-300">
+                          {b.unchecked.students} öğrencide {b.unchecked.halves} yarım gün kontrol edilmedi
+                        </span>
+                      )}
+                      {type === "report" && (
                         <span className="block text-xs text-slate-500">
                           Görev tarihleri: {b.dates!.map((d) => Number(d.slice(8, 10))).join(", ")} {MONTHS[Number(month.slice(5, 7)) - 1]}
                         </span>
@@ -252,58 +293,37 @@ export function FormsDialog({ open, onClose }: { open: boolean; onClose: () => v
             Görev günü seçilmemiş {noDay} işletme listede yok. Görev günü İşletmeler tablosundan seçilir.
           </p>
         )}
-        {type === "attendance" && (
+        {attendance && q.data?.monthOpen && q.data.today && (
+          <Alert>Ay henüz bitmedi: {dayMonth(q.data.today)} sonrası çizelgede boş kalır.</Alert>
+        )}
+        {attendance && (
           <p className="text-xs text-slate-500">
-            Çizelgeye İşletmede Devam sayfasındaki işaretler aktarılır; kontrol edilmemiş (?) günler boş kalır. Bir çizelgeye 5 öğrenci sığar.
+            Çizelgeye İşletmede Devam sayfasındaki işaretler aktarılır. Bir çizelgeye 5 öğrenci sığar.
           </p>
         )}
-        {q.data && <FormSettings settings={q.data.settings} />}
+        {q.data && !attendance && <FormSettings settings={q.data.settings} report={type === "report"} />}
       </div>
     </Modal>
   );
 }
 
-/** Formlardaki okul satırı: program adı ve ilçe (yönetim değiştirir) */
-function FormSettings({ settings }: { settings: FormsData["settings"] }) {
-  const { schoolId } = useAuth();
-  const path = useSchoolPath("internship");
-  const qc = useQueryClient();
-  const toast = useToast();
-  const [programName, setProgramName] = useState(settings.programName);
-  const [district, setDistrict] = useState(settings.district);
-  useEffect(() => {
-    setProgramName(settings.programName);
-    setDistrict(settings.district);
-  }, [settings.programName, settings.district]);
-  const save = useMutation({
-    mutationFn: () => api(`${path}/form-settings`, { method: "PUT", body: { programName, district } }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: [schoolId, "internship", "forms"] });
-      toast.success("Form bilgileri kaydedildi");
-    },
-    onError: (e) => toast.error(e.message),
-  });
-  const dirty = programName !== settings.programName || district !== settings.district;
-  if (!settings.canEdit)
-    return (
-      <p className="text-xs text-slate-500">
-        Okul satırı: {settings.programName || "program adı yok"} · {[settings.district, settings.city].filter(Boolean).join("/") || "ilçe girilmemiş"}
-      </p>
-    );
+/** Formlardaki okul bilgileri Okul Ayarları'ndan gelir; eksikse uyarı */
+function FormSettings({ settings, report }: { settings: FormsData["settings"]; report: boolean }) {
+  const missing = report ? !settings.province || !settings.district : !settings.programName;
+  const text = report
+    ? `Raporda yer: ${[settings.district, settings.province].filter(Boolean).join("/") || "girilmemiş"}`
+    : `Okul satırında program: ${settings.programName || "yazılmıyor"}`;
   return (
-    <details className="rounded-2xl border border-slate-200 px-4 py-3 dark:border-white/10">
-      <summary className="cursor-pointer text-sm font-bold">Form bilgileri</summary>
-      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-        <Field label="Program adı" help="Günlük formda okul adının yanına yazılır.">
-          {(id) => <Input id={id} value={programName} maxLength={80} onChange={(e) => setProgramName(e.target.value)} />}
-        </Field>
-        <Field label="İlçe" help={`Raporda “İlçe/${settings.city || "İl"}” olarak yazılır.`}>
-          {(id) => <Input id={id} value={district} maxLength={60} onChange={(e) => setDistrict(e.target.value)} />}
-        </Field>
-        <Button variant="secondary" disabled={!dirty} loading={save.isPending} onClick={() => save.mutate()} className="sm:mb-6">
-          Kaydet
-        </Button>
-      </div>
-    </details>
+    <p className={clsx("text-xs", missing ? "font-semibold text-amber-700 dark:text-amber-300" : "text-slate-500")}>
+      {text}.{" "}
+      {settings.canEdit ? (
+        <Link to="/ayarlar" className="font-semibold underline">
+          Okul Ayarları'ndan değiştirilir
+        </Link>
+      ) : (
+        "Okul Ayarları'ndan değiştirilir"
+      )}
+      {missing && report ? "; il ve ilçe girilmezse raporda boş kalır." : "."}
+    </p>
   );
 }

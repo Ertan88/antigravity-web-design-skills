@@ -356,6 +356,14 @@ export function Settings() {
           >
             {(id) => <SchoolTypeField id={id} value={v.settings.schoolType ?? ''} derived={splitSchoolName(v.name).type} onChange={(t) => setting('schoolType', t)} />}
           </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="İl" help="Resmî belgelerde (ör. aylık rehberlik raporu) kullanılır.">
+              {(id) => <Input id={id} value={v.settings.province ?? ''} maxLength={40} onChange={(e) => setting('province', e.target.value)} placeholder="ör. Ankara" />}
+            </Field>
+            <Field label="İlçe" help="Panodaki hava durumu yerinden ayrıdır.">
+              {(id) => <Input id={id} value={v.settings.district ?? ''} maxLength={60} onChange={(e) => setting('district', e.target.value)} placeholder="ör. Çankaya" />}
+            </Field>
+          </div>
           <Field label="Logo" help="Şeffaf arka planlı PNG önerilir.">
             {() => (
               <div className="max-w-xs">
@@ -408,6 +416,11 @@ export function Settings() {
             description="Meslek liseleri için: işletmeler, koordinatör öğretmenler ve aylık işletmede devam çizelgesi. Koordinatör öğretmenler devamsızlık ve raporu mobil uygulamadan girer."
           />
           {s.internshipEnabled && <InternshipManagerField value={s.internshipManagerUserId ?? null} onChange={(x) => setting('internshipManagerUserId', x)} />}
+          {s.internshipEnabled && (
+            <Field label="Program adı" help="Günlük rehberlik formunda okul adının yanına yazılır (ör. Anadolu Meslek Programı). Boş bırakılırsa yazılmaz.">
+              {(id) => <Input id={id} value={s.internshipProgramName ?? ''} maxLength={80} onChange={(e) => setting('internshipProgramName', e.target.value)} />}
+            </Field>
+          )}
           <p className="text-sm text-slate-500">
             Panodaki kartların yeri, renkler ve slayt süreleri{' '}
             <Link to="/ekranlar" className="font-semibold text-brand-700 hover:underline">

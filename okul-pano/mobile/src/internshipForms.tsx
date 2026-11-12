@@ -1,6 +1,8 @@
 import { errorText, mondayOf, trDate } from '@okulpano/shared';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
+import { router } from 'expo-router';
+import { openChoice } from './confirm.tsx';
 import { sharePdf } from './download.ts';
 import { useSchoolPath } from './auth.tsx';
 import { useSchoolQuery } from './data.ts';
@@ -62,6 +64,8 @@ interface FormItem {
   date?: string | null;
   holiday?: string | null;
   dates?: string[];
+  /** Devam çizelgesi: kontrol edilmemiş (?) yarım günler */
+  unchecked?: { halves: number; students: number } | null;
 }
 
 const TITLES: Record<FormType, string> = {
@@ -93,22 +97,56 @@ export function FormsSheet({ onClose }: { onClose: () => void }) {
   const [week, setWeek] = useState(() => mondayOf(localToday()));
   const [month, setMonth] = useState(() => localToday().slice(0, 7));
   const daily = type === 'daily';
-  const q = useSchoolQuery<{ items: FormItem[] }>(`internship/forms?type=${daily ? 'daily' : 'report'}&${daily ? `week=${week}` : `month=${month}`}`);
+  const attendance = type === 'attendance';
+  const q = useSchoolQuery<{ items: FormItem[]; monthOpen?: boolean; today?: string; settings: { programName: string; district: string; province: string } }>(
+    `internship/forms?type=${type}&${daily ? `week=${week}` : `month=${month}`}`,
+  );
   const items = useMemo(() => q.data?.items ?? [], [q.data]);
-  const usable = (b: FormItem) => (daily ? Boolean(b.date) : Boolean(b.dates?.length));
+  // Devam çizelgesi görev gününe bağlı değildir: öğrencisi olan her işletme
+  const usable = (b: FormItem) => (daily ? Boolean(b.date) : attendance ? b.students > 0 : Boolean(b.dates?.length));
   const [picked, setPicked] = useState<Set<string>>(new Set());
   useEffect(() => {
     setPicked(new Set(items.filter((b) => usable(b) && !b.holiday).map((b) => b.id)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
   const shown = items.filter(usable).sort((a, b) => (daily ? (a.date ?? '').localeCompare(b.date ?? '') : 0));
-  const noDay = items.filter((b) => !b.visitWeekday).length;
+  const noDay = attendance ? 0 : items.filter((b) => !b.visitWeekday).length;
+  const settings = q.data?.settings;
+  const placeMissing = type === 'report' && settings && (!settings.province || !settings.district);
   const chosen = shown.filter((b) => picked.has(b.id));
   const formCount = type === 'attendance' ? chosen.reduce((n, b) => n + Math.max(1, Math.ceil(b.students / 5)), 0) : chosen.length;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const share = async () => {
+    // Devam çizelgesinde boş kalacak günler: kontrol edilmemişler ve ay bitmediyse bugünden sonrası
+    if (attendance) {
+      const halves = chosen.reduce((n, b) => n + (b.unchecked?.halves ?? 0), 0);
+      const open = Boolean(q.data?.monthOpen);
+      if (halves || open) {
+        const days = String(halves / 2).replace('.', ',');
+        const lines = [
+          halves ? `${chosen.filter((b) => b.unchecked).length} işletmede ${days} gün kontrol edilmedi; bu günler çizelgede boş kalır.` : null,
+          open && q.data?.today ? `Ay henüz bitmedi: ${dayMonth(q.data.today)} sonrası boş kalır.` : null,
+        ].filter(Boolean);
+        const c = await openChoice({
+          title: 'Çizelgede boş günler kalacak',
+          message: lines.join(' '),
+          tone: 'warning',
+          cancelLabel: 'Vazgeç',
+          choices: [
+            ...(halves ? [{ value: 'go' as const, label: "İşletmede Devam'a git", kind: 'secondary' as const }] : []),
+            { value: 'print' as const, label: 'Yine de yazdır', kind: 'primary' as const },
+          ],
+        });
+        if (c === 'go') {
+          onClose();
+          router.push('/isletme-devam');
+          return;
+        }
+        if (c !== 'print') return;
+      }
+    }
     setBusy(true);
     setError(null);
     try {
@@ -206,7 +244,12 @@ export function FormsSheet({ onClose }: { onClose: () => void }) {
                   <T size={12.5} color={colors.faint}>
                     {b.coordinatorName ?? 'Koordinatör seçilmedi'} · {b.students} öğrenci
                   </T>
-                  {!daily && b.dates && (
+                  {attendance && b.unchecked && (
+                    <T size={12.5} weight="700" color={colors.warning}>
+                      {b.unchecked.students} öğrencide {b.unchecked.halves} yarım gün kontrol edilmedi
+                    </T>
+                  )}
+                  {type === 'report' && b.dates && (
                     <T size={12.5} color={colors.faint}>
                       Görev tarihleri: {b.dates.map((d) => Number(d.slice(8, 10))).join(', ')} {MONTHS[Number(month.slice(5, 7)) - 1]}
                     </T>
@@ -220,6 +263,16 @@ export function FormsSheet({ onClose }: { onClose: () => void }) {
               </Pressable>
             );
           })
+        )}
+        {attendance && q.data?.monthOpen && q.data.today && (
+          <T size={12.5} weight="700" color={colors.warning}>
+            Ay henüz bitmedi: {dayMonth(q.data.today)} sonrası çizelgede boş kalır.
+          </T>
+        )}
+        {placeMissing && (
+          <T size={12.5} weight="700" color={colors.warning}>
+            Okul Ayarları'nda il ve ilçe girilmemiş; raporda boş kalır.
+          </T>
         )}
         {noDay > 0 && (
           <T size={12.5} color={colors.faint}>

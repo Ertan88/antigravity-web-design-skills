@@ -180,7 +180,8 @@ export const schoolSettingsSchema = z.object({
   internshipCoordinatorTeacherIds: z.array(z.uuid()).max(500).optional(),
   /** Rehberlik formlarında okul adının yanına yazılan program (ör. "Anadolu Meslek Programı"); boşsa yazılmaz */
   internshipProgramName: z.string().trim().max(80).default('Anadolu Meslek Programı'),
-  /** Aylık rehberlik raporunun "İlçe/İl" satırındaki ilçe (okul kaydında yalnızca il var) */
+  /** Resmî belgelerdeki il ve ilçe (ör. rehberlik raporunun "İlçe/İl" satırı); panodaki hava durumu yerinden ayrıdır */
+  province: z.string().trim().max(40).default(''),
   district: z.string().trim().max(60).default(''),
   /** Arifede (yarım gün) derslerin bittiği saat; kamuda arife 13.00'ten itibaren tatildir */
   halfDayEnd: clock.default('13:00'),

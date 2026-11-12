@@ -864,10 +864,20 @@ export async function internshipRoutes(app: FastifyInstance) {
     return { days, items: list.map((b) => ({ ...b, dates: monthVisitDates(days, b.visitWeekday) })) };
   }
 
+  /** Okul Ayarları'ndan: program adı, resmî il ve ilçe */
   const formSettings = (req: FastifyRequest) => {
     const st = settingsOf(req);
-    return { programName: st.internshipProgramName, district: st.district, city: req.ctx.school.city ?? '' };
+    return { programName: st.internshipProgramName, district: st.district, province: st.province };
   };
+
+  /** Devam çizelgesindeki öğrencilerin hücreleri (işletmelere göre) */
+  async function attendanceRows(req: FastifyRequest, days: InternDay[], month: string, businessIds: Set<string>) {
+    const all = (await internStudents(deps, req.ctx.schoolId)).filter((x) => businessIds.has(x.businessId!));
+    const classIds = [...new Set(all.map((x) => x.classId).filter((x): x is string => Boolean(x)))];
+    const [weekdays, marks] = await Promise.all([schoolWeekdays(deps, req.ctx.schoolId, classIds), marksInRange(deps, req.ctx.schoolId, `${month}-01`, monthLast(month))]);
+    const now = today(req);
+    return all.map((x) => ({ ...x, cells: internCells(days, { school: weekdays.get(x.classId ?? '') ?? NO_SCHOOL, marks: marks.get(x.id) ?? new Map(), today: now }) }));
+  }
 
   /** Yazdırma penceresi: seçilen hafta ya da ayın görevleri */
   app.get(`${base}/forms`, member, async (req) => {
@@ -884,21 +894,34 @@ export async function internshipRoutes(app: FastifyInstance) {
     }
     const month = q.month ?? today(req).slice(0, 7);
     const r = await monthItems(req, month);
+    // Devam çizelgesi: kontrol edilmemiş (?) yarım günler ve ay bitmeden yazdırılırsa boş kalacak günler
+    const unchecked = new Map<string, { halves: number; students: number }>();
+    if (q.type === 'attendance') {
+      const rows = await attendanceRows(req, r.days, month, new Set(r.items.map((b) => b.id)));
+      for (const x of rows) {
+        const n = x.cells.reduce((k, c) => k + c.filter((v) => v === '?').length, 0);
+        if (!n) continue;
+        const u = unchecked.get(x.businessId!) ?? { halves: 0, students: 0 };
+        unchecked.set(x.businessId!, { halves: u.halves + n, students: u.students + 1 });
+      }
+    }
+    const now = today(req);
     return {
       settings,
       month,
-      items: r.items.map((b) => ({ id: b.id, name: b.name, coordinatorName: b.coordinatorName, students: b.students, visitWeekday: b.visitWeekday, dates: b.dates })),
+      today: now,
+      // Ay bitmediyse bugünden sonraki günler çizelgede boş kalır
+      monthOpen: now < monthLast(month),
+      items: r.items.map((b) => ({
+        id: b.id,
+        name: b.name,
+        coordinatorName: b.coordinatorName,
+        students: b.students,
+        visitWeekday: b.visitWeekday,
+        dates: b.dates,
+        unchecked: unchecked.get(b.id) ?? null,
+      })),
     };
-  });
-
-  /** Form bilgileri: program adı ve ilçe (yönetim) */
-  app.put(`${base}/form-settings`, manage, async (req) => {
-    requireModule(req);
-    const body = parse(z.object({ programName: z.string().trim().max(80), district: z.string().trim().max(60) }), req.body);
-    const settings = schoolSettingsSchema.parse({ ...(req.ctx.school.settings ?? {}), internshipProgramName: body.programName, district: body.district });
-    await db.update(schools).set({ settings }).where(eq(schools.id, req.ctx.schoolId));
-    await audit(req, 'update', 'Rehberlik formu bilgileri', null, `${body.programName} · ${body.district}`);
-    return { ok: true };
   });
 
   /**
@@ -937,12 +960,13 @@ export async function internshipRoutes(app: FastifyInstance) {
     } else {
       const month = q.month ?? today(req).slice(0, 7);
       const r = await monthItems(req, month);
-      const chosen = r.items.filter((b) => (picked ? picked.has(b.id) : b.dates.length > 0));
+      // Devam çizelgesi görev gününe bağlı değildir (öğrencisi olan her işletme); rapor görev tarihleriyle
+      const chosen = r.items.filter((b) => (picked ? picked.has(b.id) : q.type === 'attendance' ? b.students > 0 : b.dates.length > 0));
       const monthText = `${MONTHS_TR[Number(month.slice(5, 7)) - 1]} ${month.slice(0, 4)}`;
       if (q.type === 'report') {
         const forms: ReportForm[] = chosen.map((b) => ({
           addressee: `${school.name} Müdürlüğüne`,
-          place: [fs.district, (fs.city || '').toLocaleUpperCase('tr-TR')].filter(Boolean).join('/'),
+          place: [fs.district, fs.province.toLocaleUpperCase('tr-TR')].filter(Boolean).join('/'),
           area: b.areaName ?? '',
           date: trDate(b.dates.at(-1)),
           business: b.name,
@@ -954,10 +978,7 @@ export async function internshipRoutes(app: FastifyInstance) {
         pdf = await reportFormsPdf(forms);
         name = `aylik-rehberlik-raporu-${month}.pdf`;
       } else {
-        const all = (await internStudents(deps, req.ctx.schoolId)).filter((x) => chosen.some((b) => b.id === x.businessId));
-        const classIds = [...new Set(all.map((x) => x.classId).filter((x): x is string => Boolean(x)))];
-        const [weekdays, marks] = await Promise.all([schoolWeekdays(deps, req.ctx.schoolId, classIds), marksInRange(deps, req.ctx.schoolId, `${month}-01`, monthLast(month))]);
-        const now = today(req);
+        const all = await attendanceRows(req, r.days, month, new Set(chosen.map((b) => b.id)));
         const letter = (c: InternCell) => (c === 'TA' || c === 'T' ? 'T' : c === 'W' || c === '?' || c === '' || c === 'K' ? '' : c);
         const num = (v: number) => String(v).replace('.', ',');
         const forms: AttendanceForm[] = [];
@@ -965,7 +986,7 @@ export async function internshipRoutes(app: FastifyInstance) {
           const rows = all
             .filter((x) => x.businessId === b.id)
             .map((x) => {
-              const cells = internCells(r.days, { school: weekdays.get(x.classId ?? '') ?? NO_SCHOOL, marks: marks.get(x.id) ?? new Map(), today: now });
+              const cells = x.cells;
               const t = internTotals(cells);
               return {
                 name: x.fullName,
