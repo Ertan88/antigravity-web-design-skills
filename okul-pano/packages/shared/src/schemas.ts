@@ -157,6 +157,11 @@ export const schoolSettingsSchema = z.object({
   /** "Ayşe Nur Yılmaz" yerine "Ayşe Nur Y." gösterimi (KVKK dostu varsayılan) */
   birthdayNameFormat: z.enum(['full', 'initial']).default('initial'),
   slideDurationSec: z.number().int().min(3).max(300).default(10),
+  /**
+   * Bir duyurunun panoda en çok kalma süresi: süresi girilmemiş duyurular metin uzunluğuna göre en çok bu kadar kalır;
+   * elle bundan uzun süre girilen duyuru onaylayıcının onayına düşer
+   */
+  slideMaxDurationSec: z.number().int().min(10).max(300).default(60),
   /** Kayan yazı hızı, piksel/saniye */
   tickerSpeed: z.number().int().min(20).max(300).default(90),
   videoSound: z.boolean().default(false),
@@ -362,7 +367,10 @@ export const announcementSchema = z
     schedule: announcementScheduleSchema.nullable().optional(),
     imageUrl: optionalText(500),
     youtubeUrl: optionalText(300),
-    /** Boşsa görsel/metin için okul varsayılanı, video için videonun kendi süresi kullanılır. */
+    /**
+     * Boşsa görsel/metin metnin uzunluğuna göre (okul varsayılanı ile üst sınır arasında), video kendi süresince kalır.
+     * Okulun üst sınırından (slideMaxDurationSec) uzun süre onaylayıcının onayına düşer.
+     */
     durationSec: z.number().int().min(3).max(1800).nullable().optional(),
     startsAt: isoDateTime.nullable().optional(),
     endsAt: isoDateTime.nullable().optional(),

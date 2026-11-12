@@ -307,8 +307,8 @@ export function Layout() {
 
       {open && (
         <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
-          <aside className="absolute inset-y-0 left-0 w-72 max-w-[85vw] shadow-2xl">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm dark:bg-black/65" onClick={() => setOpen(false)} />
+          <aside className="absolute inset-y-0 left-0 w-72 max-w-[85vw] shadow-2xl dark:border-r dark:border-white/15">
             <button
               type="button"
               aria-label="Menüyü kapat"

@@ -1,4 +1,4 @@
-import { announcementSchema, designTemplate, designTitle, parseYouTubeUrl, youTubeThumbnail, type AnnouncementDesign } from '@okulpano/shared';
+import { announcementSchema, autoSlideSeconds, designTemplate, designTitle, parseYouTubeUrl, youTubeThumbnail, type AnnouncementDesign } from '@okulpano/shared';
 import clsx from 'clsx';
 import { useEffect, useState } from 'react';
 import type { ModalApi } from '../../components/CrudPage.tsx';
@@ -94,6 +94,8 @@ export function AnnouncementWizard({
   onDismiss,
   onSaved,
   defaultDuration,
+  maxDuration = 60,
+  isApprover = false,
   approvalNeeded,
 }: {
   api: ModalApi<Announcement, AnnouncementForm>;
@@ -104,6 +106,10 @@ export function AnnouncementWizard({
   /** Kayıt başarılı (taslaktan geldiyse taslak silinir) */
   onSaved: () => void;
   defaultDuration: number;
+  /** Okulun üst sınırı: süresi girilmemiş duyuru metne göre en çok bu kadar kalır; elle daha uzunu onaya düşer */
+  maxDuration?: number;
+  /** Duyuru onaylama yetkisi: uzun süre onu onaya düşürmez */
+  isApprover?: boolean;
   /** Okulda duyuru onayı açık ve kişinin onay yetkisi yok: son düğme "Onaya gönder" */
   approvalNeeded: boolean;
 }) {
@@ -149,7 +155,10 @@ export function AnnouncementWizard({
     if (await api.submit()) onSaved();
   };
 
-  const submitLabel = editing ? (approvalNeeded ? 'Onaya gönder' : 'Kaydet') : !v.isActive ? 'Kaydet (yayında değil)' : approvalNeeded ? 'Onaya gönder' : 'Yayına al';
+  // Üst sınırdan uzun ekranda kalma süresi onay yetkisi olmayanda onaya düşer (sunucu da aynı kuralı uygular)
+  const tooLong = !isApprover && Number(v.durationSec) > maxDuration;
+  const needsApproval = approvalNeeded || tooLong;
+  const submitLabel = editing ? (needsApproval ? 'Onaya gönder' : 'Kaydet') : !v.isActive ? 'Kaydet (yayında değil)' : needsApproval ? 'Onaya gönder' : 'Yayına al';
 
   return (
     <Modal
@@ -188,8 +197,8 @@ export function AnnouncementWizard({
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
             <div className="min-w-0 space-y-4">
               {step === 1 && <ContentStep api={api} />}
-              {step === 2 && <WhereWhenStep api={api} defaultDuration={defaultDuration} />}
-              {step === 3 && <SummaryStep api={api} defaultDuration={defaultDuration} onEdit={go} />}
+              {step === 2 && <WhereWhenStep api={api} defaultDuration={defaultDuration} maxDuration={maxDuration} isApprover={isApprover} />}
+              {step === 3 && <SummaryStep api={api} defaultDuration={defaultDuration} maxDuration={maxDuration} onEdit={go} />}
             </div>
             <MiniBoard f={v} />
           </div>
@@ -299,7 +308,12 @@ function ContentStep({ api }: { api: ModalApi<Announcement, AnnouncementForm> })
   );
 }
 
-function WhereWhenStep({ api, defaultDuration }: { api: ModalApi<Announcement, AnnouncementForm>; defaultDuration: number }) {
+/** Süresi girilmemiş duyurunun panodaki süresi: metnin okunma süresi (okul varsayılanı ile üst sınır arasında) */
+function autoDuration(v: AnnouncementForm, defaultDuration: number, maxDuration: number): number {
+  return autoSlideSeconds({ title: v.kind === 'design' ? '' : v.title, body: v.kind === 'design' ? '' : v.body, design: v.kind === 'design' ? v.design : null }, defaultDuration, maxDuration);
+}
+
+function WhereWhenStep({ api, defaultDuration, maxDuration, isApprover }: { api: ModalApi<Announcement, AnnouncementForm>; defaultDuration: number; maxDuration: number; isApprover: boolean }) {
   const { values: v, set, errors } = api.form;
   return (
     <>
@@ -315,25 +329,40 @@ function WhereWhenStep({ api, defaultDuration }: { api: ModalApi<Announcement, A
         error={errors.schedule}
         endsError={errors.endsAt}
       />
-      <Field label="Slaytın ekranda kalma süresi (sn)" error={errors.durationSec}>
+      <Field
+        label="Slaytın ekranda kalma süresi (sn)"
+        error={errors.durationSec}
+        help={
+          v.kind === 'video'
+            ? 'Boş bırakılırsa video bitene kadar kalır.'
+            : `Boş bırakılırsa metnin uzunluğuna göre kalır (şu an ${autoDuration(v, defaultDuration, maxDuration)} sn). En çok ${maxDuration} sn${isApprover ? '' : '; daha uzun süre onaylayıcının onayına düşer'}.`
+        }
+      >
         {(id) => (
-          <Input
-            id={id}
-            type="number"
-            min={3}
-            max={1800}
-            className="max-w-56"
-            value={v.durationSec}
-            onChange={(e) => set('durationSec', e.target.value)}
-            placeholder={v.kind === 'video' ? 'Video süresi' : `Varsayılan (${defaultDuration})`}
-          />
+          <>
+            <Input
+              id={id}
+              type="number"
+              min={3}
+              max={300}
+              className="max-w-56"
+              value={v.durationSec}
+              onChange={(e) => set('durationSec', e.target.value)}
+              placeholder={v.kind === 'video' ? 'Video süresi' : `Otomatik (${autoDuration(v, defaultDuration, maxDuration)} sn)`}
+            />
+            {!isApprover && Number(v.durationSec) > maxDuration && (
+              <p className="mt-1.5 text-sm font-semibold text-amber-700 dark:text-amber-400">
+                {maxDuration} saniyeden uzun süre onaylayıcının onayına düşer; onaylanınca yayına girer.
+              </p>
+            )}
+          </>
         )}
       </Field>
     </>
   );
 }
 
-function SummaryStep({ api, defaultDuration, onEdit }: { api: ModalApi<Announcement, AnnouncementForm>; defaultDuration: number; onEdit: (step: number) => void }) {
+function SummaryStep({ api, defaultDuration, maxDuration, onEdit }: { api: ModalApi<Announcement, AnnouncementForm>; defaultDuration: number; maxDuration: number; onEdit: (step: number) => void }) {
   const { values: v, set } = api.form;
   const screens = useList<Screen>('screens');
   const names = v.screenIds.map((id) => screens.data?.find((s) => s.id === id)?.name ?? '?');
@@ -343,7 +372,7 @@ function SummaryStep({ api, defaultDuration, onEdit }: { api: ModalApi<Announcem
     { label: 'Başlık', value: title || '—', step: 1 },
     { label: 'Panolar', value: names.length ? names.join(', ') : 'Tüm panolar', step: 2 },
     { label: 'Yayın planı', value: planSentence(v.startsAt, v.endsAt, v.schedule, names), step: 2 },
-    { label: 'Ekranda kalma süresi', value: v.durationSec ? `${v.durationSec} sn` : v.kind === 'video' ? 'Video süresi' : `Varsayılan (${defaultDuration} sn)`, step: 2 },
+    { label: 'Ekranda kalma süresi', value: v.durationSec ? `${v.durationSec} sn` : v.kind === 'video' ? 'Video süresi' : `Otomatik, metne göre (${autoDuration(v, defaultDuration, maxDuration)} sn)`, step: 2 },
   ];
   return (
     <>

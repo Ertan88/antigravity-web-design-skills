@@ -93,7 +93,7 @@ export function NotificationBell() {
         )}
       </button>
       {open && (
-        <div className="animate-toast absolute top-11 right-0 z-50 w-[22rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-surface shadow-[0_16px_50px_-12px_rgba(15,23,42,0.4)] ring-1 ring-slate-200">
+        <div className="animate-toast absolute top-11 right-0 z-50 w-[22rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-elevated shadow-[0_16px_50px_-12px_rgba(15,23,42,0.4)] ring-1 ring-slate-200 dark:ring-white/15">
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
             <span className="text-sm font-semibold text-ink">
               Bildirimler

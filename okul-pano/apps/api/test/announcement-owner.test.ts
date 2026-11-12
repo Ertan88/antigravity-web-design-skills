@@ -50,3 +50,18 @@ describe('başkasının duyurusu', () => {
     expect((await approver.del(path(`/${id}`))).statusCode).toBe(204);
   });
 });
+
+describe('ekranda kalma süresi üst sınırı', () => {
+  it('okulun üst sınırından (60 sn) uzun süre onaylayıcının onayına düşer; onaylayıcı ve sınır içi süre doğrudan yayına girer', async () => {
+    const long = await a.post(path(), { ...body('Uzun süreli'), durationSec: 90 });
+    expectStatus(long, 201);
+    expect(long.json().approvalStatus).toBe('pending');
+    const ok = await a.post(path(), { ...body('Sınır içinde'), durationSec: 45 });
+    expect(ok.json().approvalStatus).toBe('approved');
+    const auto = await a.post(path(), body('Süresiz (okuma süresi)'));
+    expect(auto.json().approvalStatus).toBe('approved');
+    const byApprover = await approver.post(path(), { ...body('Onaylayıcıdan uzun'), durationSec: 120 });
+    expect(byApprover.json().approvalStatus).toBe('approved');
+  });
+});
+

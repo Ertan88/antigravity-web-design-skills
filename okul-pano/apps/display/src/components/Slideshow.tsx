@@ -1,4 +1,4 @@
-import { gradeHue, isWithinWindow, parseYouTubeUrl, splitSchoolName, youTubeThumbnail, type DisplayAnnouncement, type ExamSlideRow } from '@okulpano/shared/client';
+import { gradeHue, isWithinWindow, parseYouTubeUrl, slideSeconds, splitSchoolName, youTubeThumbnail, type DisplayAnnouncement, type ExamSlideRow } from '@okulpano/shared/client';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { DesignSlide } from '@okulpano/slides';
 import { MegaphoneIcon, SchoolIcon } from './Icons.tsx';
@@ -280,6 +280,8 @@ interface Props {
   announcements: DisplayAnnouncement[];
   now: Date;
   defaultDurationSec: number;
+  /** Okulun üst sınırı: süresi girilmemiş duyuru metin uzunluğuna göre en çok bu kadar kalır */
+  maxDurationSec?: number;
   videoSound: boolean;
   schoolName: string;
   schoolType?: string;
@@ -294,7 +296,7 @@ interface Props {
   onShow?: (s: { index: number; count: number; title: string | null }) => void;
 }
 
-export function Slideshow({ announcements, now, defaultDurationSec, videoSound, schoolName, schoolType, logoUrl, full = false, nav, paused = false, onShow }: Props) {
+export function Slideshow({ announcements, now, defaultDurationSec, maxDurationSec = 60, videoSound, schoolName, schoolType, logoUrl, full = false, nav, paused = false, onShow }: Props) {
   // Yayın aralığı her 30 saniyede bir yeniden değerlendirilir (her saniye değil)
   const windowKey = Math.floor(now.getTime() / 30_000);
   const slides = useMemo(
@@ -339,7 +341,8 @@ export function Slideshow({ announcements, now, defaultDurationSec, videoSound, 
     showRef.current?.({ index, count, title: shownTitle });
   }, [index, count, shownTitle]);
 
-  const duration = slide ? (slide.durationSec ?? defaultDurationSec) : 0;
+  // Süresi girilmemiş metin, görsel ve tasarım duyurusu metnin uzunluğuna göre kalır (okuma süresi, üst sınıra kadar)
+  const duration = !slide ? 0 : slide.kind === 'exams' ? (slide.durationSec ?? defaultDurationSec) : slideSeconds(slide, defaultDurationSec, maxDurationSec);
   // Zamanlayıcı slaytın kimliğine bağlıdır: liste her saniye yeniden kurulsa da (ör. başarı slaytları)
   // geri sayım sıfırlanmaz, slayt süresi dolunca sıradakine geçilir
   const slideId = slide?.id ?? null;

@@ -36,6 +36,14 @@ const LIGHT = {
   successSoft: '#dcfce7',
   gold: '#a16207',
   goldSoft: '#fef3c7',
+  /**
+   * Üst katman (alt sayfa, onay penceresi, açılır pencere): ekranın üstünde ayrı bir yüzey olduğu belli olmalı.
+   * Açık temada beyaz; koyu temada kartlardan belirgin açık ton, çevresinde ince açık çizgi ve koyu karartma.
+   */
+  elevated: '#ffffff',
+  elevatedBorder: '#e7e3dc',
+  /** Üst katmanın arkasındaki karartma */
+  scrim: 'rgba(28,25,23,0.45)',
 };
 
 export type Palette = Record<keyof typeof LIGHT, string>;
@@ -69,6 +77,9 @@ const DARK: Palette = {
   successSoft: '#10301e',
   gold: '#fbbf24',
   goldSoft: '#3a300c',
+  elevated: '#2b2723',
+  elevatedBorder: '#4a443d',
+  scrim: 'rgba(0,0,0,0.7)',
 };
 
 export const colors: Palette = { ...LIGHT };

@@ -163,12 +163,12 @@ export function ConfirmHost() {
 
   return createPortal(
     <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center sm:p-6">
-      <div className="animate-fade absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => settle(false)} />
+      <div className="animate-fade absolute inset-0 bg-black/40 backdrop-blur-[2px] dark:bg-black/65" onClick={() => settle(false)} />
       <div
         role="alertdialog"
         aria-modal="true"
         aria-label={pending.title}
-        className="animate-toast relative w-full overflow-hidden rounded-t-3xl bg-surface shadow-2xl sm:max-w-[30rem] sm:rounded-3xl"
+        className="animate-toast relative w-full overflow-hidden rounded-t-3xl bg-elevated shadow-2xl sm:max-w-[30rem] sm:rounded-3xl dark:ring-1 dark:ring-white/12"
       >
         <div className="flex gap-4 px-6 pt-6 pb-5">
           <div className={clsx('grid size-11 shrink-0 place-items-center rounded-2xl', t.tile)}>

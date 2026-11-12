@@ -32,6 +32,16 @@ Böyle bir durum varsa kullanıcı **onaylanmaz**. Yanlış açıkça söylenir;
     `<IconButton tone="delete">`, özel düğmede `DELETE_TONE` sınıfları (`apps/admin/src/components/ui.tsx`).
   - Mobil: yazılı düğme `<Button variant="delete">`, çöp kutusu simgesi `DeleteIconButton` (`mobile/src/ui.tsx`).
   - Dolu kırmızı (`variant="danger"`) yalnızca onay penceresindeki son adım gibi kesin işlem düğmesindir.
+- **Katmanlar iki temada da ayrışır.** Pencere, alt sayfa, onay penceresi, açılır menü ve bildirim kutusu gibi üst
+  katmanlar arka plandan ve arkadaki kartlardan belirgin biçimde ayrılır. Koyu temada bunun için arkadaki kartlardan daha
+  açık bir yüzey, ince açık bir çerçeve ve daha koyu bir karartma kullanılır; gölge tek başına yetmez.
+  - Web (panel): yüzey `bg-elevated`, koyu temada `dark:ring-1 dark:ring-white/12` ya da `dark:border-white/15`,
+    karartma `bg-black/40 dark:bg-black/65`. Ortak `Modal`, `confirm` ve açılır menüler bunu kullanır.
+  - Mobil (uygulama ve web sürümü `/app`): `colors.elevated`, `colors.elevatedBorder`, `colors.scrim`. Ortak `Sheet`
+    ve `confirm` bunu kullanır.
+  - Üst katmanın içindeki düğme, kutu ve satırlar da bu yüzeyde görünür kalır (ör. ikincil düğme `colors.card` zemin
+    ve `borderStrong` çerçeveyle).
+  - Yeni eklenen ya da değiştirilen her ekran ve pencere açık ve koyu temada kontrol edilir.
 - **Panonun genel düzeni bozulamaz.** Üst bar (okul adı, saat, hava), sol ve sağ sütundaki kartlar ve alttaki
   kayan yazı her zaman yerinde kalır. Hiçbir özellik, slayt ya da değişiklik bunları gizleyemez, küçültemez ya da
   kaplayamaz; böyle bir seçenek önerilmez bile. Slaytlar (duyurular, "Bugünkü sınavlar" vb.) yalnızca ortadaki

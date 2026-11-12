@@ -327,7 +327,7 @@ export function Select({
             id={listId}
             role="listbox"
             style={{ left: pos.left, top: pos.top, minWidth: pos.width, maxHeight: pos.max, transform: pos.up ? 'translateY(-100%)' : undefined }}
-            className="fixed z-[70] max-w-[min(32rem,calc(100vw-16px))] overflow-y-auto rounded-2xl border border-slate-200 bg-surface p-1.5 text-ink shadow-[0_18px_40px_-16px_rgb(0_0_0/0.35),0_2px_6px_rgb(0_0_0/0.06)]"
+            className="fixed z-[70] max-w-[min(32rem,calc(100vw-16px))] overflow-y-auto rounded-2xl border border-slate-200 bg-elevated p-1.5 text-ink dark:border-white/15 shadow-[0_18px_40px_-16px_rgb(0_0_0/0.35),0_2px_6px_rgb(0_0_0/0.06)]"
           >
             {options.map((o, i) => (
               <Fragment key={`${o.group ?? ''}|${o.value}|${i}`}>
@@ -595,7 +595,7 @@ export function Modal({
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6">
       {/* Dışarı tıklamak pencereyi kapatmaz (yazılanlar kaybolmasın): pencere kısaca sallanır ve nasıl kapanacağı söylenir */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setNudge((n) => n + 1)} />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] dark:bg-black/65" onClick={() => setNudge((n) => n + 1)} />
       {nudge > 0 && (
         <div key={nudge} role="status" className="animate-toast pointer-events-none absolute top-4 left-1/2 z-10 -translate-x-1/2 rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-lg">
           Kapatmak için Vazgeç ya da Kapat düğmesini kullanın
@@ -606,7 +606,8 @@ export function Modal({
         aria-modal="true"
         aria-label={title}
         className={clsx(
-          'relative flex max-h-[92vh] w-full flex-col rounded-t-3xl bg-surface shadow-2xl sm:rounded-3xl',
+          // Üst katman: koyu temada da arkadaki kartlardan ayrışır (açık yüzey + ince açık çerçeve)
+          'relative flex max-h-[92vh] w-full flex-col rounded-t-3xl bg-elevated shadow-2xl sm:rounded-3xl dark:ring-1 dark:ring-white/12',
           shaking && 'animate-nudge',
           size === 'md' && 'sm:max-w-lg',
           size === 'lg' && 'sm:max-w-2xl',
@@ -825,7 +826,7 @@ export function MonthPicker({
             role="dialog"
             aria-label="Ay seç"
             style={{ left: pos.left, top: pos.top, transform: pos.up ? 'translateY(-100%)' : undefined }}
-            className="fixed z-[70] w-[280px] rounded-2xl border border-slate-200 bg-surface p-3 text-ink shadow-[0_18px_40px_-16px_rgb(0_0_0/0.35),0_2px_6px_rgb(0_0_0/0.06)]"
+            className="fixed z-[70] w-[280px] rounded-2xl border border-slate-200 bg-elevated p-3 text-ink dark:border-white/15 shadow-[0_18px_40px_-16px_rgb(0_0_0/0.35),0_2px_6px_rgb(0_0_0/0.06)]"
           >
             <div className="mb-2 flex items-center justify-between">
               <IconButton label="Önceki yıl" disabled={Boolean(min) && year - 1 < Number(min!.slice(0, 4))} onClick={() => setYear((y) => y - 1)} className="size-8! disabled:opacity-30">

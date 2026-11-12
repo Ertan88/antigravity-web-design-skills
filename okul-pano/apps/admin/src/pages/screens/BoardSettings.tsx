@@ -193,8 +193,21 @@ export function Appearance({ editable }: { editable: boolean }) {
 
       <Section title="Akış" description="Slayt, kayan yazı ve zil sayacı.">
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Slayt süresi (sn)" help="Süresi girilmemiş duyurular için">
+          <Field label="Slayt süresi (sn)" help="Kısa duyurular en az bu kadar kalır; uzun duyurular metne göre uzar">
             {(id) => <Input id={id} type="number" min={3} max={300} disabled={!editable} value={s.slideDurationSec} onChange={(e) => set('slideDurationSec', Number(e.target.value))} />}
+          </Field>
+          <Field label="En uzun slayt süresi (sn)" help="Bir duyuru en çok bu kadar kalır; elle daha uzun süre girilen duyuru onaya düşer">
+            {(id) => (
+              <Input
+                id={id}
+                type="number"
+                min={10}
+                max={300}
+                disabled={!editable}
+                value={s.slideMaxDurationSec ?? 60}
+                onChange={(e) => set('slideMaxDurationSec', Number(e.target.value))}
+              />
+            )}
           </Field>
           <Field label="Kayan yazı hızı">
             {(id) => (

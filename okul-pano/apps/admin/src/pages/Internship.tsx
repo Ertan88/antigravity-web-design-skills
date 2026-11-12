@@ -812,7 +812,7 @@ function CellMenu({
       ref={ref}
       role="dialog"
       aria-label="İşaret seç"
-      className="fixed z-50 w-[320px] rounded-2xl border border-slate-200 bg-surface p-3.5 text-sm shadow-2xl"
+      className="fixed z-50 w-[320px] rounded-2xl border border-slate-200 bg-elevated p-3.5 text-sm shadow-2xl dark:border-white/15"
       style={{ left, top, transform: below ? undefined : "translateY(-100%)" }}
     >
       <div className="flex items-baseline justify-between gap-2">

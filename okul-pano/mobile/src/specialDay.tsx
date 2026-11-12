@@ -161,8 +161,8 @@ export function SpecialDayPopup() {
   const celebration = day.def.kind === 'celebration';
   return (
     <Modal visible={open} transparent animationType="fade" statusBarTranslucent onRequestClose={close}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 }}>
-        <View accessibilityViewIsModal style={{ backgroundColor: colors.card, borderRadius: 28, overflow: 'hidden' }}>
+      <View style={{ flex: 1, backgroundColor: colors.scrim, justifyContent: 'center', padding: 20 }}>
+        <View accessibilityViewIsModal style={{ backgroundColor: colors.elevated, borderWidth: 1, borderColor: colors.elevatedBorder, borderRadius: 28, overflow: 'hidden' }}>
           <Art day={day} />
           <Pressable
             accessibilityRole="button"

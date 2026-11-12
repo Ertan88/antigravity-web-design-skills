@@ -22,12 +22,17 @@ export function Sheet({ open, onClose, children }: { open: boolean; onClose: () 
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.35)',
+            backgroundColor: colors.scrim,
           }}
         />
         <View
           style={{
-            backgroundColor: colors.card,
+            // Üst katman: koyu temada da arka plandan ayrışır (açık ton + ince çerçeve)
+            backgroundColor: colors.elevated,
+            borderTopWidth: 1,
+            borderLeftWidth: 1,
+            borderRightWidth: 1,
+            borderColor: colors.elevatedBorder,
             borderTopLeftRadius: 28,
             borderTopRightRadius: 28,
             paddingHorizontal: 16,

@@ -541,6 +541,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
       announcements={slides}
       now={now}
       defaultDurationSec={s.slideDurationSec}
+      maxDurationSec={s.slideMaxDurationSec ?? 60}
       videoSound={s.videoSound}
       schoolName={school.name}
       schoolType={s.schoolType}

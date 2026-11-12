@@ -46,6 +46,8 @@
   --color-tile-dark: #1c1917;
   /* Temaya göre değişen yüzey ve yazı renkleri */
   --color-surface: #ffffff;
+  /* Üst katman (pencere, onay penceresi, açılır menü, bildirim kutusu): koyu temada kartlardan belirgin açık */
+  --color-elevated: #ffffff;
   --color-ink: #1c1917;
   --radius-xl: 0.875rem;
   --radius-2xl: 1.25rem;
@@ -61,6 +63,7 @@
   color-scheme: dark;
   /* Kartlar zeminden belirgin biçimde açık, kenarlıklar görünür */
   --color-surface: #1f1d1a;
+  --color-elevated: #2b2722;
   --color-ink: #f5f3ef;
 
   --color-slate-50: #0c0b0a;

@@ -29,7 +29,12 @@ function safeSet(key: string, value: string | null) {
 export const embedded = (() => {
   try {
     if ((window as { ReactNativeWebView?: unknown }).ReactNativeWebView) return true;
-    if (new URLSearchParams(location.search).get('embed') === '1') return true;
+    const params = new URLSearchParams(location.search);
+    if (params.get('embed') === '1') return true;
+    // Mobil uygulamanın eski sürümleri önizlemeyi ?embed=1 olmadan açar: Android'in uygulama içi tarayıcısı ("; wv)")
+    // önizleme anahtarıyla açtıysa ve TV uygulaması değilse gömülü önizlemedir
+    const ua = navigator.userAgent;
+    if (params.has('preview') && /; wv\)/.test(ua) && !/OkulYayinPano/.test(ua)) return true;
     return window.self !== window.top;
   } catch {
     return true;

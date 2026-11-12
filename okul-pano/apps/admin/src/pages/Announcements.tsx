@@ -184,6 +184,8 @@ export function Announcements() {
           api={m}
           startStep={draft?.step ?? 0}
           defaultDuration={defaultDuration}
+          maxDuration={school.data?.settings.slideMaxDurationSec ?? 60}
+          isApprover={approver}
           approvalNeeded={approvalNeeded}
           onDismiss={(values, step) => {
             void (async () => {

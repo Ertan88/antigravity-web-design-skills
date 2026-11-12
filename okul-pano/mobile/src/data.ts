@@ -19,7 +19,7 @@ export interface SchoolInfo {
   logoUrl: string | null;
   timezone: string;
   supportAccessUntil?: string | null;
-  settings: { requireApproval?: boolean; schoolType?: string; lunchThresholdMin?: number; specialDays?: unknown };
+  settings: { requireApproval?: boolean; schoolType?: string; lunchThresholdMin?: number; specialDays?: unknown; slideDurationSec?: number; slideMaxDurationSec?: number };
 }
 
 export interface MeToday {
@@ -213,6 +213,8 @@ export interface AnnouncementDraft {
     endsAt?: string;
     /** Mobilin süre seçimi (1, 3, 7 gün ya da süresiz) */
     until?: '1' | '3' | '7' | 'none';
+    /** Panoda ekranda kalma süresi (sn); boşsa metne göre otomatik (web formunda metin olarak tutulur) */
+    durationSec?: string;
   };
   updatedAt: string;
 }

@@ -33,10 +33,15 @@ import { badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 import { notifyUsers, usersWithPermission } from '../lib/push.ts';
 import { registerResource } from './crud.ts';
 
-/** Onay akışı açıksa onay yetkisi olmayanın eklediği / değiştirdiği duyuru onay bekler */
-function approvalFor(req: FastifyRequest) {
+/**
+ * Onay akışı açıksa onay yetkisi olmayanın eklediği / değiştirdiği duyuru onay bekler. Onay akışı kapalı olsa da
+ * okulun üst sınırından (varsayılan 60 sn) uzun ekranda kalma süresi girilen duyuru onaylayıcının onayına düşer.
+ */
+function approvalFor(req: FastifyRequest, durationSec?: number | null) {
   const settings = schoolSettingsSchema.parse(req.ctx.school.settings ?? {});
-  const pending = settings.requireApproval && !req.ctx.permissions.includes('announcements.approve');
+  const approver = req.ctx.permissions.includes('announcements.approve');
+  const tooLong = durationSec != null && durationSec > settings.slideMaxDurationSec;
+  const pending = !approver && (settings.requireApproval || tooLong);
   return pending
     ? { approvalStatus: 'pending' as const, reviewedBy: null, reviewedAt: null, reviewNote: null }
     : { approvalStatus: 'approved' as const, reviewedBy: null, reviewedAt: null, reviewNote: null };
@@ -80,7 +85,7 @@ export async function contentRoutes(app: FastifyInstance) {
       design: i.kind === 'design' ? (i.design ?? null) : null,
       screenIds: i.screenIds?.length ? [...new Set(i.screenIds)] : null,
       schedule: i.schedule && (i.schedule.days.length || i.schedule.from || i.schedule.to || i.schedule.phase !== 'any') ? i.schedule : null,
-      ...approvalFor(req),
+      ...approvalFor(req, i.durationSec),
       startsAt: toDate(i.startsAt),
       endsAt: toDate(i.endsAt),
       ...(req.method === 'POST' ? { createdBy: req.ctx.userId } : {}),

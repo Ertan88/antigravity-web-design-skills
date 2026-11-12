@@ -1,6 +1,7 @@
 import { errorText } from '@okulpano/shared';
 import { parseYouTubeUrl } from '@okulpano/shared/youtube';
 import { ANNOUNCEMENT_TEMPLATES, designFields, designTemplate, designTitle, type AnnouncementDesign } from '@okulpano/shared/designs';
+import { autoSlideSeconds } from '@okulpano/shared/slideDuration';
 import { useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -47,6 +48,8 @@ interface State {
   screenIds: string[];
   phase: Phase;
   until: Until;
+  /** Panoda ekranda kalma süresi (sn); boşsa metnin uzunluğuna göre otomatik */
+  duration: number | null;
 }
 
 const hasContent = (s: State) => Boolean(s.title.trim() || s.body.trim() || s.imageUrl || s.youtubeUrl.trim() || Object.values(s.fields).some((v) => v?.trim()));
@@ -76,6 +79,7 @@ function toDraftData(s: State): AnnouncementDraft['data'] {
     schedule: { days: [], from: null, to: null, phase: s.phase === 'break' ? 'break' : 'any' },
     endsAt: end ? localInput(end) : '',
     until: s.until === 'keep' ? '7' : s.until,
+    durationSec: s.duration ? String(s.duration) : '',
   };
 }
 
@@ -108,6 +112,7 @@ export default function DuyuruYeni() {
   const [screenIds, setScreenIds] = useState<string[]>([]);
   const [phase, setPhase] = useState<Phase>('any');
   const [until, setUntil] = useState<Until>('7');
+  const [duration, setDuration] = useState<number | null>(null);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,6 +137,7 @@ export default function DuyuruYeni() {
     setScreenIds(x.screenIds ?? []);
     setPhase(x.schedule?.phase === 'break' ? 'break' : 'any');
     setUntil(x.until ?? (x.endsAt ? '7' : 'none'));
+    setDuration(x.durationSec ? Number(x.durationSec) || null : null);
     setStep(Math.min(3, Math.max(0, d.step)));
   }, [taslak, drafts.data]);
 
@@ -152,6 +158,7 @@ export default function DuyuruYeni() {
     setImageUrl(a.imageUrl);
     setYoutubeUrl(a.youtubeUrl ?? '');
     setScreenIds(a.screenIds ?? []);
+    setDuration(a.durationSec ?? null);
     if (duzenle) {
       setEditing(a);
       setPhase('keep');
@@ -164,7 +171,7 @@ export default function DuyuruYeni() {
   }, [duzenle, kopya, announcements.data]);
 
   // Ekrandan yarıda çıkılırsa taslak saklanır (geri düğmesi, telefonun geri tuşu, sekme değişimi)
-  const state: State = { kind, templateId, fields, title, body, imageUrl, youtubeUrl, screenIds, phase, until };
+  const state: State = { kind, templateId, fields, title, body, imageUrl, youtubeUrl, screenIds, phase, until, duration };
   const latest = useRef({ state, step: furthest, draftId, draftsPath, schoolId: school?.id, editing: Boolean(duzenle) });
   latest.current = { state, step: furthest, draftId, draftsPath, schoolId: school?.id, editing: Boolean(duzenle) };
   const submitted = useRef(false);
@@ -184,7 +191,14 @@ export default function DuyuruYeni() {
 
   const t = designTemplate(templateId);
   const design: AnnouncementDesign = { template: t.id, palette: palette ?? t.palette, fields };
-  const needsApproval = Boolean(info.data?.settings.requireApproval) && !can('announcements.approve');
+  // Panoda kalma süresi: boşsa metnin uzunluğuna göre (okul varsayılanı ile üst sınır arasında); üst sınırdan uzun
+  // süre onay yetkisi olmayanda onaya düşer (sunucu da aynı kuralı uygular)
+  const defaultSec = info.data?.settings.slideDurationSec ?? 10;
+  const maxSec = info.data?.settings.slideMaxDurationSec ?? 60;
+  const approver = can('announcements.approve');
+  const autoSec = autoSlideSeconds(kind === 'design' ? { design } : { title, body }, defaultSec, maxSec);
+  const tooLong = !approver && duration != null && duration > maxSec;
+  const needsApproval = (Boolean(info.data?.settings.requireApproval) && !approver) || tooLong;
 
   const pick = async (camera: boolean) => {
     setError(null);
@@ -256,7 +270,8 @@ export default function DuyuruYeni() {
       screenIds: screenIds.length ? screenIds : null,
       schedule,
       endsAt,
-      ...(editing ? { startsAt: editing.startsAt, durationSec: editing.durationSec ?? null } : {}),
+      durationSec: kind === 'video' ? (editing?.durationSec ?? null) : duration,
+      ...(editing ? { startsAt: editing.startsAt } : {}),
     };
     try {
       if (editing) await api(`${path}/${editing.id}`, { method: 'PUT', body: request });
@@ -434,6 +449,28 @@ export default function DuyuruYeni() {
             columns={editing ? 3 : 4}
             options={(Object.keys(UNTIL_LABEL) as Until[]).filter((u) => editing || u !== 'keep').map((u) => ({ value: u, label: UNTIL_LABEL[u] }))}
           />
+          {kind !== 'video' && (
+            <>
+              <SectionTitle>Ekranda kalma süresi</SectionTitle>
+              <Choice
+                value={duration ?? 0}
+                onChange={(v) => setDuration(v || null)}
+                columns={3}
+                options={[
+                  { value: 0, label: `Otomatik (${autoSec} sn)` },
+                  ...[...new Set([20, 30, 45, maxSec, 90, ...(duration ? [duration] : [])])]
+                    .filter((n) => n > 0)
+                    .sort((x, y) => x - y)
+                    .map((n) => ({ value: n, label: !approver && n > maxSec ? `${n} sn · onaya düşer` : `${n} sn` })),
+                ]}
+              />
+              <T size={12} color={colors.muted}>
+                {tooLong
+                  ? `${maxSec} saniyeden uzun süre onaylayıcının onayına düşer; onaylanınca yayına girer.`
+                  : `Otomatik: kısa duyuru ${defaultSec} sn kalır, uzun duyuru metne göre uzar (en çok ${maxSec} sn).`}
+              </T>
+            </>
+          )}
         </>
       )}
 
@@ -453,6 +490,7 @@ export default function DuyuruYeni() {
                     : `${phase === 'break' ? 'Teneffüslerde' : phase === 'keep' ? 'Zamanlama aynı' : 'Her zaman'} · ${until === 'keep' ? (editing?.endsAt ? `${dateText(editing.endsAt)} tarihine kadar` : 'süresiz') : UNTIL_LABEL[until]}`,
                 to: 2,
               },
+              ...(kind !== 'video' ? [{ label: 'Süre', value: duration ? `${duration} sn${tooLong ? ' · onaya düşer' : ''}` : `Otomatik (${autoSec} sn)`, to: 2 }] : []),
             ].map((r, i) => (
               <View key={r.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: colors.divider }}>
                 <Text style={{ width: 70, fontSize: 13, color: colors.muted }}>{r.label}</Text>

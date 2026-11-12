@@ -130,10 +130,10 @@ export function ConfirmHost() {
   return (
     <Modal visible={Boolean(pending)} transparent animationType="slide" statusBarTranslucent onRequestClose={() => settle(false)} onDismiss={() => setShown(null)}>
       <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-        <Pressable accessibilityLabel="Vazgeç" onPress={() => settle(false)} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: dark ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.45)' }} />
+        <Pressable accessibilityLabel="Vazgeç" onPress={() => settle(false)} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.scrim }} />
         <View
           accessibilityViewIsModal
-          style={{ backgroundColor: colors.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 20 + insets.bottom }}
+          style={{ backgroundColor: colors.elevated, borderTopWidth: 1, borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.elevatedBorder, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 20 + insets.bottom }}
         >
           <View style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: colors.borderStrong, alignSelf: 'center', marginBottom: 16 }} />
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
@@ -175,7 +175,7 @@ export function ConfirmHost() {
               <Pressable
                 accessibilityRole="button"
                 onPress={() => settle(false)}
-                style={({ pressed }) => ({ flex: 1, height: 52, borderRadius: 16, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}
+                style={({ pressed }) => ({ flex: 1, height: 52, borderRadius: 16, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}
               >
                 <Text style={{ fontSize: 15, fontWeight: '800', color: colors.ink }}>{o.cancelLabel ?? 'Vazgeç'}</Text>
               </Pressable>
