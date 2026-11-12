@@ -62,9 +62,9 @@ describe('ekran biçimi, şablonlu duyuru ve acil durum', () => {
   it('panoya özel ekran biçimi panoya ulaşır', async () => {
     const created = await owner.post(path('screens'), { name: 'Koridor' });
     const { screen, token } = created.json() as { screen: { id: string }; token: string };
-    expect((await state(token)).display).toEqual({ orientation: 'landscape', mode: 'board', classIds: [] });
+    expect((await state(token)).display).toEqual({ orientation: 'landscape', mode: 'board', classIds: [], animations: 'auto' });
     expectStatus(await owner.put(path(`screens/${screen.id}`), { name: 'Koridor', display: { orientation: 'portrait', mode: 'slides' } }), 200);
-    expect((await state(token)).display).toEqual({ orientation: 'portrait', mode: 'slides', classIds: [] });
+    expect((await state(token)).display).toEqual({ orientation: 'portrait', mode: 'slides', classIds: [], animations: 'auto' });
   });
 
   it('şablonlu duyuru kaydedilir ve panoya tasarımıyla gider', async () => {
