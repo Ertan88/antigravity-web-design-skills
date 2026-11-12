@@ -1,14 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Okul ağları (MEB) şifreli bağlantıları denetlemek için araya kendi sertifikasıyla girer. O sertifika TV'ye
-  yüklendiyse (Ayarlar › Güvenlik › Sertifika yükle) pano uygulaması da onu tanır. Android 7'den sonra uygulamalar
-  kullanıcının yüklediği sertifikaları kendiliğinden tanımadığı için burada açıkça izin verilir.
+  Okul ağları (MEB) şifreli bağlantıları denetlemek için araya kendi sertifikasıyla girer. Pano uygulaması bunu
+  kendiliğinden tanır: MEB'in kök sertifikası (FATİH, CN=fatihca, 2036'ya kadar geçerli, herkese açık) uygulamaya
+  gömülüdür; TV'ye sertifika yüklemek gerekmez. MEB sertifikayı değiştirirse yenisi TV'ye yüklenebilir
+  (kullanıcının yüklediği sertifikalar da tanınır) ya da buraya eklenir.
   Düz http (ör. okulun kendi sunucusu) önceki sürümdeki gibi açık kalır.
 -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
+            <certificates src="@raw/meb_fatihca" />
             <certificates src="user" />
         </trust-anchors>
     </base-config>
