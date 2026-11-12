@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { gradeOf } from './grade.ts';
-import { formatDays, internCells, internKey, internMonthDays, internshipClassIds, internTotals, isInternshipSubject, schoolHalvesFromTimetable, vocationalLessonShare, type InternStored } from './internship.ts';
+import { areaInitials, formatDays, monthVisitDates, mondayOf, trDate, weekVisitDate, internCells, internKey, internMonthDays, internshipClassIds, internTotals, isInternshipSubject, schoolHalvesFromTimetable, vocationalLessonShare, type InternStored } from './internship.ts';
 
 describe('işletmede devam çizelgesi', () => {
   // Ekim 2026: 1 Ekim Perşembe; 28 Ekim arife (öğleden sonra tatil), 29 Ekim Cumhuriyet Bayramı
@@ -113,5 +113,24 @@ describe('işletmede devam çizelgesi', () => {
     const share = vocationalLessonShare(entries, classes, gradeOf);
     expect(share.get('mat')).toBeCloseTo(0.2);
     expect(share.get('mob')).toBeCloseTo(2 / 3);
+  });
+});
+
+describe('rehberlik formları: görev tarihleri', () => {
+  it('haftanın görev günü', () => {
+    expect(weekVisitDate('2026-11-16', 4)).toBe('2026-11-19');
+    expect(weekVisitDate('2026-11-16', null)).toBeNull();
+    expect(mondayOf('2026-11-19')).toBe('2026-11-16');
+    expect(mondayOf('2026-11-22')).toBe('2026-11-16');
+  });
+  it('ayın görev tarihleri tatili atlar', () => {
+    const days = internMonthDays('2026-11', [{ date: '2026-11-19', name: 'Örnek tatil' }], []);
+    expect(monthVisitDates(days, 4)).toEqual(['2026-11-05', '2026-11-12', '2026-11-26']);
+    expect(monthVisitDates(days, null)).toEqual([]);
+  });
+  it('alan kısaltması ve tarih', () => {
+    expect(areaInitials('Bilişim Teknolojileri')).toBe('BT');
+    expect(areaInitials('Mobilya ve İç Mekân Tasarımı')).toBe('MİMT');
+    expect(trDate('2026-11-05')).toBe('05.11.2026');
   });
 });

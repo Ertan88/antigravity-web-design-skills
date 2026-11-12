@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Linking, Pressable, View } from 'react-native';
 import { api } from '../src/api.ts';
 import { useAuth, useSchoolPath } from '../src/auth.tsx';
+import { FormsSheet, VISIT_DAYS, VisitDayPicker } from '../src/internshipForms.tsx';
 import { useInternshipAccess, useSchoolQuery } from '../src/data.ts';
 import { Sheet, SheetScroll } from '../src/sheet.tsx';
 import { Text } from '../src/text.tsx';
@@ -27,6 +28,7 @@ interface Business {
   notes: string | null;
   areaName: string | null;
   coordinatorName: string | null;
+  visitWeekday: number | null;
   students: number;
   canEdit: boolean;
   canManage: boolean;
@@ -52,8 +54,21 @@ export default function Isletmelerim() {
   const [open, setOpen] = useState<string | null>(null);
   const [editing, setEditing] = useState<Business | 'new' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [forms, setForms] = useState(false);
   const canAdd = Boolean(access.data?.manage || access.data?.teacher);
   const refresh = () => void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === school?.id && String(q.queryKey[1] ?? '').startsWith('internship') });
+
+  // Görev günü: idare ve işletmenin koordinatör öğretmeni seçer (haftada bir gün); rehberlik formlarının tarihi buradan gelir
+  const setDay = async (b: Business, visitWeekday: number | null) => {
+    setError(null);
+    qc.setQueryData<Business[]>([school?.id, 'internship/businesses'], (old) => old?.map((x) => (x.id === b.id ? { ...x, visitWeekday } : x)));
+    try {
+      await api(`${path}/${b.id}/info`, { method: 'PATCH', body: { visitWeekday } });
+    } catch (e) {
+      setError(errorText(e, 'Görev günü kaydedilemedi'));
+    }
+    refresh();
+  };
 
   const remove = async (b: Business) => {
     if (!(await confirm(`${b.name} silinsin mi?`, 'Öğrencilerin işletme bağı kalkar; geçmiş devam işaretleri silinmez.', 'Sil'))) return;
@@ -75,11 +90,20 @@ export default function Isletmelerim() {
       refreshing={list.isRefetching}
       onRefresh={() => void list.refetch()}
       footer={
-        canAdd ? (
-          <Button icon="add" onPress={() => setEditing('new')}>
-            İşletme ekle
-          </Button>
-        ) : undefined
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={{ flex: 1 }}>
+            <Button variant="secondary" icon="share-outline" onPress={() => setForms(true)}>
+              Form yazdır
+            </Button>
+          </View>
+          {canAdd && (
+            <View style={{ flex: 1 }}>
+              <Button icon="add" onPress={() => setEditing('new')}>
+                İşletme ekle
+              </Button>
+            </View>
+          )}
+        </View>
       }
     >
       <ErrorNote error={list.error} />
@@ -105,11 +129,18 @@ export default function Isletmelerim() {
                   <T size={12.5} color={colors.faint}>
                     {b.students} öğrenci · {b.coordinatorName ? `Koordinatör: ${b.coordinatorName}` : 'Koordinatör seçilmedi'}
                   </T>
+                  <T size={12.5} weight="600" color={b.visitWeekday ? colors.muted : colors.warning}>
+                    {b.visitWeekday ? `Görev günü: ${VISIT_DAYS[b.visitWeekday - 1]}` : 'Görev günü seçilmedi'}
+                  </T>
                 </View>
                 <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={20} color={colors.faint} />
               </Pressable>
               {expanded && (
                 <>
+                  <View style={{ gap: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.divider }}>
+                    <Text style={{ fontSize: 12.5, fontWeight: '600', color: colors.faint }}>Görev günü (her hafta)</Text>
+                    <VisitDayPicker value={b.visitWeekday} editable={b.canEdit} onChange={(v) => void setDay(b, v)} />
+                  </View>
                   <InfoRows b={b} />
                   {(b.canEdit || b.canManage) && (
                     <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
@@ -131,6 +162,7 @@ export default function Isletmelerim() {
           );
         })
       )}
+      {forms && <FormsSheet onClose={() => setForms(false)} />}
       {editing && (
         <InfoSheet
           business={editing === 'new' ? null : editing}

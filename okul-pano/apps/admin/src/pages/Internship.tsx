@@ -54,6 +54,7 @@ import {
 import { api } from "../lib/api.ts";
 import { useAuth } from "../lib/auth.tsx";
 import { useInternshipAccess, useList, useSchoolPath, type Teacher } from "../lib/data.ts";
+import { FormsDialog, VISIT_DAYS, VisitDayPicker } from "./InternshipForms.tsx";
 
 /*
  * İşletmelerde mesleki eğitim: işletmeler ve aylık işletmede devam çizelgesi. Okul günleri ders programından,
@@ -76,6 +77,7 @@ interface Business {
   areaName: string | null;
   coordinatorTeacherId: string | null;
   coordinatorName: string | null;
+  visitWeekday: number | null;
   isActive: boolean;
   students: number;
   canEdit: boolean;
@@ -1198,6 +1200,7 @@ export function Businesses() {
   const [assigning, setAssigning] = useState<Business | null>(null);
   const [viewing, setViewing] = useState<Business | null>(null);
   const [areasOpen, setAreasOpen] = useState(false);
+  const [formsOpen, setFormsOpen] = useState(false);
   const [area, setArea] = useState<string>("");
   const [coordinator, setCoordinator] = useState("");
   const [q, setQ] = useState("");
@@ -1209,6 +1212,18 @@ export function Businesses() {
       void qc.invalidateQueries({ queryKey: [schoolId, "internship"] });
       toast.success("İşletme silindi");
     },
+    onError: (e) => toast.error(e.message),
+  });
+  // Görev günü: idare ve işletmenin koordinatör öğretmeni seçer (haftada bir gün)
+  const setDay = useMutation({
+    mutationFn: ({ id, visitWeekday }: { id: string; visitWeekday: number | null }) =>
+      api(`${path}/${id}/info`, { method: "PATCH", body: { visitWeekday } }),
+    onMutate: ({ id, visitWeekday }) => {
+      qc.setQueryData<Business[]>([schoolId, "internship", "businesses"], (old) =>
+        old?.map((b) => (b.id === id ? { ...b, visitWeekday } : b)),
+      );
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: [schoolId, "internship"] }),
     onError: (e) => toast.error(e.message),
   });
 
@@ -1262,6 +1277,13 @@ export function Businesses() {
                 Alanlar ve meslek öğretmenleri
               </Button>
             )}
+            <Button
+              variant="secondary"
+              icon={<Printer className="size-4" />}
+              onClick={() => setFormsOpen(true)}
+            >
+              Form yazdır
+            </Button>
             {(manager || designated) && (
               <Button
                 icon={<Plus className="size-4" />}
@@ -1365,7 +1387,7 @@ export function Businesses() {
             }
           />
         ) : (
-          <Table head={["İşletme", "Koordinatör öğretmen", "Öğrenci", ""]}>
+          <Table head={["İşletme", "Koordinatör öğretmen", "Görev günü", "Öğrenci", ""]}>
             {shown.map((b) => (
               <tr key={b.id}>
                 <Td>
@@ -1380,6 +1402,13 @@ export function Businesses() {
                 </Td>
                 <Td>
                   {b.coordinatorName ?? <Badge tone="amber">Seçilmedi</Badge>}
+                </Td>
+                <Td className="whitespace-nowrap">
+                  <VisitDayPicker
+                    value={b.visitWeekday}
+                    editable={b.canEdit}
+                    onChange={(v) => setDay.mutate({ id: b.id, visitWeekday: v })}
+                  />
                 </Td>
                 <Td>
                   <Button
@@ -1428,6 +1457,7 @@ export function Businesses() {
       {manager && (
         <AreasDialog open={areasOpen} onClose={() => setAreasOpen(false)} />
       )}
+      <FormsDialog open={formsOpen} onClose={() => setFormsOpen(false)} />
     </div>
   );
 }
@@ -1446,6 +1476,7 @@ function BusinessView({
     ? [
         ["Alan", b.areaName],
         ["Koordinatör öğretmen", b.coordinatorName],
+        ["Görev günü", b.visitWeekday ? VISIT_DAYS[b.visitWeekday - 1] : null],
         ["Öğrenci", `${b.students} öğrenci`],
         ["İşletme yetkilisi", b.contactName],
         ["Usta öğretici / eğitici personel", b.trainerName],

@@ -37,6 +37,7 @@ RUN npm ci --omit=dev --workspace=@okulpano/api && npm cache clean --force
 COPY --from=build /app/apps/api/dist apps/api/dist
 COPY --from=build /app/apps/api/drizzle apps/api/drizzle
 COPY --from=build /app/apps/api/seed-assets apps/api/seed-assets
+COPY --from=build /app/apps/api/assets apps/api/assets
 COPY --from=build /app/apps/admin/dist apps/admin/dist
 COPY --from=build /app/apps/display/dist apps/display/dist
 COPY --from=mobile /app/mobile/dist mobile/dist

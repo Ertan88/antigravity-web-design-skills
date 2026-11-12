@@ -32,6 +32,12 @@ import {
   vocationalLessonShare,
   parseClassName,
   compareClassNames,
+  areaInitials,
+  mondayOf,
+  monthVisitDates,
+  trDate,
+  weekVisitDate,
+  type InternCell,
 } from '@okulpano/shared';
 import { and, asc, eq, gte, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
@@ -40,6 +46,7 @@ import { randomUUID } from 'node:crypto';
 import { audit, schoolGuard, UUID_RE, type AppDeps } from '../context.ts';
 import { businesses, classGroups, internshipMarks, memberships, schools, students, teacherBranches, teachers, teacherTitles, timetableEntries, users } from '../db/schema.ts';
 import { holidaysAndHalfDays } from '../lib/dayinfo.ts';
+import { ATTENDANCE_ROWS, attendanceFormsPdf, dailyFormsPdf, reportFormsPdf, type AttendanceForm, type DailyForm, type ReportForm } from '../lib/internshipForms.ts';
 import { badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 import { notifyUsers } from '../lib/push.ts';
 import { addToInbox } from './notifications.ts';
@@ -390,6 +397,7 @@ export async function internshipRoutes(app: FastifyInstance) {
           createdBy: businesses.createdBy,
           coordinatorTeacherId: businesses.coordinatorTeacherId,
           coordinatorName: teachers.fullName,
+          visitWeekday: businesses.visitWeekday,
           isActive: businesses.isActive,
         })
         .from(businesses)
@@ -786,6 +794,208 @@ export async function internshipRoutes(app: FastifyInstance) {
       // Kendi işletmeleri önce
       businesses: [...groups.values()].sort((a, b) => Number(b.own) - Number(a.own) || trCompare(a.name, b.name)),
     };
+  });
+
+  /* ---------- Rehberlik formları (PDF) ---------- */
+
+  const MONTHS_TR = ['OCAK', 'ŞUBAT', 'MART', 'NİSAN', 'MAYIS', 'HAZİRAN', 'TEMMUZ', 'AĞUSTOS', 'EYLÜL', 'EKİM', 'KASIM', 'ARALIK'];
+  const formQuery = z.object({
+    type: z.enum(['daily', 'attendance', 'report']),
+    week: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    month: monthSchema.optional(),
+    ids: z.string().max(20000).optional(),
+  });
+
+  /** Görünen işletmeler: koordinatör, alan, öğrenci sayısı ve görev günüyle */
+  async function formBusinesses(req: FastifyRequest) {
+    const s = await scope(deps, req);
+    const [rows, counts] = await Promise.all([
+      db
+        .select({
+          id: businesses.id,
+          name: businesses.name,
+          phone: businesses.phone,
+          email: businesses.email,
+          address: businesses.address,
+          contactName: businesses.contactName,
+          field: businesses.field,
+          areaName: teacherBranches.name,
+          coordinatorName: teachers.fullName,
+          visitWeekday: businesses.visitWeekday,
+        })
+        .from(businesses)
+        .leftJoin(teachers, eq(teachers.id, businesses.coordinatorTeacherId))
+        .leftJoin(teacherBranches, eq(teacherBranches.id, businesses.areaId))
+        .where(and(eq(businesses.schoolId, req.ctx.schoolId), eq(businesses.isActive, true))),
+      db.select({ businessId: students.businessId }).from(students).where(and(eq(students.schoolId, req.ctx.schoolId), isNotNull(students.businessId))),
+    ]);
+    const n = new Map<string, number>();
+    for (const c of counts) n.set(c.businessId!, (n.get(c.businessId!) ?? 0) + 1);
+    return {
+      s,
+      list: rows
+        .filter((r) => s.sees(r.id))
+        .map((r) => ({ ...r, students: n.get(r.id) ?? 0 }))
+        .sort((a, b) => trCompare(a.coordinatorName ?? 'ZZZ', b.coordinatorName ?? 'ZZZ') || trCompare(a.name, b.name)),
+    };
+  }
+
+  /** Haftanın görevleri: her işletme için görev günü tarihi ve tatil bilgisi */
+  async function weekItems(req: FastifyRequest, week: string) {
+    const { list } = await formBusinesses(req);
+    const monday = mondayOf(week);
+    const friday = addIsoDays(monday, 4);
+    const { holidays } = await holidaysAndHalfDays(db, req.ctx.schoolId, monday, friday);
+    const off = new Map(holidays.map((h) => [h.date, h.name]));
+    return {
+      monday,
+      friday,
+      items: list.map((b) => {
+        const date = weekVisitDate(monday, b.visitWeekday);
+        return { ...b, date, holiday: date ? (off.get(date) ?? null) : null };
+      }),
+    };
+  }
+
+  /** Ayın görevleri: her işletme için görev tarihleri (tatiller çıkarılmış) */
+  async function monthItems(req: FastifyRequest, month: string) {
+    const { list } = await formBusinesses(req);
+    const days = await monthDays(deps, req.ctx.schoolId, month);
+    return { days, items: list.map((b) => ({ ...b, dates: monthVisitDates(days, b.visitWeekday) })) };
+  }
+
+  const formSettings = (req: FastifyRequest) => {
+    const st = settingsOf(req);
+    return { programName: st.internshipProgramName, district: st.district, city: req.ctx.school.city ?? '' };
+  };
+
+  /** Yazdırma penceresi: seçilen hafta ya da ayın görevleri */
+  app.get(`${base}/forms`, member, async (req) => {
+    const q = parse(formQuery, req.query);
+    const settings = { ...formSettings(req), canEdit: isManager(req) };
+    if (q.type === 'daily') {
+      const r = await weekItems(req, q.week ?? today(req));
+      return {
+        settings,
+        monday: r.monday,
+        friday: r.friday,
+        items: r.items.map((b) => ({ id: b.id, name: b.name, coordinatorName: b.coordinatorName, students: b.students, visitWeekday: b.visitWeekday, date: b.date, holiday: b.holiday })),
+      };
+    }
+    const month = q.month ?? today(req).slice(0, 7);
+    const r = await monthItems(req, month);
+    return {
+      settings,
+      month,
+      items: r.items.map((b) => ({ id: b.id, name: b.name, coordinatorName: b.coordinatorName, students: b.students, visitWeekday: b.visitWeekday, dates: b.dates })),
+    };
+  });
+
+  /** Form bilgileri: program adı ve ilçe (yönetim) */
+  app.put(`${base}/form-settings`, manage, async (req) => {
+    requireModule(req);
+    const body = parse(z.object({ programName: z.string().trim().max(80), district: z.string().trim().max(60) }), req.body);
+    const settings = schoolSettingsSchema.parse({ ...(req.ctx.school.settings ?? {}), internshipProgramName: body.programName, district: body.district });
+    await db.update(schools).set({ settings }).where(eq(schools.id, req.ctx.schoolId));
+    await audit(req, 'update', 'Rehberlik formu bilgileri', null, `${body.programName} · ${body.district}`);
+    return { ok: true };
+  });
+
+  /**
+   * Formlar (PDF, A5; iki form bir A4'e). `ids` seçilen işletmeler (virgülle); yoksa görevi olan bütün işletmeler.
+   * Günlük form: haftanın görev günü (tatile denk gelen görev ancak açıkça seçilirse basılır). Aylık devam çizelgesi:
+   * işletmedeki öğrencilerin ay boyu işaretleri. Aylık rapor: ayın görev tarihleri. Belge ve rapor tarihi, o ay o
+   * işletmeye son gidilen görev tarihidir.
+   */
+  app.get(`${base}/forms.pdf`, member, async (req, reply) => {
+    const q = parse(formQuery, req.query);
+    const picked = q.ids ? new Set(q.ids.split(',').filter((x) => UUID_RE.test(x))) : null;
+    const st = settingsOf(req);
+    const managerName = st.internshipManagerUserId ? await userName(deps, st.internshipManagerUserId) : '';
+    const school = req.ctx.school;
+    const fs = formSettings(req);
+    const area = (b: { areaName: string | null; field: string | null }) => [b.areaName, b.field].filter(Boolean).join(' / ');
+    let pdf: Buffer;
+    let name: string;
+    if (q.type === 'daily') {
+      const r = await weekItems(req, q.week ?? today(req));
+      const chosen = r.items.filter((b) => b.date && (picked ? picked.has(b.id) : !b.holiday));
+      const forms: DailyForm[] = chosen.map((b) => ({
+        schoolLine: [school.name, fs.programName].filter(Boolean).join(' '),
+        business: b.name,
+        students: b.students,
+        responsible: b.students,
+        address: b.address ?? '',
+        area: area(b),
+        date: trDate(b.date),
+        contact: b.contactName ?? '',
+        teacher: b.coordinatorName ?? '',
+        manager: managerName,
+      }));
+      pdf = await dailyFormsPdf(forms);
+      name = `gunluk-rehberlik-formu-${r.monday}.pdf`;
+    } else {
+      const month = q.month ?? today(req).slice(0, 7);
+      const r = await monthItems(req, month);
+      const chosen = r.items.filter((b) => (picked ? picked.has(b.id) : b.dates.length > 0));
+      const monthText = `${MONTHS_TR[Number(month.slice(5, 7)) - 1]} ${month.slice(0, 4)}`;
+      if (q.type === 'report') {
+        const forms: ReportForm[] = chosen.map((b) => ({
+          addressee: `${school.name} Müdürlüğüne`,
+          place: [fs.district, (fs.city || '').toLocaleUpperCase('tr-TR')].filter(Boolean).join('/'),
+          area: b.areaName ?? '',
+          date: trDate(b.dates.at(-1)),
+          business: b.name,
+          address: b.address ?? '',
+          contact: b.contactName ?? '',
+          teacher: b.coordinatorName ?? '',
+          dates: b.dates.map(trDate),
+        }));
+        pdf = await reportFormsPdf(forms);
+        name = `aylik-rehberlik-raporu-${month}.pdf`;
+      } else {
+        const all = (await internStudents(deps, req.ctx.schoolId)).filter((x) => chosen.some((b) => b.id === x.businessId));
+        const classIds = [...new Set(all.map((x) => x.classId).filter((x): x is string => Boolean(x)))];
+        const [weekdays, marks] = await Promise.all([schoolWeekdays(deps, req.ctx.schoolId, classIds), marksInRange(deps, req.ctx.schoolId, `${month}-01`, monthLast(month))]);
+        const now = today(req);
+        const letter = (c: InternCell) => (c === 'TA' || c === 'T' ? 'T' : c === 'W' || c === '?' || c === '' || c === 'K' ? '' : c);
+        const num = (v: number) => String(v).replace('.', ',');
+        const forms: AttendanceForm[] = [];
+        for (const b of chosen) {
+          const rows = all
+            .filter((x) => x.businessId === b.id)
+            .map((x) => {
+              const cells = internCells(r.days, { school: weekdays.get(x.classId ?? '') ?? NO_SCHOOL, marks: marks.get(x.id) ?? new Map(), today: now });
+              const t = internTotals(cells);
+              return {
+                name: x.fullName,
+                no: x.schoolNo,
+                area: areaInitials(x.areaName),
+                cells: cells.map(([am, pm]) => [letter(am), letter(pm)] as [string, string]),
+                excused: num(t.excused),
+                unexcused: num(t.unexcused),
+              };
+            });
+          for (let i = 0; i < Math.max(1, rows.length); i += ATTENDANCE_ROWS)
+            forms.push({
+              business: b.name,
+              phone: b.phone ?? '',
+              email: b.email ?? '',
+              month: monthText,
+              daysInMonth: r.days.length,
+              weekend: r.days.map((d) => d.weekday >= 6),
+              issued: trDate(b.dates.at(-1)),
+              contact: b.contactName ?? '',
+              manager: managerName,
+              students: rows.slice(i, i + ATTENDANCE_ROWS),
+            });
+        }
+        pdf = await attendanceFormsPdf(forms);
+        name = `aylik-devam-cizelgesi-${month}.pdf`;
+      }
+    }
+    await audit(req, 'export', 'Rehberlik formu', null, name);
+    return reply.header('content-type', 'application/pdf').header('content-disposition', `attachment; filename="${name}"`).send(pdf);
   });
 
   /**

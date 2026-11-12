@@ -269,6 +269,8 @@ export const businessSchema = z.object({
   notes: optionalText(1000),
   /** Koordinatör öğretmen */
   coordinatorTeacherId: z.uuid().nullish().transform((v) => v ?? null),
+  /** Görev günü: koordinatör her hafta bu gün işletmeye gider (1 Pazartesi … 5 Cuma); haftada bir gün */
+  visitWeekday: z.number().int().min(1).max(5).nullish().transform((v) => v ?? null),
   isActive: z.boolean().default(true),
 });
 
@@ -311,3 +313,36 @@ export const internSendSchema = z.object({
   note: z.string().trim().max(500).optional(),
 });
 export type InternSendInput = z.infer<typeof internSendSchema>;
+
+/* ---------- Rehberlik formları: görev tarihleri ---------- */
+
+/** Haftanın (pazartesi) görev günü tarihi; görev günü yoksa null */
+export function weekVisitDate(monday: string, visitWeekday: number | null): string | null {
+  if (!visitWeekday) return null;
+  const d = new Date(`${monday}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + visitWeekday - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Tarihin haftasının pazartesisi */
+export function mondayOf(date: string): string {
+  const d = new Date(`${date}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+}
+
+/** Ayın görev tarihleri: görev gününe denk gelen, tatil olmayan günler (yarım gün sayılır: sabah işletmeye gidilir) */
+export function monthVisitDates(days: readonly InternDay[], visitWeekday: number | null): string[] {
+  if (!visitWeekday) return [];
+  return days.filter((d) => d.weekday === visitWeekday && !d.holiday).map((d) => d.date);
+}
+
+/** Alan adının kısaltması (çizelgenin dar "Alanı" sütunu): "Bilişim Teknolojileri" → "BT" */
+export function areaInitials(name: string | null | undefined): string {
+  if (!name) return '';
+  const words = name.split(/\s+/).filter((w) => w && !/^(ve|ile|-)$/i.test(w));
+  return words.map((w) => w[0]!.toLocaleUpperCase('tr-TR')).join('').slice(0, 4);
+}
+
+/** GG.AA.YYYY */
+export const trDate = (iso: string | null | undefined) => (iso ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : '');

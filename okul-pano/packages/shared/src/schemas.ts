@@ -178,6 +178,10 @@ export const schoolSettingsSchema = z.object({
    * Hiç kaydedilmemişse (undefined) işletmelerin bugünkü koordinatörleri işaretli sayılır (eski okullar için).
    */
   internshipCoordinatorTeacherIds: z.array(z.uuid()).max(500).optional(),
+  /** Rehberlik formlarında okul adının yanına yazılan program (ör. "Anadolu Meslek Programı"); boşsa yazılmaz */
+  internshipProgramName: z.string().trim().max(80).default('Anadolu Meslek Programı'),
+  /** Aylık rehberlik raporunun "İlçe/İl" satırındaki ilçe (okul kaydında yalnızca il var) */
+  district: z.string().trim().max(60).default(''),
   /** Arifede (yarım gün) derslerin bittiği saat; kamuda arife 13.00'ten itibaren tatildir */
   halfDayEnd: clock.default('13:00'),
   /** Okulun kendi adlandırdığı başlıklar (kart ve sekme adları); boş olan varsayılanı kullanır */

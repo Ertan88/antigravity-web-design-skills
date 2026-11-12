@@ -396,6 +396,8 @@ export const businesses = pgTable(
     /** İşletmeyi ekleyen kullanıcı: öğretmen kendi eklediği işletmeleri görür */
     createdBy: uuid('created_by').references((): AnyPgColumn => users.id, { onDelete: 'set null' }),
     coordinatorTeacherId: uuid('coordinator_teacher_id').references((): AnyPgColumn => teachers.id, { onDelete: 'set null' }),
+    /** Koordinatörün her hafta işletmeye gittiği gün (1 Pazartesi … 5 Cuma); rehberlik formlarının görev tarihi buradan gelir */
+    visitWeekday: integer('visit_weekday'),
     isActive: isActive(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

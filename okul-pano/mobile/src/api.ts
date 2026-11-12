@@ -125,6 +125,24 @@ export async function api<T = unknown>(path: string, opts: { method?: string; bo
   return json as T;
 }
 
+/** Kimlik doğrulamalı dosya (PDF) indirme: içerik bayt olarak döner */
+export async function apiFile(path: string): Promise<ArrayBuffer> {
+  const send = () => fetch(`${server}${path}`, { headers: accessToken ? { authorization: `Bearer ${accessToken}` } : {} });
+  let res: Response;
+  try {
+    if (!accessToken && refreshToken) await refresh();
+    res = await send();
+    if (res.status === 401 && refreshToken && (await refresh())) res = await send();
+  } catch {
+    throw new ApiError('Sunucuya ulaşılamadı. İnternet bağlantınızı ve sunucu adresini kontrol edin.', 0);
+  }
+  if (!res.ok) {
+    const json = (await res.json().catch(() => null)) as { message?: string } | null;
+    throw new ApiError(json?.message ?? `Dosya indirilemedi (${res.status})`, res.status);
+  }
+  return res.arrayBuffer();
+}
+
 export async function login(email: string, password: string) {
   const json = await api<{ accessToken: string; refreshToken: string }>('/api/auth/login', {
     method: 'POST',
