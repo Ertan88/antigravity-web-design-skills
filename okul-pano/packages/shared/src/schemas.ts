@@ -742,6 +742,8 @@ export const screenLiveStatusSchema = z.object({
   slideIndex: z.number().int().min(0).max(1000),
   slideCount: z.number().int().min(0).max(1000),
   slideTitle: z.string().max(200).nullable(),
+  /** Gösterilen slaytın kimliği: önizleme (mobil uzaktan kumanda) TV'de gösterilen slayda geçer */
+  slideId: z.string().max(80).nullable().optional(),
   paused: z.boolean(),
   sleeping: z.boolean(),
   mode: z.enum(['board', 'slides', 'clock', 'emergency']),

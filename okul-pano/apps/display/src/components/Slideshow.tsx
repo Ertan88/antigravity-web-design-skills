@@ -345,10 +345,14 @@ interface Props {
   /** Uzaktan kumanda: gösterilen slaytta kal */
   paused?: boolean;
   /** Gösterilen slayt değişince (mobil uzaktan kumandada "şu an gösterilen") */
-  onShow?: (s: { index: number; count: number; title: string | null }) => void;
+  onShow?: (s: { index: number; count: number; title: string | null; id: string | null }) => void;
+  /** Önizlemede TV'yi izleme: TV'de gösterilen slayt (kimliğiyle; bulunamazsa sırasıyla) */
+  follow?: { slideId: string | null; index: number; paused: boolean; seq: number } | null;
 }
 
-export function Slideshow({ announcements, now, defaultDurationSec, maxDurationSec = 60, videoSound, schoolName, schoolType, logoUrl, full = false, nav, paused = false, onShow }: Props) {
+export function Slideshow({ announcements, now, defaultDurationSec, maxDurationSec = 60, videoSound, schoolName, schoolType, logoUrl, full = false, nav, paused: pausedProp = false, onShow, follow = null }: Props) {
+  // TV izleniyorsa önizleme kendi süresini saymaz: slaytı TV değiştirir
+  const paused = pausedProp || Boolean(follow);
   // Yayın aralığı her 30 saniyede bir yeniden değerlendirilir (her saniye değil)
   const windowKey = Math.floor(now.getTime() / 30_000);
   const slides = useMemo(
@@ -386,12 +390,22 @@ export function Slideshow({ announcements, now, defaultDurationSec, maxDurationS
     setCursor((c) => ({ index: count ? (((c.index % count) + nav.step) % count + count) % count : 0, round: c.round + 1 }));
   }, [nav, count]);
 
+  // TV'de gösterilen slayda geç (önizleme)
+  useEffect(() => {
+    if (!follow || !count) return;
+    const byId = follow.slideId ? slides.findIndex((s) => s.id === follow.slideId) : -1;
+    const target = byId >= 0 ? byId : Math.min(follow.index, count - 1);
+    setCursor((c) => (c.index % count === target ? c : { index: target, round: c.round + 1 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [follow?.seq, count]);
+
   const showRef = useRef(onShow);
   showRef.current = onShow;
   const shownTitle = slides[index]?.title ?? null;
+  const shownId = slides[index]?.id ?? null;
   useEffect(() => {
-    showRef.current?.({ index, count, title: shownTitle });
-  }, [index, count, shownTitle]);
+    showRef.current?.({ index, count, title: shownTitle, id: shownId });
+  }, [index, count, shownTitle, shownId]);
 
   // Süresi girilmemiş metin, görsel ve tasarım duyurusu metnin uzunluğuna göre kalır (okuma süresi, üst sınıra kadar)
   const duration = !slide ? 0 : slide.kind === 'exams' ? (slide.durationSec ?? defaultDurationSec) : slideSeconds(slide, defaultDurationSec, maxDurationSec);

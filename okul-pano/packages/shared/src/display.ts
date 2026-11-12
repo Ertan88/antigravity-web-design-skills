@@ -137,7 +137,9 @@ export interface WeatherNow {
 /** SSE üzerinden panoya gönderilen olaylar */
 export type DisplayEvent =
   | { type: 'content' }
-  | { type: 'command'; command: ScreenCommand; screenId: string | null };
+  | { type: 'command'; command: ScreenCommand; screenId: string | null }
+  /** TV'nin bildirdiği anlık durum: yalnızca o panonun önizlemesine iletilir (önizleme TV'yi izler) */
+  | { type: 'live'; screenId: string; slideId: string | null; slideIndex: number; paused: boolean };
 
 export function isWithinWindow(nowMs: number, startsAt: string | null, endsAt: string | null): boolean {
   if (startsAt && Date.parse(startsAt) > nowMs) return false;

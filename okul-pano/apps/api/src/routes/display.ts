@@ -390,7 +390,12 @@ export async function displayRoutes(app: FastifyInstance) {
   // Okuldaki bütün panolar aynı IP'den gelebilir: sınır pano başına değil, adres başınadır
   app.post('/api/display/status', { config: { rateLimit: { max: 600, timeWindow: '1 minute' } } }, async (req, reply) => {
     const auth = await resolveDisplay(app, req);
-    if (auth.screen && !auth.preview) bus.setLiveStatus(auth.screen.id, parse(screenLiveStatusSchema, req.body));
+    if (auth.screen && !auth.preview) {
+      const status = parse(screenLiveStatusSchema, req.body);
+      bus.setLiveStatus(auth.screen.id, status);
+      // O panonun açık önizlemeleri (mobil uzaktan kumanda) TV'de gösterilen slayda geçer
+      bus.publish(auth.schoolId, { type: 'live', screenId: auth.screen.id, slideId: status.slideId ?? null, slideIndex: status.slideIndex, paused: status.paused });
+    }
     return reply.status(204).send();
   });
 
@@ -399,6 +404,8 @@ export async function displayRoutes(app: FastifyInstance) {
     const { token } = req.query as { token?: string };
     const auth = await resolveDisplay(app, req, token);
     const screenId = auth.preview ? null : (auth.screen?.id ?? null);
+    // Belirli bir panonun önizlemesi: TV'nin anlık durumu buna iletilir
+    const followId = auth.preview ? (auth.screen?.id ?? null) : null;
 
     reply.hijack();
     const raw = reply.raw;
@@ -411,9 +418,17 @@ export async function displayRoutes(app: FastifyInstance) {
     const send = (event: string, data: unknown) => raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     raw.write('retry: 5000\n\n');
     send('hello', { serverTime: new Date().toISOString(), screenId });
+    if (followId) {
+      const now = bus.liveStatus(followId);
+      if (now) send('live', { type: 'live', screenId: followId, slideId: now.slideId ?? null, slideIndex: now.slideIndex, paused: now.paused });
+    }
 
     const unsubscribe = bus.subscribe(auth.schoolId, (e) => {
       if (e.type === 'command' && e.screenId && e.screenId !== screenId) return;
+      if (e.type === 'live') {
+        if (e.screenId === followId) send('live', e);
+        return;
+      }
       send(e.type, e);
     });
     const offline = screenId ? bus.screenConnected(screenId) : () => {};

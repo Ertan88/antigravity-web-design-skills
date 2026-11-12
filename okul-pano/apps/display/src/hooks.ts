@@ -19,6 +19,11 @@ export interface RemoteControl {
   paused: boolean;
   /** 'sleep': elle uyutuldu; 'wake': uyku saatinde elle uyandırıldı (süreli) */
   power: { state: 'sleep' | 'wake'; until: number } | null;
+  /**
+   * Yalnızca bir panonun önizlemesinde (mobil uzaktan kumanda): TV'de şu an gösterilen slayt. Önizleme kendi
+   * slaytlarını döndürmez, TV'yi izler; böylece ileri / geri / durdur düğmelerinin etkisi önizlemede de görünür.
+   */
+  follow: { slideId: string | null; index: number; paused: boolean; seq: number } | null;
 }
 
 /**
@@ -43,7 +48,15 @@ export function useDisplayData(auth: DisplayAuth, onUnauthorized: () => void) {
   const [lastUpdated, setLastUpdated] = useState<number | null>(cached?.savedAt ?? null);
   const [offsetMs, setOffsetMs] = useState(timeTravelOffset ?? 0);
   const [identifyUntil, setIdentifyUntil] = useState(0);
-  const [remote, setRemote] = useState<RemoteControl>({ nav: { seq: 0, step: 1 }, paused: false, power: null });
+  const [remote, setRemote] = useState<RemoteControl>({ nav: { seq: 0, step: 1 }, paused: false, power: null, follow: null });
+  // TV'den haber kesilirse (kapandı, bağlantı koptu) önizleme son slaytta kalmaz: kendi gösterisine döner.
+  // TV durumu değişmese de dakikada bir bildirir; 2,5 dakika sessizlik yeter.
+  const followSeq = remote.follow?.seq ?? 0;
+  useEffect(() => {
+    if (!followSeq) return;
+    const t = setTimeout(() => setRemote((r) => (r.follow?.seq === followSeq ? { ...r, follow: null } : r)), 150_000);
+    return () => clearTimeout(t);
+  }, [followSeq]);
   const inflight = useRef<Promise<void> | null>(null);
   const version = useRef<string | null>(null);
   /** Canlı bağlantıdan son haber (olay ya da sinyal) */
@@ -109,7 +122,9 @@ export function useDisplayData(auth: DisplayAuth, onUnauthorized: () => void) {
 
     const connect = () => {
       openedAt = Date.now();
-      source = new EventSource(`/api/display/stream?token=${encodeURIComponent(auth.token)}`);
+      // Belirli bir panonun önizlemesi (?screen=): TV'nin anlık durumu da gelir
+      const previewScreen = auth.preview ? new URLSearchParams(location.search).get('screen') : null;
+      source = new EventSource(`/api/display/stream?token=${encodeURIComponent(auth.token)}${previewScreen ? `&screen=${encodeURIComponent(previewScreen)}` : ''}`);
       source.addEventListener('hello', () => {
         alive();
         failures = 0;
@@ -117,6 +132,12 @@ export function useDisplayData(auth: DisplayAuth, onUnauthorized: () => void) {
         void load();
       });
       source.addEventListener('ping', alive);
+      source.addEventListener('live', (e) => {
+        alive();
+        const event = JSON.parse((e as MessageEvent).data) as DisplayEvent;
+        if (event.type !== 'live') return;
+        setRemote((r) => ({ ...r, follow: { slideId: event.slideId, index: event.slideIndex, paused: event.paused, seq: (r.follow?.seq ?? 0) + 1 } }));
+      });
       source.addEventListener('content', () => {
         alive();
         clearTimeout(debounce);

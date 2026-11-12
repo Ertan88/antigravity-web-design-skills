@@ -92,8 +92,8 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
   const weather = useWeather(auth.token);
   useNightlyReload(!auth.preview);
   // Mobil uzaktan kumanda için: şu an gösterilen slayt ve panonun durumu sunucuya bildirilir
-  const [shown, setShown] = useState<{ index: number; count: number; title: string | null }>({ index: 0, count: 0, title: null });
-  const onShow = useCallback((v: { index: number; count: number; title: string | null }) => setShown(v), []);
+  const [shown, setShown] = useState<{ index: number; count: number; title: string | null; id: string | null }>({ index: 0, count: 0, title: null, id: null });
+  const onShow = useCallback((v: { index: number; count: number; title: string | null; id: string | null }) => setShown(v), []);
   const splash = useSplash(Boolean(state));
   // Okul Yayın Pano TV uygulamasında: gizli ayarlar şifresi uygulamaya iletilir (tarayıcıda bu nesne yoktur)
   const tvPin = state?.school.settings.tvExitPin ?? null;
@@ -486,6 +486,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
         slideIndex: shown.index,
         slideCount: shown.count,
         slideTitle: shown.title,
+        slideId: shown.id,
         paused: remote.paused,
         sleeping,
         mode: state.emergency ? 'emergency' : display.mode,
@@ -549,6 +550,7 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
       full={full}
       nav={remote.nav}
       paused={remote.paused}
+      follow={remote.follow}
       onShow={onShow}
     />
   );

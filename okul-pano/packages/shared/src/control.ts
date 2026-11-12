@@ -13,6 +13,8 @@ export interface ScreenLiveStatus {
   slideIndex: number;
   slideCount: number;
   slideTitle: string | null;
+  /** Gösterilen slaytın kimliği (önizleme TV'yi izlerken kullanır; eski panolar göndermez) */
+  slideId?: string | null;
   paused: boolean;
   sleeping: boolean;
   mode: 'board' | 'slides' | 'clock' | 'emergency';
