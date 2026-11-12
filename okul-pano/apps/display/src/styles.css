@@ -3607,3 +3607,20 @@ body.cursor-hidden * {
 .theme-light .exam-slide-row.is-now {
   border-color: #d97706;
 }
+
+/* ---------- TV hafif modu (main.tsx): zayıf TV'lerde kayan yazı ve video takılmasın ---------- */
+/* "Şu an derste" çubuğundaki sürekli kayan parıltı: tek başına takılmanın büyük kısmı (ölçüm: ~110 → ~27) */
+.tv-lite .bell-progress div::after {
+  display: none;
+}
+
+/* Duyuru ve kart geçişleri efektsiz: büyük alanın (bulanık görsel, video) her geçişte yeniden çizilmesi önlenir */
+.tv-lite .slide,
+.tv-lite .card,
+.tv-lite .pager-page {
+  animation: none;
+}
+
+.tv-lite .slide-dots span {
+  transition: none;
+}
