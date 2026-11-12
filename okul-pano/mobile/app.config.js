@@ -19,15 +19,17 @@ function withoutAutofillHighlight(config) {
 }
 
 /**
- * Okul ağları (MEB) şifreli bağlantıları denetlemek için araya kendi sertifikasıyla girer. O sertifika telefona
- * yüklendiyse (Ayarlar › Güvenlik › Sertifika yükle) uygulama da onu tanısın: Android 7'den sonra uygulamalar
- * kullanıcının yüklediği sertifikaları kendiliğinden tanımaz. Düz http (okulun kendi sunucusu) önceki gibi açık kalır.
+ * Okul ağları (MEB) şifreli bağlantıları denetlemek için araya kendi sertifikasıyla girer. Uygulama bunu kendiliğinden
+ * tanır: MEB'in kök sertifikası (FATİH, CN=fatihca, 2036'ya kadar geçerli, herkese açık; assets/certs) uygulamaya
+ * gömülür, telefona sertifika yüklemek gerekmez. Telefona yüklenen sertifikalar da tanınır (MEB sertifikayı
+ * değiştirirse). Düz http (okulun kendi sunucusu) önceki gibi açık kalır. TV uygulamasıyla aynı ayar.
  */
 const NETWORK_SECURITY_XML = `<?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
+            <certificates src="@raw/meb_fatihca" />
             <certificates src="user" />
         </trust-anchors>
     </base-config>
@@ -38,9 +40,11 @@ function withSchoolNetworkCertificates(config) {
   config = withDangerousMod(config, [
     'android',
     async (c) => {
-      const dir = path.join(c.modRequest.platformProjectRoot, 'app', 'src', 'main', 'res', 'xml');
-      fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(path.join(dir, 'network_security_config.xml'), NETWORK_SECURITY_XML);
+      const res = path.join(c.modRequest.platformProjectRoot, 'app', 'src', 'main', 'res');
+      fs.mkdirSync(path.join(res, 'xml'), { recursive: true });
+      fs.writeFileSync(path.join(res, 'xml', 'network_security_config.xml'), NETWORK_SECURITY_XML);
+      fs.mkdirSync(path.join(res, 'raw'), { recursive: true });
+      fs.copyFileSync(path.join(__dirname, 'assets', 'certs', 'meb_fatihca.cer'), path.join(res, 'raw', 'meb_fatihca.cer'));
       return c;
     },
   ]);
