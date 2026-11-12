@@ -406,6 +406,29 @@ export const businesses = pgTable(
 );
 
 /**
+ * Öğrencinin işletme dönemleri: işletme değişince eski dönem bir gün önce kapanır, yenisi başlar. Aylık devam çizelgesi
+ * her işletme için yalnızca o işletmedeki günleri doldurur. startDate boşsa başlangıç bilinmiyor (dönemler tutulmaya
+ * başlamadan önceki atama), endDate boşsa öğrenci hâlâ orada.
+ */
+export const internshipPeriods = pgTable(
+  'internship_periods',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => students.id, { onDelete: 'cascade' }),
+    businessId: uuid('business_id')
+      .notNull()
+      .references(() => businesses.id, { onDelete: 'cascade' }),
+    startDate: date('start_date', { mode: 'string' }),
+    endDate: date('end_date', { mode: 'string' }),
+    createdAt: createdAt(),
+  },
+  (t) => [index('internship_periods_student_idx').on(t.studentId), index('internship_periods_business_idx').on(t.businessId)],
+);
+
+/**
  * İşletmede devam işaretleri (yarım gün): yalnızca istisnalar saklanır (D, R, T, K). Okul günü (O), takvim tatili ve
  * işletmede devam (X) kendiliğinden hesaplanır.
  */

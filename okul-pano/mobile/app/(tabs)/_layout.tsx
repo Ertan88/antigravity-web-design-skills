@@ -360,9 +360,9 @@ export default function TabsLayout() {
         screenOptions={{
           headerShown: false,
           sceneStyle: { backgroundColor: colors.bg },
-          // Sekme değişince sayfa sert değil, kısa bir solmayla gelir
-          animation: 'fade',
-          transitionSpec: { animation: 'timing', config: { duration: 180 } },
+          // Sekme değişince yeni sayfa seçilen sekmenin yönünden hafifçe kayarak gelir
+          animation: 'shift',
+          transitionSpec: { animation: 'timing', config: { duration: 240 } },
         }}
       >
         {order.map((n) => screens[n])}

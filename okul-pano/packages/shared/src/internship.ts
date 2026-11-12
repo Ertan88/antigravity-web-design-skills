@@ -176,26 +176,36 @@ export function internTotals(cells: readonly (readonly InternCell[])[]): InternT
 export const formatDays = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1).replace('.', ','));
 
 /**
- * İşletme öğrencilerinin seçileceği sınıflar: programında işletme dersi olanlar ve 12. sınıflar. Özel eğitim sınıfı
- * (zil hesabına katılmayan) yalnızca işletme dersi varsa girer; öğrencisi zaten bir işletmeye bağlı sınıf hep girer
- * (atama kaybolmasın). Hiçbiri bulunamazsa (ders programı yok, sınıf adlarından düzey anlaşılmıyor) bütün sınıflar
- * döner ve `fallback` işaretlenir.
+ * İşletme öğrencilerinin seçileceği sınıflar.
+ * - Mesleki Eğitim Merkezi (MESEM, okul türünden anlaşılır): bütün sınıflar (çıraklar her düzeyde işletmeye gider).
+ * - Diğer okullar: ders programında "İşletmelerde Mesleki Eğitim" ya da "İşletmelerde Beceri Eğitimi" dersi olan
+ *   12. sınıflar. Adından düzeyi anlaşılmayan sınıf (ör. "Mobilya A") işletme dersi varsa girer.
+ * - Ders programında işletme dersi hiç yoksa (program yüklenmemiş) 12. sınıflar, onlar da yoksa bütün sınıflar döner ve
+ *   `fallback` işaretlenir.
+ * Öğrencisi zaten bir işletmeye bağlı sınıf hep girer (atama kaybolmasın).
  */
 export function internshipClassIds(
   classes: readonly { id: string; name: string; bellExempt?: boolean | null }[],
   entries: readonly { classId: string; subject: string }[],
   assignedClassIds: Iterable<string> = [],
   gradeOfName: (name: string) => number | null = () => null,
+  opts: { mesem?: boolean } = {},
 ): { ids: Set<string>; withLesson: Set<string>; fallback: boolean } {
   const withLesson = new Set(entries.filter((e) => isInternshipSubject(e.subject)).map((e) => e.classId));
+  if (opts.mesem) return { ids: new Set(classes.map((c) => c.id)), withLesson, fallback: false };
   const ids = new Set<string>();
   for (const c of classes) {
-    if (withLesson.has(c.id)) ids.add(c.id);
-    else if (!c.bellExempt && gradeOfName(c.name) === 12) ids.add(c.id);
+    const g = gradeOfName(c.name);
+    if (withLesson.has(c.id) && (g === 12 || g === null)) ids.add(c.id);
   }
-  if (!ids.size) return { ids: new Set(classes.map((c) => c.id)), withLesson, fallback: true };
+  let fallback = false;
+  if (!withLesson.size) {
+    fallback = true;
+    for (const c of classes) if (!c.bellExempt && gradeOfName(c.name) === 12) ids.add(c.id);
+    if (!ids.size) for (const c of classes) ids.add(c.id);
+  }
   for (const id of assignedClassIds) ids.add(id);
-  return { ids, withLesson, fallback: false };
+  return { ids, withLesson, fallback };
 }
 
 /**
@@ -280,6 +290,19 @@ export const businessInfoSchema = businessSchema.omit({ coordinatorTeacherId: tr
 export const areaVocationalSchema = z.object({ vocational: z.boolean().nullable() });
 
 export const businessStudentsSchema = z.object({ studentIds: z.array(z.uuid()).max(500) });
+
+/**
+ * Öğrenci ekle / işletme değiştir (mobil): öğrenciler `businessId` işletmesine `from` tarihinden itibaren geçer;
+ * businessId null ise işletmeden ayrılır (son günü from'dan bir gün öncesidir). from boşsa bugün.
+ */
+export const internAssignSchema = z.object({
+  studentIds: z.array(z.uuid()).min(1, 'Öğrenci seçin').max(200),
+  businessId: z.uuid().nullable(),
+  from: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Tarih YYYY-AA-GG olmalı')
+    .optional(),
+});
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Tarih YYYY-AA-GG olmalı');
 

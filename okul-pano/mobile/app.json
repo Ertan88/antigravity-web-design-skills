@@ -3,7 +3,7 @@
     "name": "Okul Yayın",
     "slug": "okul-pano",
     "scheme": "okulpano",
-    "version": "1.20.43",
+    "version": "1.20.44",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#f7f6f3",
@@ -32,7 +32,7 @@
         "READ_CALENDAR",
         "WRITE_CALENDAR"
       ],
-      "versionCode": 1117,
+      "versionCode": 1118,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0E5E66"
@@ -81,7 +81,10 @@
       [
         "expo-notifications",
         {
-          "color": "#0E5E66"
+          "color": "#0E5E66",
+          "sounds": [
+            "./assets/sounds/okul_yayin.wav"
+          ]
         }
       ],
       [

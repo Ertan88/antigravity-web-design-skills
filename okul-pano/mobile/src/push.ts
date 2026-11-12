@@ -15,6 +15,31 @@ if (Platform.OS !== 'web') {
 }
 
 /**
+ * Uygulamanın kendi bildirim sesi (assets/sounds/okul_yayin.wav, app.json'da expo-notifications "sounds"). Android'de
+ * ses kanala bağlıdır ve kanal kurulduktan sonra değiştirilemez; bu yüzden sesli kanal yeni bir kimlikle açılır. Eski
+ * "default" kanalı kaldırılır. Sunucu bildirimleri de bu kanala gönderilir (apps/api/src/lib/push.ts).
+ */
+export const CHANNEL_ID = 'okul-yayin';
+export const SOUND = 'okul_yayin.wav';
+
+let channelReady: Promise<void> | null = null;
+export function ensureChannel(): Promise<void> {
+  if (Platform.OS !== 'android') return Promise.resolve();
+  channelReady ??= (async () => {
+    await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
+      name: 'Okul Yayın',
+      importance: Notifications.AndroidImportance.HIGH,
+      sound: SOUND,
+      vibrationPattern: [0, 200, 120, 200],
+    });
+    await Notifications.deleteNotificationChannelAsync('default').catch(() => undefined);
+  })().catch(() => {
+    channelReady = null;
+  });
+  return channelReady;
+}
+
+/**
  * Telefon bildirimleri için cihazı kaydeder (onay bekleyen duyuru, acil durum, nöbet görevlendirmesi…).
  * - ok: bu telefon sunucudan bildirim alır
  * - local: izin verildi, telefondaki hatırlatmalar (nöbet sabahı) çalışır; ama uygulamada bildirim hizmeti
@@ -23,12 +48,7 @@ if (Platform.OS !== 'web') {
  */
 export async function registerForPush(): Promise<'ok' | 'local' | 'denied' | 'unavailable'> {
   if (Platform.OS === 'web' || !Device.isDevice) return 'unavailable';
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'Okul Yayın',
-      importance: Notifications.AndroidImportance.HIGH,
-    });
-  }
+  await ensureChannel();
   const current = await Notifications.getPermissionsAsync();
   const granted = current.granted || (await Notifications.requestPermissionsAsync()).granted;
   if (!granted) return 'denied';
@@ -85,6 +105,7 @@ export async function scheduleReminders(items: { at: Date; title: string; body: 
   if (Platform.OS === 'web') return false;
   const perm = await Notifications.getPermissionsAsync();
   if (!perm.granted) return false;
+  await ensureChannel();
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   await Promise.all(
     scheduled.filter((n) => (n.content.data as { kind?: string } | undefined)?.kind === kind).map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
@@ -92,8 +113,8 @@ export async function scheduleReminders(items: { at: Date; title: string; body: 
   for (const item of items) {
     if (item.at.getTime() <= Date.now()) continue;
     await Notifications.scheduleNotificationAsync({
-      content: { title: item.title, body: item.body, data: { kind, url: item.url } },
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: item.at },
+      content: { title: item.title, body: item.body, sound: SOUND, data: { kind, url: item.url } },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: item.at, channelId: CHANNEL_ID },
     });
   }
   return true;
@@ -115,9 +136,10 @@ export async function sendTestNotification(): Promise<'ok' | 'denied' | 'unavail
   const current = await Notifications.getPermissionsAsync();
   const granted = current.granted || (await Notifications.requestPermissionsAsync()).granted;
   if (!granted) return 'denied';
+  await ensureChannel();
   await Notifications.scheduleNotificationAsync({
-    content: { title: 'Nöbet hatırlatmaları açık', body: 'Hatırlatmalar bu şekilde telefonunuza gelecek.', data: { kind: 'test', url: '/hatirlatmalar' } },
-    trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 3 },
+    content: { title: 'Okul Yayın bildirimleri açık', body: 'Bildirimler bu sesle ve bu şekilde telefonunuza gelecek.', sound: SOUND, data: { kind: 'test', url: '/hatirlatmalar' } },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 3, channelId: CHANNEL_ID },
   });
   return 'ok';
 }

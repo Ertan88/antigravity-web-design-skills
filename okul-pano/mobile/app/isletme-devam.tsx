@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSchoolQuery } from '../src/data.ts';
@@ -236,7 +236,8 @@ export default function IsletmeDevam() {
               </View>
               {rows.map((s) => (
                 <View key={s.id} style={{ height: ROW_H, flexDirection: 'row', alignItems: 'center', paddingLeft: 8, borderTopWidth: 1, borderTopColor: colors.divider }}>
-                  <View style={{ flex: 1, minWidth: 0 }}>
+                  {/* Ada dokununca öğrenci sayfası: bütün devamsızlıklar ve işletme bilgileri */}
+                  <Pressable accessibilityRole="button" accessibilityLabel={`${s.fullName} öğrenci sayfası`} onPress={() => router.push(`/stajyer/${s.id}`)} style={{ flex: 1, minWidth: 0 }}>
                     <Text style={{ fontSize: 12.5, fontWeight: '800', color: colors.ink }} numberOfLines={1}>
                       {s.fullName}
                     </Text>
@@ -246,7 +247,7 @@ export default function IsletmeDevam() {
                     <Text style={{ fontSize: 10, color: colors.subtle }} numberOfLines={1}>
                       {s.businessName}
                     </Text>
-                  </View>
+                  </Pressable>
                   <View style={{ width: 16, gap: 4 }}>
                     {HALVES.map((h) => (
                       <Text key={h} style={{ fontSize: 10, fontWeight: '800', color: colors.faint, height: CELL_H, lineHeight: CELL_H, textAlign: 'center' }}>

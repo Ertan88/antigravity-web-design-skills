@@ -337,6 +337,13 @@
       "when": 1796500000000,
       "tag": "0047_business_visit_day",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1796600000000,
+      "tag": "0048_internship_periods",
+      "breakpoints": true
     }
   ]
 }

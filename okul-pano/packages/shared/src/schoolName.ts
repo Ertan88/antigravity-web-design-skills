@@ -102,6 +102,12 @@ export function splitSchoolName(fullName: string, schoolType?: string | null): {
   return { name, type: null };
 }
 
+/** Mesleki Eğitim Merkezi (MESEM) mi: Okul Ayarları'ndaki okul türünden, girilmemişse addan ("… MEM", "… MESEM") */
+export function isMesem(fullName: string, schoolType?: string | null): boolean {
+  const t = lower(splitSchoolName(fullName, schoolType).type ?? '');
+  return t === 'mesleki eğitim merkezi' || t === 'mesem' || /mesleki eğitim merkez/.test(t) || /\bmesem$/.test(lower(fullName));
+}
+
 /** Okulun tam adı türüyle birlikte (ör. "Atatürk" + "Mesleki ve Teknik Anadolu Lisesi"); belgelerde ve başlıklarda */
 export function schoolFullName(fullName: string, schoolType?: string | null): string {
   const t = splitSchoolName(fullName, schoolType);

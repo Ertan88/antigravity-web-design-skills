@@ -77,7 +77,7 @@ describe('işletmede devam çizelgesi', () => {
     expect(t).toMatchObject({ excused: 1.5, unexcused: 0.5, permitted: 0.5, referred: 0.5, report: 0.5 });
   });
 
-  it('öğrenci seçimi: işletme dersi olan sınıflar ve 12. sınıflar; özel eğitim yalnızca işletme dersiyle', () => {
+  it('öğrenci seçimi: işletme dersi olan 12. sınıflar; MESEM bütün sınıflar; program yoksa 12. sınıflar', () => {
     const classes = [
       { id: 'a', name: 'AMP 12-C' },
       { id: 'b', name: 'ATP 12-A' },
@@ -85,16 +85,26 @@ describe('işletmede devam çizelgesi', () => {
       { id: 'd', name: 'AMP 12-F', bellExempt: true },
       { id: 'e', name: 'AMP 10-A' },
       { id: 'f', name: 'AMP 9-A' },
+      { id: 'g', name: 'Mobilya A' },
     ];
     const entries = [
       { classId: 'a', subject: 'İşletmelerde Mesleki Eğitim' },
       { classId: 'c', subject: 'İşletmelerde Mesleki Eğitim' },
+      { classId: 'd', subject: 'İşletmede Beceri Eğitimi' },
+      { classId: 'g', subject: 'İşletmelerde Beceri Eğitimi' },
       { classId: 'e', subject: 'Matematik' },
     ];
     const r = internshipClassIds(classes, entries, ['f'], gradeOf);
-    expect([...r.ids].sort()).toEqual(['a', 'b', 'c', 'f']);
-    expect([...r.withLesson].sort()).toEqual(['a', 'c']);
+    // b: 12 ama işletme dersi yok; c: işletme dersi var ama 11; f: öğrencisi zaten işletmede
+    expect([...r.ids].sort()).toEqual(['a', 'd', 'f', 'g']);
+    expect([...r.withLesson].sort()).toEqual(['a', 'c', 'd', 'g']);
     expect(r.fallback).toBe(false);
+    const mesem = internshipClassIds(classes, entries, [], gradeOf, { mesem: true });
+    expect(mesem.ids.size).toBe(classes.length);
+    // Program yok: 12. sınıflar (özel eğitim hariç)
+    const noPlan = internshipClassIds(classes, [], [], gradeOf);
+    expect(noPlan).toMatchObject({ fallback: true });
+    expect([...noPlan.ids].sort()).toEqual(['a', 'b']);
     // Program yok, adlardan düzey çıkmıyor: bütün sınıflar
     const none = internshipClassIds([{ id: 'x', name: 'Mobilya A' }], [], [], gradeOf);
     expect(none).toMatchObject({ fallback: true });

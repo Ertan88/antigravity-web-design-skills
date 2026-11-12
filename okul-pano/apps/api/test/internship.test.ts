@@ -323,6 +323,45 @@ describe('işletmelerde mesleki eğitim', () => {
     expect((await owner.put(`${base}/internship/businesses/${biz.kent}/students`, { studentIds: [ids['Burak Şahin'], nine] })).statusCode).toBe(400);
   });
 
+  it('öğrenci ekle / işletme değiştir: eski ve yeni işletmenin devam çizelgesi tarihe göre bölünür, öğrenci sayfası', async () => {
+    // Koordinatör başka işletmedeki öğrenciyi alamaz, başka işletmeye ekleyemez
+    expect((await coord.post(`${base}/internship/students/assign`, { studentIds: [ids['Burak Şahin']], businessId: biz.usta })).statusCode).toBe(403);
+    expect((await coord.post(`${base}/internship/students/assign`, { studentIds: [ids['Elif Demir']], businessId: biz.kent })).statusCode).toBe(403);
+    // Öğrenciler sekmesi: koordinatör kendi işletmesindekileri, özürsüz devamsızlıkla görür
+    const interns = (await coord.get(`${base}/internship/interns`)).json();
+    expect(interns.canAdd).toBe(true);
+    expect(interns.students.map((x: { fullName: string }) => x.fullName).sort()).toEqual(['Arda Kaya', 'Elif Demir']);
+    // İdare Elif'i 15 Ekim'den itibaren Kent Dekorasyon'a taşır
+    expectStatus(await owner.post(`${base}/internship/students/assign`, { studentIds: [ids['Elif Demir']], businessId: biz.kent, from: '2026-10-15' }), 200);
+    const forms = (await owner.get(`${base}/internship/forms?type=attendance&month=2026-10`)).json();
+    const count = Object.fromEntries(forms.items.map((b: { name: string; students: number }) => [b.name, b.students]));
+    expect(count['Usta Mobilya']).toBe(2); // Arda + Elif (14 Ekim'e kadar)
+    expect(count['Kent Dekorasyon']).toBe(2); // Burak + Elif (15 Ekim'den)
+    const pdf = await owner.get(`${base}/internship/forms.pdf?type=attendance&month=2026-10`);
+    expectStatus(pdf, 200);
+    expect(pdf.headers['content-type']).toContain('application/pdf');
+    // Öğrenci sayfası: idare iki dönemi de görür; 8 Ekim D eski işletmede kalır
+    const rec = (await owner.get(`${base}/internship/students/${ids['Elif Demir']}/record`)).json();
+    expect(rec.periods.map((p: { businessName: string; startDate: string | null; endDate: string | null; current: boolean }) => [p.businessName, p.startDate, p.endDate, p.current])).toEqual([
+      ['Usta Mobilya', null, '2026-10-14', false],
+      ['Kent Dekorasyon', '2026-10-15', null, true],
+    ]);
+    expect(rec.business.name).toBe('Kent Dekorasyon');
+    expect(rec.events.find((e: { date: string; half: string }) => e.date === '2026-10-08' && e.half === 'pm')).toMatchObject({ code: 'R', businessId: biz.usta });
+    // Eski koordinatör yalnızca kendi dönemini görür, şu anki işletme bilgisini görmez
+    const old = (await coord.get(`${base}/internship/students/${ids['Elif Demir']}/record`)).json();
+    expect(old.periods.map((p: { businessName: string }) => p.businessName)).toEqual(['Usta Mobilya']);
+    expect(old.business).toBeNull();
+    expect((await other.get(`${base}/internship/students/${ids['Elif Demir']}/record`)).statusCode).toBe(403);
+    // Aynı gün geri alma: yanlış atama düzeltilir, dönem silinir
+    expectStatus(await owner.post(`${base}/internship/students/assign`, { studentIds: [ids['Elif Demir']], businessId: biz.usta, from: '2026-10-15' }), 200);
+    const back = (await owner.get(`${base}/internship/students/${ids['Elif Demir']}/record`)).json();
+    expect(back.periods.map((p: { businessName: string; endDate: string | null }) => [p.businessName, p.endDate])).toEqual([
+      ['Usta Mobilya', '2026-10-14'],
+      ['Usta Mobilya', null],
+    ]);
+  });
+
   it('meslek öğretmeni de işaretlenmeden modülü görmez; /api/me ünvanı kadrodan verir', async () => {
     const titles = (await owner.get(`${base}/teacher-titles`)).json() as { id: string; name: string }[];
     const title = titles.find((x) => /Uzman/.test(x.name)) ?? titles[0];

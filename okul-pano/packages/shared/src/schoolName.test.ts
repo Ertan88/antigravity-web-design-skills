@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { shortSchoolName, splitSchoolName } from './schoolName.ts';
+import { isMesem, shortSchoolName, splitSchoolName } from './schoolName.ts';
 
 describe('splitSchoolName', () => {
   it('bilinen okul türünü ayırır (büyük harf ve Türkçe karakterlerle)', () => {
@@ -35,5 +35,16 @@ describe('shortSchoolName', () => {
     expect(shortSchoolName('Gazi İlkokulu')).toBe('Gazi İO');
     expect(shortSchoolName('Kardelen Okulları')).toBe('Kardelen Okulları');
     expect(shortSchoolName('Kardelen', 'Koleji')).toBe('Kardelen Koleji');
+  });
+});
+
+describe('isMesem', () => {
+  it('okul türünden ya da addan', () => {
+    expect(isMesem('Örnek', 'Mesleki Eğitim Merkezi')).toBe(true);
+    expect(isMesem('Örnek Mesleki Eğitim Merkezi')).toBe(true);
+    expect(isMesem('Örnek MEM')).toBe(true);
+    expect(isMesem('Örnek MESEM')).toBe(true);
+    expect(isMesem('Örnek', 'Mesleki ve Teknik Anadolu Lisesi')).toBe(false);
+    expect(isMesem('Örnek MTAL')).toBe(false);
   });
 });

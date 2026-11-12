@@ -2129,7 +2129,7 @@ function AssignStudents({
       onClose={onClose}
       size="lg"
       title={business ? `${business.name} · öğrenciler` : ""}
-      description="İşletmelerde mesleki eğitim dersi olan sınıflar ve 12. sınıflar listelenir. Başka işletmedeki bir öğrenci seçilirse o işletmeden çıkar."
+      description="Ders programında işletmelerde mesleki (ya da beceri) eğitim dersi olan 12. sınıflar listelenir; Mesleki Eğitim Merkezinde bütün sınıflar. Başka işletmedeki bir öğrenci seçilirse o işletmeden bugünden itibaren çıkar."
       footer={
         <>
           <span className="mr-auto text-sm font-semibold text-slate-500">
@@ -2147,8 +2147,10 @@ function AssignStudents({
       {students.data?.fallback && (
         <div className="mb-3">
           <Alert>
-            Ders programında işletme dersi ya da 12. sınıf bulunamadı; bütün
-            sınıflar listelendi.
+            Ders programında "İşletmelerde Mesleki Eğitim" ya da "İşletmelerde
+            Beceri Eğitimi" dersi bulunamadı; 12. sınıflar (bulunamazsa bütün
+            sınıflar) listelendi. Ders programını yükleyince yalnızca bu dersi
+            olan 12. sınıflar listelenir.
           </Alert>
         </div>
       )}

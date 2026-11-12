@@ -66,7 +66,7 @@ export async function sendToTokens(deps: Pick<AppDeps, "db" | "env">, tokens: re
         ...(deps.env.PUSH_ACCESS_TOKEN ? { authorization: `Bearer ${deps.env.PUSH_ACCESS_TOKEN}` } : {}),
       },
       body: JSON.stringify(
-        batch.map((to) => ({ to, title: message.title, body: message.body, sound: 'default', priority: 'high', data: { url: message.url ?? '/' } })),
+        batch.map((to) => ({ to, title: message.title, body: message.body, sound: 'default', priority: 'high', channelId: 'okul-yayin', data: { url: message.url ?? '/' } })),
       ),
       signal: AbortSignal.timeout(10_000),
     });
