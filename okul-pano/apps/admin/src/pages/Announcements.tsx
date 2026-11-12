@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileText, Megaphone, PlayCircle, ScanEye } from '../components/icons.tsx';
 import { useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
-import { confirm } from '../components/confirm.tsx';
+import { choose } from '../components/confirm.tsx';
 import { CrudPage } from '../components/CrudPage.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Segmented } from '../components/ui.tsx';
@@ -108,14 +108,15 @@ export function Announcements() {
   const drafts = useQuery({ queryKey: [schoolId, 'announcement-drafts'], queryFn: () => api<Draft[]>(draftsPath), enabled: can('announcements.manage') });
   const refreshDrafts = () => qc.invalidateQueries({ queryKey: [schoolId, 'announcement-drafts'] });
   const removeDraft = useMutation({ mutationFn: (id: string) => api(`${draftsPath}/${id}`, { method: 'DELETE' }), onSuccess: refreshDrafts });
-  // Taslaktan açılan pencere: kapanınca taslak güncellenir, yayına alınınca silinir
-  const [draft, setDraft] = useState<{ id: string; step: number } | null>(null);
+  // Taslaktan açılan pencere: kapatırken sorulur (güncelle / değişiklikleri at / sil), yayına alınınca silinir
+  const [draft, setDraft] = useState<{ id: string; step: number; initial: Form } | null>(null);
   const [openRequest, setOpenRequest] = useState<{ values: Form; key: number } | null>(null);
   const draftCount = drafts.data?.length ?? 0;
   const approvalNeeded = Boolean(school.data?.settings.requireApproval) && !approver;
   const openDraft = (d: Draft) => {
-    setDraft({ id: d.id, step: d.step });
-    setOpenRequest({ values: { ...empty(), ...d.data }, key: Date.now() });
+    const values = { ...empty(), ...d.data };
+    setDraft({ id: d.id, step: d.step, initial: values });
+    setOpenRequest({ values, key: Date.now() });
   };
 
   return (
@@ -187,28 +188,77 @@ export function Announcements() {
           maxDuration={school.data?.settings.slideMaxDurationSec ?? 60}
           isApprover={approver}
           approvalNeeded={approvalNeeded}
+          isDirty={(values) =>
+            m.editing ? JSON.stringify(values) !== JSON.stringify(toForm(m.editing)) : draft ? JSON.stringify(values) !== JSON.stringify(draft.initial) : hasContent(values)
+          }
           onDismiss={(values, step) => {
             void (async () => {
-              if (m.editing) {
-                // Düzenleme: değişiklik varsa uyarı; taslak tutulmaz
-                const changed = JSON.stringify(values) !== JSON.stringify(toForm(m.editing));
-                if (changed && !(await confirm({ title: 'Değişiklikler kaydedilmedi', message: 'Pencere kapanırsa yaptığınız değişiklikler kaybolur.', confirmLabel: 'Kapat', tone: 'warning' }))) return;
+              const close = () => {
+                setDraft(null);
                 m.close();
-                return;
-              }
-              // Yeni duyuru: bir şey yazıldıysa taslak olarak saklanır
-              if (hasContent(values) || draft) {
+              };
+              const saveDraft = async () => {
                 try {
                   if (draft) await api(`${draftsPath}/${draft.id}`, { method: 'PUT', body: { step, data: values } });
                   else await api(draftsPath, { method: 'POST', body: { step, data: values } });
                   await refreshDrafts();
-                  toast.success('Duyuru taslaklara kaydedildi');
+                  toast.success(draft ? 'Taslak güncellendi' : 'Duyuru taslaklara kaydedildi');
+                  close();
                 } catch (err) {
                   toast.error(err instanceof Error ? err.message : 'Taslak kaydedilemedi');
                 }
+              };
+              if (m.editing) {
+                // Yayındaki duyurunun düzenlemesi taslak olmaz: değişiklik varsa atılıp atılmayacağı sorulur
+                const changed = JSON.stringify(values) !== JSON.stringify(toForm(m.editing));
+                if (!changed) return close();
+                const c = await choose({
+                  title: 'Değişiklikler kaydedilmedi',
+                  message: 'Çıkarsanız duyuruda yaptığınız değişiklikler kaybolur.',
+                  tone: 'warning',
+                  cancelLabel: 'Düzenlemeye devam et',
+                  choices: [{ value: 'discard', label: 'Değişiklikleri at', kind: 'delete' }],
+                });
+                if (c === 'discard') close();
+                return;
               }
-              setDraft(null);
-              m.close();
+              if (draft) {
+                // Taslaktan devam: değişiklik yoksa sormadan kapanır
+                if (JSON.stringify(values) === JSON.stringify(draft.initial)) return close();
+                const c = await choose({
+                  title: 'Taslakta değişiklik var',
+                  message: '"Değişiklikleri at" taslağı açtığınız hâline bırakır; "Taslağı sil" taslağı tamamen kaldırır.',
+                  tone: 'neutral',
+                  cancelLabel: 'Yazmaya devam et',
+                  choices: [
+                    { value: 'remove', label: 'Taslağı sil', kind: 'delete' },
+                    { value: 'discard', label: 'Değişiklikleri at', kind: 'secondary' },
+                    { value: 'save', label: 'Taslağı güncelle', kind: 'primary' },
+                  ],
+                });
+                if (c === 'save') await saveDraft();
+                else if (c === 'discard') close();
+                else if (c === 'remove') {
+                  await api(`${draftsPath}/${draft.id}`, { method: 'DELETE' }).catch(() => undefined);
+                  await refreshDrafts();
+                  close();
+                }
+                return;
+              }
+              // Yeni duyuru: hiçbir şey yazılmadıysa sormadan kapanır
+              if (!hasContent(values)) return close();
+              const c = await choose({
+                title: 'Duyuruyu taslak olarak saklayalım mı?',
+                message: 'Taslaklar, Duyurular sayfasındaki "Taslaklar" sekmesinde durur; kaldığınız yerden devam edebilirsiniz.',
+                tone: 'neutral',
+                cancelLabel: 'Yazmaya devam et',
+                choices: [
+                  { value: 'delete', label: 'Sil ve çık', kind: 'delete' },
+                  { value: 'save', label: 'Taslak olarak kaydet', kind: 'primary' },
+                ],
+              });
+              if (c === 'save') await saveDraft();
+              else if (c === 'delete') close();
             })();
           }}
           onSaved={() => {

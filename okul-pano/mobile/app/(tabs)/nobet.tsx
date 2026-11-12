@@ -164,7 +164,7 @@ function MonthStrip({ data }: { data: MyDuties }) {
             <View style={{ flex: 1, backgroundColor: '#bbf7d0' }} />
           </>
         )}
-        <Text style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, textAlign: 'center', textAlignVertical: 'center', lineHeight: 30, fontSize: 12.5, fontWeight: '800', color: fg }}>
+        <Text style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, textAlign: 'center', textAlignVertical: 'center', lineHeight: 30, includeFontPadding: false, fontSize: 12.5, fontWeight: '800', color: fg }}>
           {Number(iso.slice(8))}
         </Text>
       </View>

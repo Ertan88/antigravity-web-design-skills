@@ -35,7 +35,9 @@ export function ImageUpload({
   value,
   onChange,
   invalid,
-  hint = 'PNG, JPG veya WEBP · en fazla 10 MB · en iyi sonuç için 16:9 (1920×1080)',
+  // Duyuru fotoğrafı kırpılmaz: panoda tamamı gösterilir, alanın oranına uymayan kenarlar aynı fotoğrafın bulanık
+  // hâliyle dolar (duyuru alanının oranı panonun görünümüne göre değişir, tek bir ölçü doğru olmaz)
+  hint = 'PNG, JPG veya WEBP · en fazla 10 MB · kırpmanıza gerek yok: fotoğrafın tamamı gösterilir, boşluklar bulanık fotoğrafla dolar',
   aspect = 'aspect-video',
 }: {
   value: string | null;

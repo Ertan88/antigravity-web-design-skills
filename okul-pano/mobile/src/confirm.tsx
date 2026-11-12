@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { IconName } from './icons.tsx';
 import { Text } from './text.tsx';
 import { colors, dark } from './theme.ts';
-import { Icon } from './ui.tsx';
+import { Button, Icon } from './ui.tsx';
 
 export type ConfirmTone = 'neutral' | 'warning' | 'danger';
 
@@ -32,25 +32,40 @@ export type ConfirmOptions = {
   holdLabel?: string;
 };
 
-type Pending = ConfirmOptions & { resolve: (ok: boolean) => void };
+/** Seçenekli soru (ör. duyurudan çıkarken: taslak olarak kaydet / sil / devam et) */
+export type Choice<V extends string = string> = { value: V; label: string; kind: 'primary' | 'secondary' | 'delete' };
+
+type Pending = ConfirmOptions & { choices?: Choice[]; resolve: (v: boolean | string | null) => void };
 
 let current: Pending | null = null;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 
 export function openConfirm(options: ConfirmOptions): Promise<boolean> {
-  current?.resolve(false);
+  current?.resolve(current.choices ? null : false);
   return new Promise((resolve) => {
-    current = { ...options, resolve };
+    current = { ...options, resolve: (v) => resolve(v === true) };
     emit();
   });
 }
 
-function settle(ok: boolean) {
+/**
+ * Birden çok seçenekli soru (alt sayfa, düğmeler alt alta, en üstte "primary"): seçilen değer döner; dışarı dokunma,
+ * geri tuşu ve en alttaki vazgeç (cancelLabel) null döner. Sil seçeneği yumuşak kırmızıdır.
+ */
+export function openChoice<V extends string>(options: Omit<ConfirmOptions, 'confirmLabel' | 'hold' | 'holdLabel'> & { choices: Choice<V>[] }): Promise<V | null> {
+  current?.resolve(current.choices ? null : false);
+  return new Promise((resolve) => {
+    current = { ...options, resolve: (v) => resolve(typeof v === 'string' ? (v as V) : null) };
+    emit();
+  });
+}
+
+function settle(ok: boolean | string) {
   const p = current;
   current = null;
   emit();
-  p?.resolve(ok);
+  p?.resolve(p.choices && ok === false ? null : ok);
 }
 
 function tones(tone: ConfirmTone) {
@@ -170,6 +185,18 @@ export function ConfirmHost() {
               ))}
             </View>
           ) : null}
+          {o.choices ? (
+            <View style={{ gap: 10, marginTop: 22 }}>
+              {o.choices.map((c) => (
+                <Button key={c.value} variant={c.kind} size="lg" icon={c.kind === 'delete' ? 'trash-outline' : undefined} onPress={() => settle(c.value)}>
+                  {c.label}
+                </Button>
+              ))}
+              <Pressable accessibilityRole="button" onPress={() => settle(false)} style={{ alignSelf: 'center', paddingVertical: 12, paddingHorizontal: 24 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: colors.muted }}>{o.cancelLabel ?? 'Vazgeç'}</Text>
+              </Pressable>
+            </View>
+          ) : (
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 22 }}>
             {o.hold ? null : (
               <Pressable
@@ -192,7 +219,8 @@ export function ConfirmHost() {
               </Pressable>
             )}
           </View>
-          {o.hold ? (
+          )}
+          {o.hold && !o.choices ? (
             <Pressable accessibilityRole="button" onPress={() => settle(false)} style={{ alignSelf: 'center', paddingVertical: 12, paddingHorizontal: 24, marginTop: 4 }}>
               <Text style={{ fontSize: 15, fontWeight: '700', color: colors.muted }}>{o.cancelLabel ?? 'Vazgeç'}</Text>
             </Pressable>

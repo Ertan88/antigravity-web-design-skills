@@ -30,26 +30,48 @@ export type ConfirmOptions = {
   holdLabel?: string;
 };
 
-type Pending = ConfirmOptions & { resolve: (ok: boolean) => void };
+/** Seçenekli soru (ör. duyurudan çıkarken: taslak olarak kaydet / sil / devam et) */
+export type Choice<V extends string = string> = { value: V; label: string; kind: 'primary' | 'secondary' | 'delete' };
+
+type Pending = ConfirmOptions & { choices?: Choice[]; resolve: (v: boolean | string | null) => void };
 
 let current: Pending | null = null;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 
 export function confirm(options: ConfirmOptions): Promise<boolean> {
-  current?.resolve(false);
+  current?.resolve(current.choices ? null : false);
   return new Promise((resolve) => {
-    current = { ...options, resolve };
+    current = { ...options, resolve: (v) => resolve(v === true) };
     emit();
   });
 }
 
-function settle(ok: boolean) {
+/**
+ * Birden çok seçenekli soru: seçilen değer döner; Esc, dışarı tıklama ve vazgeç düğmesi (cancelLabel) null döner.
+ * Seçenekler sağdan sola önem sırasıyla dizilir (en sağda "primary"); sil seçeneği yumuşak kırmızıdır.
+ */
+export function choose<V extends string>(options: Omit<ConfirmOptions, 'confirmLabel' | 'hold' | 'holdLabel'> & { choices: Choice<V>[] }): Promise<V | null> {
+  current?.resolve(current.choices ? null : false);
+  return new Promise((resolve) => {
+    current = { ...options, resolve: (v) => resolve(typeof v === 'string' ? (v as V) : null) };
+    emit();
+  });
+}
+
+function settle(ok: boolean | string) {
   const p = current;
   current = null;
   emit();
-  p?.resolve(ok);
+  p?.resolve(p.choices && ok === false ? null : ok);
 }
+
+const CHOICE_TONE: Record<Choice['kind'], string> = {
+  primary: 'bg-brand-600 text-white hover:bg-brand-500',
+  secondary: 'bg-surface text-ink ring-1 ring-slate-200 hover:bg-slate-100',
+  // ui.tsx DELETE_TONE ile aynı (ui.tsx bu dosyayı içe aktarır; döngü olmasın diye burada yazılı)
+  delete: 'bg-rose-50 text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100 hover:text-rose-800',
+};
 
 const TONE: Record<ConfirmTone, { tile: string; button: string; icon: AppIcon }> = {
   neutral: { tile: 'bg-slate-100 text-ink', button: 'bg-brand-600 text-white hover:bg-brand-500', icon: CircleAlert },
@@ -168,7 +190,7 @@ export function ConfirmHost() {
         role="alertdialog"
         aria-modal="true"
         aria-label={pending.title}
-        className="animate-toast relative w-full overflow-hidden rounded-t-3xl bg-elevated shadow-2xl sm:max-w-[30rem] sm:rounded-3xl dark:ring-1 dark:ring-white/12"
+        className={clsx('animate-toast relative w-full overflow-hidden rounded-t-3xl bg-elevated shadow-2xl sm:rounded-3xl dark:ring-1 dark:ring-white/12', pending.choices ? 'sm:max-w-[38rem]' : 'sm:max-w-[30rem]')}
       >
         <div className="flex gap-4 px-6 pt-6 pb-5">
           <div className={clsx('grid size-11 shrink-0 place-items-center rounded-2xl', t.tile)}>
@@ -202,11 +224,23 @@ export function ConfirmHost() {
             ref={cancelRef}
             type="button"
             onClick={() => settle(false)}
-            className="h-10 rounded-full bg-surface px-5 text-sm font-bold text-ink ring-1 ring-slate-200 hover:bg-slate-100"
+            className="h-10 rounded-full bg-surface px-5 text-sm font-bold whitespace-nowrap text-ink ring-1 ring-slate-200 hover:bg-slate-100"
           >
             {pending.cancelLabel ?? 'Vazgeç'}
           </button>
-          {pending.hold ? (
+          {pending.choices ? (
+            pending.choices.map((c) => (
+              <button
+                key={c.value}
+                type="button"
+                onClick={() => settle(c.value)}
+                className={clsx('inline-flex h-10 items-center justify-center gap-2 rounded-full px-5 text-sm font-bold whitespace-nowrap', CHOICE_TONE[c.kind])}
+              >
+                {c.kind === 'delete' && <Trash2 className="size-4" />}
+                {c.label}
+              </button>
+            ))
+          ) : pending.hold ? (
             <HoldButton label={pending.holdLabel ?? 'Onaylamak için basılı tutun'} tone={tone} onDone={() => settle(true)} />
           ) : (
             <button

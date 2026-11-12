@@ -2,7 +2,7 @@ import { errorText } from '@okulpano/shared';
 import { CONDUCT_GROUPS } from '@okulpano/shared/conduct';
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../../src/api.ts';
@@ -12,7 +12,7 @@ import { classLabel, teacherDay } from '../../src/day.ts';
 import { Text, TextInput } from '../../src/text.tsx';
 import { colors, radius, tiles } from '../../src/theme.ts';
 import { Sheet } from '../../src/sheet.tsx';
-import { Avatar, Empty, ErrorNote, HeaderButton, Icon, Loading, Screen, T } from '../../src/ui.tsx';
+import { Avatar, Empty, ErrorNote, HeaderButton, Icon, Loading, Screen, T, TabBarInset } from '../../src/ui.tsx';
 import { useTabBack } from '../../src/tabs.ts';
 
 /** Kaydettikten sonra "Geri al" bu kadar görünür */
@@ -427,13 +427,15 @@ function EntrySheet({
 }
 
 function UndoBar({ text, onUndo }: { text: string; onUndo: () => void }) {
+  // Yüzer alt menünün üstünde durur
+  const tabInset = useContext(TabBarInset);
   return (
     <View
       style={{
         position: 'absolute',
         left: 16,
         right: 16,
-        bottom: 16,
+        bottom: 16 + tabInset,
         backgroundColor: '#1c1917',
         borderRadius: 18,
         paddingVertical: 12,

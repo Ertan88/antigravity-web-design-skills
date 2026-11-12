@@ -18,9 +18,9 @@ import {
 } from '@okulpano/shared/announcementPlan';
 import { useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, ScrollView, View } from 'react-native';
+import { AppState, BackHandler, Platform, Pressable, ScrollView, View } from 'react-native';
 import { api, uploadImage } from '../src/api.ts';
 import { useAuth, useSchoolPath } from '../src/auth.tsx';
 import { useAnnouncementDrafts, useAnnouncements, useScreens, useSchoolInfo, type Announcement, type AnnouncementDraft } from '../src/data.ts';
@@ -28,6 +28,7 @@ import { AnnouncementPreview } from '../src/preview.tsx';
 import { Text } from '../src/text.tsx';
 import { colors } from '../src/theme.ts';
 import { DatePickSheet } from '../src/datePick.tsx';
+import { openChoice } from '../src/confirm.tsx';
 import { Button, Card, Chip, Field, Icon, Screen, SectionTitle, T, type IconName } from '../src/ui.tsx';
 
 type Kind = 'design' | 'image' | 'text' | 'video';
@@ -130,6 +131,10 @@ export default function DuyuruYeni() {
   const [toText, setToText] = useState('');
   const [duration, setDuration] = useState<number | null>(null);
   const [draftId, setDraftId] = useState<string | null>(null);
+  // Çıkış sorusu için: taslağın açıldığı hâli (değişiklikleri atınca geri yazılır) ve karşılaştırma noktası
+  const originalDraft = useRef<{ step: number; data: AnnouncementDraft['data'] } | null>(null);
+  const captureBaseline = useRef(false);
+  const baseline = useRef<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -142,6 +147,8 @@ export default function DuyuruYeni() {
     if (!d) return;
     const x = d.data;
     setDraftId(d.id);
+    originalDraft.current = { step: d.step, data: d.data };
+    captureBaseline.current = true;
     if (x.kind) setKind(x.kind);
     if (x.design?.template) setTemplateId(designTemplate(x.design.template).id);
     if (x.design?.palette) setPalette(x.design.palette as AnnouncementDesign['palette']);
@@ -191,6 +198,7 @@ export default function DuyuruYeni() {
     setFromText(sch.from ?? '');
     setToText(sch.to ?? '');
     if (duzenle) {
+      captureBaseline.current = true;
       setEditing(a);
       const end = a.endsAt ? new Date(a.endsAt) : null;
       setEndDate(end);
@@ -205,20 +213,183 @@ export default function DuyuruYeni() {
     }
   }, [duzenle, kopya, announcements.data]);
 
-  // Ekrandan yarıda çıkılırsa taslak saklanır (geri düğmesi, telefonun geri tuşu, sekme değişimi)
+  /*
+   * Çıkış: kişi bilerek çıkarken (geri düğmesi, telefonun geri tuşu, kaydırma) sorulur:
+   * - yeni duyuru: Taslak olarak kaydet / Sil ve çık / Yazmaya devam et (hiçbir şey yazılmadıysa sorulmaz);
+   * - taslaktan devam (değişiklik varsa): Taslağı güncelle / Değişiklikleri at (taslak açıldığı hâline döner) /
+   *   Taslağı sil / Yazmaya devam et;
+   * - yayındaki duyurunun düzenlemesi (değişiklik varsa): Değişiklikleri at / Düzenlemeye devam et (taslak olmaz).
+   * Uygulama arka plana atılırsa (telefon çaldı, başka uygulamaya geçildi; telefon uygulamayı sonra kapatabilir)
+   * yazılanlar sessizce taslak olarak saklanır; geri dönülüp "Sil" seçilirse bu taslak da silinir.
+   */
   const state: State = { kind, templateId, fields, title, body, imageUrl, youtubeUrl, screenIds, until, endDate, startDate, schedule, duration };
-  const latest = useRef({ state, step: furthest, draftId, draftsPath, schoolId: school?.id, editing: Boolean(duzenle) });
-  latest.current = { state, step: furthest, draftId, draftsPath, schoolId: school?.id, editing: Boolean(duzenle) };
+  // "beforeRemove": ekran yığından çıkmadan önce (geri düğmesi, telefonun geri tuşu, kaydırma) yakalanır
+  type NavAction = { type: string; payload?: object };
+  type BeforeRemove = { preventDefault: () => void; data: { action: NavAction } };
+  const navigation = useNavigation() as unknown as { addListener: (type: 'beforeRemove', cb: (e: BeforeRemove) => void) => () => void; dispatch: (action: NavAction) => void };
+  const latest = useRef({ state, step: furthest, draftId, draftsPath, schoolId: school?.id, editing: Boolean(duzenle), resumed: Boolean(taslak) });
+  latest.current = { state, step: furthest, draftId, draftsPath, schoolId: school?.id, editing: Boolean(duzenle), resumed: Boolean(taslak) };
   const submitted = useRef(false);
+  const decided = useRef(false);
+  // Arka plana atılınca kaydedilen taslak: yeni duyuruda oluşturuldu mu, taslaktan devamda üzerine yazıldı mı
+  const autoSaved = useRef(false);
+  const draftRef = useRef<string | null>(null);
+  draftRef.current = draftId ?? draftRef.current;
+  useEffect(() => {
+    if (!captureBaseline.current) return;
+    captureBaseline.current = false;
+    baseline.current = JSON.stringify(toDraftData(state));
+  });
+  const isDirty = () => {
+    const l = latest.current;
+    if (l.editing || l.resumed) return baseline.current != null && JSON.stringify(toDraftData(l.state)) !== baseline.current;
+    return hasContent(l.state);
+  };
+  const refreshDrafts = () => qc.invalidateQueries({ queryKey: [latest.current.schoolId, 'announcement-drafts'] });
+  const saveDraft = async (data: AnnouncementDraft['data'] = toDraftData(latest.current.state), step = latest.current.step) => {
+    const l = latest.current;
+    const id = draftRef.current;
+    if (id) await api(`${l.draftsPath}/${id}`, { method: 'PUT', body: { step, data } });
+    else {
+      const row = await api<{ id: string }>(l.draftsPath, { method: 'POST', body: { step, data } });
+      draftRef.current = row.id;
+      setDraftId(row.id);
+    }
+    await refreshDrafts();
+  };
+  const deleteDraft = async () => {
+    const id = draftRef.current;
+    if (id) await api(`${latest.current.draftsPath}/${id}`, { method: 'DELETE' }).catch(() => undefined);
+    await refreshDrafts();
+  };
+
+  /** Bilerek çıkışta sorulur; true: çıkılabilir */
+  const askExit = async (): Promise<boolean> => {
+    const l = latest.current;
+    if (!isDirty()) {
+      // Değişiklik yok; arka planda kendiliğinden kaydedilmiş yeni bir taslak varsa o da kalkar
+      if (!l.editing && !l.resumed && autoSaved.current) await deleteDraft();
+      return true;
+    }
+    try {
+      if (l.editing) {
+        const c = await openChoice({
+          title: 'Değişiklikler kaydedilmedi',
+          message: 'Çıkarsanız duyuruda yaptığınız değişiklikler kaybolur.',
+          tone: 'warning',
+          cancelLabel: 'Düzenlemeye devam et',
+          choices: [{ value: 'discard', label: 'Değişiklikleri at', kind: 'delete' }],
+        });
+        return c === 'discard';
+      }
+      if (l.resumed) {
+        const c = await openChoice({
+          title: 'Taslakta değişiklik var',
+          message: '"Değişiklikleri at" taslağı açtığınız hâline bırakır; "Taslağı sil" taslağı tamamen kaldırır.',
+          tone: 'neutral',
+          icon: 'create-outline',
+          cancelLabel: 'Yazmaya devam et',
+          choices: [
+            { value: 'save', label: 'Taslağı güncelle', kind: 'primary' },
+            { value: 'discard', label: 'Değişiklikleri at', kind: 'secondary' },
+            { value: 'remove', label: 'Taslağı sil', kind: 'delete' },
+          ],
+        });
+        if (c === 'save') await saveDraft();
+        else if (c === 'discard') {
+          // Arka planda üzerine yazıldıysa taslak açıldığı hâline geri yazılır
+          if (autoSaved.current && originalDraft.current) await saveDraft(originalDraft.current.data, originalDraft.current.step);
+        } else if (c === 'remove') await deleteDraft();
+        return c !== null;
+      }
+      const c = await openChoice({
+        title: 'Duyuruyu taslak olarak saklayalım mı?',
+        message: 'Taslaklar, Duyurular sayfasının üstünde durur; kaldığınız yerden devam edebilirsiniz.',
+        tone: 'neutral',
+        icon: 'create-outline',
+        cancelLabel: 'Yazmaya devam et',
+        choices: [
+          { value: 'save', label: 'Taslak olarak kaydet', kind: 'primary' },
+          { value: 'delete', label: 'Sil ve çık', kind: 'delete' },
+        ],
+      });
+      if (c === 'save') await saveDraft();
+      else if (c === 'delete' && autoSaved.current) await deleteDraft();
+      return c !== null;
+    } catch (err) {
+      setError(errorText(err, 'Taslak kaydedilemedi'));
+      return false;
+    }
+  };
+
+  /** Ekrandan bilerek çıkış (başlıktaki geri düğmesi, telefonun geri tuşu): önce sorulur */
+  const leave = async () => {
+    if (!(await askExit())) return;
+    decided.current = true;
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  };
+
+  // Başka yollardan kapanma (uygulamada kaydırma, yönlendirme): yığından çıkmadan önce de sorulur
+  useEffect(
+    () =>
+      navigation.addListener('beforeRemove', (e) => {
+        if (decided.current || submitted.current) return;
+        e.preventDefault();
+        void askExit().then((ok) => {
+          if (!ok) return;
+          decided.current = true;
+          navigation.dispatch(e.data.action);
+        });
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [navigation],
+  );
+
+  // Telefonun geri tuşu ara adımlarda bir önceki adıma döner (başlıktaki geri düğmesi gibi); ilk adımda çıkış sorulur
+  const stepRef = useRef(step);
+  stepRef.current = step;
+  const leaveRef = useRef(leave);
+  leaveRef.current = leave;
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (stepRef.current > 0) setStep(stepRef.current - 1);
+      else void leaveRef.current();
+      return true;
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Uygulama arka plana atılınca sessiz taslak (yayındaki duyurunun düzenlemesi hariç)
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s !== 'background' || decided.current || submitted.current || latest.current.editing || !isDirty()) return;
+      autoSaved.current = true;
+      void saveDraft().catch(() => undefined);
+    });
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Web sürümü: sekme kapatılırken tarayıcının kendi uyarısı
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const warn = (e: BeforeUnloadEvent) => {
+      if (decided.current || submitted.current || !isDirty()) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Ekran soru sorulmadan kapanırsa (oturum kapandı, bildirimden başka sayfaya geçildi) yazılanlar kaybolmaz
   useEffect(
     () => () => {
       const l = latest.current;
-      // Var olan duyurunun düzenlemesi taslak olmaz
-      if (submitted.current || l.editing || !hasContent(l.state)) return;
-      const body = { step: l.step, data: toDraftData(l.state) };
-      void (l.draftId ? api(`${l.draftsPath}/${l.draftId}`, { method: 'PUT', body }) : api(l.draftsPath, { method: 'POST', body }))
-        .then(() => qc.invalidateQueries({ queryKey: [l.schoolId, 'announcement-drafts'] }))
-        .catch(() => undefined);
+      if (decided.current || submitted.current || l.editing || !isDirty()) return;
+      void saveDraft().catch(() => undefined);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
@@ -239,7 +410,9 @@ export default function DuyuruYeni() {
     setError(null);
     const perm = camera ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted && Platform.OS !== 'web') return setError(camera ? 'Kamera izni verilmedi.' : 'Galeri izni verilmedi.');
-    const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.8, allowsEditing: true, aspect: [16, 9] };
+    // Kırpma yok: panoda fotoğrafın tamamı gösterilir, boşluklar bulanık fotoğrafla dolar (büyük fotoğraf
+    // yüklenmeden önce küçültülür: api.ts uploadImage)
+    const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.8, allowsEditing: false };
     const res = camera ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);
     const asset = res.assets?.[0];
     if (res.canceled || !asset || !school) return;
@@ -343,7 +516,7 @@ export default function DuyuruYeni() {
   return (
     <Screen
       back
-      onBack={step > 0 ? () => setStep(step - 1) : undefined}
+      onBack={step > 0 ? () => setStep(step - 1) : () => void leave()}
       title={duzenle ? 'Duyuruyu düzenle' : 'Yeni duyuru'}
       footer={
         <>
@@ -434,6 +607,11 @@ export default function DuyuruYeni() {
                     Galeriden seç
                   </Button>
                 </View>
+              )}
+              {kind === 'image' && (
+                <T size={12} color={colors.muted}>
+                  Kırpmanıza gerek yok: panoda fotoğrafın tamamı gösterilir, boşluklar bulanık fotoğrafla dolar.
+                </T>
               )}
               {kind === 'video' && (
                 <Field

@@ -98,6 +98,7 @@ export function AnnouncementWizard({
   maxDuration = 60,
   isApprover = false,
   approvalNeeded,
+  isDirty = hasContent,
 }: {
   api: ModalApi<Announcement, AnnouncementForm>;
   /** Yeni duyuruda 0, taslaktan devamda kaldığı adım; düzenlemede her zaman özet (3) */
@@ -106,6 +107,8 @@ export function AnnouncementWizard({
   onDismiss: (values: AnnouncementForm, step: number) => void;
   /** Kayıt başarılı (taslaktan geldiyse taslak silinir) */
   onSaved: () => void;
+  /** Kaybolacak bir şey var mı: sekme kapatılırken tarayıcının "Siteden ayrılınsın mı?" uyarısı için */
+  isDirty?: (values: AnnouncementForm) => boolean;
   defaultDuration: number;
   /** Okulun üst sınırı: süresi girilmemiş duyuru metne göre en çok bu kadar kalır; elle daha uzunu onaya düşer */
   maxDuration?: number;
@@ -118,6 +121,18 @@ export function AnnouncementWizard({
   const v = form.values;
   const [step, setStep] = useState(0);
   const [reached, setReached] = useState(0);
+  // Sekme kapatılırken ya da sayfa yenilenirken yazılanlar kaybolacaksa tarayıcı kendi uyarısını gösterir
+  // (bu uyarıya kendi düğmelerimizi koyamayız; pencere içinden çıkışta ayrıca sorulur)
+  const dirty = open && !saving && isDirty(v);
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
   useEffect(() => {
     if (!open) return;
     const s = editing ? 3 : Math.min(3, Math.max(0, startStep));

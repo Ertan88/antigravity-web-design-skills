@@ -7,8 +7,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth, type AppRole } from "../../src/auth.tsx";
 import { visibleTabs, type TabName } from "../../src/tabs.ts";
 import { useControlCenter, useInbox } from "../../src/data.ts";
-import { colors } from "../../src/theme.ts";
-import { Icon, type IconName } from "../../src/ui.tsx";
+import { colors, dark } from "../../src/theme.ts";
+import { Platform, View } from "react-native";
+import { Icon, TabBarInset, type IconName } from "../../src/ui.tsx";
 
 // Sekme ekranlarında beklenmeyen bir hata olursa uygulama kapanmaz, "Yeniden dene" görünür
 export { ErrorBoundary } from "../../src/errorBoundary.tsx";
@@ -28,6 +29,28 @@ const HOME_ICON: Record<AppRole, [IconName, IconName]> = {
   teacher: ["home-outline", "home"],
 };
 
+const BAR_HEIGHT = 72;
+
+/**
+ * Menünün zemini: buzlu cam. Web sürümünde arkadaki içerik gerçekten bulanıklaşır (tarayıcının bulanıklık
+ * süzgeci). Android uygulamasında gerçek bulanıklık, menünün arkasındaki her sayfanın ayrıca sarılmasını ister ve
+ * zayıf telefonlarda kaydırmayı ağırlaştırır; orada aynı renkte, biraz daha koyu (daha az saydam) bir zemin kullanılır.
+ */
+function GlassBackground() {
+  const web = Platform.OS === "web";
+  const alpha = web ? 0.72 : 0.9;
+  // Koyu temada üst katman yüzeyi (colors.elevated, #2b2723) kullanılır: menü arkadaki kartlardan ayrışır
+  const tint = dark ? `rgba(43,39,35,${alpha})` : `rgba(255,255,255,${alpha})`;
+  return (
+    <View
+      style={[
+        { flex: 1, backgroundColor: tint },
+        web ? ({ backdropFilter: "blur(18px) saturate(160%)", WebkitBackdropFilter: "blur(18px) saturate(160%)" } as object) : null,
+      ]}
+    />
+  );
+}
+
 export default function TabsLayout() {
   const { role, can, isManager, isTeacher } = useAuth();
   // Nöbet hatırlatmaları: öğretmen kaydı olan herkesin telefonunda kurulur
@@ -35,6 +58,10 @@ export default function TabsLayout() {
   useExamReminders(isTeacher);
   // Telefonun alt sistem çubuğu (üç düğmeli gezinme) menünün üstüne binmesin
   const insets = useSafeAreaInsets();
+  // Yüzer alt menü: kenarlardan boşluklu, yuvarlak köşeli, yarı saydam kart. Sayfalar menünün altından akar;
+  // son satırlar menünün arkasında kalmasın diye Screen alta bu kadar boşluk bırakır (TabBarInset)
+  const barBottom = Math.max(insets.bottom, 8) + 10;
+  const barInset = BAR_HEIGHT + barBottom + 8;
   const center = useControlCenter(isManager && role !== "platform");
   const inbox = useInbox("unread");
   const pending =
@@ -52,13 +79,22 @@ export default function TabsLayout() {
         };
   const icon = (name: IconName, active: IconName) =>
     function TabIcon({ focused, color }: { focused: boolean; color: unknown }) {
-      // Seçili sekmede simge dolu ve koyu, diğerlerinde ince çizgili ve soluk
+      // Seçili sekmede simge dolu ve koyu, arkasında yumuşak zemin; diğerlerinde ince çizgili ve soluk
       return (
-        <Icon
-          name={focused ? active : name}
-          size={24}
-          color={typeof color === "string" ? color : colors.subtle}
-        />
+        <View
+          style={{
+            paddingHorizontal: 14,
+            paddingVertical: 3,
+            borderRadius: 14,
+            backgroundColor: focused ? colors.primarySoft : "transparent",
+          }}
+        >
+          <Icon
+            name={focused ? active : name}
+            size={22}
+            color={typeof color === "string" ? color : colors.subtle}
+          />
+        </View>
       );
     };
   // Sekmeler alt menüde rolün sırasıyla dizilir (önce görünenler, sonra gizli rotalar)
@@ -248,16 +284,20 @@ export default function TabsLayout() {
   return (
     <>
       {/* Geri hareketi bir önceki sekmeye döner (ör. Menü → İzinlerim → geri: Menü); varsayılan ana sayfaya atıyordu */}
+      <TabBarInset.Provider value={barInset}>
       <Tabs
         backBehavior="history"
+        safeAreaInsets={{ bottom: 0 }}
         screenOptions={{
+          tabBarHideOnKeyboard: true,
+          tabBarBackground: () => <GlassBackground />,
           headerShown: false,
           tabBarActiveTintColor: colors.ink,
           tabBarInactiveTintColor: colors.subtle,
           tabBarLabelStyle: {
             fontSize: 11,
             fontFamily: fontFor("700"),
-            marginTop: 3,
+            marginTop: 2,
           },
           tabBarBadgeStyle: {
             backgroundColor: colors.danger,
@@ -267,18 +307,34 @@ export default function TabsLayout() {
             includeFontPadding: false,
             textAlignVertical: "center",
           },
+          tabBarItemStyle: { paddingVertical: 2 },
           tabBarStyle: {
-            height: 74 + insets.bottom,
-            paddingTop: 8,
-            paddingBottom: 8 + insets.bottom,
-            borderTopColor: colors.border,
-            backgroundColor: colors.card,
+            position: "absolute",
+            left: 12,
+            right: 12,
+            bottom: barBottom,
+            height: BAR_HEIGHT,
+            paddingTop: 6,
+            paddingBottom: 6,
+            borderRadius: 24,
+            borderWidth: 1,
+            borderTopWidth: 1,
+            borderColor: dark ? "rgba(255,255,255,0.14)" : colors.border,
+            borderTopColor: dark ? "rgba(255,255,255,0.14)" : colors.border,
+            backgroundColor: "transparent",
+            overflow: "hidden",
+            elevation: 0,
+            shadowColor: "#000",
+            shadowOpacity: dark ? 0.5 : 0.14,
+            shadowRadius: 18,
+            shadowOffset: { width: 0, height: 8 },
           },
           sceneStyle: { backgroundColor: colors.bg },
         }}
       >
         {order.map((n) => screens[n])}
       </Tabs>
+      </TabBarInset.Provider>
       {role !== "platform" && <SpecialDayPopup />}
     </>
   );

@@ -148,6 +148,12 @@ export function useFieldChain(getInner: () => unknown): FieldChain {
   return chain;
 }
 
+/**
+ * Yüzer alt menünün kapladığı yükseklik (sekme ekranlarında; yığındaki ekranlarda 0). Sayfanın son satırları ve
+ * alttaki sabit düğmeler menünün arkasında kalmasın diye Screen bu kadar boşluk bırakır.
+ */
+export const TabBarInset = createContext(0);
+
 export function Screen({
   title,
   subtitle,
@@ -175,6 +181,7 @@ export function Screen({
   scroll?: boolean;
 }) {
   const bg = tone === 'danger' ? colors.dangerTint : colors.bg;
+  const tabInset = useContext(TabBarInset);
   // Kaydırma konumu saklanır; tema değişince ekran yeniden kurulduğunda aynı yere dönülür
   const path = useScrollKey();
   const scroller = useRef<ComponentRef<typeof ScrollView>>(null);
@@ -291,16 +298,20 @@ export function Screen({
             contentH.current = h;
             tryRestore();
           }}
-          contentContainerStyle={{ paddingBottom: 32, flexGrow: 1 }}
+          contentContainerStyle={{ paddingBottom: 32 + (footer ? 0 : tabInset), flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
           refreshControl={onRefresh ? <RefreshControl refreshing={pulled} onRefresh={pull} tintColor={colors.primary} colors={[colors.primary]} /> : undefined}
         >
           {body}
         </ScrollView>
       ) : (
-        body
+        <View style={{ flex: 1, paddingBottom: footer ? 0 : tabInset }}>{body}</View>
       )}
-      {footer && <SafeAreaView edges={['bottom']} style={styles.footer}>{footer}</SafeAreaView>}
+      {footer && (
+        <SafeAreaView edges={tabInset ? [] : ['bottom']} style={[styles.footer, tabInset ? { paddingBottom: 12 + tabInset } : null]}>
+          {footer}
+        </SafeAreaView>
+      )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
