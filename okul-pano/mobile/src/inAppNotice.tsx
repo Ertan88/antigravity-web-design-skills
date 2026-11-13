@@ -19,6 +19,9 @@ import { Icon, type IconName } from './ui.tsx';
  * Uygulama açıldığında kutuda zaten olanlar gösterilmez (yalnızca açıkken gelenler).
  */
 
+/** Acil bandı iki temada da aynı koyu kırmızı (koyu temadaki açık kırmızı üzerinde beyaz yazı okunmuyordu) */
+const EMERGENCY_RED = '#e11d48';
+
 const ACTION_KINDS = new Set(['approval', 'leave-request', 'duty-gap', 'lesson-cover', 'enroll', 'support-ticket', 'issue', 'meeting']);
 
 const ICONS: Record<string, IconName> = {
@@ -36,6 +39,21 @@ const ICONS: Record<string, IconName> = {
 
 type Notice = { mode: 'quiet' | 'action' | 'emergency'; item: InboxItem | null; count: number };
 
+/*
+ * Deneme (Menü → Hatırlatmalar): üç kutu sırayla yalnızca bu telefonda görünür; sunucuya hiçbir şey gitmez, bildirim
+ * kutusuna kayıt düşmez. Bir kutu kapanınca sıradaki gelir.
+ */
+const testListeners = new Set<(list: Notice[]) => void>();
+const fake = (id: string, kind: string, title: string, body: string): InboxItem => ({ id: `test-${id}`, key: `test-${id}`, kind, title, body, at: new Date().toISOString(), to: '/hatirlatmalar', readAt: null, resolvedAt: null });
+export function showTestNotices() {
+  const list: Notice[] = [
+    { mode: 'quiet', count: 1, item: fake('quiet', 'exam', 'Deneme: sıradan bildirim', 'Birkaç saniye sonra kendiliğinden kalkar.') },
+    { mode: 'action', count: 1, item: fake('action', 'leave-request', 'Deneme: iş isteyen bildirim', 'Onay ya da görevlendirme gibi işlerde böyle görünür. Kapatınca acil bandı gelir.') },
+    { mode: 'emergency', count: 1, item: fake('emergency', 'emergency', 'Deneme: acil durum bandı', 'Gerçek acil durumda kendiliğinden kalkmaz. Kapatmak için dokunun.') },
+  ];
+  for (const l of testListeners) l(list);
+}
+
 export function InAppNotices() {
   const pathname = usePathname();
   const [active, setActive] = useState(AppState.currentState === 'active');
@@ -46,7 +64,18 @@ export function InAppNotices() {
   const inbox = useInbox('unread', active ? 30_000 : false);
   const { read } = useInboxActions();
   const seen = useRef<Set<string> | null>(null);
-  const [notice, setNotice] = useState<Notice | null>(null);
+  const [queue, setQueue] = useState<Notice[]>([]);
+  const notice = queue[0] ?? null;
+  const push = (n: Notice) => setQueue((q) => [...q, n]);
+  const next = () => setQueue((q) => q.slice(1));
+
+  useEffect(() => {
+    const l = (list: Notice[]) => setQueue((q) => [...q, ...list]);
+    testListeners.add(l);
+    return () => {
+      testListeners.delete(l);
+    };
+  }, []);
 
   useEffect(() => {
     const items = inbox.data?.items;
@@ -60,21 +89,23 @@ export function InAppNotices() {
     for (const i of items) seen.current.add(i.id);
     if (!fresh.length || pathname.startsWith('/bildirimler')) return;
     const emergency = fresh.find((i) => i.kind === 'emergency');
-    if (emergency) setNotice({ mode: 'emergency', item: emergency, count: 1 });
-    else if (fresh.length > 1) setNotice({ mode: 'quiet', item: null, count: fresh.length });
-    else setNotice({ mode: ACTION_KINDS.has(fresh[0]!.kind) ? 'action' : 'quiet', item: fresh[0]!, count: 1 });
+    if (emergency) push({ mode: 'emergency', item: emergency, count: 1 });
+    else if (fresh.length > 1) push({ mode: 'quiet', item: null, count: fresh.length });
+    else push({ mode: ACTION_KINDS.has(fresh[0]!.kind) ? 'action' : 'quiet', item: fresh[0]!, count: 1 });
   }, [inbox.data, pathname]);
 
   if (!notice) return null;
   const open = () => {
     const it = notice.item;
-    setNotice(null);
+    next();
+    // Deneme kutusu: hiçbir yere gitmez, kayıt düşmez
+    if (it?.id.startsWith('test-')) return;
     if (it) {
       read.mutate({ ids: [it.id] });
       router.push((it.to || '/bildirimler') as never);
     } else router.push('/bildirimler');
   };
-  return <NoticeView key={`${notice.item?.id ?? 'many'}-${notice.count}`} notice={notice} onOpen={open} onClose={() => setNotice(null)} />;
+  return <NoticeView key={`${notice.item?.id ?? 'many'}-${notice.count}-${queue.length}`} notice={notice} onOpen={open} onClose={next} />;
 }
 
 function NoticeView({ notice, onOpen, onClose }: { notice: Notice; onOpen: () => void; onClose: () => void }) {
@@ -104,7 +135,7 @@ function NoticeView({ notice, onOpen, onClose }: { notice: Notice; onOpen: () =>
         <Pressable
           accessibilityRole="alert"
           onPress={onOpen}
-          style={{ backgroundColor: colors.danger, paddingTop: insets.top + 10, paddingBottom: 14, paddingHorizontal: 16, borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg, flexDirection: 'row', alignItems: 'center', gap: 10 }}
+          style={{ backgroundColor: EMERGENCY_RED, paddingTop: insets.top + 10, paddingBottom: 14, paddingHorizontal: 16, borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg, flexDirection: 'row', alignItems: 'center', gap: 10 }}
         >
           <Icon name="warning" size={24} color="#ffffff" />
           <View style={{ flex: 1, minWidth: 0 }}>
@@ -118,7 +149,7 @@ function NoticeView({ notice, onOpen, onClose }: { notice: Notice; onOpen: () =>
             ) : null}
           </View>
           <View style={{ backgroundColor: '#ffffff', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 }}>
-            <Text style={{ fontSize: 13, fontWeight: '800', color: colors.danger }}>Aç</Text>
+            <Text style={{ fontSize: 13, fontWeight: '800', color: EMERGENCY_RED }}>Aç</Text>
           </View>
         </Pressable>
       </Animated.View>

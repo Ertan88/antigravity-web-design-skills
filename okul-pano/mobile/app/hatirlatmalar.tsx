@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Platform, Pressable, Switch, View } from 'react-native';
+import { showTestNotices } from '../src/inAppNotice.tsx';
 import { sendTestNotification } from '../src/push.ts';
 import { useReminderSettings, type ReminderSettings } from '../src/reminders.ts';
 import { Text } from '../src/text.tsx';
@@ -139,6 +140,13 @@ export default function Hatirlatmalar() {
           )}
         </>
       )}
+      {/* Uygulama açıkken üstten inen kutular: yalnızca bu telefonda, sunucuya ve başkalarına hiçbir şey gitmez */}
+      <Button variant="secondary" icon="notifications-outline" onPress={showTestNotices}>
+        Uygulama içi kutuyu dene
+      </Button>
+      <T size={12.5} color={colors.faint} style={{ textAlign: 'center' }}>
+        Uygulama açıkken gelen bildirimlerin görünümü: sıradan, iş isteyen ve acil durum kutuları sırayla gelir. Yalnızca bu telefonda görünür.
+      </T>
     </Screen>
   );
 }

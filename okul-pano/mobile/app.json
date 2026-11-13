@@ -3,7 +3,7 @@
     "name": "Okul Yayın",
     "slug": "okul-pano",
     "scheme": "okulpano",
-    "version": "1.20.51",
+    "version": "1.20.52",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#f7f6f3",
@@ -32,7 +32,7 @@
         "READ_CALENDAR",
         "WRITE_CALENDAR"
       ],
-      "versionCode": 1125,
+      "versionCode": 1126,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0E5E66"
