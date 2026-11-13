@@ -13,23 +13,34 @@ import { tiles } from './theme.ts';
 import { Banner, BentoRow, Card, ErrorNote, HomeHeader, ListRow, Loading, Screen, SectionTitle, Tile } from './ui.tsx';
 import { WebAppStrips } from './webStrips.tsx';
 
-/** Koyu pano kutusu: kaç pano açık, kapalı olanlar adlarıyla ve en son ne zaman görüldükleriyle */
-function ScreensTile({ screens }: { screens: ControlCenter['screens'] }) {
+/**
+ * Koyu pano kutusu: kaç pano çevrimiçi. Kapalı pano varsa yalnızca ilki adıyla ve en son ne zaman görüldüğüyle yazılır,
+ * kalanlar sayıyla ("ve 2 pano daha"); okulda çok pano olsa da kutu uzamaz. Ayrıntı Panolar ekranında.
+ */
+function ScreensTile({ screens, style }: { screens: ControlCenter['screens']; style?: object }) {
   const t = tiles.ink;
-  const shown = screens.offline.slice(0, 4);
-  const more = screens.offline.length - shown.length;
+  const first = screens.offline[0];
+  const more = screens.offline.length - 1;
   return (
-    <Tile tone="ink" icon="tv-outline" label="Panolar" value={screens.online} unit={`/${screens.total}`} caption="çevrimiçi" onPress={() => router.push('/panolar')} style={{ flex: 1 }} big>
-      <View style={{ marginTop: 14, gap: 9 }}>
-        {screens.total === 0 ? (
-          <Text style={{ fontSize: 12.5, fontWeight: '600', color: t.sub }}>Henüz pano eklenmedi</Text>
-        ) : shown.length === 0 ? (
-          <Row dot="#4ade80" name="Hepsi açık" />
-        ) : (
-          shown.map((s) => <Row key={s.id} dot="#f43f5e" name={s.name} when={s.lastSeenAt ? timeAgo(s.lastSeenAt) : 'hiç'} />)
-        )}
-        {more > 0 && <Text style={{ fontSize: 12, fontWeight: '700', color: t.sub }}>+{more} pano daha</Text>}
-      </View>
+    <Tile
+      tone="ink"
+      icon="tv-outline"
+      label="Panolar"
+      value={screens.online}
+      unit={`/${screens.total}`}
+      caption={screens.total === 0 ? 'Henüz pano eklenmedi' : first ? 'çevrimiçi' : 'hepsi çevrimiçi'}
+      onPress={() => router.push('/panolar')}
+      style={style}
+    >
+      {first ? (
+        <View style={{ marginTop: 8, gap: 2 }}>
+          <Row dot="#f43f5e" name={first.name} />
+          <Text style={{ fontSize: 11.5, fontWeight: '600', color: t.sub }} numberOfLines={2}>
+            {first.lastSeenAt ? `${timeAgo(first.lastSeenAt)} görüldü` : 'Hiç bağlanmadı'}
+            {more > 0 ? `; ${more} pano daha kapalı` : ''}
+          </Text>
+        </View>
+      ) : null}
     </Tile>
   );
 }
@@ -41,7 +52,7 @@ function Row({ dot, name, when }: { dot: string; name: string; when?: string }) 
       <Text style={{ flex: 1, fontSize: 12.5, fontWeight: '600', color: '#fff' }} numberOfLines={1}>
         {name}
       </Text>
-      {when ? <Text style={{ fontSize: 11, fontWeight: '600', color: tiles.ink.sub }}>{when.replace(' önce', '')}</Text> : null}
+      {when ? <Text style={{ fontSize: 11, fontWeight: '600', color: tiles.ink.sub }}>{when}</Text> : null}
     </View>
   );
 }
@@ -68,9 +79,8 @@ export function ManagerHome() {
   // Nöbet alt menüde değil: bugünkü nöbetçi sayısı ve boş yer Merkez'deki Nöbet kutusunda
   const duty = useDutyDay();
   const c = center.data;
-  const pending = c ? c.pending.announcements + c.pending.leaves : 0;
 
-  // Pano ve onay durumu kutularda; listede yalnızca kutulara sığmayan işler kalır
+  // Pano durumu kutuda, onaylar alt menüde; listede yalnızca kutulara sığmayan işler kalır
   const attention = c
     ? [
         // Boş nöbet yerleri üstteki uyarı bandında (nöbet yetkisi olana); yetkisi yoksa burada bilgi olarak
@@ -125,24 +135,14 @@ export function ManagerHome() {
               />
             </Pressable>
           )}
-          {me.data ? <DayBanner data={me.data} /> : c.holiday ? <Banner icon="sunny" title="Bugün tatil" text={`${c.holiday} · zil çalmıyor`} /> : null}
+          {me.data ? <DayBanner data={me.data} /> : c.holiday ? <Banner icon="sunny" title="Bugün tatil" text={`${c.holiday}. Zil çalmıyor.`} /> : null}
           {me.data && <LiveLesson data={me.data} link />}
           {me.data && <AssignmentNotice data={me.data} />}
 
+          {/* Onaylar alt menüde; burada kutusu yok */}
           <BentoRow>
-            <ScreensTile screens={c.screens} />
-            <View style={{ flex: 1, gap: 10 }}>
-              <Tile
-                tone={pending ? 'peach' : 'paper'}
-                icon="checkmark-done-outline"
-                label="Onay"
-                value={pending}
-                caption={pending ? [c.pending.announcements ? `${c.pending.announcements} duyuru` : null, c.pending.leaves ? `${c.pending.leaves} izin` : null].filter(Boolean).join(' · ') : 'bekleyen yok'}
-                onPress={() => router.push('/onaylar')}
-                style={{ flex: 1 }}
-              />
-              <Tile tone="mint" icon="radio-outline" label="Yayında" value={c.onAir} caption="içerik" onPress={() => router.push('/duyurular')} style={{ flex: 1 }} />
-            </View>
+            <ScreensTile screens={c.screens} style={{ flex: 1 }} />
+            <Tile tone="mint" icon="radio-outline" label="Yayında" value={c.onAir} caption="içerik" onPress={() => router.push('/duyurular')} style={{ flex: 1 }} />
           </BentoRow>
 
           <BentoRow>
@@ -153,7 +153,7 @@ export function ManagerHome() {
               label="İzinli"
               value={cover.data?.holiday ? '–' : (cover.data?.absent.length ?? '–')}
               // Son zilden sonra görevlendirme ertesi okul gününe geçer; kutu da hangi günü gösterdiğini yazar
-              caption={!cover.data ? null : `${relativeDayWord(cover.data.date, cover.data.today)}: ${cover.data.holiday ? 'tatil' : cover.data.absent.length ? cover.data.absent.map((a) => a.fullName).slice(0, 2).join(', ') : 'izinli yok'}`}
+              caption={!cover.data ? null : absentText(relativeDayWord(cover.data.date, cover.data.today), cover.data.holiday, cover.data.absent.map((a) => a.fullName))}
               onPress={() => router.push(can('duties.manage') ? '/gorevlendirme' : '/nobet')}
               style={{ flex: 1 }}
             />
@@ -184,6 +184,14 @@ export function ManagerHome() {
   );
 }
 
+/** İzinli kutusunun alt yazısı: "Bugün: Emine Koç, Murat Aslan ve 1 kişi daha" */
+function absentText(day: string, holiday: string | null, names: string[]) {
+  if (holiday) return `${day}: tatil`;
+  if (!names.length) return `${day}: izinli yok`;
+  const shown = names.slice(0, 2).join(', ');
+  return names.length > 2 ? `${day}: ${shown} ve ${names.length - 2} kişi daha` : `${day}: ${shown}`;
+}
+
 /** Merkez'deki Nöbet kutusu: bugün kaç kişi nöbette, boş yer varsa sayısı; dokununca nöbet çizelgesi */
 function DutyTile({ day, style }: { day: DutyDay | undefined; style?: object }) {
   const people = day ? new Set(day.entries.map((e) => (e.onLeave ? e.substitute?.teacherId : e.teacherId)).filter(Boolean)).size : 0;
@@ -194,7 +202,7 @@ function DutyTile({ day, style }: { day: DutyDay | undefined; style?: object }) 
       icon="shield-checkmark-outline"
       label="Nöbet"
       value={!day || day.holiday ? '–' : people}
-      caption={!day ? null : day.holiday ? 'Bugün tatil' : !day.entries.length ? 'Bugün nöbet girilmemiş' : open ? `nöbetçi · ${open} yer boş` : 'nöbetçi · yerler dolu'}
+      caption={!day ? null : day.holiday ? 'Bugün tatil' : !day.entries.length ? 'Bugün nöbet girilmemiş' : open ? `nöbetçi, ${open} yer boş` : 'nöbetçi, bütün yerler dolu'}
       onPress={() => router.push('/nobet')}
       style={style}
     />
