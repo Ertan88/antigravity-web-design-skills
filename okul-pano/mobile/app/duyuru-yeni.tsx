@@ -126,6 +126,8 @@ export default function DuyuruYeni() {
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [schedule, setSchedule] = useState<PlanSchedule>(EMPTY_SCHEDULE);
   const [advanced, setAdvanced] = useState(false);
+  // Cumartesi ve pazar varsayılan gizli (çoğu okulda ders yok); hafta sonu kursu olan okul "+ Hafta sonu" ile açar
+  const [weekendOpen, setWeekendOpen] = useState(false);
   const [picking, setPicking] = useState<'end' | 'start' | null>(null);
   const [fromText, setFromText] = useState('');
   const [toText, setToText] = useState('');
@@ -726,9 +728,10 @@ export default function DuyuruYeni() {
                   />
                 </View>
                 <Text style={{ fontSize: 13, fontWeight: '800', color: colors.muted }}>Haftanın günleri</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
                   {PLAN_WEEKDAYS.map((d, i) => {
                     const on = schedule.days.includes(i + 1);
+                    if (i >= 5 && !(weekendOpen || schedule.days.some((x) => x > 5))) return null;
                     return (
                       <Chip
                         key={d}
@@ -738,6 +741,11 @@ export default function DuyuruYeni() {
                       />
                     );
                   })}
+                  {!schedule.days.some((x) => x > 5) && (
+                    <Pressable accessibilityRole="button" onPress={() => setWeekendOpen(!weekendOpen)} hitSlop={8} style={{ paddingHorizontal: 6, paddingVertical: 6 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: colors.info }}>{weekendOpen ? 'Hafta sonunu gizle' : '+ Hafta sonu'}</Text>
+                    </Pressable>
+                  )}
                 </View>
                 <T size={12} color={colors.muted}>
                   Hiçbiri seçili değilse her gün.

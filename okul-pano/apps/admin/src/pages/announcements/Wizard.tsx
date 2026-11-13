@@ -350,6 +350,8 @@ function WhereWhenStep({ api, defaultDuration, maxDuration, isApprover }: { api:
   const endDate = v.endsAt ? new Date(v.endsAt) : null;
   const [until, setUntil] = useState<UntilChoice>(() => untilChoiceOf(endDate));
   const [advanced, setAdvanced] = useState(() => hasAdvancedPlan(v.startsAt || null, v.schedule));
+  // Cumartesi ve pazar varsayılan gizli (çoğu okulda ders yok); hafta sonu kursu olan okul "+ Hafta sonu" ile açar
+  const [weekendOpen, setWeekendOpen] = useState(false);
   const [manualDuration, setManualDuration] = useState(() => Boolean(v.durationSec) && ![20, 30, 45, 60].includes(Number(v.durationSec)));
   const auto = autoDuration(v, defaultDuration, maxDuration);
   const conflict = planConflict(v.startsAt || null, v.endsAt || null, v.schedule);
@@ -460,12 +462,19 @@ function WhereWhenStep({ api, defaultDuration, maxDuration, isApprover }: { api:
             </div>
             <Field label="Haftanın günleri" help="Hiçbiri seçili değilse her gün">
               {() => (
-                <div className="flex flex-wrap gap-1.5">
-                  {PLAN_WEEKDAYS.map((d, i) => (
-                    <button key={d} type="button" className={pill(s.days.includes(i + 1))} onClick={() => set('schedule', { ...s, days: toggle(s.days, i + 1).sort() })}>
-                      {d}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {PLAN_WEEKDAYS.map((d, i) =>
+                    i >= 5 && !(weekendOpen || s.days.some((x) => x > 5)) ? null : (
+                      <button key={d} type="button" className={pill(s.days.includes(i + 1))} onClick={() => set('schedule', { ...s, days: toggle(s.days, i + 1).sort() })}>
+                        {d}
+                      </button>
+                    ),
+                  )}
+                  {!s.days.some((x) => x > 5) && (
+                    <button type="button" className="px-2 text-xs font-bold text-brand-600 hover:underline" onClick={() => setWeekendOpen(!weekendOpen)}>
+                      {weekendOpen ? 'Hafta sonunu gizle' : '+ Hafta sonu'}
                     </button>
-                  ))}
+                  )}
                 </div>
               )}
             </Field>
