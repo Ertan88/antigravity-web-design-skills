@@ -877,14 +877,15 @@ export function HomeHeader({ name, school, schoolType, role, children }: { name?
   return (
     <View style={{ gap: 14, paddingTop: 8 }}>
       <SpecialDayStrip />
+      {/* Okul adı kendi satırında tam genişlikte (Acil ve bildirim düğmeleriyle yer paylaşıp kesilmesin) */}
+      {school ? (
+        <Text style={{ fontSize: 13.5, color: colors.faint, fontWeight: '600', marginBottom: -6, paddingHorizontal: 2 }} numberOfLines={2}>
+          {shortSchoolName(school, schoolType)}
+        </Text>
+      ) : null}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <Avatar name={name} />
         <View style={{ flex: 1, minWidth: 0 }}>
-          {school ? (
-            <Text style={{ fontSize: 13, color: colors.faint, fontWeight: '600' }} numberOfLines={1}>
-              {shortSchoolName(school, schoolType)}
-            </Text>
-          ) : null}
           <Text style={{ fontSize: 16, color: colors.ink, fontWeight: '800', letterSpacing: -0.2 }} numberOfLines={1}>
             {role}
           </Text>
