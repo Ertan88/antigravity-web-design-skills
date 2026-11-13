@@ -29,6 +29,9 @@ const SPLASH_MAX_MS = 2500;
 
 // Sistemin açılış ekranı yazı tipleri yüklenene kadar kalır: marka ekranı ilk karede doğru yazı tipiyle çizilir
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
+// Sistem ekranı solarak kapanmaz: logosu ortada, marka ekranınınki yukarıda olduğundan solarken ikinci, soluk bir logo
+// görünüyordu. Marka ekranı aynı renkte olduğu için anında geçiş fark edilmez.
+SplashScreen.setOptions({ fade: false, duration: 0 });
 
 /**
  * Açılış ekranı: marka renginde logo, yazı logosu, slogan ve ilerleme çubuğu. Sistemin açılış ekranından
@@ -53,7 +56,8 @@ function BrandSplash({ finishing, onHidden }: { finishing: boolean; onHidden: ()
     >
       <StatusBar style="light" />
       <Image source={require('../assets/splash-icon.png')} style={{ width: 150, height: 150 }} accessibilityIgnoresInvertColors />
-      <Text style={{ marginTop: 14, fontSize: 44, lineHeight: 50, fontWeight: '800', letterSpacing: -1.6, color: '#FFFFFF' }}>
+      {/* Satır yüksekliği "y" harflerinin alt uzantısına yer bırakır (dar satırda Android harfin altını keser) */}
+      <Text style={{ marginTop: 14, fontSize: 44, lineHeight: 62, paddingBottom: 2, fontWeight: '800', letterSpacing: -1.6, color: '#FFFFFF', includeFontPadding: false }}>
         okul<Text style={{ color: '#F5B83D' }}>yayın</Text>
       </Text>
       <Text
