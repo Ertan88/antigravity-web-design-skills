@@ -130,7 +130,7 @@ export interface StatusCard {
 /** Yana kaydırılan durum kartları (İzinli, Nöbet, Panolar, Yayında) */
 export function StatusCards({ cards }: { cards: StatusCard[] }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 4 }} style={{ marginHorizontal: -2 }}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 4 }} style={{ marginHorizontal: -2, flexGrow: 0 }}>
       {cards.map((c) => {
         const t = tiles[c.tone];
         return (
