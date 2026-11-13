@@ -877,20 +877,22 @@ export function HomeHeader({ name, school, schoolType, role, children }: { name?
   return (
     <View style={{ gap: 14, paddingTop: 8 }}>
       <SpecialDayStrip />
-      {/* Okul adı kendi satırında tam genişlikte (Acil ve bildirim düğmeleriyle yer paylaşıp kesilmesin) */}
-      {school ? (
-        <Text style={{ fontSize: 13.5, color: colors.faint, fontWeight: '600', marginBottom: -6, paddingHorizontal: 2 }} numberOfLines={2}>
-          {shortSchoolName(school, schoolType)}
-        </Text>
-      ) : null}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <Avatar name={name} />
         <View style={{ flex: 1, minWidth: 0 }}>
+          {/* Uzun okul adı kesilmez, iki satıra iner (Acil düğmesi yalnızca simge olduğu için yer açılır) */}
+          {school ? (
+            <Text style={{ fontSize: 13, color: colors.faint, fontWeight: '600' }} numberOfLines={2}>
+              {shortSchoolName(school, schoolType)}
+            </Text>
+          ) : null}
           <Text style={{ fontSize: 16, color: colors.ink, fontWeight: '800', letterSpacing: -0.2 }} numberOfLines={1}>
             {role}
           </Text>
         </View>
-        <EmergencyButton />
+        <View style={{ marginLeft: -8 }}>
+          <EmergencyButton compact />
+        </View>
         {children ? <View style={{ flexDirection: 'row', gap: 8 }}>{children}</View> : null}
       </View>
       <View style={{ gap: 2 }}>
@@ -908,7 +910,7 @@ export function HomeHeader({ name, school, schoolType, role, children }: { name?
 
 /**
  * Acil durum düğmesi: alt menüde Acil sekmesi olmayan yetkili kişide (okul müdürü, müdür yardımcısı, görevli öğretmen)
- * her ekranın başlığında kırmızı durur. Ana sayfada yazılı, diğer ekranlarda yalnızca simge; Acil ekranının kendisinde görünmez.
+ * her ekranın başlığında kırmızı, yuvarlak simge olarak durur (ana sayfada da; okul adına yer kalsın); Acil ekranının kendisinde görünmez.
  */
 export function EmergencyButton({ compact }: { compact?: boolean }) {
   const show = useEmergencyInHeader();
