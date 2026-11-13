@@ -49,8 +49,14 @@ export function ScreenFormatDialog({ screen, onClose }: { screen: Screen | null;
   const classes = useList<ClassGroup>('classes');
   const sortedClasses = [...(classes.data ?? [])].sort((a, b) => compareClassNames(a.name, b.name));
 
+  // Çoğu okulda pano bütün okulu gösterir; sınıf çipleri yalnızca "Yalnızca bazı sınıflar" seçilince açılır
+  const [someClasses, setSomeClasses] = useState(() => resolveScreenDisplay(screen?.display).classIds.length > 0);
+
   useEffect(() => {
-    if (screen) setD(resolveScreenDisplay(screen.display));
+    if (screen) {
+      setD(resolveScreenDisplay(screen.display));
+      setSomeClasses(resolveScreenDisplay(screen.display).classIds.length > 0);
+    }
   }, [screen]);
 
   const set = (patch: Partial<ScreenDisplay>) => setD((x) => resolveScreenDisplay({ ...x, ...patch }));
@@ -167,25 +173,51 @@ export function ScreenFormatDialog({ screen, onClose }: { screen: Screen | null;
                 </div>
               )}
             </Field>
-            <Field label="Bu panoda gösterilen sınıflar" help="Dersler ve zil yalnızca seçili sınıflara göre gösterilir (ör. aynı binadaki ortaokul). Hiçbiri seçili değilse bütün okul.">
+            <Field
+              label="Bu panoda gösterilen sınıflar"
+              help={
+                someClasses
+                  ? 'Dersler ve zil yalnızca seçili sınıflara göre gösterilir (ör. aynı binadaki ortaokul ya da ayrı bir blok).'
+                  : 'Pano bütün okulun derslerini ve zilini gösterir. Birden fazla bina ya da kademe varsa yalnızca bazı sınıfları seçebilirsiniz.'
+              }
+            >
               {() => (
-                <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">
-                  {sortedClasses.map((c) => {
-                    const on = d.classIds.includes(c.id);
-                    return (
-                      <button
-                        key={c.id}
-                        type="button"
-                        disabled={!editable}
-                        aria-pressed={on}
-                        onClick={() => set({ classIds: on ? d.classIds.filter((x) => x !== c.id) : [...d.classIds, c.id] })}
-                        className={clsx('rounded-full px-3 py-1 text-xs font-bold transition', on ? 'bg-ink text-surface' : 'bg-surface text-slate-700 ring-1 ring-slate-200 hover:ring-slate-300')}
-                      >
-                        {c.name}
-                      </button>
-                    );
-                  })}
-                  {!sortedClasses.length && <span className="text-xs text-slate-500">Sınıf yok.</span>}
+                <div className="space-y-2">
+                  <Segmented
+                    value={someClasses ? 'some' : 'all'}
+                    onChange={(v) => {
+                      if (!editable) return;
+                      setSomeClasses(v === 'some');
+                      if (v === 'all') set({ classIds: [] });
+                    }}
+                    options={[
+                      { value: 'all', label: 'Bütün okul' },
+                      { value: 'some', label: 'Yalnızca bazı sınıflar' },
+                    ]}
+                  />
+                  {someClasses && (
+                    <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">
+                      {sortedClasses.map((c) => {
+                        const on = d.classIds.includes(c.id);
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            disabled={!editable}
+                            aria-pressed={on}
+                            onClick={() => set({ classIds: on ? d.classIds.filter((x) => x !== c.id) : [...d.classIds, c.id] })}
+                            className={clsx('rounded-full px-3 py-1 text-xs font-bold transition', on ? 'bg-ink text-surface' : 'bg-surface text-slate-700 ring-1 ring-slate-200 hover:ring-slate-300')}
+                          >
+                            {c.name}
+                          </button>
+                        );
+                      })}
+                      {!sortedClasses.length && <span className="text-xs text-slate-500">Sınıf yok.</span>}
+                    </div>
+                  )}
+                  {someClasses && !d.classIds.length && sortedClasses.length > 0 && (
+                    <p className="text-xs font-medium text-amber-600">Sınıf seçilmedi; pano bütün okulu gösterir.</p>
+                  )}
                 </div>
               )}
             </Field>

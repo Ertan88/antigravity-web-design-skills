@@ -1143,26 +1143,18 @@ p {
   /* Kenar solması (mask-image) yok: maske, kaymanın ekran kartında yapılmasını engelliyor, TV'de takılmaya yol açıyordu */
 }
 
-.ticker-probe {
+/* Kayan yazının tek öğesi: kendi katmanında kayar (bkz. Ticker.tsx) */
+.ticker-run {
   position: absolute;
-  visibility: hidden;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
   white-space: nowrap;
-  display: flex;
-}
-
-.ticker-track {
-  display: flex;
-  width: max-content;
-  animation: ticker linear infinite;
   will-change: transform;
-  /* Kendi katmanında, ekran kartında kayar (sayfanın geri kalanı her saniye yeniden çizilse de etkilenmez) */
   backface-visibility: hidden;
-  transform: translate3d(0, 0, 0);
-}
-
-.ticker-copy {
-  display: flex;
-  flex: none;
+  transform: translate3d(100vw, 0, 0);
 }
 
 .ticker-item {
@@ -1393,15 +1385,6 @@ p {
 }
 
 /* ---------- Animasyonlar ---------- */
-
-@keyframes ticker {
-  from {
-    transform: translate3d(0, 0, 0);
-  }
-  to {
-    transform: translate3d(-50%, 0, 0);
-  }
-}
 
 @keyframes progress {
   from {
