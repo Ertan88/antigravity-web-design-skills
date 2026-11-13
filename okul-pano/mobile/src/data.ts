@@ -252,13 +252,13 @@ export const useMyLeaves = () => useSchoolQuery<Leave[]>('me/leaves');
 export const useInternshipAccess = () =>
   useSchoolQuery<{ enabled: boolean; all: boolean; coordinator: boolean; manage: boolean; teacher?: boolean; areaHead?: boolean; canPickManager?: boolean }>('internship/access');
 /** Bildirim kutusu: okul seçiliyse okulun ve platformun bildirimleri, değilse (platform yöneticisi) yalnızca platformunkiler */
-export function useInbox(filter: 'all' | 'unread' = 'all') {
+export function useInbox(filter: 'all' | 'unread' = 'all', refetchInterval: number | false = 60_000) {
   const { school } = useAuth();
   const path = useSchoolPath(`inbox?filter=${filter}&limit=50`);
   return useQuery({
     queryKey: [school?.id ?? 'me', `inbox?filter=${filter}`],
     queryFn: () => api<InboxPage>(school ? path : `/api/me/inbox?filter=${filter}&limit=50`),
-    refetchInterval: 60_000,
+    refetchInterval,
   });
 }
 

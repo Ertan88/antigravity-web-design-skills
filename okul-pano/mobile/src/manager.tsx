@@ -2,8 +2,8 @@ import { EMERGENCY_INFO } from '@okulpano/shared/emergency';
 import { router } from 'expo-router';
 import { Pressable } from 'react-native';
 import { membershipLabel, useAuth } from './auth.tsx';
-import { useControlCenter, useDutyDay, useExamSchedule, useMeToday, useSchoolQuery, type ControlCenter, type DutyDay } from './data.ts';
-import { BellStrip, DayFlow, StatusCards, type StatusCard } from './dayFlow.tsx';
+import { useControlCenter, useDutyDay, useMeToday, useSchoolQuery, type ControlCenter, type DutyDay } from './data.ts';
+import { BellStrip, StatusCards, type StatusCard } from './dayFlow.tsx';
 import { clock } from './day.ts';
 import { QuickAdd } from './quick.tsx';
 import { AssignmentNotice, DayBanner, MyDayCard, NotificationsButton } from './teacher.tsx';
@@ -31,7 +31,6 @@ export function ManagerHome() {
   // Nöbet alt menüde değil: bugünkü nöbetçi sayısı ve boş yer Merkez'deki Nöbet kutusunda
   const duty = useDutyDay();
   const c = center.data;
-  const exams = useExamSchedule();
 
   // Pano durumu kutuda, onaylar alt menüde; listede yalnızca kutulara sığmayan işler kalır
   const attention = c
@@ -70,20 +69,6 @@ export function ManagerHome() {
           {me.data && <AssignmentNotice data={me.data} />}
           {me.data && <BellStrip data={me.data} />}
           <StatusCards cards={statusCards(c, cover.data, duty.data, can('duties.manage'), openLessons)} />
-          {me.data && cover.data !== undefined && (
-            <>
-              <SectionTitle>Bugünün akışı</SectionTitle>
-              <DayFlow
-                data={me.data}
-                // Boş dersler yalnızca bugünü gösteriyorsa akışa girer (son zilden sonra görevlendirme ertesi güne geçer)
-                gaps={cover.data && cover.data.date === cover.data.today && !cover.data.holiday ? cover.data.lessons.map((l) => ({ periodNo: l.periodNo, className: l.className, covered: Boolean(l.cover) })) : []}
-                exams={(exams.data?.exams ?? []).filter((e) => e.date === exams.data?.today).map((e) => ({ periodNo: e.periodNo, start: e.start, label: `${e.classLabel} ${e.subject}` }))}
-                ending={c.endingToday.map((a) => a.title)}
-                canCover={can('duties.manage')}
-              />
-            </>
-          )}
-
           {attention.length > 0 && (
             <>
               <SectionTitle>İlgilenmeniz gerekenler</SectionTitle>

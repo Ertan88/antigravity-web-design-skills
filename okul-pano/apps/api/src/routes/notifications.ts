@@ -9,6 +9,10 @@ import { achievements, announcements, memberships, notifications, schools, teach
 import { dutyDay, dutyGaps } from '../lib/dayinfo.ts';
 import { upcomingHolidays } from './holidays.ts';
 
+/** Bildirim metni için "23 Kasım" */
+const trDay = (iso: string) =>
+  new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));
+
 export interface PanelNotification {
   /** Okundu bilgisi için kalıcı anahtar */
   key: string;
@@ -116,7 +120,7 @@ export async function notificationRoutes(app: FastifyInstance) {
           key: `leave-request:${l.id}`,
           kind: 'leave-request',
           title: 'İzin bildirimi',
-          body: `${l.name} ${l.startDate === l.endDate ? l.startDate : `${l.startDate} – ${l.endDate}`} için izin bildirdi.`,
+          body: `${l.name} ${l.startDate === l.endDate ? trDay(l.startDate) : `${trDay(l.startDate)} – ${trDay(l.endDate)}`} için izin bildirdi.`,
           at: l.createdAt.toISOString(),
           to: '/izinler',
         });

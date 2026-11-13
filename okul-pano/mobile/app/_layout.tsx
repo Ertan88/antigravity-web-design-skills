@@ -13,6 +13,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, Platform, StyleSheet, View } from 'react-native';
+import { InAppNotices } from '../src/inAppNotice.tsx';
 import { Text } from '../src/text.tsx';
 import { initialWindowMetrics, SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../src/auth.tsx';
@@ -152,6 +153,7 @@ function Gate({ fontsReady }: { fontsReady: boolean }) {
           <Stack.Screen name="izin" options={{ presentation: 'modal' }} />
         </Stack>
       )}
+      {status === 'signedIn' && fontsReady && splashHidden && <InAppNotices />}
       <ConfirmHost />
       {!splashHidden &&
         (fontsReady ? (
