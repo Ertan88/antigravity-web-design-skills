@@ -244,7 +244,7 @@ export default function IsletmeDevam() {
                     <Text style={{ fontSize: 10.5, fontWeight: '700', color: colors.faint }} numberOfLines={1}>
                       {s.schoolNo} · {s.className ?? ''}
                     </Text>
-                    <Text style={{ fontSize: 10, color: colors.subtle }} numberOfLines={1}>
+                    <Text style={{ fontSize: 10, color: colors.faint }} numberOfLines={1}>
                       {s.businessName}
                     </Text>
                   </Pressable>

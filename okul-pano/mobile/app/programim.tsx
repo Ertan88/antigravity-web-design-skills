@@ -190,7 +190,7 @@ function ItemRow({ it, first, past, tone }: { it: Item; first: boolean; past?: b
     return (
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 16, backgroundColor: colors.bg, opacity: past ? 0.55 : 1, ...border }}>
         <Icon name="restaurant-outline" size={14} color={colors.subtle} />
-        <Text style={{ fontSize: 12.5, fontWeight: '600', color: colors.subtle }}>
+        <Text style={{ fontSize: 12.5, fontWeight: '600', color: colors.faint }}>
           Öğle arası {it.from} – {it.to}
         </Text>
       </View>
@@ -232,7 +232,7 @@ function ItemRow({ it, first, past, tone }: { it: Item; first: boolean; past?: b
           {classLabel(lesson.className)} · {lesson.subject}
         </Text>
       ) : (
-        <Text style={{ flex: 1, fontSize: 14, fontWeight: '500', color: colors.subtle }}>Boş</Text>
+        <Text style={{ flex: 1, fontSize: 14, fontWeight: '500', color: colors.faint }}>Boş</Text>
       )}
       {tone && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: tone }} />}
     </View>

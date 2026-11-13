@@ -85,11 +85,35 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   app.setErrorHandler(errorHandler);
 
   await app.register(helmet, {
-    // Pano YouTube videolarını gömdüğü için CSP, ön yüz uygulamalarının kendi başlıklarında yönetilir.
+    // CSP aşağıda yalnızca HTML sayfalarına eklenir (YouTube ve dış görsellere izin veren politika)
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
     // YouTube gömülü oynatıcı, kaynağı (Referer) göremezse videoyu oynatmayı reddeder
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  });
+  /*
+   * İçerik Güvenlik Politikası (CSP): panel, pano ve mobil web sayfalarında yalnızca kendi betiklerimiz çalışır; olası bir
+   * XSS açığında dışarıdan betik yüklenemez, başka sitelere gömülemez. Görseller (kitap kapağı, duyuru) her HTTPS
+   * adresinden, video yalnızca YouTube'dan.
+   */
+  const CSP = [
+    "default-src 'self'",
+    "script-src 'self' https://www.youtube.com https://s.ytimg.com",
+    "style-src 'self' 'unsafe-inline'",
+    "font-src 'self' data:",
+    "img-src 'self' data: blob: https:",
+    "media-src 'self' blob: https:",
+    "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com",
+    "connect-src 'self' https: wss:",
+    "worker-src 'self' blob:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'self'",
+  ].join('; ');
+  app.addHook('onSend', async (_req, reply, payload) => {
+    if (String(reply.getHeader('content-type') ?? '').startsWith('text/html')) reply.header('Content-Security-Policy', CSP);
+    return payload;
   });
   await app.register(cookie);
   await app.register(jwt, { secret: env.JWT_SECRET });

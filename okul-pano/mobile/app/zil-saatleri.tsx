@@ -428,7 +428,7 @@ export default function ZilSaatleri() {
                             <Text style={{ fontSize: 10, fontWeight: '800', color: colors.muted }}>{d}</Text>
                           </View>
                         ))}
-                        {!used.length && <Text style={{ fontSize: 10.5, color: colors.subtle }}>Bu hafta çalmıyor</Text>}
+                        {!used.length && <Text style={{ fontSize: 10.5, color: colors.faint }}>Bu hafta çalmıyor</Text>}
                       </View>
                     </View>
                     {editable && (

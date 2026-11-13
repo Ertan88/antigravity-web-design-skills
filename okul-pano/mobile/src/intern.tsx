@@ -337,7 +337,7 @@ export function SendSheet({ rows, onClose, onSent }: { rows: PendingMark[]; onCl
                   {r.fullName}
                 </Text>
                 {r.businessName && (
-                  <Text style={{ fontSize: 11.5, color: colors.subtle }} numberOfLines={1}>
+                  <Text style={{ fontSize: 11.5, color: colors.faint }} numberOfLines={1}>
                     {r.businessName}
                   </Text>
                 )}

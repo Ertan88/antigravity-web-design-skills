@@ -1,5 +1,8 @@
 # Çalışma kuralları (Okul Yayın / okul-pano)
 
+Ayrıntılı teknik kurallar (güvenlik, KVKK, tasarım ve erişilebilirlik, mobil, pano performansı):
+`okul-pano/docs/KURALLAR.md`. Yeni özellik ve değişiklikte bu belge de uygulanır.
+
 Bu kurallar her oturumda geçerlidir. Yanıtlar her zaman Türkçe yazılır.
 
 ## 1. Fikirleri onaylamadan önce sorgula (en önemli kural)

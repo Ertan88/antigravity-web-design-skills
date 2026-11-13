@@ -112,7 +112,7 @@ export default function StudentCard() {
                         {e.note ? ` · “${e.note}”` : ''}
                       </Text>
                     </View>
-                    <Text style={{ fontSize: 11, color: colors.subtle, fontWeight: '600' }}>{shortStamp(e.createdAt)}</Text>
+                    <Text style={{ fontSize: 11, color: colors.faint, fontWeight: '600' }}>{shortStamp(e.createdAt)}</Text>
                     {e.mine && (
                       <DeleteIconButton label="Kaydı sil" onPress={() => void remove(e.id)} />
                     )}

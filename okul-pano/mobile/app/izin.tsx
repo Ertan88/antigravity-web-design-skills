@@ -149,7 +149,7 @@ export default function Izin() {
                   {kind ? (
                     <Text style={{ fontWeight: '800', color: colors.ink }}> · {kind}</Text>
                   ) : (
-                    <Text style={{ color: colors.subtle }}> · neden seçilmedi</Text>
+                    <Text style={{ color: colors.faint }}> · neden seçilmedi</Text>
                   )}
                 </Text>
                 <Text style={{ fontSize: 13, fontWeight: '600', color: colors.muted }}>{dayCount(valid[0], valid[1])} gün</Text>

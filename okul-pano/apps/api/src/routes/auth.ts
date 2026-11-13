@@ -5,11 +5,42 @@ import { z } from 'zod';
 import { accessUser } from '../context.ts';
 import { memberships, schools, sessions, teacherBranches, teachers, teacherTitles, timetableEntries, users } from '../db/schema.ts';
 import { burnPasswordCheck, hashPassword, randomToken, sha256, verifyPassword } from '../lib/crypto.ts';
-import { badRequest, conflict, notFound, parse, unauthorized } from '../lib/errors.ts';
+import { badRequest, conflict, HttpError, notFound, parse, unauthorized } from '../lib/errors.ts';
 
 const ACCESS_TTL = '15m';
 const REFRESH_TTL_MS = 30 * 24 * 3600 * 1000;
 const COOKIE = 'op_refresh';
+
+/** Hesap başına hatalı giriş sayacı (sunucu belleğinde; yeniden başlayınca sıfırlanır) */
+const failures = new Map<string, { count: number; first: number; until: number }>();
+const FAIL_LIMIT = 5;
+const FAIL_WINDOW_MS = 15 * 60_000;
+const LOCK_MS = 5 * 60_000;
+function noteFailure(email: string, now = Date.now()) {
+  const f = failures.get(email);
+  const cur = f && now - f.first < FAIL_WINDOW_MS ? f : { count: 0, first: now, until: 0 };
+  cur.count += 1;
+  if (cur.count >= FAIL_LIMIT) {
+    cur.until = now + LOCK_MS;
+    cur.count = 0;
+    cur.first = now;
+  }
+  failures.set(email, cur);
+  if (failures.size > 10_000) for (const [k, v] of failures) if (now - v.first > FAIL_WINDOW_MS && v.until < now) failures.delete(k);
+}
+const lockedFor = (email: string, now = Date.now()) => Math.max(0, ((failures.get(email)?.until ?? 0) - now) / 1000);
+
+/** Adres başına geniş sınır: aynı okul ağından dakikada en çok 120 giriş denemesi */
+const ipHits = new Map<string, { n: number; start: number }>();
+async function loginIpLimit(req: FastifyRequest) {
+  const now = Date.now();
+  const h = ipHits.get(req.ip);
+  const cur = h && now - h.start < 60_000 ? h : { n: 0, start: now };
+  cur.n += 1;
+  ipHits.set(req.ip, cur);
+  if (ipHits.size > 10_000) for (const [k, v] of ipHits) if (now - v.start > 60_000) ipHits.delete(k);
+  if (cur.n > 120) throw new HttpError(429, 'Bu ağdan çok sayıda giriş denendi. Bir dakika sonra yeniden deneyin.', 'too_many');
+}
 
 export async function authRoutes(app: FastifyInstance) {
   const { db, env } = app.deps;
@@ -40,14 +71,39 @@ export async function authRoutes(app: FastifyInstance) {
     return app.jwt.sign({ typ: 'access', sub: user.id, sa: user.isSuperAdmin }, { expiresIn: ACCESS_TTL });
   }
 
-  app.post('/api/auth/login', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
+  /*
+   * Giriş hız sınırı: okul ağında bütün öğretmenler aynı internet adresinden çıkar. Sınır yalnızca adrese bağlı olsaydı
+   * sabah aynı dakikada giriş yapan okul engellenirdi. Bu yüzden adres + e-posta başına 10/dk, adres başına geniş 120/dk;
+   * ayrıca bir hesaba art arda 5 hatalı girişte o hesap 5 dakika bekletilir (şifre deneme saldırısı).
+   */
+  app.post(
+    '/api/auth/login',
+    {
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: '1 minute',
+          keyGenerator: (req: FastifyRequest) => `${req.ip}|${String((req.body as { email?: unknown } | undefined)?.email ?? '').toLowerCase().slice(0, 200)}`,
+        },
+      },
+      preHandler: loginIpLimit,
+    },
+    async (req, reply) => {
     const body = parse(loginSchema, req.body);
-    const [user] = await db.select().from(users).where(eq(users.email, body.email.toLowerCase()));
+    const email = body.email.toLowerCase();
+    const wait = lockedFor(email);
+    if (wait > 0) throw new HttpError(429, `Bu hesapla çok sayıda hatalı giriş denendi. ${Math.ceil(wait / 60)} dakika sonra yeniden deneyin.`, 'too_many');
+    const [user] = await db.select().from(users).where(eq(users.email, email));
     if (!user) {
       await burnPasswordCheck(body.password);
+      noteFailure(email);
       throw unauthorized('E-posta ya da şifre hatalı.');
     }
-    if (!(await verifyPassword(body.password, user.passwordHash))) throw unauthorized('E-posta ya da şifre hatalı.');
+    if (!(await verifyPassword(body.password, user.passwordHash))) {
+      noteFailure(email);
+      throw unauthorized('E-posta ya da şifre hatalı.');
+    }
+    failures.delete(email);
 
     await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
     await db.delete(sessions).where(lt(sessions.expiresAt, new Date()));
@@ -57,7 +113,8 @@ export async function authRoutes(app: FastifyInstance) {
       accessToken: accessToken(user),
       ...(body.client === 'mobile' ? { refreshToken } : {}),
     };
-  });
+    },
+  );
 
   /** Yenileme anahtarı her kullanımda döndürülür (rotation); çalınan eski anahtar işe yaramaz. */
   app.post('/api/auth/refresh', async (req, reply) => {

@@ -127,7 +127,7 @@ export function PeriodList({ periods, lunchThresholdMin, onPeriod, gapControls, 
             >
               <View style={{ width: 46 }}>
                 <Text style={{ fontSize: 13, fontWeight: '800', color: colors.ink }}>{p.start}</Text>
-                <Text style={{ fontSize: 10.5, fontWeight: '600', color: colors.subtle }}>{p.end}</Text>
+                <Text style={{ fontSize: 10.5, fontWeight: '600', color: colors.faint }}>{p.end}</Text>
               </View>
               <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 12, paddingHorizontal: 11, paddingVertical: 8, backgroundColor: now ? colors.primary : elevated ? colors.card : colors.primarySoft, borderWidth: elevated && !now ? 1 : 0, borderColor: colors.borderStrong }}>
                 <Text style={{ fontSize: 13.5, fontWeight: '700', color: now ? colors.onPrimary : colors.ink }}>{p.no}. Ders</Text>

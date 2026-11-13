@@ -14,7 +14,7 @@ const LIGHT = {
   divider: '#f1efea',
   ink: '#1c1917',
   muted: '#57534e',
-  faint: '#78716c',
+  faint: '#6f6863',
   subtle: '#a8a29e',
   primary: '#1c1917',
   /** Ana renkli zeminin (birincil düğme, seçili çip) üstündeki yazı */

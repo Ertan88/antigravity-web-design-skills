@@ -3,7 +3,7 @@
 Bu belge projeye eklenen her özellikte ve her değişiklikte uyulacak kuralları toplar. Kaynaklar: OWASP ASVS ve
 OWASP Top 10 (web ve API güvenliği), OWASP MASVS (mobil güvenlik), WCAG 2.2 AA (erişilebilirlik), Android ve Google Play
 politikaları, KVKK (6698 sayılı Kanun) ve projenin şimdiye kadarki kararları (kök dizindeki `CLAUDE.md`). Belgenin
-sonunda Kasım 2026 incelemesinde bulunan açıklar öncelik sırasıyla listelenir.
+sonunda Kasım 2026 incelemesinde bulunan açıklar öncelik sırasıyla ve durumlarıyla listelenir.
 
 Çalışma kuralları (fikri onaylamadan önce sorgulama, kodlamadan önce onay, A/B/C tasarım örnekleri) `CLAUDE.md`'de
 kalır; burada tekrarlanmaz.
@@ -195,12 +195,12 @@ Zayıf TV işlemcilerinde edinilen dersler:
 
 | # | Öncelik | Konu | Durum ve öneri |
 |---|---|---|---|
-| 1 | Yüksek | Mobil uygulama düz HTTP'ye izin veriyor (`usesCleartextTraffic: true`, `app.json`) | Üretimde yalnızca HTTPS kullanılıyor. Ancak bu ayar açık kaldıkça ağdaki biri bağlantıyı HTTP'ye düşürebilir. Geliştirme dışında kapatılmalı. |
-| 2 | Orta | Giriş hız sınırı IP başına (10/dk) | Okul ağında bütün öğretmenler aynı IP'den çıkar; sabah aynı dakikada girişte okul engellenebilir. Sınır e-posta + IP birlikte, IP için daha geniş tutulmalı. Hesap başına art arda hatalı girişte kısa bekleme eklenmeli. |
-| 3 | Orta | Panel ve pano sayfalarında İçerik Güvenlik Politikası (CSP) yok | `helmet` CSP'yi kapatıyor. YouTube ve yüklenen görsellere izin veren bir CSP eklenmeli. Olası bir XSS açığının etkisini sınırlar. |
-| 4 | Orta | Bağımlılık açığı taraması CI'da yok | GitHub Dependabot ya da CI'da `npm audit --omit=dev` adımı eklenmeli. |
+| 1 | Yüksek | Mobil uygulama düz HTTP'ye izin veriyordu (`usesCleartextTraffic`) | **Düzeltildi (1.20.53):** ayar kaldırıldı, uygulama yalnızca HTTPS kullanır. |
+| 2 | Orta | Giriş hız sınırı yalnızca IP başınaydı | **Düzeltildi:** adres + e-posta başına 10/dk, adres başına 120/dk; bir hesaba art arda 5 hatalı girişte 5 dakika bekleme. |
+| 3 | Orta | Panel ve pano sayfalarında İçerik Güvenlik Politikası (CSP) yoktu | **Düzeltildi:** HTML sayfalarına CSP başlığı eklendi (yalnızca kendi betiklerimiz ve YouTube). |
+| 4 | Orta | Bağımlılık açığı taraması otomatik değil | `npm audit` elle çalıştırıldı: e-posta paketi (nodemailer, yüksek) 10.2.1'e yükseltildi. Kalan 3 orta düzey açık `@fastify/static` içindeki `glob` paketinde; düzeltilmiş sürüm iki haftayı doldurunca yükseltilecek. Otomatik tarama (Dependabot) depo ayarı gerektirir, kullanıcı onayıyla açılır. |
 | 5 | Orta | Play Store'a çıkışta `USE_EXACT_ALARM` reddedilir | Şimdilik APK GitHub'dan dağıtıldığı için sorun yok. Play'e çıkmadan önce kaldırılmalı. |
-| 6 | Düşük–orta | `colors.subtle` metin rengi kontrastı 2.3–2.5 (AA altı), `colors.faint` açık temada 4.44 | `subtle` okunması gereken metinlerden çıkarılmalı; `faint` biraz koyulaştırılmalı (ör. `#716a65`). |
+| 6 | Düşük–orta | Soluk gri metin kontrastı AA altındaydı | **Mobilde düzeltildi:** `colors.faint` açık temada `#6f6863` (5.07:1); `colors.subtle` metinlerden çıkarıldı. Panelde (Tailwind `slate-400` metinler) ayrıca bakılacak. |
 | 7 | İşlevsel | Sunucudan telefona bildirim gelmiyor (Firebase kurulu değil) | Acil durum ve onay bildirimleri uygulama kapalıyken telefona ulaşmıyor. Firebase projesi kurulmalı. |
 | 8 | Düşük | Yöneticiler için iki adımlı doğrulama yok | Okul müdürü ve platform yöneticisi hesapları için isteğe bağlı iki adımlı doğrulama (TOTP) ileride eklenebilir. |
 
