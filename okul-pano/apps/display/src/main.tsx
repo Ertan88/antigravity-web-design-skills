@@ -15,6 +15,11 @@ if (isLiteMode('auto', navigator.userAgent) || new URLSearchParams(location.sear
   document.documentElement.classList.add('tv-lite');
 }
 
+// TV cihazı (TV uygulaması ya da Android WebView): kart sayfa geçişleri efektsiz (kayan yazı takılmasın)
+if (/OkulYayinPano/.test(navigator.userAgent) || /; wv\)/.test(navigator.userAgent)) {
+  document.documentElement.classList.add('tv-device');
+}
+
 // Çevrimdışı kopya (public/sw.js): internet ya da okul ağı koptuğunda pano saklanan kopyadan açılır.
 // Panelin önizlemesinde (geçici, ?preview=) ve geliştirmede kurulmaz.
 if (import.meta.env.PROD && 'serviceWorker' in navigator && !new URLSearchParams(location.search).has('preview')) {

@@ -447,7 +447,8 @@ p {
   height: 9px;
   border-radius: 999px;
   background: var(--border);
-  transition: all 0.4s ease;
+  /* Yalnızca renk geçer: genişlik geçişi her karede sayfa yerleşimini yeniden hesaplatıp kayan yazıyı takıltıyordu */
+  transition: background-color 0.4s ease;
 }
 
 .pager-dots span.active,
@@ -3612,6 +3613,26 @@ body.cursor-hidden * {
 
 .theme-light .exam-slide-row.is-now {
   border-color: #d97706;
+}
+
+/*
+ * Kart içi değişimler (Şu an derste, Nöbetçi öğretmenler sayfası, Zil Vakti) yalnızca kendi kartını yeniden yerleştirip
+ * çizdirir; sayfanın geri kalanı ve alttaki kayan yazı bu işe katılmaz. Eskiden her sayfa değişiminde bütün pano
+ * yeniden hesaplanıyor, zayıf TV'de kayan yazı o anda takılıyordu.
+ */
+.card,
+.footer {
+  contain: layout paint;
+}
+
+.pager-body,
+.ticker {
+  contain: strict;
+}
+
+/* TV'de (TV uygulaması ya da Android WebView) kart sayfaları efektsiz değişir: kayan yazı her zaman öncelikli */
+.tv-device .pager-page {
+  animation: none;
 }
 
 /* ---------- TV hafif modu (main.tsx): zayıf TV'lerde kayan yazı ve video takılmasın ---------- */
