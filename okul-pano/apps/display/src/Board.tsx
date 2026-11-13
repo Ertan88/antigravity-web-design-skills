@@ -89,7 +89,7 @@ function useSplash(ready: boolean) {
 /** Sütunda kalan alanı dolduran kartlar (listeler) */
 const GROW = new Set<BoardModule>(['duties', 'lessons']);
 
-export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthorized: () => void }) {
+export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthorized: (reason: string) => void }) {
   const { state, connection, lastUpdated, offsetMs, identifying, remote, power } = useDisplayData(auth, onUnauthorized);
   const now = useClock(offsetMs);
   const weather = useWeather(auth.token);

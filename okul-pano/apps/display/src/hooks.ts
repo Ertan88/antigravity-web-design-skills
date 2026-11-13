@@ -41,7 +41,7 @@ const timeTravelOffset = (() => {
  * sessizse dakikada bir),
  * internet kesilirse son kayıtlı veriyle çalışmaya devam etme ve uzaktan komutlar.
  */
-export function useDisplayData(auth: DisplayAuth, onUnauthorized: () => void) {
+export function useDisplayData(auth: DisplayAuth, onUnauthorized: (reason: string) => void) {
   const cached = auth.preview ? null : cachedState();
   const [state, setState] = useState<DisplayState | null>(cached?.state ?? null);
   const [connection, setConnection] = useState<Connection>('loading');
@@ -86,7 +86,7 @@ export function useDisplayData(auth: DisplayAuth, onUnauthorized: () => void) {
       .catch((err) => {
         if (err instanceof AuthError) {
           setConnection('unauthorized');
-          onUnauthorized();
+          onUnauthorized(err.message);
         } else {
           setConnection('offline');
         }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { dropPreviewParams, embedded, resolveAuth, saveDeviceToken, type DisplayAuth } from './api.ts';
+import { dropPreviewParams, embedded, resolveAuth, saveDeviceToken, suspendDeviceToken, type DisplayAuth } from './api.ts';
 import { Board } from './Board.tsx';
 import { PreviewBadge } from './components/PreviewBadge.tsx';
 import { Pairing } from './Pairing.tsx';
@@ -78,22 +78,27 @@ export function App() {
     setAuth(resolveAuth());
   }, []);
 
-  const onUnauthorized = useCallback(() => {
-    if (auth?.preview) {
-      if (!embedded) leavePreview();
-      return;
-    }
-    // Ekran panelden silindi ya da anahtarı yenilendi: eşleştirme ekranına dön
-    saveDeviceToken(null);
-    setAuth(null);
-  }, [auth, leavePreview]);
+  const onUnauthorized = useCallback(
+    (reason: string) => {
+      if (auth?.preview) {
+        if (!embedded) leavePreview();
+        return;
+      }
+      // Sunucu anahtarı geçersiz saydı (pano silindi, anahtarı yenilendi…): eşleştirme ekranı, eski anahtar askıda
+      suspendDeviceToken(reason);
+      setAuth(null);
+    },
+    [auth, leavePreview],
+  );
+
+  const onRestored = useCallback((token: string) => setAuth({ token, preview: false }), []);
 
   const onPaired = useCallback((token: string) => {
     saveDeviceToken(token);
     setAuth({ token, preview: false });
   }, []);
 
-  if (!auth) return <Pairing onPaired={onPaired} />;
+  if (!auth) return <Pairing onPaired={onPaired} onRestored={onRestored} />;
   return (
     <>
       <Board key={auth.token} auth={auth} onUnauthorized={onUnauthorized} />

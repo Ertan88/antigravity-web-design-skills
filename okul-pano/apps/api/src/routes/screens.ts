@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { audit, schoolGuard, UUID_RE } from '../context.ts';
 import { displayPairings, screens } from '../db/schema.ts';
 import { randomToken, sha256 } from '../lib/crypto.ts';
+import { rememberRevoked } from '../lib/screenSecurity.ts';
 import { badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 
 export const DEVICE_TOKEN_PREFIX = 'opd';
@@ -117,6 +118,7 @@ export async function screenRoutes(app: FastifyInstance) {
   app.post(`${base}/:id/rotate-key`, manage, async (req) => {
     const s = await loadScreen(req);
     const token = randomToken(DEVICE_TOKEN_PREFIX);
+    await rememberRevoked(app.deps, s, 'rotated');
     await db.update(screens).set({ tokenHash: sha256(token) }).where(eq(screens.id, s.id));
     bus.publish(req.ctx.schoolId, { type: 'command', command: 'reload', screenId: s.id });
     await audit(req, 'update', 'Ekran anahtarı', s.id, s.name);
@@ -147,6 +149,7 @@ export async function screenRoutes(app: FastifyInstance) {
 
   app.delete(`${base}/:id`, manage, async (req, reply) => {
     const s = await loadScreen(req);
+    await rememberRevoked(app.deps, s, 'deleted');
     await db.delete(screens).where(eq(screens.id, s.id));
     bus.publish(req.ctx.schoolId, { type: 'command', command: 'reload', screenId: s.id });
     await audit(req, 'delete', 'Ekran', s.id, s.name);

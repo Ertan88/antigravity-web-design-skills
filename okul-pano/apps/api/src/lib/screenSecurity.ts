@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { and, eq, isNotNull, lt, or, isNull } from 'drizzle-orm';
 import type { AppDeps } from '../context.ts';
-import { screens } from '../db/schema.ts';
+import { revokedScreenTokens, screens } from '../db/schema.ts';
 import { addToInbox } from '../routes/notifications.ts';
 import { notifyUsers, usersWithPermission } from './push.ts';
 
@@ -57,14 +57,30 @@ export async function noteScreenSeen(deps: AppDeps, screen: typeof screens.$infe
   }
 }
 
+export type RevokeReason = 'rotated' | 'deleted' | 'idle';
+
+/** Geçersiz kılınan anahtarın nedeni saklanır: pano eşleştirme ekranında nedenini gösterir */
+export async function rememberRevoked(deps: AppDeps, screen: { schoolId: string; name: string; tokenHash: string | null }, reason: RevokeReason) {
+  if (!screen.tokenHash) return;
+  await deps.db
+    .insert(revokedScreenTokens)
+    .values({ tokenHash: screen.tokenHash, schoolId: screen.schoolId, screenName: screen.name, reason })
+    .onConflictDoNothing();
+}
+
+/** Pano anahtarı geçersizse nedeni (kayıtlıysa) */
+export async function revokedReason(deps: AppDeps, tokenHash: string) {
+  const [r] = await deps.db.select().from(revokedScreenTokens).where(eq(revokedScreenTokens.tokenHash, tokenHash));
+  return r ?? null;
+}
+
 /** Uzun süre bağlanmayan panoların anahtarını iptal eder (saatlik görev); iptal edilen pano sayısı */
 export async function runScreenKeyExpiry(deps: AppDeps, now = new Date()) {
   const limit = new Date(now.getTime() - SCREEN_KEY_IDLE_DAYS * 86400_000);
-  const expired = await deps.db
-    .update(screens)
-    .set({ tokenHash: null })
-    .where(and(isNotNull(screens.tokenHash), or(lt(screens.lastSeenAt, limit), and(isNull(screens.lastSeenAt), lt(screens.createdAt, limit)))))
-    .returning({ schoolId: screens.schoolId, name: screens.name });
+  const idle = and(isNotNull(screens.tokenHash), or(lt(screens.lastSeenAt, limit), and(isNull(screens.lastSeenAt), lt(screens.createdAt, limit))));
+  const before = await deps.db.select({ schoolId: screens.schoolId, name: screens.name, tokenHash: screens.tokenHash }).from(screens).where(idle);
+  for (const s of before) await rememberRevoked(deps, s, 'idle');
+  const expired = await deps.db.update(screens).set({ tokenHash: null }).where(idle).returning({ schoolId: screens.schoolId, name: screens.name });
   for (const s of expired) {
     await tellScreenAdmins(deps, s.schoolId, {
       title: 'Pano anahtarı iptal edildi',

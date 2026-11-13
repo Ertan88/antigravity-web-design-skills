@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { pollPairing, startPairing, type PairingStart } from './api.ts';
+import { checkToken, pollPairing, restoreSuspectToken, startPairing, suspectToken, type PairingStart } from './api.ts';
 import { BrandMark } from './components/Brand.tsx';
 import { QrCode } from './components/QrCode.tsx';
 import { Stage } from './components/Stage.tsx';
@@ -13,8 +13,27 @@ export const pairingLink = (code: string) => `okulpano://eslestir/${code}`;
  * İlk kurulum ekranı: TV'de klavye gerekmez. Ekran 6 haneli kod gösterir,
  * yönetici paneline kodu girince ekran kalıcı anahtarını alır ve panoya geçer.
  */
-export function Pairing({ onPaired }: { onPaired: (token: string) => void }) {
+export function Pairing({ onPaired, onRestored }: { onPaired: (token: string) => void; onRestored: (token: string) => void }) {
   const [pairing, setPairing] = useState<PairingStart | null>(null);
+  const [suspect] = useState(() => suspectToken());
+
+  // Eski anahtar dakikada bir denenir: geçici bir sorunsa (ör. ağ, sunucu güncellemesi) pano kendiliğinden geri döner
+  useEffect(() => {
+    if (!suspect) return;
+    let alive = true;
+    const tryOld = async () => {
+      if ((await checkToken(suspect.token)) && alive) {
+        const t = restoreSuspectToken();
+        if (t) onRestored(t);
+      }
+    };
+    void tryOld();
+    const timer = setInterval(() => void tryOld(), 60_000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [suspect, onRestored]);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const [attempt, setAttempt] = useState(0);
@@ -66,6 +85,12 @@ export function Pairing({ onPaired }: { onPaired: (token: string) => void }) {
       <div className="pairing">
         <BrandMark size={96} className="pairing-icon" />
         <h1>Bu ekranı okulunuza bağlayın</h1>
+        {suspect && (
+          <div className="pairing-reason">
+            {suspect.reason ?? 'Bu panonun anahtarı geçersiz sayıldı.'} Sorun geçiciyse pano dakikada bir yeniden dener ve kendiliğinden açılır;
+            değilse aşağıdaki kodla yeniden eşleştirin.
+          </div>
+        )}
         {pairing ? (
           <>
             <div className="pairing-code" aria-label={`Eşleştirme kodu ${pairing.code.split('').join(' ')}`}>

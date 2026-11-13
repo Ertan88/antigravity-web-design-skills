@@ -2,7 +2,11 @@ import type { DisplayState, ScreenLiveStatus, WeatherNow } from '@okulpano/share
 
 const TOKEN_KEY = 'okulpano.deviceToken';
 const STATE_KEY = 'okulpano.lastState';
+/** Sunucunun geçersiz saydığı eski anahtar: eşleştirme ekranında dakikada bir yeniden denenir (yanlış alarmda geri dönülür) */
+const SUSPECT_KEY = 'okulpano.suspectToken';
+const SUSPECT_REASON_KEY = 'okulpano.suspectReason';
 
+/** Sunucunun kendisi "pano anahtarı geçersiz" dedi (yanıtta device_invalid kodu) */
 export class AuthError extends Error {}
 
 function safeGet(key: string): string | null {
@@ -83,16 +87,59 @@ export function resolveAuth(): DisplayAuth | null {
   return stored ? { token: stored, preview: false } : null;
 }
 
-export function saveDeviceToken(token: string | null) {
+/** Yeni eşleşme: kalıcı anahtar saklanır, askıdaki eski anahtar bırakılır */
+export function saveDeviceToken(token: string) {
   safeSet(TOKEN_KEY, token);
-  if (!token) safeSet(STATE_KEY, null);
+  safeSet(SUSPECT_KEY, null);
+  safeSet(SUSPECT_REASON_KEY, null);
 }
 
+/**
+ * Sunucu anahtarı geçersiz saydı: anahtar silinmez, askıya alınır. Eşleştirme ekranı gösterilirken dakikada bir
+ * denenir; yeniden geçerli olursa pano kendiliğinden geri döner. Son kaydedilen pano verisi de korunur.
+ */
+export function suspendDeviceToken(reason: string) {
+  const token = safeGet(TOKEN_KEY);
+  if (token) safeSet(SUSPECT_KEY, token);
+  safeSet(SUSPECT_REASON_KEY, reason);
+  safeSet(TOKEN_KEY, null);
+}
+
+export function suspectToken(): { token: string; reason: string | null } | null {
+  const token = safeGet(SUSPECT_KEY);
+  return token ? { token, reason: safeGet(SUSPECT_REASON_KEY) } : null;
+}
+
+/** Askıdaki anahtar yeniden geçerli: pano kaldığı yerden devam eder */
+export function restoreSuspectToken(): string | null {
+  const token = safeGet(SUSPECT_KEY);
+  if (token) saveDeviceToken(token);
+  return token;
+}
+
+/**
+ * Yalnızca bizim sunucumuzun "anahtar geçersiz" yanıtı (device_invalid) eşleşmeyi askıya alır. Okul ağının ya da bir
+ * vekil sunucunun (ör. kimlik doğrulama isteyen ağ) kendi 401 yanıtı bağlantı sorunu sayılır: pano son verisiyle sürer.
+ */
 async function getJson<T>(path: string, token: string): Promise<T> {
   const res = await fetch(path, { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' });
-  if (res.status === 401) throw new AuthError('Anahtar geçersiz');
+  if (res.status === 401) {
+    const body = (await res.json().catch(() => null)) as { error?: string; message?: string } | null;
+    if (body?.error === 'device_invalid') throw new AuthError(body.message ?? 'Anahtar geçersiz');
+    throw new Error('Ağ kimlik doğrulama istedi (401); sunucuya ulaşılamadı');
+  }
   if (!res.ok) throw new Error(`Sunucu hatası: ${res.status}`);
   return res.json() as Promise<T>;
+}
+
+/** Askıdaki anahtar yeniden geçerli mi: true geçerli, false sunucu hâlâ geçersiz diyor, null ulaşılamadı */
+export async function checkToken(token: string): Promise<boolean | null> {
+  try {
+    await getJson('/api/display/state', token);
+    return true;
+  } catch (err) {
+    return err instanceof AuthError ? false : null;
+  }
 }
 
 /** Paneldeki önizlemede belirli bir pano seçilebilir (?screen=): o panonun düzeni ve ekran biçimiyle */

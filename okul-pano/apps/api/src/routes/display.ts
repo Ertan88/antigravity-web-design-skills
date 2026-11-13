@@ -38,12 +38,12 @@ import {
   transportDuties,
 } from '../db/schema.ts';
 import { pairingCode, randomToken, sha256 } from '../lib/crypto.ts';
-import { forbidden, notFound, parse, unauthorized } from '../lib/errors.ts';
+import { forbidden, HttpError, notFound, parse, unauthorized } from '../lib/errors.ts';
 import { feedTitlesNow } from '../lib/rss.ts';
 import { getWeather } from '../lib/weather.ts';
 import { addDays, holidaysAndHalfDays } from '../lib/dayinfo.ts';
 import { DEVICE_TOKEN_PREFIX } from './screens.ts';
-import { noteScreenSeen, noticeScreenPaired } from '../lib/screenSecurity.ts';
+import { noteScreenSeen, noticeScreenPaired, revokedReason } from '../lib/screenSecurity.ts';
 import { listExams } from '../lib/examSchedule.ts';
 import { noteScreenAlive, touchScreen } from '../lib/screenOffline.ts';
 
@@ -58,6 +58,12 @@ interface DisplayAuth {
   preview?: boolean;
 }
 
+/**
+ * Pano anahtarı geçersiz: yanıt "device_invalid" koduyla döner. Pano yalnızca bu kodu görünce eşleştirme ekranına
+ * geçer; okul ağı ya da vekil sunucunun kendi 401 yanıtı bağlantı sorunu sayılır (eşleşme silinmez).
+ */
+const deviceInvalid = (message: string) => new HttpError(401, message, 'device_invalid');
+
 /** Ekranlar cihaz anahtarıyla, paneldeki önizleme kısa ömürlü JWT ile kimlik doğrular. */
 async function resolveDisplay(app: FastifyInstance, req: FastifyRequest, queryToken?: string): Promise<DisplayAuth> {
   const header = req.headers.authorization;
@@ -66,7 +72,18 @@ async function resolveDisplay(app: FastifyInstance, req: FastifyRequest, queryTo
 
   if (token.startsWith(`${DEVICE_TOKEN_PREFIX}_`)) {
     const [screen] = await app.deps.db.select().from(screens).where(eq(screens.tokenHash, sha256(token)));
-    if (!screen) throw unauthorized('Ekran anahtarı geçersiz ya da ekran silinmiş.');
+    if (!screen) {
+      const r = await revokedReason(app.deps, sha256(token));
+      throw deviceInvalid(
+        r?.reason === 'rotated'
+          ? `"${r.screenName}" panosunun anahtarı panelden yenilendi.`
+          : r?.reason === 'deleted'
+            ? `"${r.screenName}" panosu panelden silindi.`
+            : r?.reason === 'idle'
+              ? `"${r.screenName}" panosu uzun süre bağlanmadığı için anahtarı güvenlik amacıyla iptal edildi.`
+              : 'Bu panonun anahtarı sunucuda bulunamadı (pano silinmiş ya da anahtarı yenilenmiş olabilir).',
+      );
+    }
     // Adres değiştiyse kaydedilir; kısa sürede iki farklı adres: anahtar kopyalanmış olabilir, yönetici uyarılır
     if (req.ip !== screen.lastIp) await noteScreenSeen(app.deps, screen, req.ip).catch(() => {});
     // Son görülme (en çok dakikada bir); kopma bildirimi gönderilmişse "yeniden bağlandı"
@@ -90,7 +107,7 @@ async function resolveDisplay(app: FastifyInstance, req: FastifyRequest, queryTo
   } catch {
     /* geçersiz */
   }
-  throw unauthorized('Ekran anahtarı geçersiz.');
+  throw deviceInvalid('Ekran anahtarı geçersiz.');
 }
 
 function groupTransport(rows: { date: string; teacherName: string }[]) {

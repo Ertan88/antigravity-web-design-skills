@@ -53,9 +53,28 @@ describe('pano güvenliği', () => {
   it(`${SCREEN_KEY_IDLE_DAYS} gün bağlanmayan panonun anahtarı iptal edilir`, async () => {
     expect(await runScreenKeyExpiry(t.app.deps)).toBe(0);
     expect(await runScreenKeyExpiry(t.app.deps, new Date(Date.now() + (SCREEN_KEY_IDLE_DAYS + 1) * 86400_000))).toBe(1);
-    expect((await state('198.51.100.10')).statusCode).toBe(401);
+    const r = await state('198.51.100.10');
+    expect(r.statusCode).toBe(401);
+    // Pano yalnızca bu kodla eşleştirme ekranına geçer; nedeni ekranda yazılır
+    expect(r.json()).toMatchObject({ error: 'device_invalid' });
+    expect(r.json().message).toContain('uzun süre bağlanmadığı');
     const screens = (await owner.get(`${base}/screens`)).json() as { hasKey: boolean }[];
     expect(screens[0]!.hasKey).toBe(false);
     expect(await titles()).toContain('Pano anahtarı iptal edildi');
+  });
+
+  it('anahtar yenilenince ya da pano silinince eski anahtar nedeniyle reddedilir; bilinmeyen anahtar da device_invalid', async () => {
+    const created = (await owner.post(`${base}/screens`, { name: 'Kantin' })).json() as { screen: { id: string }; token: string };
+    const old = created.token;
+    const get = (tok: string) => t.app.inject({ method: 'GET', url: '/api/display/state', headers: { authorization: `Bearer ${tok}` } });
+    expectStatus(await get(old), 200);
+    const fresh = (await owner.post(`${base}/screens/${created.screen.id}/rotate-key`, {})).json().token as string;
+    const r1 = await get(old);
+    expect(r1.json()).toMatchObject({ error: 'device_invalid' });
+    expect(r1.json().message).toContain('yenilendi');
+    expectStatus(await get(fresh), 200);
+    expectStatus(await owner.del(`${base}/screens/${created.screen.id}`), 204);
+    expect((await get(fresh)).json().message).toContain('silindi');
+    expect((await get('opd_bilinmeyen')).json()).toMatchObject({ error: 'device_invalid' });
   });
 });

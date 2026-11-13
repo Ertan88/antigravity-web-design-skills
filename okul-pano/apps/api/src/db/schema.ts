@@ -374,6 +374,22 @@ export const students = pgTable(
   (t) => [index('students_school_idx').on(t.schoolId), uniqueIndex('students_school_no_uq').on(t.schoolId, t.schoolNo)],
 );
 
+/**
+ * Geçersiz kılınmış pano anahtarları: pano "anahtar geçersiz" yanıtı alınca nedenini (yenilendi, silindi, 30 gün
+ * bağlanmadı) eşleştirme ekranında gösterebilsin. Anahtarın kendisi değil, özeti saklanır.
+ */
+export const revokedScreenTokens = pgTable(
+  'revoked_screen_tokens',
+  {
+    tokenHash: text('token_hash').primaryKey(),
+    schoolId: schoolId(),
+    screenName: text('screen_name').notNull(),
+    reason: text('reason').$type<'rotated' | 'deleted' | 'idle'>().notNull(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('revoked_screen_tokens_school_idx').on(t.schoolId)],
+);
+
 /** İşletmelerde mesleki eğitim: öğrencilerin gittiği işletmeler ve koordinatör öğretmenleri */
 export const businesses = pgTable(
   'businesses',

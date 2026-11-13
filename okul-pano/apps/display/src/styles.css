@@ -3672,3 +3672,17 @@ body.cursor-hidden * {
   background: #c7d2fe;
   color: #312e81;
 }
+
+/* Eşleşme askıya alındı: nedeni ve kendiliğinden yeniden deneme notu */
+.pairing-reason {
+  max-width: 1100px;
+  margin: 0 auto 28px;
+  padding: 18px 28px;
+  border-radius: 18px;
+  background: rgba(251, 146, 60, 0.14);
+  border: 1px solid rgba(251, 146, 60, 0.4);
+  color: #fed7aa;
+  font-size: 26px;
+  line-height: 1.4;
+  text-align: center;
+}
