@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { accessUser } from '../context.ts';
 import { auditLogs, memberships, schools, sessions, users } from '../db/schema.ts';
-import { hashPassword, readablePassword } from '../lib/crypto.ts';
+import { hashPassword, readablePassword, verifyPassword } from '../lib/crypto.ts';
 import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
 import { trySendMail } from '../lib/mailer.ts';
 import { INVITE_PENDING } from './members.ts';
@@ -60,6 +60,35 @@ export async function platformAccountsRoutes(app: FastifyInstance) {
   const log = async (byUserId: string, schoolIds: string[], action: string, summary: string) => {
     if (schoolIds.length) await db.insert(auditLogs).values(schoolIds.map((schoolId) => ({ schoolId, userId: byUserId, action, entity: 'Hesap', summary: summary.slice(0, 200) })));
   };
+
+  /**
+   * Hesap ayrımı (KVKK): platform yöneticisi aynı zamanda bir okulda çalışıyorsa platform yetkisi yeni bir hesaba
+   * (başka e-posta) taşınır. Mevcut hesap okul hesabı olarak kalır: okuldaki bütün kayıtları (izin, bildirim, öğretmen
+   * eşleşmesi, geçmiş) yerinde durur, platform görünümü kapanır. Uygulamada iki hesap arasında hızlı geçiş yapılır.
+   */
+  const splitSchema = z.object({
+    email: z.email('Geçerli bir e-posta girin').max(160),
+    password: z.string().min(8, 'Şifre en az 8 karakter olmalı').max(200),
+    currentPassword: z.string().min(1, 'Mevcut şifrenizi girin').max(200),
+  });
+  app.post('/api/platform/split', platform, async (req) => {
+    const body = parse(splitSchema, req.body);
+    const me = accessUser(req).sub;
+    const [user] = await db.select().from(users).where(eq(users.id, me));
+    if (!user?.isSuperAdmin) throw forbidden();
+    if (!(await verifyPassword(body.currentPassword, user.passwordHash))) throw badRequest('Mevcut şifre hatalı.');
+    const own = await db.select({ schoolId: memberships.schoolId }).from(memberships).where(eq(memberships.userId, me));
+    if (!own.length) throw badRequest('Bu hesap hiçbir okula üye değil; ayırmaya gerek yok.');
+    const email = body.email.trim().toLowerCase();
+    const [taken] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
+    if (taken) throw conflict('Bu e-posta başka bir hesapta kullanılıyor.');
+    const [created] = await db.transaction(async (tx) => {
+      const rows = await tx.insert(users).values({ email, fullName: user.fullName, passwordHash: await hashPassword(body.password), isSuperAdmin: true }).returning({ id: users.id, email: users.email });
+      await tx.update(users).set({ isSuperAdmin: false }).where(eq(users.id, me));
+      return rows;
+    });
+    return { platformEmail: created!.email };
+  });
 
   app.get('/api/platform/accounts', platform, async (req) => {
     const { email } = parse(findSchema, req.query);

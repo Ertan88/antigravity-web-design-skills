@@ -24,6 +24,7 @@ import { badRequest, conflict, forbidden, notFound, parse, unauthorized } from '
 import { z } from 'zod';
 import { mailConfigured, trySendMail } from '../lib/mailer.ts';
 import { tell } from './issues.ts';
+import { assertNotPlatformAccount, PLATFORM_MEMBER_ERROR } from '../lib/platformAccount.ts';
 
 /** Kişi başı giriş kodu 15 dakika, toplantı QR'ı 1 saat, adımlar (e-posta, şifre) 30 dakika geçerli */
 const CODE_TTL_MS = 15 * 60_000;
@@ -128,6 +129,7 @@ export async function enrollRoutes(app: FastifyInstance) {
         const [u] = await tx.insert(users).values({ email: e.email!, fullName: t.fullName, passwordHash: e.passwordHash! }).returning({ id: users.id });
         userId = u!.id;
       }
+      await assertNotPlatformAccount(tx as unknown as typeof db, userId);
       const [already] = await tx
         .select({ id: memberships.id })
         .from(memberships)
@@ -334,6 +336,7 @@ export async function enrollRoutes(app: FastifyInstance) {
     if (!user) [user] = await db.insert(users).values({ email: t.email, fullName: t.fullName, passwordHash: INVITE_PENDING }).returning();
     const [already] = await db.select({ id: memberships.id }).from(memberships).where(and(eq(memberships.userId, user!.id), eq(memberships.schoolId, req.ctx.schoolId)));
     if (already) throw conflict(`${t.email} bu okulda başka bir hesaba bağlı.`);
+    if (user!.isSuperAdmin) throw badRequest(PLATFORM_MEMBER_ERROR);
     await db.insert(memberships).values({ userId: user!.id, schoolId: req.ctx.schoolId, role: m.role, permissions: m.permissions, teacherId: t.id });
     await audit(req, 'create', 'Kullanıcı', user!.id, `${t.fullName} (${t.email}) davet edildi`);
     const invite = created

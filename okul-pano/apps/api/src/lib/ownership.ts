@@ -8,6 +8,7 @@ import { notifyUsers } from './push.ts';
 import { INVITE_PENDING } from '../routes/members.ts';
 import { addToInbox } from '../routes/notifications.ts';
 import { createInvite } from '../routes/signup.ts';
+import { PLATFORM_MEMBER_ERROR } from './platformAccount.ts';
 
 /**
  * Okul müdürlüğünü devreder. Okulda her zaman tek müdür kalır: yeni kişi müdür olur, eski müdür yönetici olarak
@@ -36,6 +37,7 @@ export async function transferOwnership(
       [user] = await db.insert(users).values({ email, fullName: input.fullName!, passwordHash: INVITE_PENDING }).returning();
       createdUser = true;
     }
+    if (user!.isSuperAdmin) throw badRequest(PLATFORM_MEMBER_ERROR);
     [target] = await db.select().from(memberships).where(and(eq(memberships.userId, user!.id), eq(memberships.schoolId, schoolId)));
     if (!target) [target] = await db.insert(memberships).values({ userId: user!.id, schoolId, role: 'admin', permissions: [] }).returning();
   }

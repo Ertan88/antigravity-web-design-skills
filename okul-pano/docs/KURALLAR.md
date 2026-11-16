@@ -91,7 +91,7 @@ kalır; burada tekrarlanmaz.
 - Kişisel veri günlüklere (log), hata bildirimlerine, bildirim metinlerine ve URL'lere yazılmaz. Bildirimde yalnızca
   gerekli en kısa bilgi bulunur (ör. "Ayşe Demir 23 Kasım için izin bildirdi").
 - Aydınlatma metni ve gizlilik sayfası yeni veri türü eklenince güncellenir.
-- **Platform ile okul tamamen ayrıdır.** Platform yöneticisi hesabı hiçbir okula üye olamaz; platform görünümünde
+- **Platform ile okul tamamen ayrıdır.** Platform yöneticisi hesabı hiçbir okula üye olamaz (API her üyelik yolunda reddeder); okulda da çalışan kişi okul için ayrı e-postayla hesap kullanır, uygulamada hesaplar arasında hızlı geçiş vardır (Menü › Hesap değiştir). Kuraldan önce kalan üyelik "Platform hesabını ayır" ile ayrılır: mevcut hesap okul hesabı kalır, platform yetkisi yeni hesaba geçer; platform görünümünde
   yalnızca platformu kullananların platformla yazışması (destek talepleri, kayıt başvuruları, abonelikler) görünür.
   Hiçbir okulda (geliştiricinin kendi okulu dahil) yapılan işlem platform yöneticisine görünmez, bildirim olarak
   gitmez. Okul verisine yalnızca müdürün verdiği süreli destek erişimiyle, o süre içinde girilir.

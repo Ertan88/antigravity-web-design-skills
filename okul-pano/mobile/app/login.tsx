@@ -5,6 +5,7 @@ import { Text } from '../src/text.tsx';
 import { router } from 'expo-router';
 import { DEFAULT_SERVER, normalizeServer, session } from '../src/api.ts';
 import { useAuth } from '../src/auth.tsx';
+import { AccountRow } from '../src/accountsSheet.tsx';
 // Marka kutusu temadan bağımsızdır (koyu turkuaz); üzerindeki etiketler her iki temada açık pastel renklerle
 import { colors, LIGHT_TILES, type TileTone } from '../src/theme.ts';
 import { Button, Card, Field, Icon, Screen, T, type IconName } from '../src/ui.tsx';
@@ -20,7 +21,8 @@ const FEATURES: { label: string; icon: IconName; tone: TileTone }[] = [
  * açıldığı adrestir. Kendi sunucusunu kuran okullar için "Farklı sunucu" ile değiştirilebilir.
  */
 export default function Login() {
-  const { signIn, server: saved } = useAuth();
+  const { signIn, server: saved, accounts, switchAccount } = useAuth();
+  const [switching, setSwitching] = useState<string | null>(null);
   const [server, setServer] = useState(saved || DEFAULT_SERVER);
   const [editServer, setEditServer] = useState(!(saved || DEFAULT_SERVER));
   const [email, setEmail] = useState('');
@@ -71,6 +73,34 @@ export default function Login() {
           </View>
         </View>
 
+        {/* Bu telefonda kayıtlı hesaplar: dokununca şifresiz geçilir (oturumu kapanmış olanda e-posta doldurulur) */}
+        {accounts.length > 0 && (
+          <Card style={{ gap: 4 }}>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: colors.ink, marginBottom: 4 }}>Kayıtlı hesaplar</Text>
+            {accounts.map((a) => (
+              <AccountRow
+                key={`${a.server}|${a.userId}`}
+                a={a}
+                active={false}
+                busy={switching === a.userId}
+                onPress={() => {
+                  setError(null);
+                  if (!a.refresh) {
+                    setEmail(a.email);
+                    return;
+                  }
+                  setSwitching(a.userId);
+                  switchAccount(a.userId)
+                    .catch((e: unknown) => {
+                      setEmail(a.email);
+                      setError(errorText(e, 'Hesaba geçilemedi'));
+                    })
+                    .finally(() => setSwitching(null));
+                }}
+              />
+            ))}
+          </Card>
+        )}
         <Card style={{ gap: 14 }}>
           <View style={{ gap: 2 }}>
             <Text style={{ fontSize: 19, fontWeight: '800', color: colors.ink }} accessibilityRole="header">

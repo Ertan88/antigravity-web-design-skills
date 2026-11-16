@@ -12,6 +12,7 @@ import { addToInbox, untilText } from './notifications.ts';
 import { geocode } from '../lib/weather.ts';
 import { SAMPLE_TABLES, seedSchoolContent, type SampleData } from '../seed-data.ts';
 import { addDefaultTeacherOptions } from './teachers.ts';
+import { PLATFORM_MEMBER_ERROR } from '../lib/platformAccount.ts';
 
 /**
  * Okulun panelde görünen bilgileri. TV uygulamasının çıkış şifresi yalnızca ayar yetkisi olana gider (öğretmen
@@ -334,6 +335,7 @@ export async function schoolRoutes(app: FastifyInstance) {
           onboarding: 'pending',
         })
         .returning();
+      if (owner!.isSuperAdmin) throw badRequest(PLATFORM_MEMBER_ERROR);
       await tx.insert(memberships).values({ userId: owner!.id, schoolId: school!.id, role: 'owner' });
       await addDefaultTeacherOptions(tx, school!.id);
       return school!;

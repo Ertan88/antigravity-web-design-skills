@@ -1,7 +1,8 @@
 import type { Permission } from '@okulpano/shared/permissions';
 import { reminderSummary, useReminderSettings } from '../../src/reminders.ts';
 import { router } from 'expo-router';
-
+import { useState } from 'react';
+import { AccountsSheet } from '../../src/accountsSheet.tsx';
 import { Platform, Pressable, View } from 'react-native';
 import { Text } from '../../src/text.tsx';
 import { membershipLabel, useAuth, type AppRole } from '../../src/auth.tsx';
@@ -166,7 +167,8 @@ function MenuTile({ item, tone, wide }: { item: Item; tone: TileTone; wide?: boo
  * (profil, şifre, bildirimler, çıkış). Alt menüye sığmayan her şey buradadır.
  */
 export default function Menu() {
-  const { me, school, role, can, isTeacher, selectSchool, setPlatformMode, signOut } = useAuth();
+  const { me, school, role, can, isTeacher, selectSchool, setPlatformMode, signOut, accounts } = useAuth();
+  const [accountsOpen, setAccountsOpen] = useState(false);
   const back = useTabBack('profil');
   // Menü alt menüde olmayan ekranları listeler (alt menüdekiler burada tekrar edilmez)
   const tabs = useVisibleTabs();
@@ -184,6 +186,20 @@ export default function Menu() {
   if (role === 'platform') {
     const own = me?.schools.filter((s) => !s.support) ?? [];
     const support = me?.schools.filter((s) => s.support) ?? [];
+    // KVKK: platform hesabı okula üye olamaz. Kuraldan önce kalan üyelik varsa hesap ayrılır.
+    if (own.length)
+      sections.push({
+        title: 'Hesap ayrımı',
+        items: [
+          {
+            title: 'Platform hesabını ayır',
+            subtitle: 'Okul üyeliği bu hesapta kalır, platform yeni e-postaya geçer',
+            icon: 'swap-horizontal-outline',
+            tone: 'gold',
+            to: '/hesap/ayir',
+          },
+        ],
+      });
     sections.push({
       title: 'Okullarım',
       items: [
@@ -327,6 +343,17 @@ export default function Menu() {
           ...(school?.support && role !== 'platform' ? ['Destek erişimi'] : []),
         ]}
       />
+      {/* Hızlı hesap geçişi (A): platform ve okul ayrı hesaplar; bu telefonda kayıtlı hesaplar arasında şifresiz geçiş */}
+      <Card style={{ paddingVertical: 4, gap: 0 }}>
+        <ListRow
+          tile={{ icon: 'swap-horizontal-outline', tone: 'sky' }}
+          title="Hesap değiştir"
+          subtitle={accounts.length > 1 ? `${accounts.length} hesap kayıtlı` : 'Başka bir hesap ekleyin'}
+          onPress={() => setAccountsOpen(true)}
+          last
+        />
+      </Card>
+      <AccountsSheet open={accountsOpen} onClose={() => setAccountsOpen(false)} />
 
       {schoolChoices.length > 1 && (
         <>

@@ -10,6 +10,7 @@ import { notifyUsers } from '../lib/push.ts';
 import { addToInbox } from './notifications.ts';
 import { createInvite } from './signup.ts';
 import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
+import { PLATFORM_MEMBER_ERROR } from '../lib/platformAccount.ts';
 
 /** Davetle eklenen ve henüz şifresini belirlemeyen hesap: bu değerle hiçbir şifre eşleşmez */
 /** Müdür yardımcısında saklanan yetkiler: yalnızca açıkça verilenler (ör. "Mesleki eğitimi yönetir") */
@@ -166,6 +167,7 @@ export async function memberRoutes(app: FastifyInstance) {
         })
         .returning();
     }
+    if (user!.isSuperAdmin) throw badRequest(PLATFORM_MEMBER_ERROR);
     const [existing] = await db
       .select({ id: memberships.id })
       .from(memberships)

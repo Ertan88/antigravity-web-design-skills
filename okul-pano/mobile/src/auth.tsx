@@ -1,9 +1,10 @@
 import { appView, type Permission, type Role } from '@okulpano/shared/permissions';
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { api, login, logout, session } from './api.ts';
+import { loadAccounts, saveAccounts, upsert, type SavedAccount } from './accounts.ts';
+import { api, login, loginOther, logout, session } from './api.ts';
 import { clearSaved, restoreQueries, startSaving } from './persist.ts';
-import { unregisterPush } from './push.ts';
+import { registerForPush, unregisterPush } from './push.ts';
 import { storage } from './storage.ts';
 
 export interface SchoolAccess {
@@ -61,6 +62,16 @@ interface AuthValue {
   signIn: (server: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   selectSchool: (id: string) => Promise<void>;
+  /** Bu telefonda kayıtlı hesaplar (etkin olan dahil) */
+  accounts: SavedAccount[];
+  /** Kayıtlı başka bir hesaba şifresiz geçer */
+  switchAccount: (userId: string) => Promise<void>;
+  /** Etkin hesabı saklayıp giriş ekranını açar (yeni hesap eklemek için) */
+  addAccount: () => Promise<void>;
+  /** Etkin oturuma dokunmadan bir hesabı listeye ekler (hesap ayırma sonrası) */
+  rememberAccount: (email: string, password: string) => Promise<void>;
+  /** Kayıtlı (etkin olmayan) hesabı bu telefondan kaldırır */
+  forgetAccount: (userId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
@@ -74,6 +85,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [server, setServer] = useState('');
   // Platform yöneticisi açılışta platform görünümündedir; okuluna geçince hatırlanır
   const [platformMode, setPlatformModeState] = useState(true);
+  const [accounts, setAccounts] = useState<SavedAccount[]>([]);
+  const updateAccounts = useCallback(async (fn: (list: SavedAccount[]) => SavedAccount[]) => {
+    const next = fn(await loadAccounts());
+    await saveAccounts(next);
+    setAccounts(next);
+    return next;
+  }, []);
 
   const applyMe = useCallback((data: Me, preferred: string | null) => {
     setMe(data);
@@ -90,8 +108,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const picked = applyMe(data, preferred);
       startSaving(qc, `${session.server}|${data.user.id}`);
       await Promise.all([session.setSchool(picked), session.setMe(JSON.stringify(data))]);
+      // Etkin hesap listede (yenileme anahtarı oturumda durur, listede tutulmaz)
+      await updateAccounts((list) => upsert(list, { ...accountMeta(data), server: session.server, refresh: null }));
     },
-    [applyMe, qc],
+    [applyMe, qc, updateAccounts],
   );
 
   useEffect(() => {
@@ -101,7 +121,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setStatus('signedOut');
     });
     void (async () => {
-      const [s, mode] = await Promise.all([session.load(), storage.get(PLATFORM_KEY)]);
+      const [s, mode, saved] = await Promise.all([session.load(), storage.get(PLATFORM_KEY), loadAccounts()]);
+      setAccounts(saved);
       setServer(s.server);
       setPlatformModeState(mode !== 'school');
       if (!s.hasSession || !s.server) return setStatus('signedOut');
@@ -163,12 +184,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await loadMe(null);
       },
       signOut: async () => {
+        const id = me?.user.id;
         await unregisterPush().catch(() => undefined);
         await clearSaved();
         await logout();
+        if (id) await updateAccounts((list) => list.filter((a) => !(a.userId === id && a.server === session.server)));
         qc.clear();
         setMe(null);
         setStatus('signedOut');
+      },
+      accounts,
+      switchAccount: async (userId) => {
+        const target = accounts.find((a) => a.userId === userId);
+        if (!target || target.userId === me?.user.id) return;
+        if (!target.refresh) throw new Error('Bu hesabın oturumu kapanmış. Şifreyle yeniden giriş yapın.');
+        const current = me ? { ...accountMeta(me), server: session.server, refresh: session.refresh } : null;
+        // Bildirimler yeni hesaba gelsin: telefon eski hesaptan çıkarılır, yeni hesapla kaydedilir
+        await unregisterPush().catch(() => undefined);
+        await clearSaved();
+        await updateAccounts((list) => {
+          let next = current ? upsert(list, current) : list;
+          next = upsert(next, { ...target, refresh: null });
+          return next;
+        });
+        qc.clear();
+        await session.setServer(target.server);
+        setServer(session.server);
+        await session.setTokens(null, target.refresh);
+        try {
+          await loadMe(null);
+        } catch (e) {
+          // Oturum düşmüşse önceki hesaba dönülür
+          await updateAccounts((list) => upsert(list, { ...target, refresh: null }));
+          if (current?.refresh) {
+            await session.setServer(current.server);
+            await session.setTokens(null, current.refresh);
+            await loadMe(null).catch(() => undefined);
+          }
+          throw e instanceof Error ? e : new Error('Hesaba geçilemedi');
+        }
+        void registerForPush({ auto: true }).catch(() => undefined);
+      },
+      addAccount: async () => {
+        if (me) await updateAccounts((list) => upsert(list, { ...accountMeta(me), server: session.server, refresh: session.refresh }));
+        await unregisterPush().catch(() => undefined);
+        await clearSaved();
+        // Sunucudaki oturum kapatılmaz: hesap listede kalır, geri geçilebilir
+        await session.setTokens(null, null);
+        qc.clear();
+        setMe(null);
+        setStatus('signedOut');
+      },
+      rememberAccount: async (email, password) => {
+        const r = await loginOther(email, password);
+        const meta = { userId: r.me.id, email: r.me.email, fullName: r.me.fullName, kind: r.me.isSuperAdmin ? ('platform' as const) : ('school' as const), detail: r.me.isSuperAdmin ? 'Platform yöneticisi' : '' };
+        await updateAccounts((list) => upsert(list, { ...meta, server: session.server, refresh: r.refreshToken }));
+      },
+      forgetAccount: async (userId) => {
+        const a = accounts.find((x) => x.userId === userId);
+        if (!a || a.userId === me?.user.id) return;
+        if (a.refresh) void fetch(`${a.server}/api/auth/logout`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ refreshToken: a.refresh }) }).catch(() => undefined);
+        await updateAccounts((list) => list.filter((x) => !(x.userId === userId && x.server === a.server)));
       },
       selectSchool: async (id) => {
         setSchoolId(id);
@@ -177,7 +253,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         void api('/api/me/school', { method: 'PUT', body: { schoolId: id } }).catch(() => undefined);
       },
     };
-  }, [status, me, schoolId, server, platformMode, loadMe, qc]);
+  }, [status, me, schoolId, server, platformMode, loadMe, qc, accounts, updateAccounts]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
@@ -192,6 +268,18 @@ export function membershipLabel(s: SchoolAccess): string {
   if (s.role === 'admin') return 'Yönetici';
   // Kadroda olmayan kişi (ör. memur) panelde olduğu gibi "Görevli"
   return s.teacherId ? 'Öğretmen' : 'Görevli';
+}
+
+/** Hesap listesinde görünen bilgiler: platform hesabı ya da okul (ilk okul ve görevi) */
+function accountMeta(data: Me): Omit<SavedAccount, 'server' | 'refresh'> {
+  const own = data.schools.filter((s) => !s.support);
+  return {
+    userId: data.user.id,
+    email: data.user.email,
+    fullName: data.user.fullName,
+    kind: data.user.isSuperAdmin ? 'platform' : 'school',
+    detail: data.user.isSuperAdmin ? 'Platform yöneticisi' : own.map((s) => `${s.name} · ${membershipLabel(s)}`).join(', '),
+  };
 }
 
 export function useAuth(): AuthValue {

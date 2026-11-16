@@ -46,6 +46,10 @@ export const session = {
   get token() {
     return accessToken;
   },
+  /** Etkin hesabın yenileme anahtarı (hesap değiştirirken saklanır) */
+  get refresh() {
+    return refreshToken;
+  },
   async setServer(url: string) {
     server = normalizeServer(url);
     await storage.set(KEYS.server, server);
@@ -152,6 +156,23 @@ export async function login(email: string, password: string) {
 }
 
 /** Şifre değişince sunucu diğer oturumları kapatır; bu cihazın oturumu yeni anahtarla sürer */
+/**
+ * Etkin oturuma dokunmadan başka bir hesaba giriş yapar (hesap ekleme, hesap ayırma): yenileme anahtarı ve hesap
+ * bilgisi döner; hesap listesine saklanır.
+ */
+export async function loginOther(email: string, password: string): Promise<{ refreshToken: string; me: { id: string; email: string; fullName: string; isSuperAdmin: boolean } }> {
+  const res = await fetch(`${server}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: email.trim().toLowerCase(), password, client: 'mobile' }),
+  });
+  const json = (await res.json().catch(() => null)) as { accessToken?: string; refreshToken?: string; message?: string } | null;
+  if (!res.ok || !json?.accessToken || !json.refreshToken) throw new ApiError(json?.message ?? 'Giriş yapılamadı', res.status);
+  const meRes = await fetch(`${server}/api/me`, { headers: { authorization: `Bearer ${json.accessToken}` } });
+  const me = (await meRes.json()) as { user: { id: string; email: string; fullName: string; isSuperAdmin: boolean } };
+  return { refreshToken: json.refreshToken, me: me.user };
+}
+
 export async function changePassword(currentPassword: string, newPassword: string) {
   const json = await api<{ refreshToken?: string }>('/api/me/password', { method: 'POST', body: { currentPassword, newPassword, client: 'mobile' } });
   if (json.refreshToken) await session.setTokens(null, json.refreshToken);

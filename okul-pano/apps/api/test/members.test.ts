@@ -62,10 +62,12 @@ describe('kullanıcı şifreleri', () => {
   });
 
   it('sistemde kayıtlı e-posta eklenince girilen şifre kullanılmaz ve bu bildirilir', async () => {
-    const res = await owner.post(path('members'), { email: SUPER.email, fullName: 'Kök', password: 'BaskaSifre123', role: 'editor', permissions: [] });
+    // Başka okulda hesabı olan kişi (platform yöneticisi okula eklenemez; o kural platform-split testinde)
+    expectStatus(await root.post('/api/platform/schools', { name: 'Komşu Okul', slug: 'komsu-okul', ownerEmail: 'komsu@test.local', ownerName: 'Komşu Müdür', ownerPassword: 'KomsuSifre42' }), 201);
+    const res = await owner.post(path('members'), { email: 'komsu@test.local', fullName: 'Komşu', password: 'BaskaSifre123', role: 'editor', permissions: [] });
     expectStatus(res, 201);
     expect(res.json().existingUser).toBe(true);
-    expect((await tryLogin(SUPER.email, SUPER.password)).statusCode).toBe(200);
+    expect((await tryLogin('komsu@test.local', 'KomsuSifre42')).statusCode).toBe(200);
   });
 
   it('okul müdürünün ve kendi şifresi buradan sıfırlanamaz', async () => {
