@@ -109,7 +109,7 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
-    title: 'Öğrenciler',
+    title: 'Öğrenci Takibi',
     items: [
       { to: '/ogrenciler', label: 'Öğrenciler', icon: Cake, permission: 'students.manage' },
       { to: '/gozlem', label: 'Öğrenci Gözlemleri', icon: ClipboardCheck, permission: 'conduct.counsel' },

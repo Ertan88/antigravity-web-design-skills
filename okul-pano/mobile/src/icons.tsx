@@ -121,6 +121,7 @@ import IconSchool from '@tabler/icons-react-native/IconSchool';
 import IconSearch from '@tabler/icons-react-native/IconSearch';
 import IconSend from '@tabler/icons-react-native/IconSend';
 import IconShare from '@tabler/icons-react-native/IconShare';
+import IconPrinter from '@tabler/icons-react-native/IconPrinter';
 import IconShield from '@tabler/icons-react-native/IconShield';
 import IconShieldCheck from '@tabler/icons-react-native/IconShieldCheck';
 import IconSpeakerphone from '@tabler/icons-react-native/IconSpeakerphone';
@@ -244,6 +245,7 @@ export const ICONS = {
   'send': IconSend,
   'send-outline': IconSend,
   'share-outline': IconShare,
+  'print-outline': IconPrinter,
   'shield-checkmark': IconShieldCheck,
   'shield-checkmark-outline': IconShieldCheck,
   'shield-outline': IconShield,

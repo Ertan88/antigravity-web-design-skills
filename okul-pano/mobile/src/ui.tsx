@@ -1,6 +1,6 @@
 import { errorText, shortTitle } from '@okulpano/shared';
 import { reportScroll, resetScrollChrome, useChromeHidden } from './scrollChrome.ts';
-import { router, usePathname, useRoute } from 'expo-router';
+import { router, useIsFocused, usePathname, useRoute } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ComponentRef, type ReactNode } from 'react';
 import { ActivityIndicator, Animated, Easing, Keyboard, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, TextInput as NativeTextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 import { centeredText, Text, TextInput } from './text.tsx';
@@ -1128,7 +1128,13 @@ export function switchColors() {
 export function AddFab({ label = 'Ekle', onPress }: { label?: string; onPress: () => void }) {
   const tabInset = useContext(TabBarInset);
   const insets = useSafeAreaInsets();
-  const small = useChromeHidden();
+  // Başka ekran açılırken (bu ekran arkada kalınca) düğme o anki hâlinde donar: yeni ekranın açılışı alt menüyü
+  // sıfırlasa da geçiş sırasında küçük "+" birden "Hesap aç" gibi uzun hâline dönmez
+  const hiddenNow = useChromeHidden();
+  const focused = useIsFocused();
+  const frozen = useRef(hiddenNow);
+  if (focused) frozen.current = hiddenNow;
+  const small = focused ? hiddenNow : frozen.current;
   const base = Math.max(insets.bottom, 8) + 14;
   const bottom = tabInset && !small ? tabInset + 4 : base;
   return (

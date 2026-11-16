@@ -1,5 +1,6 @@
 import { normalizeName } from '@okulpano/shared/teachers';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import { Text } from '../../src/text.tsx';
 import { useAuth } from '../../src/auth.tsx';
@@ -14,9 +15,13 @@ import { useTabBack } from '../../src/tabs.ts';
 export default function Nobet() {
   const back = useTabBack('nobet');
   const { isTeacher } = useAuth();
-  const [tab, setTab] = useState<'mine' | 'all'>(isTeacher ? 'mine' : 'all');
+  // Menüdeki "Nöbet çizelgesi" (?g=cizelge) okulun çizelgesiyle, "Nöbetlerim" kendi nöbetlerinizle açılır
+  const { g } = useLocalSearchParams<{ g?: string }>();
+  const chart = g === 'cizelge';
+  const [tab, setTab] = useState<'mine' | 'all'>(isTeacher && !chart ? 'mine' : 'all');
+  useEffect(() => setTab(isTeacher && !chart ? 'mine' : 'all'), [chart, isTeacher]);
   return (
-    <Screen back={back} title={isTeacher ? 'Nöbetlerim' : 'Nöbetler'}>
+    <Screen back={back} title={chart ? 'Nöbet çizelgesi' : isTeacher ? 'Nöbetlerim' : 'Nöbetler'}>
       {isTeacher && (
         <Segmented
           value={tab}

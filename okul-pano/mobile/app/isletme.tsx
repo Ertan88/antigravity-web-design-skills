@@ -2,6 +2,7 @@ import { errorText } from "@okulpano/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Linking, Pressable, View } from "react-native";
+import { useLocalSearchParams } from "expo-router";
 import { api } from "../src/api.ts";
 import { useAuth, useSchoolPath } from "../src/auth.tsx";
 import {
@@ -28,7 +29,6 @@ import {
   Field,
   Loading,
   Screen,
-  Segmented,
   T,
 } from "../src/ui.tsx";
 
@@ -90,7 +90,9 @@ export default function Isletmelerim() {
   const [editing, setEditing] = useState<Business | "new" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [forms, setForms] = useState(false);
-  const [tab, setTab] = useState<"businesses" | "students">("businesses");
+  // Menüde iki ayrı ekran: İşletmeler (/isletme) ve Öğrenciler (/isletme?sekme=ogrenciler)
+  const { sekme } = useLocalSearchParams<{ sekme?: string }>();
+  const tab: "businesses" | "students" = sekme === "ogrenciler" ? "students" : "businesses";
   const [adding, setAdding] = useState(false);
   const interns = useSchoolQuery<{ canAdd: boolean; students: Intern[] }>(
     "internship/interns",
@@ -141,13 +143,17 @@ export default function Isletmelerim() {
 
   return (
     <Screen
-      title="İşletmede Eğitim"
+      title={tab === "students" ? "Öğrenciler" : "İşletmeler"}
       subtitle={
-        list.data && interns.data
-          ? `${list.data.length} işletme · ${interns.data.students.length} öğrenci`
-          : access.data?.all
-            ? "Okulun bütün işletmeleri"
-            : "Eklediğiniz ve koordinatörü olduğunuz işletmeler"
+        tab === "students"
+          ? interns.data
+            ? `${interns.data.students.length} öğrenci`
+            : undefined
+          : list.data
+            ? `${list.data.length} işletme`
+            : access.data?.all
+              ? "Okulun bütün işletmeleri"
+              : "Eklediğiniz ve koordinatörü olduğunuz işletmeler"
       }
       back
       refreshing={list.isRefetching || interns.isRefetching}
@@ -170,7 +176,7 @@ export default function Isletmelerim() {
                 icon="share-outline"
                 onPress={() => setForms(true)}
               >
-                Form yazdır
+                Formlar
               </Button>
             </View>
             {canAdd && (
@@ -184,19 +190,6 @@ export default function Isletmelerim() {
         )
       }
     >
-      <Segmented
-        options={[
-          { value: "businesses", label: "İşletmeler" },
-          {
-            value: "students",
-            label: interns.data
-              ? `Öğrenciler · ${interns.data.students.length}`
-              : "Öğrenciler",
-          },
-        ]}
-        value={tab}
-        onChange={setTab}
-      />
       {tab === "students" ? (
         <StudentsTab data={interns.data} error={interns.error} />
       ) : (
@@ -452,8 +445,8 @@ function InfoSheet({
       {!business && (
         <T size={12.5} color={colors.faint} style={{ marginBottom: 8 }}>
           Alanı öğretmen kadrosundaki branşınızdan gelir; koordinatörü siz
-          olursunuz. Öğrencileri Öğrenciler sekmesindeki “Öğrenci ekle” ile
-          ekleyebilirsiniz.
+          olursunuz. Öğrencileri Menü › Mesleki eğitim › Öğrenciler ekranındaki “Öğrenci
+          ekle” ile ekleyebilirsiniz.
         </T>
       )}
       <SheetScroll

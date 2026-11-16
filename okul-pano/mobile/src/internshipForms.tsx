@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { router } from 'expo-router';
 import { openChoice } from './confirm.tsx';
-import { sharePdf } from './download.ts';
+import { printPdf, sharePdf } from './download.ts';
 import { useSchoolPath } from './auth.tsx';
 import { useSchoolQuery } from './data.ts';
 import { Sheet, SheetScroll } from './sheet.tsx';
@@ -90,7 +90,7 @@ const addMonths = (month: string, n: number) => {
 const dayMonth = (iso: string) => `${Number(iso.slice(8, 10))} ${MONTHS[Number(iso.slice(5, 7)) - 1]}`;
 const monthName = (m: string) => `${MONTHS[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
 
-/** Form yazdır: tür, hafta ya da ay, işletmeler; PDF paylaşım menüsüyle açılır */
+/** Formlar: tür, hafta ya da ay, işletmeler; PDF yazdırılır ya da paylaşım menüsüyle kaydedilir */
 export function FormsSheet({ onClose }: { onClose: () => void }) {
   const path = useSchoolPath('internship');
   const [type, setType] = useState<FormType>('daily');
@@ -115,10 +115,10 @@ export function FormsSheet({ onClose }: { onClose: () => void }) {
   const placeMissing = type === 'report' && settings && (!settings.province || !settings.district);
   const chosen = shown.filter((b) => picked.has(b.id));
   const formCount = type === 'attendance' ? chosen.reduce((n, b) => n + Math.max(1, Math.ceil(b.students / 5)), 0) : chosen.length;
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<'print' | 'share' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const share = async () => {
+  const run = async (mode: 'print' | 'share') => {
     // Devam çizelgesinde boş kalacak günler: kontrol edilmemişler ve ay bitmediyse bugünden sonrası
     if (attendance) {
       const halves = chosen.reduce((n, b) => n + (b.unchecked?.halves ?? 0), 0);
@@ -147,16 +147,18 @@ export function FormsSheet({ onClose }: { onClose: () => void }) {
         if (c !== 'print') return;
       }
     }
-    setBusy(true);
+    setBusy(mode);
     setError(null);
     try {
       const period = daily ? `week=${week}` : `month=${month}`;
       const label = daily ? `Günlük Rehberlik Formu ${trDate(week)}` : `${type === 'attendance' ? 'Aylık Devam Çizelgesi' : 'Aylık Rehberlik Raporu'} ${monthName(month)}`;
-      await sharePdf(`${path}/forms.pdf?type=${type}&${period}&ids=${chosen.map((b) => b.id).join(',')}`, `${label}.pdf`);
+      const url = `${path}/forms.pdf?type=${type}&${period}&ids=${chosen.map((b) => b.id).join(',')}`;
+      if (mode === 'print') await printPdf(url);
+      else await sharePdf(url, `${label}.pdf`);
     } catch (e) {
       setError(errorText(e, 'PDF hazırlanamadı'));
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
@@ -165,7 +167,7 @@ export function FormsSheet({ onClose }: { onClose: () => void }) {
 
   return (
     <Sheet open onClose={onClose}>
-      <Text style={{ fontSize: 17, fontWeight: '800', color: colors.ink }}>Form yazdır</Text>
+      <Text style={{ fontSize: 17, fontWeight: '800', color: colors.ink }}>Formlar</Text>
       <T size={12.5} color={colors.faint} style={{ marginTop: 2, marginBottom: 10 }}>
         Her form A5 boyutundadır; iki form bir A4 kâğıda sığar. Yazdırırken ölçeği “Gerçek boyut” (%100) seçin.
       </T>
@@ -286,9 +288,18 @@ export function FormsSheet({ onClose }: { onClose: () => void }) {
         </T>
       )}
       <View style={{ marginTop: 12 }}>
-        <Button icon="share-outline" loading={busy} disabled={!formCount} onPress={() => void share()}>
-          {formCount ? `PDF'i paylaş / kaydet · ${formCount} form` : 'Seçili form yok'}
-        </Button>
+        {formCount ? (
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Button variant="secondary" icon="share-outline" loading={busy === 'share'} disabled={Boolean(busy)} onPress={() => void run('share')} style={{ flex: 1 }}>
+              PDF paylaş / Kaydet
+            </Button>
+            <Button icon="print-outline" loading={busy === 'print'} disabled={Boolean(busy)} onPress={() => void run('print')} style={{ flex: 1 }}>
+              Yazdır
+            </Button>
+          </View>
+        ) : (
+          <Button disabled>Seçili form yok</Button>
+        )}
       </View>
     </Sheet>
   );

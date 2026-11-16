@@ -60,7 +60,8 @@ const TILE_BY_TITLE: Record<string, Tile> = {
   'İzin bildir': { icon: 'calendar-plus', tone: 'mint' },
   'Telefon takvimine ekle': { icon: 'calendar-share', tone: 'sky' },
   'İşletmede devam': { icon: 'clipboard-check', tone: 'sky' },
-  'İşletmelerim': { icon: 'factory', tone: 'peach' },
+  İşletmeler: { icon: 'factory', tone: 'peach' },
+  Öğrenciler: { icon: 'school-outline', tone: 'mint' },
   'Etkinlik geçmişi': { icon: 'history', tone: 'paper' },
   'Tatil takvimi': { icon: 'beach', tone: 'sun' },
   'MEB çalışma takvimi': { icon: 'calendar-number-outline', tone: 'sky' },
@@ -222,7 +223,7 @@ export default function Menu() {
     });
   }
 
-  // Gruplar web paneliyle aynı ad ve sırada: Pano · Takvim ve Ders · Personel · Öğrenciler · Mesleki eğitim ·
+  // Gruplar web paneliyle aynı ad ve sırada: Pano · Takvim ve Ders · Personel · Öğrenci takibi · Mesleki eğitim ·
   // İletişim · Yönetim. Boş kalan grup görünmez.
   if (role !== 'platform') {
     const add = (title: string, items: (Item | false | undefined)[]) => {
@@ -261,8 +262,9 @@ export default function Menu() {
       notTab('nobet') &&
         (isTeacher && !mine
           ? { title: 'Nöbetlerim', subtitle: 'Bu hafta ve yerine görevlendirmeler', icon: 'shield-checkmark-outline', to: '/nobet' }
-          : can('duties.manage') && { title: 'Nöbet çizelgesi', subtitle: 'Bugünkü nöbetçiler ve haftalık çizelge', icon: 'shield-checkmark-outline', to: '/nobet' }),
+          : can('duties.manage') && { title: 'Nöbet çizelgesi', subtitle: 'Bugünkü nöbetçiler ve haftalık çizelge', icon: 'shield-checkmark-outline', to: '/nobet?g=cizelge' }),
       can('duties.manage') && notTab('gorevlendirme') && { title: 'Ders görevlendirme', subtitle: 'İzinli öğretmenin dersleri ve nöbet yeri', icon: 'people-outline', to: '/gorevlendirme' },
+      can('directory.manage') && { title: 'Öğretmen kadrosu', subtitle: 'Ad, branş, ünvan, iletişim · ekle, düzenle', icon: 'school-outline', to: '/kadro' },
       isTeacher && {
         title: role === 'teacher' ? 'İzinlerim' : 'İzin bildir',
         subtitle: pendingLeaves ? `${pendingLeaves} bildirim onay bekliyor` : 'Onay durumu',
@@ -270,7 +272,7 @@ export default function Menu() {
         to: role === 'teacher' ? '/izinlerim' : '/izin',
       },
     ]);
-    add('Öğrenciler', [
+    add('Öğrenci takibi', [
       (managerial || isTeacher || counsel) && notTab('gozlem') && { title: 'Gözlem', subtitle: 'Öğrencilere artı / eksi, öğrenci kartları', icon: 'clipboard-outline', to: '/gozlem' },
       (managerial || counsel) && { title: 'Rehberlik uyarıları', subtitle: 'Kısa sürede çok eksi alan öğrenciler', icon: 'heart-outline', to: '/rehberlik' },
       { title: 'Doğum günleri', subtitle: 'Bugün doğum günü olan öğrenciler', icon: 'gift-outline', to: '/dogum-gunleri' },
@@ -279,7 +281,8 @@ export default function Menu() {
     if (internship.data?.enabled && (internship.data.all || internship.data.teacher || internship.data.areaHead)) {
       add('Mesleki eğitim', [
         { title: 'İşletmede devam', subtitle: 'Aylık çizelge: X, D, İ, R, H, K, T · özürlü / özürsüz', icon: 'grid-outline', to: '/isletme-devam' },
-        { title: 'İşletmelerim', subtitle: 'İşletme bilgileri, ekle, düzenle', icon: 'business-outline', to: '/isletme' },
+        { title: 'İşletmeler', subtitle: 'İşletme bilgileri, ekle, düzenle', icon: 'business-outline', to: '/isletme' },
+        { title: 'Öğrenciler', subtitle: 'İşletmedeki öğrenciler, öğrenci ekle', icon: 'people-outline', to: '/isletme?sekme=ogrenciler' },
       ]);
     }
     add('İletişim', [
@@ -289,7 +292,6 @@ export default function Menu() {
       (managerial || can('support.contact')) && { title: 'Platforma yaz', subtitle: 'Okul Yayın ekibine sorun, öneri ya da soru', icon: 'lifebuoy', to: '/platforma-yaz' },
     ]);
     add('Yönetim', [
-      can('directory.manage') && { title: 'Öğretmen kadrosu', subtitle: 'Ad, branş, ünvan, iletişim · ekle, düzenle', icon: 'school-outline', to: '/kadro' },
       (can('users.manage') || can('accounts.enroll')) && {
         title: 'Kişiler ve yetkiler',
         subtitle: can('users.manage') ? 'Hesap aç · rol ve görev ver · iş bölümü' : 'Öğretmen hesabı aç · onay bekleyenler',
@@ -377,9 +379,10 @@ export default function Menu() {
       )}
 
       <View style={{ gap: 6 }}>
-        <SectionTitle>Ayarlar</SectionTitle>
+        <SectionTitle>Uygulama ayarları</SectionTitle>
         <Card style={{ paddingVertical: 4, gap: 0 }}>
-          <ListRow tile={{ icon: 'notifications-outline', tone: 'sun' }} title="Bildirim ayarları" onPress={() => router.push('/hatirlatmalar')} last />
+          <ListRow tile={{ icon: 'notifications-outline', tone: 'sun' }} title="Bildirimler" onPress={() => router.push('/hatirlatmalar')} />
+          <ListRow tile={{ icon: 'lock-closed-outline', tone: 'lilac' }} title="Şifre değiştir" onPress={() => router.push('/hesap/sifre')} last />
         </Card>
       </View>
 

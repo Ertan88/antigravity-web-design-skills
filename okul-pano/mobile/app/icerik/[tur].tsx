@@ -4,7 +4,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Image, Platform, View } from 'react-native';
+import { Image, Platform, Pressable, View } from 'react-native';
+import { Sheet, SheetScroll } from '../../src/sheet.tsx';
+import { Text } from '../../src/text.tsx';
 import { absoluteUrl, api, uploadImage } from '../../src/api.ts';
 import { useAuth, useSchoolPath } from '../../src/auth.tsx';
 import { useSchoolQuery } from '../../src/data.ts';
@@ -136,6 +138,7 @@ export default function Icerik() {
   const path = useSchoolPath(tur ?? '');
   const qc = useQueryClient();
   const [editing, setEditing] = useState<Row | 'new' | null>(yeni ? 'new' : null);
+  const [viewing, setViewing] = useState<Row | null>(null);
   const refresh = () => qc.invalidateQueries({ predicate: (q) => q.queryKey[1] === tur });
   const toggle = useMutation({ mutationFn: (r: Row) => api(`${path}/${r.id}`, { method: 'PATCH', body: { isActive: !r.isActive } }), onSuccess: refresh });
   const remove = useMutation({ mutationFn: (r: Row) => api(`${path}/${r.id}`, { method: 'DELETE' }), onSuccess: refresh });
@@ -186,7 +189,13 @@ export default function Icerik() {
           const photo = kind.photoKey ? absoluteUrl(s(r[kind.photoKey]) || null) : null;
           return (
             <Card key={r.id} style={{ gap: 8, opacity: r.isActive === false ? 0.6 : 1 }}>
-              <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+              {/* Karta dokununca içerik düzenlemeye girmeden okunur */}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${kind.rowTitle(r)}, ayrıntıları göster`}
+                onPress={() => setViewing(r)}
+                style={({ pressed }) => ({ flexDirection: 'row', gap: 12, alignItems: 'center', opacity: pressed ? 0.7 : 1 })}
+              >
                 {photo && (
                   <Image
                     source={{ uri: photo }}
@@ -203,7 +212,7 @@ export default function Icerik() {
                   </T>
                 </View>
                 {r.isActive === false && <Badge>Kapalı</Badge>}
-              </View>
+              </Pressable>
               {writable && (
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <Button size="sm" variant="secondary" icon="create-outline" onPress={() => setEditing(r)} style={{ flex: 1 }}>
@@ -228,7 +237,49 @@ export default function Icerik() {
           );
         })
       )}
+      {viewing && <ViewSheet kind={kind} row={viewing} onClose={() => setViewing(null)} />}
     </Screen>
+  );
+}
+
+/** Kaydın okuma görünümü: fotoğraf büyük, alanlar başlık ve değerleriyle (düzenleme yetkisi gerekmez) */
+function ViewSheet({ kind, row, onClose }: { kind: Kind; row: Row; onClose: () => void }) {
+  const value = (f: FieldDef): string => {
+    const v = s(row[f.key]);
+    if (!v) return '';
+    if (f.type === 'choice') return f.options.find((o) => o.value === v)?.label ?? v;
+    if (f.type === 'date') return fullDate(v.slice(0, 10));
+    if (f.type === 'datetime') return `${fullDate(localIso(new Date(v)))} ${clock(v)}`;
+    return v;
+  };
+  const photo = kind.photoKey ? absoluteUrl(s(row[kind.photoKey]) || null) : null;
+  const shown = kind.fields.filter((f) => f.type !== 'photo' && value(f));
+  return (
+    <Sheet open onClose={onClose}>
+      <SheetScroll style={{ maxHeight: 560 }} contentContainerStyle={{ gap: 12 }}>
+        {photo && (
+          <Image
+            source={{ uri: photo }}
+            resizeMode="contain"
+            style={{ width: '100%', aspectRatio: 1, maxHeight: 300, borderRadius: 14, backgroundColor: colors.divider }}
+            accessibilityIgnoresInvertColors
+          />
+        )}
+        <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink }}>{kind.rowTitle(row)}</Text>
+        {shown.map((f) => (
+          <View key={f.key} style={{ gap: 2 }}>
+            <T size={12.5} weight="700" color={colors.faint}>
+              {f.label}
+            </T>
+            <T>{value(f)}</T>
+          </View>
+        ))}
+        {row.isActive === false && <Badge>Panoda kapalı</Badge>}
+      </SheetScroll>
+      <Button variant="secondary" onPress={onClose} style={{ marginTop: 12 }}>
+        Kapat
+      </Button>
+    </Sheet>
   );
 }
 

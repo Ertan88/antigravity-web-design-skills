@@ -72,7 +72,7 @@ export function AccessResult({ kind, fullName, email, secret, emailed, onDone }:
   const panel = `${server.replace(/\/$/, '')}/admin/`;
   const message =
     kind === 'password'
-      ? `Merhaba ${fullName},\n\n${school?.name ?? ''} Okulyayın giriş bilgileriniz:\n\nAdres: ${panel}\nE-posta: ${email}\nŞifre: ${secret}\n\nMobil uygulamaya da aynı bilgilerle girebilirsiniz. Giriş yaptıktan sonra Hesabım'dan şifrenizi değiştirin.`
+      ? `Merhaba ${fullName},\n\n${school?.name ?? ''} Okulyayın giriş bilgileriniz:\n\nAdres: ${panel}\nE-posta: ${email}\nŞifre: ${secret}\n\nMobil uygulamaya da aynı bilgilerle girebilirsiniz. Giriş yaptıktan sonra şifrenizi değiştirin.`
       : `Merhaba ${fullName},\n\n${school?.name ?? ''} sizi Okulyayın'a davet etti. Şifrenizi belirlemek için bağlantıyı açın (7 gün geçerli):\n${secret}\n\nMobil uygulamaya da aynı e-posta ve şifreyle girebilirsiniz.`;
   return (
     <Card style={{ gap: 10 }}>

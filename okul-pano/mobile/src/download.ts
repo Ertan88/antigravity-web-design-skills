@@ -1,4 +1,5 @@
 import { File, Paths } from 'expo-file-system';
+import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 import { apiFile } from './api.ts';
@@ -26,4 +27,23 @@ export async function sharePdf(path: string, name: string): Promise<void> {
   file.write(new Uint8Array(bytes));
   if (!(await Sharing.isAvailableAsync())) throw new Error('Bu cihazda dosya paylaşımı kullanılamıyor.');
   await Sharing.shareAsync(file.uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf', dialogTitle: name });
+}
+
+/**
+ * Sunucudan PDF'i alıp telefonun yazdırma penceresini açar (yazıcı seçilir; "PDF olarak kaydet" de buradadır).
+ * Web sürümünde PDF yeni sekmede açılır; yazdırma oradan yapılır.
+ */
+export async function printPdf(path: string): Promise<void> {
+  const bytes = await apiFile(path);
+  if (Platform.OS === 'web') {
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return;
+  }
+  const file = new File(Paths.cache, 'yazdir.pdf');
+  if (file.exists) file.delete();
+  file.create();
+  file.write(new Uint8Array(bytes));
+  await Print.printAsync({ uri: file.uri });
 }
