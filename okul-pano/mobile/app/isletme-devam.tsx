@@ -350,6 +350,7 @@ export default function IsletmeDevam() {
       )}
       {filling && d && (
         <FillSheet
+          month={d.month}
           today={d.today}
           businesses={d.businesses}
           businessId={businessId}

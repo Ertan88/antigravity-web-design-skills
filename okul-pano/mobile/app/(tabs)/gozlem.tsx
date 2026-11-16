@@ -25,6 +25,17 @@ const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0');
  * seç → kaydet. Birkaç öğrenci ya da bütün sınıf birlikte seçilebilir. Kaydedince 10 saniye "Geri al" çıkar.
  * Kutulardaki rakam öğrencinin bu ayki net puanıdır (yalnızca öğretmenler, rehber ve idare görür).
  */
+/** Adın son kelimesi soyadı sayılır (ör. "Ayşe Nur Yılmaz" → "Ayşe Nur" / "Yılmaz") */
+const nameParts = (full: string) => full.trim().split(/\s+/);
+const givenName = (full: string) => {
+  const p = nameParts(full);
+  return p.length > 1 ? p.slice(0, -1).join(' ') : full;
+};
+const surname = (full: string) => {
+  const p = nameParts(full);
+  return p.length > 1 ? p[p.length - 1]! : '';
+};
+
 export default function Gozlem() {
   const back = useTabBack('gozlem');
   const { me, can } = useAuth();
@@ -171,9 +182,15 @@ export default function Gozlem() {
                   <Avatar name={st.fullName} size={32} />
                   <NetChip n={st.net} />
                 </View>
-                <Text style={{ marginTop: 7, fontSize: 12.5, fontWeight: '800', color: colors.ink, lineHeight: 16 }} numberOfLines={2}>
-                  {st.fullName}
-                </Text>
+                {/* Ad ve soyad ayrı satırda; uzun ad kesilmez, satıra sığacak kadar küçülür */}
+                <View style={{ marginTop: 7 }}>
+                  <Text style={{ fontSize: 12.5, fontWeight: '800', color: colors.ink, lineHeight: 16 }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                    {givenName(st.fullName)}
+                  </Text>
+                  <Text style={{ fontSize: 12.5, fontWeight: '800', color: colors.ink, lineHeight: 16 }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                    {surname(st.fullName)}
+                  </Text>
+                </View>
                 <Text style={{ fontSize: 11, fontWeight: '600', color: colors.faint }}>No {st.schoolNo}</Text>
               </Pressable>
             );

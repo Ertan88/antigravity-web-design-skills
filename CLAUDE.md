@@ -51,6 +51,9 @@ Böyle bir durum varsa kullanıcı **onaylanmaz**. Yanlış açıkça söylenir;
   duyuru alanının içinde tasarlanır. (Acil durum ekranı ve panelden seçilen "Yalnızca duyurular / Tam ekran saat"
   biçimleri okulun kendi seçimidir, bu kuralın dışındadır.)
 
+- **Ortak arayüz standartları** (acil düğmesi yalnızca ana sayfada, menüde açıklama yok, kısa düğme yazıları,
+  "Md. Yrd." kısaltması, okul adı türüyle, formlarda "Ayşe YILMAZ" yazımı): `KURALLAR.md` 3.3 ve 3.4.
+
 ## 4a. Türkçe yazım
 
 - Arayüzdeki bütün metinler (web, mobil, pano, bildirim, e-posta, Excel) Türkçe yazım kurallarına uyar
@@ -66,6 +69,9 @@ Böyle bir durum varsa kullanıcı **onaylanmaz**. Yanlış açıkça söylenir;
 
 ## 5. KVKK
 
+- **Platform ile okul tamamen ayrıdır.** Platform yöneticisi hesabı hiçbir okula üye olamaz. Platform görünümünde
+  yalnızca platformu kullananların platformla yazışması görünür; hiçbir okulda (geliştiricinin kendi okulu dahil)
+  yapılan işlem platform yöneticisine görünmez ve bildirim olarak gitmez. Ayrıntı: `KURALLAR.md` 2. bölüm.
 - Gerçek okul belgeleri ve kişisel veriler depoya eklenmez.
 - Testler, videolar ve ekran görüntüleri yalnızca uydurma (sentetik) verilerle hazırlanır.
 

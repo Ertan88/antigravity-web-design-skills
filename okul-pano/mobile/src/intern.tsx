@@ -371,12 +371,15 @@ export function SendSheet({ rows, onClose, onSent }: { rows: PendingMark[]; onCl
 
 /** Toplu "İşletmede": seçilen dönemde yalnızca "?" (kontrol edilmedi) bölümler X olur; konan işaretlere dokunulmaz */
 export function FillSheet({
+  month,
   today,
   businesses,
   businessId,
   onClose,
   onDone,
 }: {
+  /** Ekranda açık olan ay (YYYY-AA): geçmiş ay açıksa seçenekler o ayın haftaları olur */
+  month: string;
   today: string;
   businesses: { id: string; name: string }[];
   businessId: string;
@@ -384,14 +387,33 @@ export function FillSheet({
   onDone: (msg: string) => void;
 }) {
   const path = useSchoolPath('internship/marks/fill');
-  const weekday = ((new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
-  const RANGES = [
-    { key: 'today', label: `Yalnız bugün (${shortDate(today)})`, from: today },
-    { key: 'week', label: `Bu hafta, bugüne kadar (${shortDate(addDays(today, 1 - weekday))} – ${shortDate(today)})`, from: addDays(today, 1 - weekday) },
-    { key: 'two', label: `Son iki hafta (${shortDate(addDays(today, -6 - weekday))} – ${shortDate(today)})`, from: addDays(today, -6 - weekday) },
-    { key: 'month', label: `Bu ay, bugüne kadar (${shortDate(`${today.slice(0, 7)}-01`)} – ${shortDate(today)})`, from: `${today.slice(0, 7)}-01` },
-  ];
-  const [range, setRange] = useState('week');
+  const dow = (iso: string) => ((new Date(`${iso}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
+  const weekday = dow(today);
+  const monthStart = `${month}-01`;
+  const monthEnd = addDays(`${addDays(monthStart, 32).slice(0, 7)}-01`, -1);
+  const RANGES: { key: string; label: string; from: string; until: string }[] =
+    month === today.slice(0, 7)
+      ? [
+          { key: 'today', label: `Yalnız bugün (${shortDate(today)})`, from: today, until: today },
+          { key: 'week', label: `Bu hafta, bugüne kadar (${shortDate(addDays(today, 1 - weekday))} – ${shortDate(today)})`, from: addDays(today, 1 - weekday), until: today },
+          { key: 'two', label: `Son iki hafta (${shortDate(addDays(today, -6 - weekday))} – ${shortDate(today)})`, from: addDays(today, -6 - weekday), until: today },
+          { key: 'month', label: `Bu ay, bugüne kadar (${shortDate(monthStart)} – ${shortDate(today)})`, from: monthStart, until: today },
+        ]
+      : (() => {
+          // Geçmiş ay: ayın tamamı ve ayın haftaları (Pazartesi–Pazar, ay sınırında kesilir)
+          const out = [{ key: 'month', label: `Ayın tamamı (${shortDate(monthStart)} – ${shortDate(monthEnd)})`, from: monthStart, until: monthEnd }];
+          let start = monthStart;
+          let n = 1;
+          while (start <= monthEnd) {
+            const end = addDays(start, 7 - dow(start));
+            const until = end > monthEnd ? monthEnd : end;
+            out.push({ key: `w${n}`, label: `${n}. hafta (${shortDate(start)} – ${shortDate(until)})`, from: start, until });
+            start = addDays(until, 1);
+            n += 1;
+          }
+          return out;
+        })();
+  const [range, setRange] = useState(month === today.slice(0, 7) ? 'week' : 'month');
   const [biz, setBiz] = useState(businessId);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -400,7 +422,7 @@ export function FillSheet({
     setBusy(true);
     setError(null);
     try {
-      const r = await api<{ changed: number }>(path, { method: 'POST', body: { from: RANGES.find((x) => x.key === range)!.from, until: today, businessId: biz || null } });
+      const r = await api<{ changed: number }>(path, { method: 'POST', body: { from: RANGES.find((x) => x.key === range)!.from, until: RANGES.find((x) => x.key === range)!.until, businessId: biz || null } });
       onDone(r.changed ? `${days(r.changed / 2)} gün “İşletmede” işaretlendi.` : 'İşaretsiz gün yoktu.');
     } catch (e) {
       setError(errorText(e, 'Kaydedilemedi'));

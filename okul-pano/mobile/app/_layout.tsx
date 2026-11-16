@@ -122,7 +122,7 @@ function Gate({ fontsReady }: { fontsReady: boolean }) {
   }, [status, onLogin, onEnroll]);
 
   useEffect(() => {
-    if (status === 'signedIn') void registerForPush().catch(() => undefined);
+    if (status === 'signedIn') void registerForPush({ auto: true }).catch(() => undefined);
   }, [status, school?.id]);
 
   // Bildirime dokununca ilgili ekran açılır (ör. onay bekleyen duyuru → Onaylar)

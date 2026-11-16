@@ -116,7 +116,7 @@ export function InboxScreen({ back }: { back?: boolean }) {
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {unreadCount > 0 && (
             <Button variant="secondary" size="sm" icon="checkmark-done-outline" onPress={readAll} style={{ flex: 1 }}>
-              Tümünü okundu say
+              Tümü okundu
             </Button>
           )}
           {readCount > 0 && (

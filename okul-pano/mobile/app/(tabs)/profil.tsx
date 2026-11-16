@@ -1,13 +1,13 @@
 import type { Permission } from '@okulpano/shared/permissions';
 import { reminderSummary, useReminderSettings } from '../../src/reminders.ts';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+
 import { Platform, Pressable, View } from 'react-native';
 import { Text } from '../../src/text.tsx';
 import { membershipLabel, useAuth, type AppRole } from '../../src/auth.tsx';
-import { useInbox, useInternshipAccess, useMyLeaves } from '../../src/data.ts';
+import { schoolFullName, shortTitle } from '@okulpano/shared';
+import { useInternshipAccess, useMyLeaves } from '../../src/data.ts';
 import { useOpenSchool } from '../../src/platform.tsx';
-import { PUSH_TEXT, pushStatus, registerForPush, type PushState } from '../../src/push.ts';
 import { colors, radius, tiles, type TileTone } from '../../src/theme.ts';
 import { Avatar, Badge, BentoRow, Card, Chip, Icon, ListRow, Screen, SectionTitle, Segmented, T, type IconName } from '../../src/ui.tsx';
 import { useThemeMode } from '../../src/themeMode.tsx';
@@ -127,7 +127,7 @@ function ProfileTile({ name, email, school, badges }: { name: string; email: str
           </View>
         ))}
         {school ? (
-          <Text style={{ flexShrink: 1, fontSize: 12.5, fontWeight: '600', color: t.sub, marginLeft: 4 }} numberOfLines={1}>
+          <Text style={{ flexBasis: '100%', fontSize: 12.5, fontWeight: '600', color: t.sub }} numberOfLines={2}>
             {school}
           </Text>
         ) : null}
@@ -137,7 +137,8 @@ function ProfileTile({ name, email, school, badges }: { name: string; email: str
 }
 
 /** Menünün öne çıkan bölümündeki renkli kutu: simge, başlık ve kısa açıklama */
-function MenuTile({ item, tone }: { item: Item; tone: TileTone }) {
+/** Satırda tek başına kalan kutu (wide) yatay dizilir: yazı simgenin yanında */
+function MenuTile({ item, tone, wide }: { item: Item; tone: TileTone; wide?: boolean }) {
   const t = tiles[tone];
   const onPress = item.onPress ?? (item.to ? () => router.push(item.to as never) : undefined);
   return (
@@ -145,20 +146,15 @@ function MenuTile({ item, tone }: { item: Item; tone: TileTone }) {
       accessibilityRole="button"
       accessibilityLabel={[item.title, item.subtitle].filter(Boolean).join(', ')}
       onPress={onPress}
-      style={({ pressed }) => ({ flex: 1, backgroundColor: t.bg, borderRadius: radius.lg, padding: 14, minHeight: 124, gap: 12, opacity: pressed ? 0.88 : 1, transform: [{ scale: pressed ? 0.985 : 1 }] })}
+      style={({ pressed }) => ({ flex: 1, backgroundColor: t.bg, borderRadius: radius.lg, padding: 14, minHeight: wide ? 72 : 124, gap: 12, flexDirection: wide ? 'row' : 'column', alignItems: wide ? 'center' : 'stretch', opacity: pressed ? 0.88 : 1, transform: [{ scale: pressed ? 0.985 : 1 }] })}
     >
       <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: t.chip, alignItems: 'center', justifyContent: 'center' }}>
         <Icon name={tileFor(item)?.icon ?? item.icon} size={21} color={t.fg} />
       </View>
-      <View style={{ gap: 3 }}>
+      <View style={{ gap: 3, flex: wide ? 1 : undefined }}>
         <Text style={{ fontSize: 15, lineHeight: 19, fontWeight: '800', letterSpacing: -0.3, color: t.fg }} numberOfLines={2}>
           {item.title}
         </Text>
-        {item.subtitle ? (
-          <Text style={{ fontSize: 12, lineHeight: 16, fontWeight: '600', color: t.sub }} numberOfLines={2}>
-            {item.subtitle}
-          </Text>
-        ) : null}
       </View>
     </Pressable>
   );
@@ -176,17 +172,10 @@ export default function Menu() {
   const notTab = (t: Parameters<typeof tabs.includes>[0]) => !tabs.includes(t);
   const openSchool = useOpenSchool();
   const theme = useThemeMode();
-  const inbox = useInbox('unread');
   const leaves = useMyLeaves();
   const internship = useInternshipAccess();
-  const [push, setPush] = useState<PushState | 'error' | null>(null);
   const [reminders] = useReminderSettings();
-  // Menüye her girişte telefonun gerçek izin durumu okunur (açıldıysa açık görünür)
-  useEffect(() => {
-    void pushStatus().then(setPush).catch(() => undefined);
-  }, []);
   const pendingLeaves = (leaves.data ?? []).filter((l) => l.approvalStatus === 'pending').length;
-  const unread = inbox.data?.unread ?? 0;
   const managerial = role === 'owner' || role === 'admin';
 
   const sections: { title: string; items: Item[] }[] = [];
@@ -202,8 +191,8 @@ export default function Menu() {
         ),
         {
           title: 'Destek erişimi olan okullar',
-          subtitle: support.length ? `${support.length} okul · müdür onayıyla, süreli` : 'Şu an yok',
           icon: 'key-outline',
+          right: support.length ? <Badge tone="primary">{String(support.length)}</Badge> : undefined,
           to: '/okullar',
         },
       ],
@@ -319,33 +308,6 @@ export default function Menu() {
     ]);
   }
 
-  sections.push({
-    title: 'Hesabım',
-    items: [
-      { title: 'Hesabım', subtitle: 'Ad soyad, e-posta, şifre', icon: 'person-outline', tone: 'muted', to: '/hesap/profil' },
-      {
-        title: 'Bildirimler',
-        subtitle: 'Okunanlar dahil geçmiş',
-        icon: 'notifications-outline',
-        tone: 'muted',
-        to: '/bildirimler',
-        right: unread ? <Badge tone="danger">{String(unread)}</Badge> : undefined,
-      },
-      ...(Platform.OS !== 'web'
-        ? [
-            {
-              title: push === 'ok' || push === 'local' ? 'Telefon bildirimleri' : 'Telefon bildirimlerini aç',
-              subtitle: push === 'error' ? 'Kaydedilemedi: internet bağlantınızı kontrol edip yeniden deneyin.' : push ? PUSH_TEXT[push] : 'Onaylar, nöbet hatırlatmaları',
-              icon: 'phone-portrait-outline' as IconName,
-              tone: 'muted' as const,
-              right: push === 'ok' || push === 'local' ? <Badge tone="success">Açık</Badge> : push === 'off' || push === 'denied' ? <Badge tone="warning">Kapalı</Badge> : undefined,
-              onPress: () => void registerForPush().then((r) => setPush(r === 'denied' ? 'denied' : r)).catch(() => setPush('error')),
-            },
-          ]
-        : []),
-    ],
-  });
-
   const schoolChoices = role === 'platform' ? [] : (me?.schools ?? []);
 
   // Rolün ilk bölümü renkli kutular hâlinde (en sık kullanılanlar; tek kalan kutu tam genişlikte), geri kalanı liste
@@ -356,10 +318,10 @@ export default function Menu() {
       <ProfileTile
         name={me?.user.fullName ?? ''}
         email={me?.user.email ?? ''}
-        school={role !== 'platform' ? school?.name : null}
+        school={role !== 'platform' && school ? schoolFullName(school.name, school.schoolType) : null}
         badges={[
           // Öğretmen kaydı bağlıysa kadrodaki ünvan (Müdür Yardımcısı, Uzman Öğretmen…), değilse rol
-          role !== 'platform' && school ? membershipLabel(school) : ROLE_LABEL[role],
+          role !== 'platform' && school ? shortTitle(membershipLabel(school)) : ROLE_LABEL[role],
           ...(isTeacher && role !== 'teacher' && role !== 'platform' && !school?.teacherTitle ? ['Öğretmen'] : []),
           ...(school?.support && role !== 'platform' ? ['Destek erişimi'] : []),
         ]}
@@ -382,7 +344,7 @@ export default function Menu() {
           {Array.from({ length: Math.ceil(featured.items.length / 2) }, (_, r) => featured.items.slice(r * 2, r * 2 + 2)).map((row, r) => (
             <BentoRow key={r}>
               {row.map((it, j) => (
-                <MenuTile key={it.title} item={it} tone={TILE_CYCLE[(r * 2 + j) % TILE_CYCLE.length]} />
+                <MenuTile key={it.title} item={it} tone={TILE_CYCLE[(r * 2 + j) % TILE_CYCLE.length]} wide={row.length === 1} />
               ))}
             </BentoRow>
           ))}
@@ -400,7 +362,6 @@ export default function Menu() {
                 tile={tileFor(it)}
                 iconTone={it.tone ?? 'primary'}
                 title={it.title}
-                subtitle={it.subtitle}
                 right={it.right}
                 onPress={it.onPress ?? (it.to ? () => router.push(it.to as never) : undefined)}
                 last={i === s.items.length - 1}

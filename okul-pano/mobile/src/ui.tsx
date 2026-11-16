@@ -1,4 +1,4 @@
-import { errorText } from '@okulpano/shared';
+import { errorText, shortTitle } from '@okulpano/shared';
 import { router, usePathname, useRoute } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ComponentRef, type ReactNode } from 'react';
 import { ActivityIndicator, Animated, Easing, Keyboard, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, TextInput as NativeTextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
@@ -266,7 +266,6 @@ export function Screen({
             {subtitle ? typeof subtitle === 'string' ? <Text style={styles.subtitle}>{subtitle}</Text> : subtitle : null}
           </View>
           {right}
-          <EmergencyButton compact />
         </View>
       )}
       {/* Klavye açılınca içerik kısalır (Android kenardan kenara çizimde pencere küçülmez) ve odaktaki kutu görünür kalır */}
@@ -887,7 +886,7 @@ export function HomeHeader({ name, school, schoolType, role, children }: { name?
             </Text>
           ) : null}
           <Text style={{ fontSize: 16, color: colors.ink, fontWeight: '800', letterSpacing: -0.2 }} numberOfLines={1}>
-            {role}
+            {shortTitle(role)}
           </Text>
         </View>
         <View style={{ marginLeft: -8 }}>

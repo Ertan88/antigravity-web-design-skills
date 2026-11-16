@@ -8,6 +8,7 @@ import { membershipLabel, useAuth } from './auth.tsx';
 import { useAcademicCalendars, usePlatformSchools, useSignups } from './data.ts';
 import { fullDate, timeAgo } from './day.ts';
 import { colors } from './theme.ts';
+import { NotificationsButton } from './teacher.tsx';
 import { Badge, BentoRow, Button, Card, Empty, ErrorNote, HomeHeader, ListRow, Loading, Screen, SectionTitle, T, Tile } from './ui.tsx';
 import { MenuButton } from './quick.tsx';
 
@@ -47,6 +48,7 @@ export function PlatformHome() {
   return (
     <Screen refreshing={schools.isRefetching} onRefresh={() => void Promise.all([schools.refetch(), signups.refetch(), calendars.refetch()])}>
       <HomeHeader name={me?.user.fullName} role="Platform yöneticisi">
+        <NotificationsButton />
         <MenuButton />
       </HomeHeader>
       <ErrorNote error={schools.error} />

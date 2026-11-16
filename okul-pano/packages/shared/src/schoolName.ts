@@ -143,3 +143,14 @@ export function shortSchoolName(fullName: string, schoolType?: string | null): s
   const t = splitSchoolName(cleaned, schoolType);
   return t.type ? `${t.name} ${schoolTypeAbbr(t.type)}`.trim() : t.name;
 }
+
+/**
+ * Dar yerlerde (kart, rozet, başlık) uzun ünvanların MEB yazışmalarındaki kısaltması:
+ * "Müdür Yardımcısı" → "Md. Yrd.", "Müdür Başyardımcısı" → "Md. Başyrd.". Diğer ünvanlar olduğu gibi kalır.
+ */
+export function shortTitle(title: string): string {
+  return title
+    .replace(/müdür\s+başyardımcısı/giu, 'Md. Başyrd.')
+    .replace(/müdür\s+yardımcısı/giu, 'Md. Yrd.')
+    .replace(/müdür\s+yardımcıları/giu, 'Md. Yrd.');
+}

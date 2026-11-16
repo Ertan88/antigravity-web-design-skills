@@ -5,6 +5,7 @@ import { Platform } from 'react-native';
 import { api } from './api.ts';
 import { storage } from './storage.ts';
 
+const MUTED_KEY = 'okulpano.pushMuted';
 const TOKEN_KEY = 'okulpano.pushToken';
 
 // Uygulama açıkken gelen bildirim de üstte görünsün
@@ -46,8 +47,11 @@ export function ensureChannel(): Promise<void> {
  *   (Firebase / Expo projesi) tanımlı olmadığı için sunucudan gelen bildirimler bu sürümde gelmez
  * - denied: izin verilmedi · unavailable: web ya da emülatör
  */
-export async function registerForPush(): Promise<'ok' | 'local' | 'denied' | 'unavailable'> {
+export async function registerForPush(opts: { auto?: boolean } = {}): Promise<'ok' | 'local' | 'denied' | 'unavailable' | 'off'> {
   if (Platform.OS === 'web' || !Device.isDevice) return 'unavailable';
+  // Kullanıcı menüden kapattıysa açılışta kendiliğinden yeniden açılmaz
+  if (opts.auto && (await storage.get(MUTED_KEY))) return 'off';
+  if (!opts.auto) await storage.set(MUTED_KEY, null);
   await ensureChannel();
   const current = await Notifications.getPermissionsAsync();
   const granted = current.granted || (await Notifications.requestPermissionsAsync()).granted;
@@ -77,6 +81,7 @@ export async function pushStatus(): Promise<PushState> {
   if (Platform.OS === 'web' || !Device.isDevice) return 'unavailable';
   const perm = await Notifications.getPermissionsAsync();
   if (!perm.granted) return perm.canAskAgain === false ? 'denied' : 'off';
+  if (await storage.get(MUTED_KEY)) return 'off';
   return (await storage.get(TOKEN_KEY)) ? 'ok' : 'local';
 }
 
@@ -88,6 +93,12 @@ export const PUSH_TEXT: Record<PushState, string> = {
   denied: 'İzin verilmedi: telefon ayarlarından Okul Yayın için bildirimleri açın.',
   unavailable: 'Bu cihazda kullanılamıyor.',
 };
+
+/** Menüden kapatma: bu telefon sunucudan bildirim almaz ve açılışta kendiliğinden yeniden açılmaz */
+export async function mutePush() {
+  await unregisterPush();
+  await storage.set(MUTED_KEY, '1');
+}
 
 /** Çıkışta bu telefon artık bildirim almaz */
 export async function unregisterPush() {

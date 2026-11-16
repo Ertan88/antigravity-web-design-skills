@@ -1,5 +1,4 @@
 import { normalizeName } from '@okulpano/shared/teachers';
-import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Text } from '../../src/text.tsx';
@@ -8,7 +7,7 @@ import { useDutyWeek, useMeToday, useMyDuties, useSchoolQuery, type DutyDay, typ
 import { CoverTag } from '../../src/lesson.tsx';
 import { addDays, dayTitle } from '../../src/day.ts';
 import { colors, tiles } from '../../src/theme.ts';
-import { Badge, Banner, Button, Card, Empty, ErrorNote, HolidayCard, Icon, Label, Loading, Screen, Segmented, T } from '../../src/ui.tsx';
+import { Badge, Banner, Card, Empty, ErrorNote, HolidayCard, Icon, Label, Loading, Screen, Segmented, T } from '../../src/ui.tsx';
 import { useTabBack } from '../../src/tabs.ts';
 
 /** Nöbet (tasarım 2 ve 10): kendi nöbetlerim ve bugün kim nerede; yetkisi olan boş yere görevlendirir */
@@ -23,7 +22,7 @@ export default function Nobet() {
           value={tab}
           onChange={setTab}
           options={[
-            { value: 'mine', label: 'Benim Nöbetlerim' },
+            { value: 'mine', label: 'Nöbetlerim' },
             { value: 'all', label: 'Kim Nerede' },
           ]}
         />
@@ -80,12 +79,15 @@ function MyDuties() {
           <Empty icon="checkmark-circle-outline" title={showingNext ? `${monthName(d.showing)} ayında da nöbetiniz yok` : 'Bu ay kalan nöbetiniz yok'} />
         </Card>
       ) : (
-        d.days.map((day) => <MyDutyCard key={day.date} day={day} today={d.today} teacherName={d.teacherName} />)
+        groupHolidays(d.days).map((g) =>
+          'from' in g ? (
+            <HolidayCard key={g.from} label={rangeLabel(g.from, g.to)} name={g.holiday} />
+          ) : (
+            <MyDutyCard key={g.day.date} day={g.day} today={d.today} teacherName={d.teacherName} />
+          ),
+        )
       )}
 
-      <Button icon="calendar-outline" variant="secondary" onPress={() => router.push('/izin')}>
-        İzin bildir
-      </Button>
       <T size={12} color={colors.muted} style={{ textAlign: 'center' }}>
         Nöbet günlerinizde ilk dersten 15 dakika önce telefonunuza hatırlatma gelir.
       </T>
@@ -253,7 +255,7 @@ function MyDutyCard({ day, today, teacherName }: { day: MyDuties['days'][number]
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.divider }}>
         <Icon name="person-circle-outline" size={16} color={colors.muted} />
         <T size={13} color={colors.muted}>
-          Nöbetçi müdür yardımcısı: <Text style={{ fontWeight: '700', color: day.supervisor ? colors.ink : colors.faint }}>{day.supervisor ?? 'girilmemiş'}</Text>
+          Nöbetçi Md. Yrd.: <Text style={{ fontWeight: '700', color: day.supervisor ? colors.ink : colors.faint }}>{day.supervisor ?? 'girilmemiş'}</Text>
         </T>
       </View>
     </Card>
@@ -266,6 +268,36 @@ function Pill({ children, tone = 'muted' }: { children: React.ReactNode; tone?: 
       <Text style={{ fontSize: 12, color: tone === 'warning' ? colors.warning : colors.ink }}>{children}</Text>
     </View>
   );
+}
+
+/** Haftalık görünümde seçilen tatil gününün, haftadaki aynı adlı tatil günleriyle birlikte tarih aralığı */
+function holidaySpan(days: { date: string; holiday?: string | null }[], date: string, name: string): string {
+  const same = days.filter((d) => d.holiday === name).map((d) => d.date);
+  const i = same.indexOf(date);
+  let a = i;
+  let b = i;
+  while (a > 0 && addDays(same[a - 1]!, 1) === same[a]) a -= 1;
+  while (b < same.length - 1 && addDays(same[b]!, 1) === same[b + 1]) b += 1;
+  return i < 0 ? rangeLabel(date, date) : rangeLabel(same[a]!, same[b]!);
+}
+
+/** "16–20 Kasım" ya da "30 Ekim – 3 Kasım"; tek gün "16 Kasım" */
+function rangeLabel(from: string, to: string): string {
+  const dm = (iso: string) => `${Number(iso.slice(8))} ${shortMonth(iso)}`;
+  if (from === to) return dm(from);
+  return from.slice(0, 7) === to.slice(0, 7) ? `${Number(from.slice(8))}–${dm(to)}` : `${dm(from)} – ${dm(to)}`;
+}
+
+/** Art arda aynı adlı tatil günleri tek kartta birleşir (ör. ara tatilin beş günü) */
+function groupHolidays(days: MyDuties['days']) {
+  const out: ({ holiday: string; from: string; to: string } | { holiday: null; day: MyDuties['days'][number] })[] = [];
+  for (const day of days) {
+    const prev = out[out.length - 1];
+    if (day.holiday && prev && 'from' in prev && prev.holiday === day.holiday && addDays(prev.to, 1) <= day.date && day.date <= addDays(prev.to, 3)) prev.to = day.date;
+    else if (day.holiday) out.push({ holiday: day.holiday, from: day.date, to: day.date });
+    else out.push({ holiday: null, day });
+  }
+  return out;
 }
 
 const shortMonth = (iso: string) => new Intl.DateTimeFormat('tr-TR', { month: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));
@@ -362,7 +394,7 @@ function AllDuties() {
               <Icon name="person-circle-outline" size={22} color={colors.primary} />
               <View style={{ flex: 1 }}>
                 <T size={12.5} color={colors.muted} weight="600">
-                  Nöbetçi müdür yardımcısı
+                  Nöbetçi Md. Yrd.
                 </T>
                 <T size={15.5} weight="800">
                   {day.supervisor}
@@ -371,7 +403,7 @@ function AllDuties() {
             </Card>
           )}
           {day.holiday ? (
-            <HolidayCard label={`${WEEKDAY_LONG_TR[day.weekday]} · tatil`} name={day.holiday} />
+            <HolidayCard label={holidaySpan(week?.days ?? [], day.date, day.holiday)} name={day.holiday} />
           ) : !day.entries.length ? (
             <Card>
               <Empty icon="shield-outline" title="Bu gün için nöbet girilmemiş" text="Nöbet çizelgesi panelden Excel ile ya da elle girilebilir." />

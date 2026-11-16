@@ -8,6 +8,7 @@ import { addDays, dutyDay, dutyScheduleStatus, effectiveHolidays, holidaysAndHal
 import { badRequest, notFound, parse } from '../lib/errors.ts';
 import { notifyUsers, usersWithPermission } from '../lib/push.ts';
 import { teacherCovers } from './covers.ts';
+import { tell } from './issues.ts';
 
 /**
  * Mobil uygulamanın "benim" uç noktaları: öğretmenin günü (ders programı, nöbetleri), izin bildirimi
@@ -183,7 +184,10 @@ export async function meRoutes(app: FastifyInstance) {
     const { teacherId, schoolId, permissions, userId } = req.ctx;
     if (!teacherId) throw badRequest('Hesabınız bir öğretmen kaydına bağlı değil. Okul yöneticinizden hesabınızı öğretmen kaydınızla eşleştirmesini isteyin.');
     const body = parse(leaveRequestSchema, req.body);
-    const autoApprove = permissions.includes('leaves.manage');
+    // Kişi kendi iznini onaylamaz: izin yetkisi olan başka biri varsa onaya düşer. Onaylayacak başka kimse yoksa
+    // (ör. tek yöneticili okulda müdürün kendi izni) doğrudan geçerli olur.
+    const approvers = (await usersWithPermission(app.deps, schoolId, 'leaves.manage')).filter((id) => id !== userId);
+    const autoApprove = permissions.includes('leaves.manage') && approvers.length === 0;
     const [row] = await db
       .insert(teacherLeaves)
       .values({
@@ -200,7 +204,8 @@ export async function meRoutes(app: FastifyInstance) {
     await audit(req, 'create', 'İzin bildirimi', row!.id, `${t?.fullName ?? ''} · ${body.startDate} – ${body.endDate}`);
     if (autoApprove) bus.contentChanged(schoolId);
     else {
-      notifyUsers(app.deps, await usersWithPermission(app.deps, schoolId, 'leaves.manage'), {
+      // Bildirim kutusunda onay bekleyen izin olarak görünür (notifications.ts); telefona da gönderilir
+      notifyUsers(app.deps, approvers, {
         title: 'İzin bildirimi',
         body: `${t?.fullName ?? 'Bir öğretmen'} ${trRange(body.startDate, body.endDate)} için izin bildirdi.`,
         url: '/onaylar',
@@ -240,10 +245,13 @@ export async function meRoutes(app: FastifyInstance) {
     await audit(req, 'delete', 'İzin bildirimi', id, `${t?.fullName ?? ''} · ${row.startDate} – ${row.endDate}`);
     if (row.approvalStatus === 'approved') {
       bus.contentChanged(schoolId);
-      notifyUsers(app.deps, await usersWithPermission(app.deps, schoolId, 'leaves.manage'), {
+      const approvers = (await usersWithPermission(app.deps, schoolId, 'leaves.manage')).filter((u) => u !== req.ctx.userId);
+      await tell(app.deps, approvers, {
+        kind: 'leave-withdrawn',
         title: 'İzin geri alındı',
         body: `${t?.fullName ?? 'Bir öğretmen'} ${when} iznini geri aldı.`,
-        url: '/izinler',
+        to: '/izinler',
+        schoolId,
       });
     }
     return reply.status(204).send();

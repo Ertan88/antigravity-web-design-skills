@@ -109,13 +109,14 @@ export async function notificationRoutes(app: FastifyInstance) {
     // Öğretmenlerin mobil uygulamadan bildirdiği izinler
     if (permissions.includes('leaves.manage')) {
       const pendingLeaves = await db
-        .select({ id: teacherLeaves.id, startDate: teacherLeaves.startDate, endDate: teacherLeaves.endDate, createdAt: teacherLeaves.createdAt, name: teachers.fullName })
+        .select({ id: teacherLeaves.id, startDate: teacherLeaves.startDate, endDate: teacherLeaves.endDate, createdAt: teacherLeaves.createdAt, name: teachers.fullName, requestedBy: teacherLeaves.requestedBy })
         .from(teacherLeaves)
         .innerJoin(teachers, eq(teachers.id, teacherLeaves.teacherId))
         .where(and(eq(teacherLeaves.schoolId, schoolId), eq(teacherLeaves.approvalStatus, 'pending')))
         .orderBy(desc(teacherLeaves.createdAt))
         .limit(30);
-      for (const l of pendingLeaves) {
+      // Kişi kendi izin bildirimini onaylamaz: kendi talebi kutusunda onay bekleyen olarak görünmez
+      for (const l of pendingLeaves.filter((x) => x.requestedBy !== userId)) {
         out.push({
           key: `leave-request:${l.id}`,
           kind: 'leave-request',

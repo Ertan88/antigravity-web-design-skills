@@ -224,6 +224,12 @@ export async function contentRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     if (!UUID_RE.test(id)) throw notFound();
     const { note } = parse(reviewSchema, req.body ?? {});
+    // Kişi kendi izin bildirimini onaylayamaz (onaylayacak başka yetkili yoksa izin zaten doğrudan geçerli olur)
+    const [own] = await app.deps.db
+      .select({ requestedBy: teacherLeaves.requestedBy, approvalStatus: teacherLeaves.approvalStatus })
+      .from(teacherLeaves)
+      .where(and(eq(teacherLeaves.id, id), eq(teacherLeaves.schoolId, req.ctx.schoolId)));
+    if (own?.approvalStatus === 'pending' && own.requestedBy === req.ctx.userId) throw forbidden('Kendi izin bildiriminizi onaylayamazsınız; başka bir yönetici onaylar.');
     const [updated] = await app.deps.db
       .update(teacherLeaves)
       .set({ approvalStatus: status })

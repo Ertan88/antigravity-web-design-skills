@@ -232,8 +232,8 @@ export default function Izin() {
                       flexGrow: 1,
                       flexDirection: 'row',
                       alignItems: 'center',
-                      gap: 9,
-                      padding: on ? 8 : 9,
+                      gap: 8,
+                      padding: on ? 7 : 8,
                       borderRadius: 15,
                       borderWidth: on ? 2 : 1,
                       borderColor: on ? colors.ink : colors.border,
@@ -243,7 +243,10 @@ export default function Izin() {
                     <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: tiles[k.tone].bg, alignItems: 'center', justifyContent: 'center' }}>
                       <Icon name={k.icon} size={17} color={tiles[k.tone].fg} />
                     </View>
-                    <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.ink }}>{k.value}</Text>
+                    {/* Uzun tek kelime (Görevlendirme) dar ekranda kelime ortasından bölünmesin: yazı sığacak kadar küçülür */}
+                    <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.ink }} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
+                      {k.value}
+                    </Text>
                   </Pressable>
                 );
               })}

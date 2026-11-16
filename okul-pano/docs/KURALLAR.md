@@ -91,6 +91,12 @@ kalır; burada tekrarlanmaz.
 - Kişisel veri günlüklere (log), hata bildirimlerine, bildirim metinlerine ve URL'lere yazılmaz. Bildirimde yalnızca
   gerekli en kısa bilgi bulunur (ör. "Ayşe Demir 23 Kasım için izin bildirdi").
 - Aydınlatma metni ve gizlilik sayfası yeni veri türü eklenince güncellenir.
+- **Platform ile okul tamamen ayrıdır.** Platform yöneticisi hesabı hiçbir okula üye olamaz; platform görünümünde
+  yalnızca platformu kullananların platformla yazışması (destek talepleri, kayıt başvuruları, abonelikler) görünür.
+  Hiçbir okulda (geliştiricinin kendi okulu dahil) yapılan işlem platform yöneticisine görünmez, bildirim olarak
+  gitmez. Okul verisine yalnızca müdürün verdiği süreli destek erişimiyle, o süre içinde girilir.
+- Kişi kendi talebini onaylamaz (ör. kendi izin bildirimi): onay başka bir yetkiliden gelir; onaylayacak başka kimse
+  yoksa kayıt doğrudan geçerli olur.
 
 ---
 
@@ -126,12 +132,25 @@ kalır; burada tekrarlanmaz.
 - Geri alınamayan işlemden önce ortak onay penceresi açılır; çok önemli işlemlerde basılı tutma istenir.
 - Tek dokunuşla kayıt değiştiren düğmeler (uzat, görevlendir, sil) yanlışlıkla basılmaya karşı onay ya da geri alma
   sunar.
+- Acil durum düğmesi yalnızca ana sayfanın başlığındadır; diğer sayfalarda yoktur.
+- Mobil Menü'de satırların altında açıklama yazılmaz; yalnızca sayı ya da durum gibi değişen bilgi (rozet) gösterilir.
+  Hesabım ve Bildirimler menüde yer almaz: Bildirimler ana sayfadaki zil simgesinden, Hesabım menünün üstündeki ad
+  kartından açılır.
+- Düğme yazısı kısa ve tek satırdır ("Tümü okundu"); sığmayan uzun yazı kullanılmaz.
+- Dar yerlerde (kart, rozet, başlık) ad ve ünvan kesilmez: ünvan kısaltılır ("Md. Yrd.", ortak `shortTitle`), ad
+  soyad iki satıra bölünür ya da sığacak kadar küçülür.
+- Okul adı türüyle birlikte yazılır (ör. "Atatürk Mesleki ve Teknik Anadolu Lisesi"); dar yerde tür kısaltılır
+  ("Atatürk MTAL").
 
 ### 3.4 Türkçe
 - Bütün metinler TDK yazımına uyar; devrik cümle kurulmaz (`CLAUDE.md` 4a). Tarihler "23 Kasım", saatler "13:55"
   biçimindedir; kullanıcıya ISO tarihi (2026-11-23) gösterilmez.
 - Sayıya ek gerekiyorsa ek yerine cümle kurulur ("Teneffüs: 13:55"), çünkü "13:55'te / 15:30'da" gibi ekler
   okunuşa göre değişir ve kolay yanlış yazılır.
+- Resmî formlarda ve belgelerde kişi adı MEB yazımıyla yazılır: ad ilk harfi büyük, soyadı tamamı büyük
+  ("Ayşe YILMAZ"). Ad soyadın zaten yazdığı yerde ayrıca "Adı Soyadı" başlığı tekrarlanmaz.
+- Formlarda okul adı ve türü en üstte yazar; öğrenci "No · Sınıf" biçiminde gösterilir; uzun alan adı kısaltılır
+  (ör. "Bilişim Tek.").
 
 ---
 
