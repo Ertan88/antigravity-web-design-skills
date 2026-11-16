@@ -369,7 +369,7 @@ export function Timetable() {
                             ) : (
                               editable &&
                               mode === 'class' && (
-                                <IconButton label="Ders ekle" className="size-8 text-slate-300 hover:bg-surface hover:text-brand-600" onClick={() => openCell(d, p)}>
+                                <IconButton label="Ders ekle" className="size-8 text-slate-400 hover:bg-surface hover:text-brand-600" onClick={() => openCell(d, p)}>
                                   <Plus className="size-4" />
                                 </IconButton>
                               )

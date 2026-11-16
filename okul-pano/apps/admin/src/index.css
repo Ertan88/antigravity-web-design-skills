@@ -24,8 +24,9 @@
   --color-slate-100: #f0ede8;
   --color-slate-200: #e7e3dc;
   --color-slate-300: #d6d1c8;
-  --color-slate-400: #a8a29e;
-  --color-slate-500: #78716c;
+  /* Yazı olarak kullanılan griler beyaz ve açık zeminde en az 4,5:1 karşıtlık sağlar (WCAG AA) */
+  --color-slate-400: #77706a;
+  --color-slate-500: #635c56;
   --color-slate-600: #57534e;
   --color-slate-700: #44403c;
   --color-slate-800: #292524;
@@ -70,7 +71,7 @@
   --color-slate-100: #2a2723;
   --color-slate-200: #3a3631;
   --color-slate-300: #4d4740;
-  --color-slate-400: #8a837b;
+  --color-slate-400: #9d968e;
   --color-slate-500: #b0a9a1;
   --color-slate-600: #cdc8c1;
   --color-slate-700: #e3dfd9;

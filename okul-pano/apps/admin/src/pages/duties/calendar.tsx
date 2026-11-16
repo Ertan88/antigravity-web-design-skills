@@ -207,7 +207,7 @@ export function SaveMark({ state }: { state: 'idle' | 'saving' | 'saved' }) {
 }
 
 export const fieldClass =
-  'h-9 w-full min-w-0 rounded-xl border-0 bg-surface px-2 text-[13px] font-medium text-ink ring-1 ring-slate-200 transition placeholder:text-slate-300 hover:ring-slate-300 focus:ring-2 focus:ring-brand-500 focus:outline-none disabled:bg-transparent disabled:ring-transparent';
+  'h-9 w-full min-w-0 rounded-xl border-0 bg-surface px-2 text-[13px] font-medium text-ink ring-1 ring-slate-200 transition placeholder:text-slate-400 hover:ring-slate-300 focus:ring-2 focus:ring-brand-500 focus:outline-none disabled:bg-transparent disabled:ring-transparent';
 
 /* ---------- Nöbetçi müdür yardımcısı ---------- */
 

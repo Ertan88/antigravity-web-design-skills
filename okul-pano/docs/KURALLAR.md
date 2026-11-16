@@ -200,7 +200,7 @@ Zayıf TV işlemcilerinde edinilen dersler:
 | 3 | Orta | Panel ve pano sayfalarında İçerik Güvenlik Politikası (CSP) yoktu | **Düzeltildi:** HTML sayfalarına CSP başlığı eklendi (yalnızca kendi betiklerimiz ve YouTube). |
 | 4 | Orta | Bağımlılık açığı taraması otomatik değil | `npm audit` elle çalıştırıldı: e-posta paketi (nodemailer, yüksek) 10.2.1'e yükseltildi. Kalan 3 orta düzey açık `@fastify/static` içindeki `glob` paketinde; düzeltilmiş sürüm iki haftayı doldurunca yükseltilecek. Otomatik tarama (Dependabot) depo ayarı gerektirir, kullanıcı onayıyla açılır. |
 | 5 | Orta | Play Store'a çıkışta `USE_EXACT_ALARM` reddedilir | Şimdilik APK GitHub'dan dağıtıldığı için sorun yok. Play'e çıkmadan önce kaldırılmalı. |
-| 6 | Düşük–orta | Soluk gri metin kontrastı AA altındaydı | **Mobilde düzeltildi:** `colors.faint` açık temada `#6f6863` (5.07:1); `colors.subtle` metinlerden çıkarıldı. Panelde (Tailwind `slate-400` metinler) ayrıca bakılacak. |
+| 6 | Düşük–orta | Soluk gri metin kontrastı AA altındaydı | **Düzeltildi.** Mobilde `colors.faint` açık temada `#6f6863` (5.07:1); `colors.subtle` metinlerden çıkarıldı. Panelde `slate-400` açık temada `#77706a` (beyazda 4.87:1), `slate-500` `#635c56` (6.57:1); koyu temada `slate-400` `#9d968e` (yüzeyde 5.08:1). Yer tutucu ve simgelerdeki `slate-300` kullanımları `slate-400`'e alındı. |
 | 7 | İşlevsel | Sunucudan telefona bildirim gelmiyor (Firebase kurulu değil) | Acil durum ve onay bildirimleri uygulama kapalıyken telefona ulaşmıyor. Firebase projesi kurulmalı. |
 | 8 | Düşük | Yöneticiler için iki adımlı doğrulama yok | Okul müdürü ve platform yöneticisi hesapları için isteğe bağlı iki adımlı doğrulama (TOTP) ileride eklenebilir. |
 
