@@ -1,5 +1,6 @@
 import { officialHolidays, zonedParts } from '@okulpano/shared';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { effectiveHolidays } from '../src/lib/dayinfo.ts';
 import { sentPushes } from '../src/lib/push.ts';
 import { client, createTestApp, expectStatus, login, SUPER, type TestCtx } from './helpers.ts';
 
@@ -76,7 +77,15 @@ afterAll(async () => {
 const pushesTo = (token: string) => sentPushes.filter((p) => p.to.includes(token)).map((p) => p.message.title);
 const flushPushes = () => new Promise((r) => setTimeout(r, 30));
 
-describe.skipIf(holidayToday)('izin bildirimi ve boş nöbet', () => {
+describe('izin bildirimi ve boş nöbet', () => {
+  // Tatil günü (resmî tatil ya da MEB takvimindeki ara tatil) nöbet boşluğu hesaplanmaz: bu bölüm atlanır
+  let offDay = holidayToday;
+  beforeAll(async () => {
+    offDay = offDay || (await effectiveHolidays(t.database.db, schoolId, today.isoDate, today.isoDate)).length > 0;
+  });
+  beforeEach((ctx) => {
+    if (offDay) ctx.skip();
+  });
   let leaveId = '';
 
   it('öğretmen izin bildirir: onay bekler, panoda görünmez, yöneticiye bildirim gider', async () => {
