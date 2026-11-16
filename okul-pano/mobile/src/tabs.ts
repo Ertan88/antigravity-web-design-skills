@@ -19,7 +19,7 @@ export type TabName =
 
 /**
  * Alt menü role göre kurulur (en çok 5 sekme; son sekme Menü, geri kalanı Menü'de):
- * - Platform yöneticisi: Platform · Abonelikler · Takvim · Bildirimler
+ * - Platform yöneticisi: Platform · Abonelikler · Takvim · Menü (bildirimler üstteki zil düğmesinde)
  * - Okul müdürü ve müdür yardımcısı: Merkez · Duyurular · Onaylar · Panolar · Menü (Acil başlıkta, Nöbet Merkez'den)
  * - Kadro dışı görevli (editör): İçerik + en çok 3 görev sekmesi + Menü; Acil yetkisi varsa Acil hiç düşmez
  * - Öğretmen (görevi olan da): Bugün · Nöbetim · Gözlem · Program ya da ilk görevi · Menü
@@ -28,7 +28,7 @@ export type TabName =
 export function visibleTabs(role: AppRole, can: (p: Permission) => boolean, isTeacher: boolean): TabName[] {
   switch (role) {
     case 'platform':
-      return ['index', 'okullar', 'takvim', 'kutu'];
+      return ['index', 'okullar', 'takvim', 'profil'];
     case 'owner':
     case 'admin':
       return ['index', 'duyurular', 'onaylar', 'panolar', 'profil'];
