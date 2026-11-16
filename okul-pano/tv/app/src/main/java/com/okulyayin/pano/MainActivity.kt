@@ -32,6 +32,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.webkit.JavascriptInterface
+import java.util.UUID
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.SslErrorHandler
 import android.webkit.WebChromeClient
@@ -152,6 +153,9 @@ class MainActivity : Activity() {
             mediaPlaybackRequiresUserGesture = false
             loadWithOverviewMode = true
             useWideViewPort = true
+            // Pano yalnızca sunucudan açılır: cihazdaki dosyalara ve içerik sağlayıcılara erişim kapalı
+            allowFileAccess = false
+            allowContentAccess = false
             userAgentString = "$userAgentString OkulYayinPano/${BuildConfig.VERSION_NAME}"
         }
         w.isFocusable = true
@@ -171,6 +175,11 @@ class MainActivity : Activity() {
             }
 
             override fun onPageFinished(view: WebView, url: String) {
+                // Köprü anahtarı yalnızca pano sunucusunun ana sayfasına verilir (evaluateJavascript ana çerçevede
+                // çalışır): sayfadaki YouTube gibi gömülü çerçeveler anahtarı bilmediği için ayarları değiştiremez
+                if (Uri.parse(url).host == Uri.parse(Prefs.server(this@MainActivity)).host) {
+                    view.evaluateJavascript("window.__okulYayinTvKey=${JSONObject.quote(bridgeKey)};", null)
+                }
                 if (pageFailed) return
                 // Yazı ve önbellek ayarı ancak pano gerçekten çizilince değişir (bkz. checkRendered)
                 renderChecks = 0
@@ -306,12 +315,18 @@ class MainActivity : Activity() {
         return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
-    /** Pano sayfası bu nesneyle uygulamaya ayar iletir (ör. gizli ayarlar şifresi) */
+    /**
+     * Pano sayfası bu nesneyle uygulamaya ayar iletir (ör. gizli ayarlar şifresi). Android köprüyü sayfadaki bütün
+     * çerçevelere açtığı için her çağrı, yalnızca pano ana sayfasına verilen anahtarla kabul edilir.
+     */
+    private val bridgeKey: String = UUID.randomUUID().toString()
+
     inner class Bridge {
         @JavascriptInterface
         fun setConfig(json: String) {
             try {
                 val o = JSONObject(json)
+                if (o.optString("key") != bridgeKey) return
                 if (o.has("pin")) Prefs.setPin(this@MainActivity, if (o.isNull("pin")) null else o.getString("pin").takeIf { it.isNotBlank() })
             } catch (_: Exception) {
                 // bozuk veri: yok sayılır
@@ -643,7 +658,16 @@ class MainActivity : Activity() {
             .setView(padded(input))
             .setPositiveButton("Kaydet") { _, _ ->
                 val v = input.text.toString().trim()
-                Prefs.setServer(this, if (v.isEmpty() || v == BuildConfig.DEFAULT_SERVER) null else if (v.startsWith("http")) v else "https://$v")
+                // Yalnızca şifreli bağlantı (https): düz http adresi kabul edilmez
+                if (v.startsWith("http://", ignoreCase = true)) {
+                    dialog()
+                        .setTitle("Güvenli adres gerekli")
+                        .setMessage("Sunucu adresi https:// ile başlamalı. Düz http bağlantısı güvenli olmadığı için kullanılamaz.")
+                        .setPositiveButton("Tamam", null)
+                        .showTracked()
+                    return@setPositiveButton
+                }
+                Prefs.setServer(this, if (v.isEmpty() || v == BuildConfig.DEFAULT_SERVER) null else if (v.startsWith("https://", ignoreCase = true)) v else "https://$v")
                 load()
             }
             .setNeutralButton("Varsayılan") { _, _ ->

@@ -103,11 +103,24 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
   const hasState = Boolean(state);
   useEffect(() => {
     if (!hasState || auth.preview) return;
-    try {
-      (window as { OkulYayinTV?: { setConfig(json: string): void } }).OkulYayinTV?.setConfig(JSON.stringify({ pin: tvPin }));
-    } catch {
-      /* eski uygulama sürümü */
-    }
+    const w = window as { OkulYayinTV?: { setConfig(json: string): void }; __okulYayinTvKey?: string };
+    if (!w.OkulYayinTV) return;
+    // Uygulama, köprü anahtarını sayfa yüklenince verir; anahtar gelene kadar kısa aralıklarla yeniden denenir
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const send = () => {
+      if (!w.__okulYayinTvKey && tries++ < 20) {
+        timer = setTimeout(send, 500);
+        return;
+      }
+      try {
+        w.OkulYayinTV?.setConfig(JSON.stringify({ pin: tvPin, key: w.__okulYayinTvKey ?? null }));
+      } catch {
+        /* eski uygulama sürümü */
+      }
+    };
+    send();
+    return () => clearTimeout(timer);
   }, [tvPin, hasState, auth.preview]);
 
   if (!state || splash.show) {

@@ -52,7 +52,7 @@ jobs:
             echo "TV_KEYSTORE_FILE=$RUNNER_TEMP/pano.keystore" >> "$GITHUB_ENV"
             echo "Kalıcı imza anahtarı kullanılıyor"
           else
-            echo "::warning::TV_KEYSTORE_BASE64 tanımlı değil: APK geliştirme anahtarıyla imzalandı"
+            echo "::warning::TV_KEYSTORE_BASE64 tanımlı değil: APK herkesin bildiği geliştirme anahtarıyla imzalandı (okullara dağıtmadan önce tanımlanmalı)"
           fi
 
       - name: APK derle

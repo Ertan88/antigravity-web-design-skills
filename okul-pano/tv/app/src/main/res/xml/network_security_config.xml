@@ -4,10 +4,12 @@
   kendiliğinden tanır: MEB'in kök sertifikası (FATİH, CN=fatihca, 2036'ya kadar geçerli, herkese açık) uygulamaya
   gömülüdür; TV'ye sertifika yüklemek gerekmez. MEB sertifikayı değiştirirse yenisi TV'ye yüklenebilir
   (kullanıcının yüklediği sertifikalar da tanınır) ya da buraya eklenir.
-  Düz http (ör. okulun kendi sunucusu) önceki sürümdeki gibi açık kalır.
+  Düz http bağlantısına izin verilmez: pano yalnızca şifreli (https) sunucudan açılır.
+  Kullanıcı sertifikaları, okul ağının kendi denetim sertifikasını kullanan özel okullar için tanınır; TV'ye
+  sertifika yüklemek fiziksel erişim ve TV ayarları gerektirir.
 -->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="true">
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
             <certificates src="@raw/meb_fatihca" />
