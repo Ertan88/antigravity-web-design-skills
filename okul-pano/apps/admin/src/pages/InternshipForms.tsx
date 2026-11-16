@@ -7,7 +7,7 @@ import { useToast } from "../components/Toast.tsx";
 import { Link, useNavigate } from "react-router-dom";
 import { choose } from "../components/confirm.tsx";
 import { Alert, Button, Modal, MonthPicker, Spinner } from "../components/ui.tsx";
-import { api, downloadFile } from "../lib/api.ts";
+import { api, fetchBlob, saveBlob } from "../lib/api.ts";
 import { useAuth } from "../lib/auth.tsx";
 import { useSchoolPath } from "../lib/data.ts";
 
@@ -137,6 +137,53 @@ export function FormsDialog({ open, onClose }: { open: boolean; onClose: () => v
   const formCount =
     type === "attendance" ? chosen.reduce((n, b) => n + Math.max(1, Math.ceil(b.students / 5)), 0) : chosen.length;
   const [busy, setBusy] = useState(false);
+  const period = daily ? `week=${week}` : `month=${month}`;
+  const pdfPath = `${path}/forms.pdf?type=${type}&${period}&ids=${chosen.map((b) => b.id).join(",")}`;
+  const label = daily
+    ? `Günlük Rehberlik Formu ${trDate(week)}`
+    : `${type === "attendance" ? "Aylık Devam Çizelgesi" : "Aylık Rehberlik Raporu"} ${MONTHS[Number(month.slice(5, 7)) - 1]} ${month.slice(0, 4)}`;
+
+  // Önizleme (B): seçim değiştikçe kısa bir beklemeden sonra PDF yeniden üretilir ve yanda gösterilir
+  const [preview, setPreview] = useState<{ key: string; blob: Blob; url: string } | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  useEffect(() => {
+    if (!open || !formCount) {
+      setPreviewError(null);
+      return;
+    }
+    const ctrl = new AbortController();
+    const t = setTimeout(() => {
+      setPreviewing(true);
+      fetchBlob(pdfPath, ctrl.signal)
+        .then((blob) => {
+          setPreviewError(null);
+          setPreview((old) => {
+            if (old) URL.revokeObjectURL(old.url);
+            return { key: pdfPath, blob, url: URL.createObjectURL(blob) };
+          });
+        })
+        .catch((e: Error) => {
+          if (!ctrl.signal.aborted) setPreviewError(e.message);
+        })
+        .finally(() => {
+          if (!ctrl.signal.aborted) setPreviewing(false);
+        });
+    }, 450);
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
+  }, [open, pdfPath, formCount]);
+  // Pencere kapanınca önizleme belleği bırakılır
+  useEffect(() => {
+    if (open) return;
+    setPreview((old) => {
+      if (old) URL.revokeObjectURL(old.url);
+      return null;
+    });
+  }, [open]);
+  const current = preview && preview.key === pdfPath && formCount ? preview : null;
 
   const download = async () => {
     // Devam çizelgesinde boş kalacak günler: kontrol edilmemişler ve ay bitmediyse bugünden sonrası
@@ -168,11 +215,8 @@ export function FormsDialog({ open, onClose }: { open: boolean; onClose: () => v
     }
     setBusy(true);
     try {
-      const period = daily ? `week=${week}` : `month=${month}`;
-      const label = daily
-        ? `Günlük Rehberlik Formu ${trDate(week)}`
-        : `${type === "attendance" ? "Aylık Devam Çizelgesi" : "Aylık Rehberlik Raporu"} ${MONTHS[Number(month.slice(5, 7)) - 1]} ${month.slice(0, 4)}`;
-      await downloadFile(`${path}/forms.pdf?type=${type}&${period}&ids=${chosen.map((b) => b.id).join(",")}`, `${label}.pdf`);
+      // Önizlemedeki dosya güncelse yeniden üretilmez
+      saveBlob(current ? current.blob : await fetchBlob(pdfPath), `${label}.pdf`);
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -184,7 +228,7 @@ export function FormsDialog({ open, onClose }: { open: boolean; onClose: () => v
     <Modal
       open={open}
       onClose={onClose}
-      size="lg"
+      size="2xl"
       title="Form yazdır"
       description="Her form A5 boyutundadır; iki form bir A4 kâğıda sığar. Yazdırırken ölçeği “Gerçek boyut” (%100) seçin."
       footer={
@@ -193,12 +237,13 @@ export function FormsDialog({ open, onClose }: { open: boolean; onClose: () => v
             Vazgeç
           </Button>
           <Button icon={<FileDown className="size-4" />} loading={busy} disabled={!formCount} onClick={() => void download()}>
-            PDF indir{formCount ? ` · ${formCount} form, ${Math.ceil(formCount / 2)} sayfa` : ""}
+            İndir{formCount ? ` · ${formCount} form, ${Math.ceil(formCount / 2)} sayfa` : ""}
           </Button>
         </>
       }
     >
-      <div className="space-y-4">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+      <div className="min-w-0 space-y-4">
         <div className="flex flex-wrap gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-white/5">
           {TYPES.map((t) => (
             <button
@@ -303,7 +348,31 @@ export function FormsDialog({ open, onClose }: { open: boolean; onClose: () => v
         )}
         {q.data && !attendance && <FormSettings settings={q.data.settings} report={type === "report"} />}
       </div>
+      <FormPreview url={current?.url ?? preview?.url ?? null} loading={previewing || (Boolean(formCount) && !current && !previewError)} error={previewError} empty={!formCount} />
+      </div>
     </Modal>
+  );
+}
+
+/** Önizleme alanı: tarayıcının PDF görüntüleyicisi; seçim değişirken eski önizleme soluk kalır */
+function FormPreview({ url, loading, error, empty }: { url: string | null; loading: boolean; error: string | null; empty: boolean }) {
+  return (
+    <div className="relative hidden min-h-[60vh] overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200 lg:block dark:bg-white/5 dark:ring-white/10">
+      {empty ? (
+        <p className="absolute inset-0 grid place-items-center p-6 text-center text-sm font-semibold text-slate-500">Önizleme için listeden işletme seçin.</p>
+      ) : error ? (
+        <div className="p-4">
+          <Alert tone="red">{error}</Alert>
+        </div>
+      ) : url ? (
+        <iframe title="Form önizlemesi" src={`${url}#toolbar=0&navpanes=0&view=FitH`} className={clsx("absolute inset-0 size-full bg-white transition-opacity", loading && "opacity-50")} />
+      ) : null}
+      {loading && !error && !empty && (
+        <div className="absolute inset-x-0 top-3 flex justify-center">
+          <span className="rounded-full bg-elevated px-3 py-1 text-xs font-bold text-slate-600 shadow ring-1 ring-slate-200 dark:text-slate-300 dark:ring-white/15">Önizleme hazırlanıyor…</span>
+        </div>
+      )}
+    </div>
   );
 }
 

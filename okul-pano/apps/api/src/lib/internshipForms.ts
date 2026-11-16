@@ -154,8 +154,8 @@ function drawDaily(doc: Doc, f: DailyForm, ox: number, oy: number) {
   const colW = w / 3;
   const sig: [string, string][] = [
     ['İşletme Eğitim Yetkilisi', f.contact],
-    ['Koordinatör Öğretmen', up(f.teacher)],
-    ['Koordinatör Müdür Yardımcısı', up(f.manager)],
+    ['Koordinatör Öğretmen', f.teacher],
+    ['Koordinatör Müdür Yardımcısı', f.manager],
   ];
   sig.forEach(([title, name], i) => {
     const sx = x + i * colW + 2;
@@ -180,6 +180,8 @@ export const dailyFormsPdf = (forms: DailyForm[]) => twoUp(forms, 'landscape', '
 /* ---------- Aylık devam-devamsızlık bildirim çizelgesi (A5 yatay) ---------- */
 
 export interface AttendanceForm {
+  /** Okulun adı ve türü (formun en üstünde) */
+  school: string;
   business: string;
   phone: string;
   email: string;
@@ -194,7 +196,7 @@ export interface AttendanceForm {
   contact: string;
   manager: string;
   /** En çok 5 öğrenci (fazlası sonraki sayfada aynı başlıkla) */
-  students: { name: string; no: string; area: string; cells: [string, string][]; excused: string; unexcused: string }[];
+  students: { name: string; no: string; className: string; area: string; cells: [string, string][]; excused: string; unexcused: string }[];
 }
 
 export const ATTENDANCE_ROWS = 5;
@@ -207,18 +209,21 @@ function drawAttendance(doc: Doc, f: AttendanceForm, ox: number, oy: number) {
   const bottom = oy + A5_SHORT - 7 * PT;
   doc.lineWidth(0.6).strokeColor('#000').fillColor('#000');
 
-  // Başlık (üstte noktalı çizgi)
-  const tw = w * 0.66;
-  doc.save().lineWidth(0.5).dash(0.6, { space: 1.4 }).moveTo(x + (w - tw) / 2, top).lineTo(x + (w + tw) / 2, top).stroke().undash().restore();
-  doc.font('serif-b').fontSize(8.4).text('ÖĞRENCİLERİN İŞLETMELERDE MESLEKİ EĞİTİMİ AYLIK DEVAM- DEVAMSIZLIK BİLDİRİM ÇİZELGESİ', x, top + 3, { width: w, align: 'center' });
-  let cy = doc.y + 3;
+  // Başlık: en üstte okulun adı ve türü, altında formun adı
+  doc.font('serif-b').fontSize(8.6).text(up(f.school), x, top, { width: w, align: 'center' });
+  doc.font('serif-b').fontSize(7.6).text('ÖĞRENCİLERİN İŞLETMELERDE MESLEKİ EĞİTİMİ AYLIK DEVAM-DEVAMSIZLIK BİLDİRİM ÇİZELGESİ', x, doc.y + 1.5, { width: w, align: 'center' });
+  let cy = Math.round((doc.y + 3) * 2) / 2;
 
-  // Sütunlar
-  const nameW = 84;
+  // Sütunlar: No · Sınıf · Adı soyadı · Alanı (dikey) · Gün (S/Ö) · 31 gün · toplam devamsızlık
+  // Çizgiler kaymasın diye genişlikler ve yükseklikler yarım noktaya yuvarlanır
+  const noW = 15;
+  const clsW = 17;
+  const nameW = 66;
   const narrow = 13;
-  const totW = 27;
-  const dayW = (w - nameW - narrow * 3 - totW * 2) / 31;
-  const dayX = (i: number) => x + nameW + narrow * 3 + i * dayW;
+  const left4 = noW + clsW + nameW + narrow * 2;
+  const dayW = Math.floor(((w - left4 - 54) / 31) * 4) / 4;
+  const totW = (w - left4 - dayW * 31) / 2;
+  const dayX = (i: number) => x + left4 + i * dayW;
   const totX = dayX(31);
 
   // Yükseklikler: kalan alan öğrenci satırlarına ve imza bölümüne paylaştırılır
@@ -229,7 +234,7 @@ function drawAttendance(doc: Doc, f: AttendanceForm, ox: number, oy: number) {
   const noteH = 20;
   const sigH = 58;
   const avail = bottom - cy - hdrH - valH - ogH - colHdrH - noteH - sigH;
-  const rowH = Math.min(19, avail / (ATTENDANCE_ROWS * 2));
+  const rowH = Math.floor(Math.min(19, avail / (ATTENDANCE_ROWS * 2)) * 2) / 2;
 
   const cell = (cx: number, cyy: number, cw: number, ch: number) => doc.rect(cx, cyy, cw, ch).stroke();
   const ctext = (s: string, cx: number, cyy: number, cw: number, ch: number, font = 'serif', size = 6.5) => {
@@ -257,29 +262,37 @@ function drawAttendance(doc: Doc, f: AttendanceForm, ox: number, oy: number) {
   }
   cy += hdrH + valH;
 
+  // Dikey yazı (dar sütun başlıkları ve alan adı)
+  const vtext = (t: string, cx: number, cyy: number, cw: number, ch: number, font = 'serif-b', size = 4.6) => {
+    doc.save();
+    doc.font(font).fontSize(size);
+    const tw2 = doc.widthOfString(t);
+    doc.rotate(-90, { origin: [cx + cw / 2, cyy + ch / 2] });
+    doc.text(t, cx + cw / 2 - tw2 / 2, cyy + ch / 2 - size * 0.56, { lineBreak: false });
+    doc.restore();
+  };
   // Öğrenci başlıkları
-  const left4 = nameW + narrow * 3;
+  const colX = { no: x, cls: x + noW, name: x + noW + clsW, area: x + noW + clsW + nameW, half: x + noW + clsW + nameW + narrow };
   cell(x, cy, left4, ogH);
   ctext('ÖĞRENCİNİN', x, cy, left4, ogH, 'serif-b', 8);
-  cell(x, cy + ogH, nameW, colHdrH);
-  ctext('ADI SOYADI', x, cy + ogH, nameW, colHdrH, 'serif-b', 7.5);
-  ['NUMARA', 'ALANI', 'GÜNLER'].forEach((t, i) => {
-    const cx = x + nameW + i * narrow;
-    cell(cx, cy + ogH, narrow, colHdrH);
-    doc.save();
-    doc.font('serif-b').fontSize(4.6);
-    const tw2 = doc.widthOfString(t);
-    doc.rotate(-90, { origin: [cx + narrow / 2, cy + ogH + colHdrH / 2] });
-    doc.text(t, cx + narrow / 2 - tw2 / 2, cy + ogH + colHdrH / 2 - 2.6, { lineBreak: false });
-    doc.restore();
-  });
+  const hy = cy + ogH;
+  cell(colX.no, hy, noW, colHdrH);
+  vtext('NO', colX.no, hy, noW, colHdrH);
+  cell(colX.cls, hy, clsW, colHdrH);
+  vtext('SINIF', colX.cls, hy, clsW, colHdrH);
+  cell(colX.name, hy, nameW, colHdrH);
+  ctext('ADI SOYADI', colX.name, hy, nameW, colHdrH, 'serif-b', 7);
+  cell(colX.area, hy, narrow, colHdrH);
+  vtext('ALANI', colX.area, hy, narrow, colHdrH);
+  cell(colX.half, hy, narrow, colHdrH);
+  vtext('GÜN', colX.half, hy, narrow, colHdrH);
   for (let i = 0; i < 31; i++) {
     cell(dayX(i), cy, dayW, ogH + colHdrH);
     if (i >= f.daysInMonth) doc.save().fillColor('#d9d9d9').rect(dayX(i) + 0.3, cy + 0.3, dayW - 0.6, ogH + colHdrH - 0.6).fill().restore();
     ctext(String(i + 1), dayX(i), cy, dayW, ogH + colHdrH, 'serif-b', 6);
   }
   cell(totX, cy, totW * 2, ogH);
-  ctext('TOPLAM DEVAMSIZLIĞI', totX, cy, totW * 2, ogH, 'serif-b', 5);
+  ctext('TOPLAM DEVAMSIZLIK', totX, cy, totW * 2, ogH, 'serif-b', 4.2);
   cell(totX, cy + ogH, totW, colHdrH);
   cell(totX + totW, cy + ogH, totW, colHdrH);
   ctext('ÖZÜRLÜ', totX, cy + ogH, totW, colHdrH, 'serif-b', 4.4);
@@ -289,20 +302,42 @@ function drawAttendance(doc: Doc, f: AttendanceForm, ox: number, oy: number) {
   // Öğrenci satırları (her öğrenci için S ve Ö)
   for (let r = 0; r < ATTENDANCE_ROWS; r++) {
     const s = f.students[r];
-    cell(x, cy, nameW, rowH * 2);
-    cell(x + nameW, cy, narrow, rowH * 2);
-    cell(x + nameW + narrow, cy, narrow, rowH * 2);
+    cell(colX.no, cy, noW, rowH * 2);
+    cell(colX.cls, cy, clsW, rowH * 2);
+    cell(colX.name, cy, nameW, rowH * 2);
+    cell(colX.area, cy, narrow, rowH * 2);
     if (s) {
-      doc.font('serif').fontSize(6.8);
+      ctext(s.no, colX.no, cy, noW, rowH * 2, 'serif', s.no.length > 4 ? 4.6 : 5.6);
+      ctext(s.className, colX.cls, cy, clsW, rowH * 2, 'serif', s.className.length > 4 ? 4.6 : 5.6);
+      doc.font('serif').fontSize(6.6);
       const th = doc.heightOfString(s.name, { width: nameW - 5 });
-      doc.text(s.name, x + 3, cy + rowH - th / 2, { width: nameW - 5 });
-      ctext(s.no, x + nameW, cy, narrow, rowH * 2, 'serif', s.no.length > 4 ? 3.6 : 4.4);
-      ctext(s.area, x + nameW + narrow, cy, narrow, rowH * 2, 'serif', s.area.length > 3 ? 3.2 : s.area.length > 2 ? 3.8 : 4.6);
+      doc.text(s.name, colX.name + 2.5, cy + rowH - th / 2, { width: nameW - 5 });
+      // Alan dikey ve kısaltılmış (ör. "Bilişim Tek."); sığmazsa iki satıra bölünür
+      if (s.area) {
+        const room = rowH * 2 - 3;
+        doc.font('serif').fontSize(4.6);
+        const words = s.area.split(' ');
+        if (doc.widthOfString(s.area) <= room || words.length < 2) {
+          vtext(s.area, colX.area, cy, narrow, rowH * 2, 'serif', Math.max(3.4, Math.min(4.6, (4.6 * room) / doc.widthOfString(s.area))));
+        } else {
+          // Ortaya en yakın boşluktan ikiye böl; iki dikey satır yan yana
+          let cut = 1;
+          let best = Infinity;
+          for (let i = 1; i < words.length; i++) {
+            const d = Math.abs(doc.widthOfString(words.slice(0, i).join(' ')) - doc.widthOfString(words.slice(i).join(' ')));
+            if (d < best) [best, cut] = [d, i];
+          }
+          const parts = [words.slice(0, cut).join(' '), words.slice(cut).join(' ')];
+          const widest = Math.max(...parts.map((t) => doc.widthOfString(t)));
+          const size = Math.max(3.4, Math.min(4.4, (4.6 * room) / widest));
+          parts.forEach((t, i) => vtext(t, colX.area + (i === 0 ? -2.3 : 2.3), cy, narrow, rowH * 2, 'serif', size));
+        }
+      }
     }
     ['S', 'Ö'].forEach((half, hi) => {
       const ry = cy + hi * rowH;
-      cell(x + nameW + narrow * 2, ry, narrow, rowH);
-      ctext(half, x + nameW + narrow * 2, ry, narrow, rowH, 'serif', 5.5);
+      cell(colX.half, ry, narrow, rowH);
+      ctext(half, colX.half, ry, narrow, rowH, 'serif', 5.5);
       for (let i = 0; i < 31; i++) {
         const gray = i >= f.daysInMonth || f.weekend[i];
         if (gray) doc.save().fillColor(i >= f.daysInMonth ? '#d9d9d9' : '#ececec').rect(dayX(i) + 0.3, ry + 0.3, dayW - 0.6, rowH - 0.6).fill().restore();
@@ -336,8 +371,9 @@ function drawAttendance(doc: Doc, f: AttendanceForm, ox: number, oy: number) {
     doc.font('serif').fontSize(5.6);
     for (const line of sub) doc.text(line, cx, doc.y + 1, { width: cw, align: 'center' });
   };
-  sigCol(x, c1, 'İŞLETME YETKİLİSİ', f.contact, ['Adı Soyadı', 'Kaşe - İmza']);
-  sigCol(x + c1, c2, 'İNCELENDİ', up(f.manager), ['Koordinatör Müdür Yardımcısı']);
+  // Ad soyad zaten yazdığı için ayrıca "Adı Soyadı" etiketi yok
+  sigCol(x, c1, 'İŞLETME YETKİLİSİ', f.contact, ['Kaşe - İmza']);
+  sigCol(x + c1, c2, 'İNCELENDİ', f.manager, ['Koordinatör Müdür Yardımcısı']);
   const lx = x + c1 + c2 + 5;
   const lw2 = c3 - 10;
   doc.font('serif').fontSize(6.6).text('Devamın Göstereceği Semboller', lx, cy + 5, { width: lw2, align: 'center', underline: true });
@@ -462,15 +498,13 @@ function drawReport(doc: Doc, f: ReportForm, ox: number, oy: number) {
     return yy;
   };
   const e1 = sigCol(x + pad, [
-    ['sans', 'İşletme Eğitim Yetkilisinin'],
-    ['sans', 'Adı Soyadı'],
+    ['sans', 'İşletme Eğitim Yetkilisi'],
     ['sans-b', f.contact],
     ['sans', 'İmza'],
   ]);
   const e2 = sigCol(x + pad + half, [
-    ['sans', 'Koordinatör Öğretmenin'],
-    ['sans', 'Adı Soyadı'],
-    ['sans-bi', up(f.teacher)],
+    ['sans', 'Koordinatör Öğretmen'],
+    ['sans-bi', f.teacher],
     ['sans', 'İmza'],
   ]);
   const rx = x + w - pad - rightW;

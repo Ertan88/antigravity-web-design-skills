@@ -34,7 +34,9 @@ import {
   internAssignSchema,
   parseClassName,
   compareClassNames,
-  areaInitials,
+  areaShort,
+  formalName,
+  schoolFullName,
   mondayOf,
   monthVisitDates,
   trDate,
@@ -205,6 +207,8 @@ async function eligibleClasses(deps: AppDeps, req: FastifyRequest) {
     gradeOf,
     { mesem },
   );
+  // Anadolu Teknik Programı sınıfları da (staj dönemi için) mesleki eğitime dahildir
+  for (const id of settingsOf(req).internshipTechnical?.classIds ?? []) if (classes.some((c) => c.id === id)) r.ids.add(id);
   return { ...r, classes, mesem };
 }
 
@@ -254,6 +258,25 @@ async function schoolWeekdays(deps: AppDeps, schoolId: string, classIds: string[
 }
 
 const NO_SCHOOL: SchoolHalves = new Map();
+
+/**
+ * Öğrencinin günlük devam hücreleri. Teknik program sınıfları staj tarihleri arasında her iş günü işletmededir
+ * (okul günü yok); bu tarihlerin dışında ve diğer sınıflarda okul günleri ders programından gelir.
+ */
+function classCells(
+  req: FastifyRequest,
+  days: readonly InternDay[],
+  classId: string | null,
+  weekdays: Map<string, SchoolHalves>,
+  marks: ReadonlyMap<string, InternStored>,
+  now: string,
+): [InternCell, InternCell][] {
+  const normal = internCells(days, { school: weekdays.get(classId ?? '') ?? NO_SCHOOL, marks, today: now });
+  const tech = settingsOf(req).internshipTechnical;
+  if (!classId || !tech?.start || !tech.end || !tech.classIds.includes(classId)) return normal;
+  const full = internCells(days, { school: NO_SCHOOL, marks, today: now });
+  return days.map((d, i) => (d.date >= tech.start! && d.date <= tech.end! ? full[i]! : normal[i]!));
+}
 
 async function marksInRange(deps: AppDeps, schoolId: string, from: string, to: string) {
   const rows = await deps.db
@@ -790,7 +813,7 @@ export async function internshipRoutes(app: FastifyInstance) {
     const allCells: InternCell[][] = [];
     const perBusiness = new Map<string, InternCell[][]>();
     for (const days of monthList) {
-      const cells = internCells(days, { school: weekdays.get(st.classId ?? '') ?? NO_SCHOOL, marks, today: now });
+      const cells = classCells(req, days, st.classId, weekdays, marks, now);
       days.forEach((d, i) => {
         if (!visible(d.date)) return;
         allCells.push(cells[i]!);
@@ -968,7 +991,7 @@ export async function internshipRoutes(app: FastifyInstance) {
       areas: [...new Map(list.filter((x) => x.areaId).map((x) => [x.areaId!, { id: x.areaId!, name: x.areaName ?? '' }])).values()].sort((a, b) => trCompare(a.name, b.name)),
       managerAssigned: Boolean(settings.internshipManagerUserId),
       students: shown.map((st) => {
-        const cells = internCells(days, { school: weekdays.get(st.classId ?? '') ?? NO_SCHOOL, marks: marks.get(st.id) ?? new Map(), today: now });
+        const cells = classCells(req, days, st.classId, weekdays, marks.get(st.id) ?? new Map(), now);
         return {
           id: st.id,
           fullName: st.fullName,
@@ -1019,7 +1042,7 @@ export async function internshipRoutes(app: FastifyInstance) {
     const now = today(req);
     const groups = new Map<string, { id: string; name: string; own: boolean; editable: boolean; info: unknown; students: unknown[] }>();
     for (const st of list) {
-      const [cell] = internCells([day], { school: weekdays.get(st.classId ?? '') ?? NO_SCHOOL, marks: marks.get(st.id) ?? new Map(), today: now });
+      const [cell] = classCells(req, [day], st.classId, weekdays, marks.get(st.id) ?? new Map(), now);
       const g = groups.get(st.businessId!) ?? {
         id: st.businessId!,
         name: st.businessName,
@@ -1167,7 +1190,7 @@ export async function internshipRoutes(app: FastifyInstance) {
     const [weekdays, marks] = await Promise.all([schoolWeekdays(deps, req.ctx.schoolId, classIds), marksInRange(deps, req.ctx.schoolId, from, to)]);
     const now = today(req);
     return rows.map((x) => {
-      const raw = internCells(days, { school: weekdays.get(x.classId ?? '') ?? NO_SCHOOL, marks: marks.get(x.id) ?? new Map(), today: now });
+      const raw = classCells(req, days, x.classId, weekdays, marks.get(x.id) ?? new Map(), now);
       const outside = days.map((d) => Boolean((x.start && d.date < x.start) || (x.end && d.date > x.end)));
       return { ...x, cells: maskCells(days, raw, x.start, x.end), outside };
     });
@@ -1241,16 +1264,16 @@ export async function internshipRoutes(app: FastifyInstance) {
       const r = await weekItems(req, q.week ?? today(req));
       const chosen = r.items.filter((b) => b.date && (picked ? picked.has(b.id) : !b.holiday));
       const forms: DailyForm[] = chosen.map((b) => ({
-        schoolLine: [school.name, fs.programName].filter(Boolean).join(' '),
+        schoolLine: [schoolFullName(school.name, st.schoolType), fs.programName].filter(Boolean).join(' '),
         business: b.name,
         students: b.students,
         responsible: b.students,
         address: b.address ?? '',
         area: area(b),
         date: trDate(b.date),
-        contact: b.contactName ?? '',
-        teacher: b.coordinatorName ?? '',
-        manager: managerName,
+        contact: formalName(b.contactName),
+        teacher: formalName(b.coordinatorName),
+        manager: formalName(managerName),
       }));
       pdf = await dailyFormsPdf(forms);
       name = `gunluk-rehberlik-formu-${r.monday}.pdf`;
@@ -1263,14 +1286,14 @@ export async function internshipRoutes(app: FastifyInstance) {
       const monthText = `${MONTHS_TR[Number(month.slice(5, 7)) - 1]} ${month.slice(0, 4)}`;
       if (q.type === 'report') {
         const forms: ReportForm[] = chosen.map((b) => ({
-          addressee: `${school.name} Müdürlüğüne`,
+          addressee: `${schoolFullName(school.name, st.schoolType)} Müdürlüğüne`,
           place: [fs.district, fs.province.toLocaleUpperCase('tr-TR')].filter(Boolean).join('/'),
           area: b.areaName ?? '',
           date: trDate(b.dates.at(-1)),
           business: b.name,
           address: b.address ?? '',
-          contact: b.contactName ?? '',
-          teacher: b.coordinatorName ?? '',
+          contact: formalName(b.contactName),
+          teacher: formalName(b.coordinatorName),
           dates: b.dates.map(trDate),
         }));
         pdf = await reportFormsPdf(forms);
@@ -1287,9 +1310,10 @@ export async function internshipRoutes(app: FastifyInstance) {
               const cells = x.cells;
               const t = internTotals(cells);
               return {
-                name: x.fullName,
+                name: formalName(x.fullName),
                 no: x.schoolNo,
-                area: areaInitials(x.areaName),
+                className: x.className ?? '',
+                area: areaShort(x.areaName),
                 // İşletmede olmadığı günler (ayrıldıktan sonra ya da gelmeden önce) "–"
                 cells: cells.map(([am, pm], i) => (x.outside[i] && r.days[i]!.weekday < 6 ? ['–', '–'] : [letter(am ?? ''), letter(pm ?? '')]) as [string, string]),
                 excused: num(t.excused),
@@ -1298,6 +1322,7 @@ export async function internshipRoutes(app: FastifyInstance) {
             });
           for (let i = 0; i < Math.max(1, rows.length); i += ATTENDANCE_ROWS)
             forms.push({
+              school: schoolFullName(school.name, st.schoolType),
               business: b.name,
               phone: b.phone ?? '',
               email: b.email ?? '',
@@ -1305,8 +1330,8 @@ export async function internshipRoutes(app: FastifyInstance) {
               daysInMonth: r.days.length,
               weekend: r.days.map((d) => d.weekday >= 6),
               issued: trDate(b.dates.at(-1)),
-              contact: b.contactName ?? '',
-              manager: managerName,
+              contact: formalName(b.contactName),
+              manager: formalName(managerName),
               students: rows.slice(i, i + ATTENDANCE_ROWS),
             });
         }
@@ -1356,7 +1381,7 @@ export async function internshipRoutes(app: FastifyInstance) {
       /** İşletme günü mü (okul günü, hafta sonu ve takvim tatili değil) */
       const workHalf = (studentId: string, half: InternHalf) => {
         const st = byId.get(studentId)!;
-        const [c] = internCells([day], { school: weekdays.get(st.classId ?? '') ?? NO_SCHOOL, marks: new Map(), today: '9999-12-31' });
+        const [c] = classCells(req, [day], st.classId, weekdays, new Map(), '9999-12-31');
         return c![half === 'am' ? 0 : 1] === '?';
       };
       const next = new Map<string, InternStored | null>();
@@ -1432,7 +1457,7 @@ export async function internshipRoutes(app: FastifyInstance) {
     const rows: (typeof internshipMarks.$inferInsert)[] = [];
     const name = await userName(deps, req.ctx.userId);
     for (const st of list) {
-      const cells = internCells(days, { school: weekdays.get(st.classId ?? '') ?? NO_SCHOOL, marks: before.get(st.id) ?? new Map(), today: now });
+      const cells = classCells(req, days, st.classId, weekdays, before.get(st.id) ?? new Map(), now);
       days.forEach((d, i) =>
         INTERN_HALVES_LIST.forEach((half, hi) => {
           if (cells[i]![hi] === '?') rows.push({ schoolId: req.ctx.schoolId, studentId: st.id, date: d.date, half, code: 'X', userId: req.ctx.userId, userName: name });

@@ -369,3 +369,34 @@ export function areaInitials(name: string | null | undefined): string {
 
 /** GG.AA.YYYY */
 export const trDate = (iso: string | null | undefined) => (iso ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : '');
+
+/** Uzun alan adının formlarda kullanılan kısa biçimi (ör. "Bilişim Teknolojileri" → "Bilişim Tek.") */
+const AREA_WORDS: Record<string, string> = {
+  teknolojileri: 'Tek.',
+  teknolojisi: 'Tek.',
+  hizmetleri: 'Hiz.',
+  finansman: 'Fin.',
+  elektronik: 'Elektronik',
+  sanatları: 'San.',
+  sanatlar: 'San.',
+  makinesi: 'Mak.',
+  yönetimi: 'Yön.',
+  tasarımı: 'Tas.',
+};
+export function areaShort(name: string | null | undefined): string {
+  if (!name) return '';
+  const words = name.trim().split(/\s+/);
+  if (name.length <= 14) return name.trim();
+  return words.map((w, i) => (i === 0 ? w : (AREA_WORDS[w.toLocaleLowerCase('tr-TR')] ?? w))).join(' ');
+}
+
+/**
+ * Resmî belgelerde kişi adı (MEB yazımı): adlar ilk harfi büyük, soyadı tamamı büyük ("ayşe nur yılmaz" → "Ayşe Nur YILMAZ").
+ */
+export function formalName(full: string | null | undefined): string {
+  const parts = (full ?? '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '';
+  const cap = (w: string) => w.charAt(0).toLocaleUpperCase('tr-TR') + w.slice(1).toLocaleLowerCase('tr-TR');
+  if (parts.length === 1) return cap(parts[0]!);
+  return [...parts.slice(0, -1).map(cap), parts[parts.length - 1]!.toLocaleUpperCase('tr-TR')].join(' ');
+}

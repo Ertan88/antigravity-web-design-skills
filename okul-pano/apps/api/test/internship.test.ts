@@ -445,4 +445,20 @@ describe('mesleki eğitim yetkileri: yönetim, işaretli koordinatör, alan şef
     expect(list.map((x) => x.name)).not.toContain('Kent Dekorasyon');
     expect(list.every((x) => !x.canEdit)).toBe(true);
   });
+
+  it('teknik program: staj tarihleri arasında okul günü yoktur, dışında ders programı geçerlidir', async () => {
+    // 12-A pazartesi okulda (5 Ekim). Staj 1-31 Aralık: Aralık pazartesileri işletme günü, Kasım değişmez
+    expectStatus(await owner.patch(base, { settings: { internshipTechnical: { classIds: [classId], start: '2026-12-01', end: '2026-12-31' } } }), 200);
+    const dec = (await owner.get(`${base}/internship/sheet?month=2026-12`)).json();
+    const arda = dec.students.find((s: { fullName: string }) => s.fullName === 'Arda Kaya');
+    expect(arda.cells[6]).not.toEqual(['O', 'O']); // 7 Aralık Pazartesi: stajda
+    expect(arda.cells[5]).toEqual(['W', 'W']); // hafta sonu yine hafta sonu
+    const nov = (await owner.get(`${base}/internship/sheet?month=2026-11`)).json();
+    expect(nov.students.find((s: { fullName: string }) => s.fullName === 'Arda Kaya').cells[29]).toEqual(['O', 'O']); // 30 Kasım Pazartesi: okulda
+    // Bitiş başlangıçtan önceyse kural uygulanmaz (her şey ders programından)
+    expectStatus(await owner.patch(base, { settings: { internshipTechnical: { classIds: [classId], start: '2026-12-31', end: '2026-12-01' } } }), 200);
+    const bad = (await owner.get(`${base}/internship/sheet?month=2026-12`)).json();
+    expect(bad.students.find((s: { fullName: string }) => s.fullName === 'Arda Kaya').cells[6]).toEqual(['O', 'O']);
+    expectStatus(await owner.patch(base, { settings: { internshipTechnical: { classIds: [], start: null, end: null } } }), 200);
+  });
 });

@@ -220,6 +220,17 @@ export const schoolSettingsSchema = z.object({
    * yetkisi olan bütün yöneticilere gider. Ders görevlendirme her gün o günün nöbetçi müdür yardımcısına gider (ayar yok);
    * mesleki eğitim "Koordinatör müdür yardımcısı" ayarını kullanır.
    */
+  /**
+   * Anadolu Teknik Programı: bu sınıfların öğrencileri eğitim yılı içinde değil, staj döneminde (ör. yaz) her iş günü
+   * işletmededir. Devam çizelgesi ve formlar yalnızca bu tarihleri kapsar. Diğer sınıflar Anadolu Meslek Programıdır.
+   */
+  internshipTechnical: z
+    .object({
+      classIds: z.array(z.uuid()).max(200).default([]),
+      start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
+      end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
+    })
+    .default({ classIds: [], start: null, end: null }),
   responsibilities: z
     .object({
       leaves: z.array(z.uuid()).max(10).default([]),

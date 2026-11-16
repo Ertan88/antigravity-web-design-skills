@@ -82,17 +82,22 @@ export async function uploadImage(schoolId: string, file: File): Promise<string>
  * Kimlik doğrulamalı dosya indirme (Excel şablonu, dışa aktarma). Dosya adı sunucunun
  * Content-Disposition başlığından alınır; Türkçe karakterler korunur.
  */
-export async function downloadFile(path: string, name: string): Promise<void> {
+/** Oturumla birlikte bir dosyayı indirir ve içeriğini döndürür (önizleme ve indirme için) */
+export async function fetchBlob(path: string, signal?: AbortSignal): Promise<Blob> {
   const send = () =>
-    fetch(path, { credentials: 'same-origin', headers: accessToken ? { authorization: `Bearer ${accessToken}` } : {} });
+    fetch(path, { credentials: 'same-origin', signal, headers: accessToken ? { authorization: `Bearer ${accessToken}` } : {} });
   let res = await send();
   if (res.status === 401 && (await refreshSession())) res = await send();
   if (!res.ok) {
     const data = (await res.json().catch(() => null)) as { message?: string } | null;
     throw new ApiError(res.status, data?.message ?? 'Dosya indirilemedi.');
   }
-  // Dosya adını panel verir ("Okul Adı - Nöbet Çizelgesi.xlsx"); sunucunun ASCII adı yalnızca doğrudan bağlantılar için
-  const url = URL.createObjectURL(await res.blob());
+  return res.blob();
+}
+
+/** Elde olan bir dosyayı verilen adla kaydettirir */
+export function saveBlob(blob: Blob, name: string): void {
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = name;
@@ -101,6 +106,12 @@ export async function downloadFile(path: string, name: string): Promise<void> {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+export async function downloadFile(path: string, name: string): Promise<void> {
+  // Dosya adını panel verir ("Okul Adı - Nöbet Çizelgesi.xlsx"); sunucunun ASCII adı yalnızca doğrudan bağlantılar için
+  saveBlob(await fetchBlob(path), name);
+}
+
 
 /**
  * İndirilen Excel dosyasının adı: "<Okul adı> - <Modül>.xlsx".

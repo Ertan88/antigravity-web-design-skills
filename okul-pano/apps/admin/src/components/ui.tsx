@@ -565,7 +565,7 @@ export function Modal({
   description?: string;
   children: ReactNode;
   footer?: ReactNode;
-  size?: 'md' | 'lg' | 'xl';
+  size?: 'md' | 'lg' | 'xl' | '2xl';
 }) {
   // Dışarı tıklama sayacı: uyarıyı yeniden gösterir; sallanma içeriği yeniden kurmadan sınıfla yapılır
   const [nudge, setNudge] = useState(0);
@@ -612,6 +612,7 @@ export function Modal({
           size === 'md' && 'sm:max-w-lg',
           size === 'lg' && 'sm:max-w-2xl',
           size === 'xl' && 'sm:max-w-4xl',
+          size === '2xl' && 'sm:max-w-6xl',
         )}
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
