@@ -64,6 +64,15 @@ kalır; burada tekrarlanmaz.
 ### 1.6 Bağımlılıklar ve dağıtım
 - Paket sürümleri tam sürümle sabitlenir; en az iki haftalık sürümler seçilir. Yeni paket eklemeden önce
   bakımının sürdüğü ve lisansının uygun olduğu kontrol edilir.
+- **Açık bırakılmaz.** Her commit ve push öncesinde kök klasörde (`okul-pano/`) ve `okul-pano/mobile/` klasöründe
+  `npm audit` çalıştırılır; ikisi de "found 0 vulnerabilities" demeden gönderim yapılmaz. Geliştirme araçlarındaki
+  açıklar da bu kurala dahildir.
+  - Doğrudan bağımlılık tam sürümle yükseltilir. Dolaylı bağımlılık kök `package.json`'daki `overrides` ile
+    yükseltilir; ardından kilit dosyasında ilgili paketin kaydı silinip `npm install` ile yeniden çözülür ve
+    `npm ls` ile eksik ya da geçersiz paket kalmadığı, temiz bir klasörde `npm ci` ile kurulumun çalıştığı doğrulanır.
+  - Açığı kapatmak, "en az iki haftalık sürüm" kuralından önce gelir (kullanıcı kararı, 16 Kasım 2026). İki haftadan
+    yeni bir sürüm kullanıldıysa bulgular tablosuna paket, sürüm ve tarih yazılır.
+  - Açık yeni bir özellikle birlikte gelirse aynı işte kapatılır; ayrı bir işe bırakılmaz.
 - Docker imajı yalnızca derlenmiş dosyaları içerir; geliştirme bağımlılıkları ve kaynak haritaları üretime girmez.
 - Üretim veritabanına doğrudan erişilmez; veri değişikliği yalnızca uygulama ya da göç (migration) dosyasıyla yapılır.
   Göçler geri alınabilir ya da `IF NOT EXISTS` ile tekrar çalıştırılabilir yazılır.
@@ -198,7 +207,7 @@ Zayıf TV işlemcilerinde edinilen dersler:
 | 1 | Yüksek | Mobil uygulama düz HTTP'ye izin veriyordu (`usesCleartextTraffic`) | **Düzeltildi (1.20.53):** ayar kaldırıldı, uygulama yalnızca HTTPS kullanır. |
 | 2 | Orta | Giriş hız sınırı yalnızca IP başınaydı | **Düzeltildi:** adres + e-posta başına 10/dk, adres başına 120/dk; bir hesaba art arda 5 hatalı girişte 5 dakika bekleme. |
 | 3 | Orta | Panel ve pano sayfalarında İçerik Güvenlik Politikası (CSP) yoktu | **Düzeltildi:** HTML sayfalarına CSP başlığı eklendi (yalnızca kendi betiklerimiz ve YouTube). |
-| 4 | Orta | Bağımlılık açığı taraması otomatik değil | `npm audit` elle çalıştırıldı: e-posta paketi (nodemailer, yüksek) 10.2.1'e yükseltildi. Kalan 3 orta düzey açık `@fastify/static` içindeki `glob` paketinde; düzeltilmiş sürüm iki haftayı doldurunca yükseltilecek. Otomatik tarama (Dependabot) depo ayarı gerektirir, kullanıcı onayıyla açılır. |
+| 4 | Orta | Bağımlılık açıkları | **Kapatıldı (16 Kasım 2026), iki projede de `npm audit` 0.** Kök: `@fastify/static` 10.1.8 (glob 14.0.3, minimatch 11.0.4 `overrides` ile), drizzle-kit içindeki esbuild 0.25.12. Mobil: `npm audit fix` ile @expo/cli 58.1.20, node-forge 1.4.3 ve diğerleri; `@expo/fingerprint` için minimatch 11.0.8 (`overrides`). İki haftadan yeni olup kullanıcı kararıyla alınanlar: @expo/cli 58.1.20 (11 Kasım), minimatch 11.0.8 (11 Kasım), node-forge 1.4.3 (4 Kasım). Otomatik tarama (Dependabot) depo ayarı gerektirir, kullanıcı onayıyla açılır. |
 | 5 | Orta | Play Store'a çıkışta `USE_EXACT_ALARM` reddedilir | Şimdilik APK GitHub'dan dağıtıldığı için sorun yok. Play'e çıkmadan önce kaldırılmalı. |
 | 6 | Düşük–orta | Soluk gri metin kontrastı AA altındaydı | **Düzeltildi.** Mobilde `colors.faint` açık temada `#6f6863` (5.07:1); `colors.subtle` metinlerden çıkarıldı. Panelde `slate-400` açık temada `#77706a` (beyazda 4.87:1), `slate-500` `#635c56` (6.57:1); koyu temada `slate-400` `#9d968e` (yüzeyde 5.08:1). Yer tutucu ve simgelerdeki `slate-300` kullanımları `slate-400`'e alındı. |
 | 7 | İşlevsel | Sunucudan telefona bildirim gelmiyor (Firebase kurulu değil) | Acil durum ve onay bildirimleri uygulama kapalıyken telefona ulaşmıyor. Firebase projesi kurulmalı. |

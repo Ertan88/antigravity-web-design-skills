@@ -59,6 +59,11 @@ Böyle bir durum varsa kullanıcı **onaylanmaz**. Yanlış açıkça söylenir;
   (Yanlış: "Bugün 3 boş: 2 ders, 1 nöbet yeri · Ayşe Yılmaz izinli".)
 - Yeni metin eklerken ve var olan bir metne dokunurken bu kural kontrol edilir.
 
+## 4b. Güvenlik açığı bırakılmaz
+
+- Her commit ve push öncesinde `okul-pano/` ve `okul-pano/mobile/` klasörlerinde `npm audit` çalıştırılır; açık varsa
+  önce kapatılır, sonra gönderilir. Yöntem ve ayrıntılar: `okul-pano/docs/KURALLAR.md` (1.6 Bağımlılıklar).
+
 ## 5. KVKK
 
 - Gerçek okul belgeleri ve kişisel veriler depoya eklenmez.
