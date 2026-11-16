@@ -1111,3 +1111,27 @@ export const examRemindersSent = pgTable(
   },
   (t) => [primaryKey({ columns: [t.examId, t.notifyAt] })],
 );
+
+/**
+ * Tanıtım sitesinin iletişim formundan gelen talepler (okula bağlı değildir; yalnızca platform yöneticisi görür).
+ * KVKK: yanıtlanan talepler 1 yıl, yanıtlanmayanlar 2 yıl sonra kendiliğinden silinir (runContactRetention).
+ */
+export const contactRequests = pgTable(
+  'contact_requests',
+  {
+    id: pk(),
+    topic: text('topic').$type<'demo' | 'quote' | 'question'>().notNull(),
+    name: text('name').notNull(),
+    role: text('role').notNull(),
+    school: text('school').notNull(),
+    city: text('city').notNull(),
+    email: text('email').notNull(),
+    phone: text('phone'),
+    preferredTime: text('preferred_time'),
+    message: text('message').notNull(),
+    status: text('status').$type<'new' | 'done'>().notNull().default('new'),
+    handledAt: timestamp('handled_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index('contact_requests_created_idx').on(t.createdAt)],
+);

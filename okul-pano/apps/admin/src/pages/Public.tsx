@@ -196,8 +196,11 @@ export function Signup() {
           <label className="flex items-start gap-2.5">
             <input type="checkbox" required className="mt-0.5 size-4 accent-brand-600" checked={kvkk} onChange={(e) => setKvkk(e.target.checked)} />
             <span className="text-slate-600">
-              Kayıt için verdiğim ad, e-posta ve telefon bilgilerinin hesabın açılması, deneme süresi ve abonelik iletişimi için işlenmesine ilişkin
-              aydınlatmayı okudum. <span className="text-slate-400">(zorunlu)</span>
+              Kayıt için verdiğim ad, e-posta ve telefon bilgilerinin hesabın açılması, deneme süresi ve abonelik iletişimi için işlenmesine ilişkin{' '}
+              <a href="/kvkk" target="_blank" rel="noopener" className="font-semibold text-brand-700 underline">
+                aydınlatma metnini
+              </a>{' '}
+              okudum. <span className="text-slate-400">(zorunlu)</span>
             </span>
           </label>
           <label className="flex items-start gap-2.5">

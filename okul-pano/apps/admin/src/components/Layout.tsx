@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 import { appView } from '@okulpano/shared';
-import { Building2, Download, Lifebuoy2, ChevronDown, Mail, ChevronRight, ChevronsUpDown, LogOut, Menu, Moon, MonitorSmartphone, School, Sun, X } from './icons.tsx';
+import { Building2, Download, Inbox, Lifebuoy2, ChevronDown, Mail, ChevronRight, ChevronsUpDown, LogOut, Menu, Moon, MonitorSmartphone, School, Sun, X } from './icons.tsx';
 import { Suspense, useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth.tsx';
@@ -188,6 +188,9 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             </NavLink>
             <NavLink to="/platform/destek" onClick={onNavigate} className={navLinkClass}>
               <Lifebuoy2 className="size-[18px]" /> Destek talepleri
+            </NavLink>
+            <NavLink to="/platform/iletisim" onClick={onNavigate} className={navLinkClass}>
+              <Inbox className="size-[18px]" /> İletişim talepleri
             </NavLink>
             <NavLink to="/platform/e-posta" onClick={onNavigate} className={navLinkClass}>
               <Mail className="size-[18px]" /> E-posta ayarları

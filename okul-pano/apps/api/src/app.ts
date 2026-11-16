@@ -33,6 +33,7 @@ import { memberRoutes } from './routes/members.ts';
 import { enrollRoutes } from './routes/enroll.ts';
 import { loadPlatformMail, platformSettingsRoutes } from './routes/platformSettings.ts';
 import { platformAccountsRoutes } from './routes/platformAccounts.ts';
+import { runContactRetention, siteRoutes } from './routes/site.ts';
 import { runExamReminders } from './lib/examReminders.ts';
 import { runScreenOfflineAlerts } from './lib/screenOffline.ts';
 import { controlRoutes } from './routes/control.ts';
@@ -165,6 +166,8 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   await app.register(issueRoutes);
   await app.register(platformSettingsRoutes);
   await app.register(platformAccountsRoutes);
+  // Tanıtım sitesi (kök adres, iletişim ve yasal sayfalar) ve iletişim formu
+  await app.register(siteRoutes);
   // Panelden girilmiş e-posta ayarı (ortam değişkeni yoksa kullanılır)
   await loadPlatformMail(deps).catch((err) => app.log.error(err, 'e-posta ayarı okunamadı'));
 
@@ -175,6 +178,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
       void runConductRetention(deps).catch((err) => app.log.error(err, 'gözlem saklama süresi'));
       // Uzun süre bağlanmayan panoların anahtarı iptal edilir
       void runScreenKeyExpiry(deps).catch((err) => app.log.error(err, 'pano anahtarı süresi'));
+      void runContactRetention(deps).catch((err) => app.log.error(err, 'iletişim talebi saklama süresi'));
       void runIssuePhotoRetention(deps).catch((err) => app.log.error(err, 'sorun fotoğrafı saklama süresi'));
       // MEB çalışma takvimi: haziran ortasından itibaren yayımlanır; her yıl için günde bir deneme
       if (deps.env.MEB_INDEX_URLS) void runMebCalendarJob(deps).catch((err) => app.log.error(err, 'MEB çalışma takvimi'));
@@ -228,7 +232,8 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     await app.register(fastifyStatic, { root: resolve(spa.dir), prefix: spa.prefix, decorateReply: false });
   }
   if (spas.length) {
-    app.get('/', (_req, reply) => reply.redirect('/admin/'));
+    // Tanıtım sitesi yoksa (dosyaları bulunamadıysa) kök adres panele gider
+    if (!app.hasRoute({ method: 'GET', url: '/' })) app.get('/', (_req, reply) => reply.redirect('/admin/'));
     app.setNotFoundHandler((req, reply) => {
       const [path = '', query] = req.url.split('?');
       // Sondaki "/" unutulmuş adres (ör. /app, /display) uygulamanın kendisine gider

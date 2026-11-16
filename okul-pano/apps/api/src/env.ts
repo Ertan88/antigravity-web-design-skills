@@ -19,6 +19,18 @@ const schema = z.object({
   DISPLAY_DIST: z.string().default('../display/dist'),
   /** Mobil uygulamanın web sürümü (varsa): /app/ — uygulamayı yüklemeyen öğretmenler tarayıcıdan kullanır */
   MOBILE_DIST: z.string().default('../../mobile/dist'),
+  /** Tanıtım sitesinin dosyaları (stil, betik, görseller): kök adreste (/) tanıtım sayfası, /site/ altında dosyalar */
+  SITE_DIR: z.string().default('./site'),
+  /**
+   * Satıcı ve iletişim bilgileri: tanıtım sitesinin alt bilgisinde, iletişim sayfasında ve yasal metinlerde yazar.
+   * Boş bırakılan bilgi sayfada sarı yer tutucu olarak görünür (site o hâliyle satışa açılmamalıdır).
+   */
+  SELLER_NAME: z.string().optional().transform((v) => v?.trim() || undefined),
+  SELLER_ADDRESS: z.string().optional().transform((v) => v?.trim() || undefined),
+  SELLER_TAX_OFFICE: z.string().optional().transform((v) => v?.trim() || undefined),
+  SELLER_TAX_NO: z.string().optional().transform((v) => v?.trim() || undefined),
+  CONTACT_EMAIL: z.string().optional().transform((v) => v?.trim() || undefined),
+  CONTACT_PHONE: z.string().optional().transform((v) => v?.trim() || undefined),
   /** Okul Yayın Pano TV uygulamasının indirme adresi: TV'de kısa "/tv" adresi buraya yönlendirir */
   TV_APK_URL: z.string().default('https://github.com/Ertan88/antigravity-web-design-skills/releases/download/okul-pano-tv/Okul-Yayin-Pano.apk'),
   /** Okul Yayın telefon uygulamasının (Android) indirme adresi: panelin ve /app'in "İndir" bağlantısı kısa "/indir" adresinden buraya gider */
