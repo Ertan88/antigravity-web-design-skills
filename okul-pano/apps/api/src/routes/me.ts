@@ -267,11 +267,11 @@ export async function meRoutes(app: FastifyInstance) {
   app.post('/api/me/push-tokens', { preHandler: app.authenticate }, async (req, reply) => {
     const { sub } = accessUser(req);
     const body = parse(pushTokenSchema, req.body);
-    // Aynı telefon başka hesapla açılırsa anahtar yeni kullanıcıya geçer
+    // Aynı telefon birden fazla hesaba bağlanabilir (hızlı hesap geçişi); hesap kaldırılınca yalnızca onunki silinir
     await db
       .insert(pushTokens)
       .values({ userId: sub, token: body.token, platform: body.platform })
-      .onConflictDoUpdate({ target: pushTokens.token, set: { userId: sub, platform: body.platform } });
+      .onConflictDoUpdate({ target: [pushTokens.token, pushTokens.userId], set: { platform: body.platform } });
     return reply.status(204).send();
   });
 

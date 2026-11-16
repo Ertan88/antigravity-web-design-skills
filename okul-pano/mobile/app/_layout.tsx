@@ -17,7 +17,7 @@ import { InAppNotices } from '../src/inAppNotice.tsx';
 import { Text } from '../src/text.tsx';
 import { initialWindowMetrics, SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../src/auth.tsx';
-import { ConfirmHost } from '../src/confirm.tsx';
+import { ConfirmHost, openConfirm } from '../src/confirm.tsx';
 import { SwitchingOverlay } from '../src/accountsSheet.tsx';
 import { restored } from '../src/persist.ts';
 import { registerForPush } from '../src/push.ts';
@@ -90,7 +90,8 @@ function BrandSplash({ finishing, onHidden }: { finishing: boolean; onHidden: ()
 
 /** Oturum yoksa giriş ekranına, varsa uygulamaya yönlendirir; telefon bildirimlerini kaydeder */
 function Gate({ fontsReady }: { fontsReady: boolean }) {
-  const { status, school } = useAuth();
+  const auth = useAuth();
+  const { status, school } = auth;
   const theme = useThemeMode();
   const nav = useNavigationContainerRef();
   const segments = useSegments();
@@ -126,12 +127,31 @@ function Gate({ fontsReady }: { fontsReady: boolean }) {
     if (status === 'signedIn') void registerForPush({ auto: true }).catch(() => undefined);
   }, [status, school?.id]);
 
-  // Bildirime dokununca ilgili ekran açılır (ör. onay bekleyen duyuru → Onaylar)
+  // Bildirime dokununca ilgili ekran açılır (ör. onay bekleyen duyuru → Onaylar). Bildirim telefonda kayıtlı başka bir
+  // hesaba aitse önce o hesaba geçilir (hızlı hesap geçişi); hesap telefondan kaldırılmışsa kısa bir uyarı çıkar.
+  const authRef = useRef(auth);
+  authRef.current = auth;
   useEffect(() => {
     if (Platform.OS === 'web') return;
     const sub = Notifications.addNotificationResponseReceivedListener((r) => {
-      const url = (r.notification.request.content.data as { url?: string } | undefined)?.url;
-      if (url) router.push(url as never);
+      const data = r.notification.request.content.data as { url?: string; userId?: string } | undefined;
+      const a = authRef.current;
+      const open = () => {
+        if (data?.url) router.push(data.url as never);
+      };
+      if (data?.userId && a.me && data.userId !== a.me.user.id) {
+        const target = a.accounts.find((x) => x.userId === data.userId);
+        if (!target) {
+          void openConfirm({ title: 'Bu hesap telefonda kayıtlı değil', message: 'Bildirim, bu telefondan kaldırılmış bir hesaba ait.', confirmLabel: 'Tamam', tone: 'neutral' });
+          return;
+        }
+        void a
+          .switchAccount(target.userId)
+          .then(() => setTimeout(open, 900))
+          .catch(() => undefined);
+        return;
+      }
+      open();
     });
     return () => sub.remove();
   }, []);

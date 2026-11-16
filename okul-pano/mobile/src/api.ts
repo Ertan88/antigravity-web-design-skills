@@ -183,6 +183,21 @@ export async function loginOther(email: string, password: string): Promise<{ ref
   return { refreshToken: json.refreshToken, me: me.user };
 }
 
+/**
+ * Telefonda kayıtlı, açık olmayan hesap için işlem (yenileme anahtarıyla; anahtar değişmez): bildirim bağı
+ * (link/unlink) ya da okunmamış bildirim sayısı (summary).
+ */
+export async function deviceAccount(srv: string, refresh: string, op: 'link' | 'unlink' | 'summary', token?: string): Promise<{ unread?: number }> {
+  const res = await fetch(`${srv}/api/auth/device-account`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ refreshToken: refresh, op, ...(token ? { token, platform: Platform.OS } : {}) }),
+  });
+  const json = (await res.json().catch(() => null)) as { unread?: number; message?: string } | null;
+  if (!res.ok) throw new ApiError(json?.message ?? 'İşlem yapılamadı', res.status);
+  return json ?? {};
+}
+
 export async function changePassword(currentPassword: string, newPassword: string) {
   const json = await api<{ refreshToken?: string }>('/api/me/password', { method: 'POST', body: { currentPassword, newPassword, client: 'mobile' } });
   if (json.refreshToken) await session.setTokens(null, json.refreshToken);

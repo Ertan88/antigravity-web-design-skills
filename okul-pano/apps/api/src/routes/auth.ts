@@ -1,9 +1,9 @@
-import { branchIsVocational, changePasswordSchema, effectivePermissions, isInternshipSubject, loginSchema, updateProfileSchema } from '@okulpano/shared';
-import { and, asc, eq, gt, inArray, lt } from 'drizzle-orm';
+import { branchIsVocational, changePasswordSchema, effectivePermissions, isInternshipSubject, loginSchema, pushTokenSchema, updateProfileSchema } from '@okulpano/shared';
+import { and, asc, eq, gt, inArray, isNull, lt, sql } from 'drizzle-orm';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { accessUser } from '../context.ts';
-import { memberships, schools, sessions, teacherBranches, teachers, teacherTitles, timetableEntries, users } from '../db/schema.ts';
+import { memberships, notifications, pushTokens, schools, sessions, teacherBranches, teachers, teacherTitles, timetableEntries, users } from '../db/schema.ts';
 import { burnPasswordCheck, hashPassword, randomToken, sha256, verifyPassword } from '../lib/crypto.ts';
 import { badRequest, conflict, HttpError, notFound, parse, unauthorized } from '../lib/errors.ts';
 
@@ -157,6 +157,42 @@ export async function authRoutes(app: FastifyInstance) {
     const [user] = await db.select().from(users).where(eq(users.id, session.userId));
     if (!user) throw unauthorized();
     return { userId: user.id, refreshToken: await issueSession(req, user.id) };
+  });
+
+  /**
+   * Telefonda kayıtlı, o an açık olmayan hesap (hızlı hesap geçişi): yenileme anahtarıyla doğrulanır, anahtar
+   * değişmez. link/unlink: bu telefonun bildirimleri o hesaba gelsin ya da gelmesin; summary: okunmamış bildirim sayısı.
+   */
+  const deviceAccountSchema = z.object({
+    refreshToken: z.string().min(10).max(300),
+    op: z.enum(['link', 'unlink', 'summary']),
+    token: pushTokenSchema.shape.token.optional(),
+    platform: z.enum(['android', 'ios', 'web']).optional(),
+  });
+  app.post('/api/auth/device-account', { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req) => {
+    const body = parse(deviceAccountSchema, req.body);
+    const [session] = await db
+      .select({ userId: sessions.userId })
+      .from(sessions)
+      .where(and(eq(sessions.tokenHash, sha256(body.refreshToken)), gt(sessions.expiresAt, new Date())));
+    if (!session) throw unauthorized('Oturumun süresi doldu, lütfen yeniden giriş yapın.');
+    if (body.op === 'summary') {
+      const [row] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(notifications)
+        .where(and(eq(notifications.userId, session.userId), isNull(notifications.readAt)));
+      return { unread: row?.n ?? 0 };
+    }
+    if (!body.token) throw badRequest('Telefon anahtarı gerekli.');
+    if (body.op === 'unlink') {
+      await db.delete(pushTokens).where(and(eq(pushTokens.token, body.token), eq(pushTokens.userId, session.userId)));
+    } else {
+      await db
+        .insert(pushTokens)
+        .values({ userId: session.userId, token: body.token, platform: body.platform ?? 'android' })
+        .onConflictDoUpdate({ target: [pushTokens.token, pushTokens.userId], set: { platform: body.platform ?? 'android' } });
+    }
+    return { ok: true };
   });
 
   app.post('/api/auth/logout', async (req, reply) => {

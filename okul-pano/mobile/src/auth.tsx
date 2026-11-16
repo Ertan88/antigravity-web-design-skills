@@ -3,9 +3,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { loadAccounts, saveAccounts, upsert, type SavedAccount } from './accounts.ts';
-import { api, login, loginOther, logout, session } from './api.ts';
+import { api, deviceAccount, login, loginOther, logout, session } from './api.ts';
 import { clearSaved, restoreQueries, startSaving } from './persist.ts';
-import { registerForPush, unregisterPush } from './push.ts';
+import { deviceToken, isMuted, registerForPush, setMuted, setPushUser, unregisterPush } from './push.ts';
 import { storage } from './storage.ts';
 
 export interface SchoolAccess {
@@ -98,6 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const applyMe = useCallback((data: Me, preferred: string | null) => {
+    setPushUser(data.user.id);
     setMe(data);
     const pick =
       data.schools.find((s) => s.id === preferred) ?? data.schools.find((s) => s.id === data.lastSchoolId) ?? data.schools[0] ?? null;
@@ -206,8 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Arkada süren oturum yenilemesi bitmeden etkin hesabın anahtarı saklanmaz
         await session.settle();
         const current = me ? { ...accountMeta(me), server: session.server, refresh: session.refresh } : null;
-        // Bildirimler yeni hesaba gelsin: telefon eski hesaptan çıkarılır, yeni hesapla kaydedilir
-        await unregisterPush().catch(() => undefined);
+        // Önceki hesabın bildirimleri bu telefona gelmeye devam eder (hesap başına ayar); yeni hesap da bağlanır
         await clearSaved();
         await updateAccounts((list) => {
           let next = current ? upsert(list, current) : list;
@@ -240,7 +240,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       addAccount: async () => {
         await session.settle();
         if (me) await updateAccounts((list) => upsert(list, { ...accountMeta(me), server: session.server, refresh: session.refresh }));
-        await unregisterPush().catch(() => undefined);
         await clearSaved();
         // Sunucudaki oturum kapatılmaz: hesap listede kalır, geri geçilebilir
         await session.setTokens(null, null);
@@ -252,10 +251,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const r = await loginOther(email, password);
         const meta = { userId: r.me.id, email: r.me.email, fullName: r.me.fullName, kind: r.me.isSuperAdmin ? ('platform' as const) : ('school' as const), detail: r.me.isSuperAdmin ? 'Platform yöneticisi' : '' };
         await updateAccounts((list) => upsert(list, { ...meta, server: session.server, refresh: r.refreshToken }));
+        // Yeni kayıtlı hesabın bildirimleri de bu telefona gelir (kapatılmadıysa)
+        const token = await deviceToken();
+        if (token && !(await isMuted(r.me.id))) await deviceAccount(session.server, r.refreshToken, 'link', token).catch(() => undefined);
       },
       forgetAccount: async (userId) => {
         const a = accounts.find((x) => x.userId === userId);
         if (!a || a.userId === me?.user.id) return;
+        const token = await deviceToken();
+        if (a.refresh && token) await deviceAccount(a.server, a.refresh, 'unlink', token).catch(() => undefined);
+        await setMuted(a.userId, false);
         if (a.refresh) void fetch(`${a.server}/api/auth/logout`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ refreshToken: a.refresh }) }).catch(() => undefined);
         await updateAccounts((list) => list.filter((x) => !(x.userId === userId && x.server === a.server)));
       },

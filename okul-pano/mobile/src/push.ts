@@ -5,8 +5,28 @@ import { Platform } from 'react-native';
 import { api } from './api.ts';
 import { storage } from './storage.ts';
 
-const MUTED_KEY = 'okulpano.pushMuted';
+const MUTED_BASE = 'okulpano.pushMuted';
+/** Telefonun bildirim anahtarı (telefona ait; birden fazla hesap aynı anahtarla bağlanır) */
 const TOKEN_KEY = 'okulpano.pushToken';
+
+/**
+ * Bildirim ayarı hesap başınadır (hızlı hesap geçişi): açık hesap AuthProvider'dan bildirilir. Kapatma bilgisi
+ * hesabın kimliğiyle saklanır; eski sürümden kalan tek anahtar ilk hesaba sayılır.
+ */
+let activeUser: string | null = null;
+export function setPushUser(id: string | null) {
+  activeUser = id;
+}
+const mutedKey = (userId: string | null = activeUser) => (userId ? `${MUTED_BASE}.${userId}` : MUTED_BASE);
+export async function isMuted(userId: string | null = activeUser): Promise<boolean> {
+  return Boolean((await storage.get(mutedKey(userId))) ?? (await storage.get(MUTED_BASE)));
+}
+export async function setMuted(userId: string, muted: boolean) {
+  await storage.set(mutedKey(userId), muted ? '1' : null);
+  await storage.set(MUTED_BASE, null);
+}
+/** Bu telefonun bildirim anahtarı (daha önce alındıysa) */
+export const deviceToken = () => storage.get(TOKEN_KEY);
 
 // Uygulama açıkken gelen bildirim de üstte görünsün
 if (Platform.OS !== 'web') {
@@ -50,8 +70,8 @@ export function ensureChannel(): Promise<void> {
 export async function registerForPush(opts: { auto?: boolean } = {}): Promise<'ok' | 'local' | 'denied' | 'unavailable' | 'off'> {
   if (Platform.OS === 'web' || !Device.isDevice) return 'unavailable';
   // Kullanıcı menüden kapattıysa açılışta kendiliğinden yeniden açılmaz
-  if (opts.auto && (await storage.get(MUTED_KEY))) return 'off';
-  if (!opts.auto) await storage.set(MUTED_KEY, null);
+  if (opts.auto && (await isMuted())) return 'off';
+  if (!opts.auto && activeUser) await setMuted(activeUser, false);
   await ensureChannel();
   const current = await Notifications.getPermissionsAsync();
   const granted = current.granted || (await Notifications.requestPermissionsAsync()).granted;
@@ -81,7 +101,7 @@ export async function pushStatus(): Promise<PushState> {
   if (Platform.OS === 'web' || !Device.isDevice) return 'unavailable';
   const perm = await Notifications.getPermissionsAsync();
   if (!perm.granted) return perm.canAskAgain === false ? 'denied' : 'off';
-  if (await storage.get(MUTED_KEY)) return 'off';
+  if (await isMuted()) return 'off';
   return (await storage.get(TOKEN_KEY)) ? 'ok' : 'local';
 }
 
@@ -97,15 +117,17 @@ export const PUSH_TEXT: Record<PushState, string> = {
 /** Menüden kapatma: bu telefon sunucudan bildirim almaz ve açılışta kendiliğinden yeniden açılmaz */
 export async function mutePush() {
   await unregisterPush();
-  await storage.set(MUTED_KEY, '1');
+  if (activeUser) await setMuted(activeUser, true);
 }
 
-/** Çıkışta bu telefon artık bildirim almaz */
+/**
+ * Açık hesabın bu telefondaki bildirim bağını kaldırır (çıkış, kapatma). Telefonun anahtarı silinmez: telefonda
+ * kayıtlı diğer hesapların bildirimleri gelmeye devam eder.
+ */
 export async function unregisterPush() {
   const token = await storage.get(TOKEN_KEY);
   if (!token) return;
   await api('/api/me/push-tokens', { method: 'DELETE', body: { token } }).catch(() => undefined);
-  await storage.set(TOKEN_KEY, null);
 }
 
 /**

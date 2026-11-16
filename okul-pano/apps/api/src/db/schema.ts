@@ -943,12 +943,13 @@ export const pushTokens = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    token: text('token').notNull().unique(),
+    /** Aynı telefon birden fazla hesaba bağlanabilir (hızlı hesap geçişi): telefon + hesap eşsizdir */
+    token: text('token').notNull(),
     platform: text('platform').notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [index('push_tokens_user_idx').on(t.userId)],
+  (t) => [index('push_tokens_user_idx').on(t.userId), uniqueIndex('push_tokens_token_user_uq').on(t.token, t.userId)],
 );
 
 /** Ekranda gösterilen 6 haneli kodla cihaz eşleştirme (TV'lerde klavye gerekmez). */

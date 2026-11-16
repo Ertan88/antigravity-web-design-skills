@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../src/auth.tsx';
 import { Platform, Pressable, Switch, View } from 'react-native';
 import { showTestNotices } from '../src/inAppNotice.tsx';
-import { mutePush, PUSH_TEXT, pushStatus, registerForPush, sendTestNotification, type PushState } from '../src/push.ts';
+import { deviceToken, isMuted, mutePush, PUSH_TEXT, pushStatus, registerForPush, sendTestNotification, setMuted, type PushState } from '../src/push.ts';
+import { deviceAccount } from '../src/api.ts';
+import { AccountKind } from '../src/accountsSheet.tsx';
 import { useReminderSettings, type ReminderSettings } from '../src/reminders.ts';
 import { Text } from '../src/text.tsx';
 import { colors, tiles, type TileTone } from '../src/theme.ts';
@@ -59,7 +61,29 @@ const ROWS: Row[] = [
 
 export default function Hatirlatmalar() {
   const [s, save] = useReminderSettings();
-  const { isTeacher } = useAuth();
+  const { isTeacher, me, accounts } = useAuth();
+  // Bu telefonda kayıtlı diğer hesaplar: her birinin bildirimi ayrı açılır / kapanır
+  const others = accounts.filter((a) => a.userId !== me?.user.id);
+  const [otherOn, setOtherOn] = useState<Record<string, boolean>>({});
+  const [otherError, setOtherError] = useState<string | null>(null);
+  useEffect(() => {
+    void Promise.all(others.map(async (a) => [a.userId, !(await isMuted(a.userId))] as const)).then((rows) => setOtherOn(Object.fromEntries(rows)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accounts.length, me?.user.id]);
+  const toggleOther = async (userId: string, on: boolean) => {
+    const a = others.find((x) => x.userId === userId);
+    if (!a) return;
+    setOtherError(null);
+    setOtherOn((m) => ({ ...m, [userId]: on }));
+    try {
+      const token = await deviceToken();
+      if (a.refresh && token) await deviceAccount(a.server, a.refresh, on ? 'link' : 'unlink', token);
+      await setMuted(userId, !on);
+    } catch {
+      setOtherOn((m) => ({ ...m, [userId]: !on }));
+      setOtherError('Kaydedilemedi: internet bağlantınızı kontrol edip yeniden deneyin.');
+    }
+  };
   const [test, setTest] = useState<string | null>(null);
   const [push, setPush] = useState<PushState | 'error' | null>(null);
   // Sayfaya her girişte telefonun gerçek izin durumu okunur
@@ -93,6 +117,40 @@ export default function Hatirlatmalar() {
             last
           />
         </Card>
+      )}
+      {Platform.OS !== 'web' && others.length > 0 && (
+        <>
+          <Label>Bu telefondaki diğer hesaplar</Label>
+          <Card style={{ paddingVertical: 4, gap: 0 }}>
+            {others.map((a, i) => (
+              <View key={a.userId} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: colors.divider }}>
+                <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: colors.ink, flexShrink: 1 }} numberOfLines={1}>
+                      {a.fullName}
+                    </Text>
+                    <AccountKind kind={a.kind} />
+                  </View>
+                  <T size={12.5} color={colors.muted} lines={1}>
+                    {!a.refresh ? 'Oturum kapalı: bildirim için bu hesaba bir kez şifreyle girin' : otherOn[a.userId] === false ? 'Bildirimleri bu telefona gelmiyor' : 'Bildirimleri bu telefona da gelir'}
+                  </T>
+                </View>
+                <Switch
+                  accessibilityLabel={`${a.fullName} bildirimleri`}
+                  value={Boolean(a.refresh) && otherOn[a.userId] !== false}
+                  disabled={!a.refresh}
+                  onValueChange={(v) => void toggleOther(a.userId, v)}
+                  {...switchColors()}
+                />
+              </View>
+            ))}
+          </Card>
+          {otherError && (
+            <T size={13} color={colors.danger}>
+              {otherError}
+            </T>
+          )}
+        </>
       )}
       {isTeacher && <Label>Nöbet hatırlatmaları</Label>}
       {isTeacher && (

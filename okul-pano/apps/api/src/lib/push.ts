@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { AppDeps } from '../context.ts';
-import { memberships, pushTokens } from '../db/schema.ts';
+import { memberships, pushTokens, users } from '../db/schema.ts';
 import type { Permission } from '@okulpano/shared';
 
 export interface PushMessage {
@@ -30,7 +30,7 @@ export async function tell(
 }
 
 /** 'memory' modunda gönderilen bildirimler (testler) */
-export const sentPushes: { to: string[]; message: PushMessage }[] = [];
+export const sentPushes: { to: string[]; message: PushMessage; userId?: string }[] = [];
 
 const CHUNK = 100;
 
@@ -44,16 +44,32 @@ export function notifyUsers(deps: AppDeps, userIds: readonly string[], message: 
   void send(deps, ids, message).catch((err) => console.warn('Bildirim gönderilemedi:', (err as Error).message));
 }
 
+/**
+ * Bir telefon birden fazla hesaba bağlı olabilir (hızlı hesap geçişi): bildirim hesabın kimliğiyle gider, uygulama
+ * dokununca o hesaba geçer. Platform hesabına gidenlerin başında "Platform ·" yazar (hangi hesaba geldiği belli olsun).
+ */
 async function send(deps: AppDeps, userIds: string[], message: PushMessage) {
-  const rows = await deps.db.select({ token: pushTokens.token }).from(pushTokens).where(inArray(pushTokens.userId, userIds));
-  await sendToTokens(deps, rows.map((r) => r.token), message);
+  const rows = await deps.db
+    .select({ token: pushTokens.token, userId: pushTokens.userId, sa: users.isSuperAdmin })
+    .from(pushTokens)
+    .innerJoin(users, eq(users.id, pushTokens.userId))
+    .where(inArray(pushTokens.userId, userIds));
+  const byUser = new Map<string, { sa: boolean; tokens: string[] }>();
+  for (const r of rows) {
+    const g = byUser.get(r.userId) ?? { sa: r.sa, tokens: [] };
+    g.tokens.push(r.token);
+    byUser.set(r.userId, g);
+  }
+  for (const [userId, g] of byUser) {
+    await sendToTokens(deps, g.tokens, { ...message, title: g.sa ? `Platform · ${message.title}` : message.title }, { userId });
+  }
 }
 
 /** Belirli telefonlara gönderir (ör. sınav hatırlatmasını kendinde kurmamış olanlara) */
-export async function sendToTokens(deps: Pick<AppDeps, "db" | "env">, tokens: readonly string[], message: PushMessage) {
+export async function sendToTokens(deps: Pick<AppDeps, "db" | "env">, tokens: readonly string[], message: PushMessage, extra: { userId?: string } = {}) {
   if (!tokens.length || deps.env.PUSH_URL === 'off') return;
   if (deps.env.PUSH_URL === 'memory') {
-    sentPushes.push({ to: [...tokens], message });
+    sentPushes.push({ to: [...tokens], message, ...extra });
     return;
   }
   for (let i = 0; i < tokens.length; i += CHUNK) {
@@ -66,7 +82,7 @@ export async function sendToTokens(deps: Pick<AppDeps, "db" | "env">, tokens: re
         ...(deps.env.PUSH_ACCESS_TOKEN ? { authorization: `Bearer ${deps.env.PUSH_ACCESS_TOKEN}` } : {}),
       },
       body: JSON.stringify(
-        batch.map((to) => ({ to, title: message.title, body: message.body, sound: 'default', priority: 'high', channelId: 'okul-yayin', data: { url: message.url ?? '/' } })),
+        batch.map((to) => ({ to, title: message.title, body: message.body, sound: 'default', priority: 'high', channelId: 'okul-yayin', data: { url: message.url ?? '/', ...(extra.userId ? { userId: extra.userId } : {}) } })),
       ),
       signal: AbortSignal.timeout(10_000),
     });

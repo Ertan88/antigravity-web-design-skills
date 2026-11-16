@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { deviceAccount } from './api.ts';
 import { Modal, Pressable, View } from 'react-native';
 import type { SavedAccount } from './accounts.ts';
 import { useAuth } from './auth.tsx';
@@ -18,7 +19,7 @@ export function AccountKind({ kind }: { kind: SavedAccount['kind'] }) {
 }
 
 /** Tek hesap satırı: dokununca o hesaba geçilir; etkin hesap işaretli */
-export function AccountRow({ a, active, busy, onPress, onForget }: { a: SavedAccount; active: boolean; busy?: boolean; onPress: () => void; onForget?: () => void }) {
+export function AccountRow({ a, active, busy, unread, onPress, onForget }: { a: SavedAccount; active: boolean; busy?: boolean; unread?: number; onPress: () => void; onForget?: () => void }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
       <Pressable
@@ -62,6 +63,11 @@ export function AccountRow({ a, active, busy, onPress, onForget }: { a: SavedAcc
             </T>
           )}
         </View>
+        {!active && unread ? (
+          <View accessibilityLabel={`${unread} okunmamış bildirim`} style={{ minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, backgroundColor: colors.danger, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#fff' }}>{unread > 99 ? '99+' : String(unread)}</Text>
+          </View>
+        ) : null}
         {active && <Icon name="checkmark" size={20} color={colors.ink} strokeWidth={3} />}
       </Pressable>
       {!active && onForget && <DeleteIconButton label={`${a.email} bu telefondan kaldırılsın`} onPress={onForget} />}
@@ -78,6 +84,17 @@ export function AccountsSheet({ open, onClose }: { open: boolean; onClose: () =>
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const activeId = me?.user.id;
+  // Açık olmayan hesapların okunmamış bildirim sayısı (sayfa her açıldığında)
+  const [unread, setUnread] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (!open) return;
+    for (const a of accounts) {
+      if (a.userId === activeId || !a.refresh) continue;
+      void deviceAccount(a.server, a.refresh, 'summary')
+        .then((r) => setUnread((m) => ({ ...m, [a.userId]: r.unread ?? 0 })))
+        .catch(() => undefined);
+    }
+  }, [open, accounts, activeId]);
   const list = [...accounts].sort((a, b) => (a.userId === activeId ? -1 : b.userId === activeId ? 1 : 0));
 
   const go = async (a: SavedAccount) => {
@@ -108,6 +125,7 @@ export function AccountsSheet({ open, onClose }: { open: boolean; onClose: () =>
             a={a}
             active={a.userId === activeId}
             busy={busy === a.userId}
+            unread={unread[a.userId]}
             onPress={() => void go(a)}
             onForget={() =>
               void confirm('Hesap bu telefondan kaldırılsın mı?', `${a.email} listeden çıkar. Hesap silinmez; yeniden eklemek için şifreyle giriş yapılır.`, 'Kaldır').then(
