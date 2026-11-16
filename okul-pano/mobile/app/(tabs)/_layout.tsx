@@ -8,7 +8,7 @@ import { useAuth, type AppRole } from "../../src/auth.tsx";
 import { visibleTabs, type TabName } from "../../src/tabs.ts";
 import { useControlCenter, useInbox } from "../../src/data.ts";
 import { colors, dark } from "../../src/theme.ts";
-import { Animated, Keyboard, Platform, Pressable, View } from "react-native";
+import { Animated, Keyboard, Platform, Pressable, useWindowDimensions, View } from "react-native";
 import { useChromeHidden } from "../../src/scrollChrome.ts";
 import { Icon, TabBarInset, type IconName } from "../../src/ui.tsx";
 
@@ -30,7 +30,7 @@ const HOME_ICON: Record<AppRole, [IconName, IconName]> = {
   teacher: ["home-outline", "home"],
 };
 
-const BAR_HEIGHT = 60;
+const BAR_HEIGHT = 66;
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>>[0];
 
@@ -42,6 +42,7 @@ type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>
 function FloatingTabBar({ state, descriptors, emitter, navigateToTab, bottom }: TabBarProps & { bottom: number }) {
   const [keyboard, setKeyboard] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
+  const { width: winWidth } = useWindowDimensions();
   // Aşağı kaydırırken alt menü ekranın altına kayar, yukarı kaydırınca geri gelir
   const hidden = useChromeHidden();
   const slide = useRef(new Animated.Value(0)).current;
@@ -80,6 +81,7 @@ function FloatingTabBar({ state, descriptors, emitter, navigateToTab, bottom }: 
         style={{
           flexDirection: "row",
           alignItems: "center",
+          width: Math.min(winWidth - 28, 520),
           gap: 2,
           height: BAR_HEIGHT,
           paddingHorizontal: 7,
@@ -99,7 +101,7 @@ function FloatingTabBar({ state, descriptors, emitter, navigateToTab, bottom }: 
           const focused = state.index === index;
           const label = typeof options.title === "string" ? options.title : route.name;
           const badge = options.tabBarBadge;
-          const color = focused ? colors.onPrimary : colors.muted;
+          const color = focused ? colors.ink : colors.muted;
           const onPress = () => {
             const e = emitter.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
             if (!focused && !e.defaultPrevented) navigateToTab(route.key);
@@ -111,28 +113,20 @@ function FloatingTabBar({ state, descriptors, emitter, navigateToTab, bottom }: 
               accessibilityState={{ selected: focused }}
               accessibilityLabel={badge ? `${label}, ${badge}` : label}
               onPress={onPress}
-              onLongPress={() => setHint(label)}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 7,
-                height: 46,
-                minWidth: 50,
-                justifyContent: "center",
-                paddingHorizontal: focused ? 16 : 12,
-                borderRadius: 23,
-                backgroundColor: focused ? colors.primary : "transparent",
-              }}
+              style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 3, height: BAR_HEIGHT - 8 }}
             >
-              <View>
+              {/* Alt menü A: simge üstte (seçiliyse hafif zeminde), adı her zaman altında */}
+              <View style={{ paddingHorizontal: 14, paddingVertical: 3, borderRadius: 14, backgroundColor: focused ? colors.primarySoft : "transparent" }}>
                 {options.tabBarIcon?.({ focused, color, size: 22 })}
                 {badge != null && badge !== "" && (
-                  <View style={{ position: "absolute", top: -6, right: -9, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: colors.danger, alignItems: "center", justifyContent: "center" }}>
+                  <View style={{ position: "absolute", top: -4, right: 2, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: colors.danger, alignItems: "center", justifyContent: "center" }}>
                     <Text style={{ ...centeredText(10), fontWeight: "800", color: "#fff" }}>{String(badge)}</Text>
                   </View>
                 )}
               </View>
-              {focused && <Text style={{ fontSize: 14, fontWeight: "800", color: colors.onPrimary }}>{label}</Text>}
+              <Text numberOfLines={1} style={{ fontSize: 10.5, fontWeight: focused ? "800" : "700", color: focused ? colors.ink : colors.muted, maxWidth: "100%" }}>
+                {label}
+              </Text>
             </Pressable>
           );
         })}

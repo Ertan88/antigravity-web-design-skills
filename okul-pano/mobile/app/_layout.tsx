@@ -18,6 +18,7 @@ import { Text } from '../src/text.tsx';
 import { initialWindowMetrics, SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../src/auth.tsx';
 import { ConfirmHost } from '../src/confirm.tsx';
+import { SwitchingOverlay } from '../src/accountsSheet.tsx';
 import { restored } from '../src/persist.ts';
 import { registerForPush } from '../src/push.ts';
 import { colors } from '../src/theme.ts';
@@ -155,6 +156,7 @@ function Gate({ fontsReady }: { fontsReady: boolean }) {
       )}
       {status === 'signedIn' && fontsReady && splashHidden && <InAppNotices />}
       <ConfirmHost />
+      <SwitchingOverlay />
       {!splashHidden &&
         (fontsReady ? (
           <BrandSplash finishing={splashFinishing} onHidden={hideSplash} />

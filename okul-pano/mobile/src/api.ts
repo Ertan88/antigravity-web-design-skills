@@ -50,6 +50,13 @@ export const session = {
   get refresh() {
     return refreshToken;
   },
+  /**
+   * Sürmekte olan oturum yenilemesini bekler. Hesap değiştirmeden önce çağrılır: yenileme yarıda kalırsa sunucu eski
+   * anahtarı geçersiz kılar, yeni anahtar da başka hesabın oturumuna yazılırdı (hesap "oturum kapalı" görünürdü).
+   */
+  async settle() {
+    if (refreshing) await refreshing.catch(() => false);
+  },
   async setServer(url: string) {
     server = normalizeServer(url);
     await storage.set(KEYS.server, server);
@@ -82,14 +89,17 @@ export const absoluteUrl = (u: string | null | undefined) => (u ? (/^https?:/i.t
 async function refresh(): Promise<boolean> {
   if (!refreshToken) return false;
   refreshing ??= (async () => {
+    const sent = refreshToken;
     try {
       const res = await fetch(`${server}/api/auth/refresh`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
+        body: JSON.stringify({ refreshToken: sent }),
       });
       if (!res.ok) return false;
       const json = (await res.json()) as { accessToken: string; refreshToken: string };
+      // Bu arada hesap değiştiyse yeni anahtar başka hesabın oturumuna yazılmaz
+      if (refreshToken !== sent) return false;
       await session.setTokens(json.accessToken, json.refreshToken);
       return true;
     } catch {

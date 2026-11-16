@@ -1,5 +1,6 @@
 import { appView, type Permission, type Role } from '@okulpano/shared/permissions';
 import { useQueryClient } from '@tanstack/react-query';
+import { router } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { loadAccounts, saveAccounts, upsert, type SavedAccount } from './accounts.ts';
 import { api, login, loginOther, logout, session } from './api.ts';
@@ -66,6 +67,8 @@ interface AuthValue {
   accounts: SavedAccount[];
   /** Kayıtlı başka bir hesaba şifresiz geçer */
   switchAccount: (userId: string) => Promise<void>;
+  /** Geçiş sürerken ekranı kaplayan bilgi ("Okul hesabına geçiliyor") */
+  switching: SavedAccount | null;
   /** Etkin hesabı saklayıp giriş ekranını açar (yeni hesap eklemek için) */
   addAccount: () => Promise<void>;
   /** Etkin oturuma dokunmadan bir hesabı listeye ekler (hesap ayırma sonrası) */
@@ -86,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Platform yöneticisi açılışta platform görünümündedir; okuluna geçince hatırlanır
   const [platformMode, setPlatformModeState] = useState(true);
   const [accounts, setAccounts] = useState<SavedAccount[]>([]);
+  const [switching, setSwitching] = useState<SavedAccount | null>(null);
   const updateAccounts = useCallback(async (fn: (list: SavedAccount[]) => SavedAccount[]) => {
     const next = fn(await loadAccounts());
     await saveAccounts(next);
@@ -198,6 +202,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const target = accounts.find((a) => a.userId === userId);
         if (!target || target.userId === me?.user.id) return;
         if (!target.refresh) throw new Error('Bu hesabın oturumu kapanmış. Şifreyle yeniden giriş yapın.');
+        setSwitching(target);
+        // Arkada süren oturum yenilemesi bitmeden etkin hesabın anahtarı saklanmaz
+        await session.settle();
         const current = me ? { ...accountMeta(me), server: session.server, refresh: session.refresh } : null;
         // Bildirimler yeni hesaba gelsin: telefon eski hesaptan çıkarılır, yeni hesapla kaydedilir
         await unregisterPush().catch(() => undefined);
@@ -221,11 +228,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             await session.setTokens(null, current.refresh);
             await loadMe(null).catch(() => undefined);
           }
+          setSwitching(null);
           throw e instanceof Error ? e : new Error('Hesaba geçilemedi');
         }
         void registerForPush({ auto: true }).catch(() => undefined);
+        // Yeni hesabın ana sayfası açılır; geçiş ekranı kısa bir süre görünür kalır
+        router.replace('/');
+        setTimeout(() => setSwitching(null), 700);
       },
+      switching,
       addAccount: async () => {
+        await session.settle();
         if (me) await updateAccounts((list) => upsert(list, { ...accountMeta(me), server: session.server, refresh: session.refresh }));
         await unregisterPush().catch(() => undefined);
         await clearSaved();
@@ -253,7 +266,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         void api('/api/me/school', { method: 'PUT', body: { schoolId: id } }).catch(() => undefined);
       },
     };
-  }, [status, me, schoolId, server, platformMode, loadMe, qc, accounts, updateAccounts]);
+  }, [status, me, schoolId, server, platformMode, loadMe, qc, accounts, updateAccounts, switching]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

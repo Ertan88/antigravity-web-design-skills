@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Modal, Pressable, View } from 'react-native';
 import type { SavedAccount } from './accounts.ts';
 import { useAuth } from './auth.tsx';
 import { Sheet } from './sheet.tsx';
@@ -141,5 +141,28 @@ export function AccountsSheet({ open, onClose }: { open: boolean; onClose: () =>
         Hesaplar yalnızca bu telefonda kayıtlıdır. Platform ve okul işlemleri birbirine karışmaz. Telefonunuzda ekran kilidi açık olsun.
       </T>
     </Sheet>
+  );
+}
+
+/** Hesap değişirken ekranı kaplayan kısa bilgi: hangi hesaba geçildiği açıkça görünür */
+export function SwitchingOverlay() {
+  const { switching } = useAuth();
+  if (!switching) return null;
+  return (
+    <Modal visible transparent animationType="fade" statusBarTranslucent>
+      <View accessibilityLiveRegion="polite" style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', gap: 14, padding: 24 }}>
+        <Avatar name={switching.fullName} size={72} />
+        <Text style={{ fontSize: 20, fontWeight: '800', color: colors.ink, textAlign: 'center' }}>{switching.fullName}</Text>
+        <AccountKind kind={switching.kind} />
+        <T color={colors.muted} style={{ textAlign: 'center' }}>
+          {switching.kind === 'platform' ? 'Platform hesabına geçiliyor…' : 'Okul hesabına geçiliyor…'}
+        </T>
+        {switching.kind === 'school' && switching.detail ? (
+          <T size={13} color={colors.faint} style={{ textAlign: 'center' }}>
+            {switching.detail}
+          </T>
+        ) : null}
+      </View>
+    </Modal>
   );
 }
