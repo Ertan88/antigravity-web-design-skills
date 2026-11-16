@@ -1,4 +1,4 @@
-import { bellClassDays, joinClassNames, leaveRequestSchema, lessonCounts, nextSchoolDay, normalizeName, pushTokenSchema, schoolSettingsSchema, zonedParts, type SchoolCalendar } from '@okulpano/shared';
+import { bellClassDays, joinClassNames, responsibleFor, leaveRequestSchema, lessonCounts, nextSchoolDay, normalizeName, pushTokenSchema, schoolSettingsSchema, zonedParts, type SchoolCalendar } from '@okulpano/shared';
 import { and, asc, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -9,6 +9,7 @@ import { badRequest, notFound, parse } from '../lib/errors.ts';
 import { notifyUsers, usersWithPermission } from '../lib/push.ts';
 import { teacherCovers } from './covers.ts';
 import { tell } from './issues.ts';
+import { notifyCoverNeed } from '../lib/responsibility.ts';
 
 /**
  * Mobil uygulamanın "benim" uç noktaları: öğretmenin günü (ders programı, nöbetleri), izin bildirimi
@@ -186,7 +187,9 @@ export async function meRoutes(app: FastifyInstance) {
     const body = parse(leaveRequestSchema, req.body);
     // Kişi kendi iznini onaylamaz: izin yetkisi olan başka biri varsa onaya düşer. Onaylayacak başka kimse yoksa
     // (ör. tek yöneticili okulda müdürün kendi izni) doğrudan geçerli olur.
-    const approvers = (await usersWithPermission(app.deps, schoolId, 'leaves.manage')).filter((id) => id !== userId);
+    const eligible = (await usersWithPermission(app.deps, schoolId, 'leaves.manage')).filter((id) => id !== userId);
+    // Görev dağılımında izinlerin sorumlusu seçildiyse yalnızca ona gider
+    const approvers = responsibleFor(req.ctx.school.settings?.responsibilities?.leaves, eligible);
     const autoApprove = permissions.includes('leaves.manage') && approvers.length === 0;
     const [row] = await db
       .insert(teacherLeaves)
@@ -202,8 +205,10 @@ export async function meRoutes(app: FastifyInstance) {
       .returning();
     const [t] = await db.select({ fullName: teachers.fullName }).from(teachers).where(eq(teachers.id, teacherId));
     await audit(req, 'create', 'İzin bildirimi', row!.id, `${t?.fullName ?? ''} · ${body.startDate} – ${body.endDate}`);
-    if (autoApprove) bus.contentChanged(schoolId);
-    else {
+    if (autoApprove) {
+      bus.contentChanged(schoolId);
+      await notifyCoverNeed(app.deps, schoolId, req.ctx.school.settings, zonedParts(new Date(), req.ctx.school.timezone).isoDate, { teacherName: t?.fullName ?? '', startDate: body.startDate, endDate: body.endDate }, (ids, n) => tell(app.deps, ids, n));
+    } else {
       // Bildirim kutusunda onay bekleyen izin olarak görünür (notifications.ts); telefona da gönderilir
       notifyUsers(app.deps, approvers, {
         title: 'İzin bildirimi',
@@ -245,7 +250,7 @@ export async function meRoutes(app: FastifyInstance) {
     await audit(req, 'delete', 'İzin bildirimi', id, `${t?.fullName ?? ''} · ${row.startDate} – ${row.endDate}`);
     if (row.approvalStatus === 'approved') {
       bus.contentChanged(schoolId);
-      const approvers = (await usersWithPermission(app.deps, schoolId, 'leaves.manage')).filter((u) => u !== req.ctx.userId);
+      const approvers = responsibleFor(req.ctx.school.settings?.responsibilities?.leaves, (await usersWithPermission(app.deps, schoolId, 'leaves.manage')).filter((u) => u !== req.ctx.userId));
       await tell(app.deps, approvers, {
         kind: 'leave-withdrawn',
         title: 'İzin geri alındı',

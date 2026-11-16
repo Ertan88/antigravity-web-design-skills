@@ -215,6 +215,19 @@ export const schoolSettingsSchema = z.object({
   titleRoles: z.record(z.uuid(), z.enum(['admin', 'teacher', 'counselor'])).default({}),
   /** KVKK aydınlatma metni: okulun kendi metni, herkese açık /aydinlatma/<okul> adresinde yayınlanır */
   privacyNotice: z.string().max(20000).default(''),
+  /**
+   * Görev dağılımı: iş → bildirim ve onayın gideceği yöneticiler (müdür ya da müdür yardımcıları). Boş bırakılan işte
+   * yetkisi olan bütün yöneticilere gider. Ders görevlendirme her gün o günün nöbetçi müdür yardımcısına gider (ayar yok);
+   * mesleki eğitim "Koordinatör müdür yardımcısı" ayarını kullanır.
+   */
+  responsibilities: z
+    .object({
+      leaves: z.array(z.uuid()).max(10).default([]),
+      duties: z.array(z.uuid()).max(10).default([]),
+      issues: z.array(z.uuid()).max(10).default([]),
+      announcements: z.array(z.uuid()).max(10).default([]),
+    })
+    .default({ leaves: [], duties: [], issues: [], announcements: [] }),
 });
 export type SchoolSettings = z.infer<typeof schoolSettingsSchema>;
 export const defaultSchoolSettings: SchoolSettings = schoolSettingsSchema.parse({});

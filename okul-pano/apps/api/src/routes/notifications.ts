@@ -1,4 +1,5 @@
-import { schoolFullName, zonedParts } from '@okulpano/shared';
+import { isResponsible } from '../lib/responsibility.ts';
+import { schoolFullName, zonedParts, type Permission, type ResponsibilityArea } from '@okulpano/shared';
 import { and, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, notInArray, or, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -50,8 +51,11 @@ export async function notificationRoutes(app: FastifyInstance) {
     const { schoolId, userId, permissions, school } = ctx;
     const out: PanelNotification[] = [];
     const weekAgo = new Date(Date.now() - 7 * 86400_000);
+    // Görev dağılımı: işin sorumlusu seçildiyse türetilen bildirim yalnızca ona görünür
+    const assigned = (area: ResponsibilityArea, permission: Permission) =>
+      permissions.includes(permission) && isResponsible(app.deps, schoolId, school.settings, area, permission, userId);
 
-    if (permissions.includes('announcements.approve')) {
+    if (await assigned('announcements', 'announcements.approve')) {
       const pending = await db
         .select({ id: announcements.id, title: announcements.title, updatedAt: announcements.updatedAt, by: users.fullName })
         .from(announcements)
@@ -107,7 +111,7 @@ export async function notificationRoutes(app: FastifyInstance) {
     }
 
     // Öğretmenlerin mobil uygulamadan bildirdiği izinler
-    if (permissions.includes('leaves.manage')) {
+    if (await assigned('leaves', 'leaves.manage')) {
       const pendingLeaves = await db
         .select({ id: teacherLeaves.id, startDate: teacherLeaves.startDate, endDate: teacherLeaves.endDate, createdAt: teacherLeaves.createdAt, name: teachers.fullName, requestedBy: teacherLeaves.requestedBy })
         .from(teacherLeaves)
@@ -129,7 +133,7 @@ export async function notificationRoutes(app: FastifyInstance) {
     }
 
     // Bugün boş kalan nöbet yerleri (öğretmen izinli, yerine kimse yok)
-    if (permissions.includes('duties.manage')) {
+    if (await assigned('duties', 'duties.manage')) {
       const today = zonedParts(new Date(), school.timezone).isoDate;
       const gaps = dutyGaps(await dutyDay(db, schoolId, today));
       if (gaps.length) {
@@ -146,7 +150,7 @@ export async function notificationRoutes(app: FastifyInstance) {
     }
 
     // Önümüzdeki 3 hafta: bayrama bitişik olası köprü günleri (idari izin ilan edilirse Tatil Takvimi'nden işaretlenir)
-    if (permissions.includes('duties.manage')) {
+    if (await assigned('duties', 'duties.manage')) {
       const today = zonedParts(new Date(), school.timezone).isoDate;
       const { bridges } = await upcomingHolidays(db, schoolId, today, 21);
       for (const b of bridges) {

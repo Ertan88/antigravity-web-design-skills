@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useAuth } from '../src/auth.tsx';
 import { Platform, Pressable, Switch, View } from 'react-native';
 import { showTestNotices } from '../src/inAppNotice.tsx';
-import { sendTestNotification } from '../src/push.ts';
+import { mutePush, PUSH_TEXT, pushStatus, registerForPush, sendTestNotification, type PushState } from '../src/push.ts';
 import { useReminderSettings, type ReminderSettings } from '../src/reminders.ts';
 import { Text } from '../src/text.tsx';
 import { colors, tiles, type TileTone } from '../src/theme.ts';
-import { Button, Card, Icon, Loading, Screen, switchColors, T, type IconName } from '../src/ui.tsx';
+import { Badge, Button, Card, Icon, Label, ListRow, Loading, Screen, switchColors, T, type IconName } from '../src/ui.tsx';
 
 /*
+ * Bildirim ayarları: telefon bildirimleri (aç / kapat) ve nöbet hatırlatmaları tek sayfada.
  * Nöbet hatırlatmaları: her biri ayrı açılır, saatleri seçilir. Bildirimleri uygulama telefonun kendisinde kurar
  * (internet gerekmez); ayarlar bu telefonda saklanır.
  */
@@ -57,10 +59,16 @@ const ROWS: Row[] = [
 
 export default function Hatirlatmalar() {
   const [s, save] = useReminderSettings();
+  const { isTeacher } = useAuth();
   const [test, setTest] = useState<string | null>(null);
+  const [push, setPush] = useState<PushState | 'error' | null>(null);
+  // Sayfaya her girişte telefonun gerçek izin durumu okunur
+  useEffect(() => {
+    void pushStatus().then(setPush).catch(() => undefined);
+  }, []);
   if (!s) {
     return (
-      <Screen back title="Nöbet hatırlatmaları">
+      <Screen back title="Bildirim ayarları">
         <Loading />
       </Screen>
     );
@@ -68,7 +76,26 @@ export default function Hatirlatmalar() {
   const set = <K extends Key>(key: K, patch: Partial<ReminderSettings[K]>) => save({ ...s, [key]: { ...s[key], ...patch } });
 
   return (
-    <Screen back title="Nöbet hatırlatmaları" subtitle="Telefonunuza bildirim olarak gelir">
+    <Screen back title="Bildirim ayarları">
+      {Platform.OS !== 'web' && (
+        <Card style={{ paddingVertical: 4, gap: 0 }}>
+          <ListRow
+            tile={{ icon: 'phone-portrait-outline', tone: 'sky' }}
+            title="Telefon bildirimleri"
+            subtitle={push === 'error' ? 'Kaydedilemedi: internet bağlantınızı kontrol edip yeniden deneyin.' : push ? PUSH_TEXT[push] : undefined}
+            right={push === 'ok' || push === 'local' ? <Badge tone="success">Açık</Badge> : push === 'off' || push === 'denied' ? <Badge tone="warning">Kapalı</Badge> : undefined}
+            // Açıkken dokunmak kapatır, kapalıyken açar
+            onPress={() =>
+              void (push === 'ok' || push === 'local' ? mutePush().then(() => setPush('off')) : registerForPush().then((r) => setPush(r === 'denied' ? 'denied' : r))).catch(() =>
+                setPush('error'),
+              )
+            }
+            last
+          />
+        </Card>
+      )}
+      {isTeacher && <Label>Nöbet hatırlatmaları</Label>}
+      {isTeacher && (
       <Card style={{ padding: 0, gap: 0, overflow: 'hidden' }}>
         {ROWS.map((r, i) => {
           const on = s[r.key].on;
@@ -112,6 +139,7 @@ export default function Hatirlatmalar() {
           );
         })}
       </Card>
+      )}
       <T size={12.5} color={colors.faint} style={{ lineHeight: 18 }}>
         Değişiklik bildirimleri her zaman açıktır: yerinize birisi görevlendirildiğinde, size yeni görev verildiğinde ya da nöbet çizelgesi değiştiğinde haber verilir.
         Hatırlatmalar bu telefonda kurulur; internet olmasa da gelir.

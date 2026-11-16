@@ -7,6 +7,7 @@ import {
   issueCreateSchema,
   issueUpdateSchema,
   messageSchema,
+  responsibleFor,
   schoolSettingsSchema,
   supportCreateSchema,
   supportStatusSchema,
@@ -73,7 +74,9 @@ export async function issueRoutes(app: FastifyInstance) {
   /** Kategorinin sorumlu idarecisi (okul ayarı) ya da bütün idareciler; ayrıca ek sorumlular (ör. meslek öğretmeni) */
   async function recipients(schoolId: string, category: string): Promise<string[]> {
     const { owners } = await issueSettings(schoolId);
-    const all = await managers(schoolId);
+    // Görev dağılımında okul sorunlarının sorumlusu seçildiyse kategori sorumlusu olmayan sorunlar ona gider
+    const [sc] = await db.select({ settings: schools.settings }).from(schools).where(eq(schools.id, schoolId));
+    const all = responsibleFor(sc?.settings?.responsibilities?.issues, await managers(schoolId));
     const owner = owners[category];
     return [...new Set([...(owner && all.includes(owner) ? [owner] : all), ...(await helpersOf(schoolId, category))])];
   }

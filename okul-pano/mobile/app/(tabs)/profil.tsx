@@ -263,7 +263,6 @@ export default function Menu() {
           ? { title: 'Nöbetlerim', subtitle: 'Bu hafta ve yerine görevlendirmeler', icon: 'shield-checkmark-outline', to: '/nobet' }
           : can('duties.manage') && { title: 'Nöbet çizelgesi', subtitle: 'Bugünkü nöbetçiler ve haftalık çizelge', icon: 'shield-checkmark-outline', to: '/nobet' }),
       can('duties.manage') && notTab('gorevlendirme') && { title: 'Ders görevlendirme', subtitle: 'İzinli öğretmenin dersleri ve nöbet yeri', icon: 'people-outline', to: '/gorevlendirme' },
-      isTeacher && { title: 'Nöbet hatırlatmaları', subtitle: reminderSummary(reminders), icon: 'notifications-outline', to: '/hatirlatmalar' },
       isTeacher && {
         title: role === 'teacher' ? 'İzinlerim' : 'İzin bildir',
         subtitle: pendingLeaves ? `${pendingLeaves} bildirim onay bekliyor` : 'Onay durumu',
@@ -376,6 +375,13 @@ export default function Menu() {
           Üyesi olduğunuz okullarda üyeliğinizdeki rolle çalışırsınız. Diğer okullara yalnızca müdürün onayladığı süreli destek erişimiyle girersiniz.
         </T>
       )}
+
+      <View style={{ gap: 6 }}>
+        <SectionTitle>Ayarlar</SectionTitle>
+        <Card style={{ paddingVertical: 4, gap: 0 }}>
+          <ListRow tile={{ icon: 'notifications-outline', tone: 'sun' }} title="Bildirim ayarları" onPress={() => router.push('/hatirlatmalar')} last />
+        </Card>
+      </View>
 
       <View style={{ gap: 10 }}>
         <SectionTitle>Görünüm</SectionTitle>

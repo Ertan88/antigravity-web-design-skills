@@ -1136,7 +1136,9 @@ function CoordinatorsCard() {
   });
   const list = q.data?.teachers ?? [];
   const on = list.filter((t) => t.designated);
-  const off = list.filter((t) => !t.designated);
+  const groups = [...list.reduce((m, t) => m.set(t.branchName || "Alan girilmemiş", [...(m.get(t.branchName || "Alan girilmemiş") ?? []), t]), new Map<string, typeof list>())].sort((a, b) =>
+    a[0].localeCompare(b[0], "tr"),
+  );
   const set = (ids: string[]) => save.mutate(ids);
   return (
     <Card className="mb-4 p-5">
@@ -1145,42 +1147,34 @@ function CoordinatorsCard() {
         Yalnızca işaretlenen meslek öğretmenleri mesleki eğitimi görür; kendi işletmelerini ve öğrencilerini girebilir, işletmelere
         koordinatör olarak atanabilir. Kültür dersi öğretmenleri listede yer almaz.
       </p>
-      <div className="flex flex-wrap items-center gap-2">
-        {on.map((t) => (
-          <span key={t.id} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 py-1 pr-1 pl-3 text-sm font-semibold text-ink ring-1 ring-slate-200">
-            {t.fullName}
-            {t.branchName && <span className="text-xs font-medium text-slate-500">{t.branchName}</span>}
-            <button
-              type="button"
-              aria-label={`${t.fullName} koordinatörlükten çıkar`}
-              disabled={save.isPending}
-              onClick={() => set(on.filter((x) => x.id !== t.id).map((x) => x.id))}
-              className={clsx(ACTION_SHAPE, "size-6 rounded-full", DELETE_TONE)}
-            >
-              <X className="size-3.5" />
-            </button>
-          </span>
-        ))}
-        {!on.length && <span className="text-sm text-slate-500">Henüz işaretli koordinatör yok.</span>}
-        {off.length > 0 && (
-          <div className="w-64">
-          <Select
-            value=""
-            disabled={save.isPending}
-            onChange={(e) => e.target.value && set([...on.map((x) => x.id), e.target.value])}
-            aria-label="Koordinatör ekle"
-          >
-            <option value="">+ Koordinatör ekle</option>
-            {off.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.fullName}
-                {t.branchName ? ` · ${t.branchName}` : ""}
-              </option>
-            ))}
-          </Select>
-          </div>
-        )}
-      </div>
+      {/* Alana göre gruplu işaret listesi: işaretlenen öğretmen yerinde kalır, liste kaymaz */}
+      {!list.length ? (
+        <span className="text-sm text-slate-500">Meslek alanı branşlı öğretmen yok.</span>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {groups.map(([area, ts]) => (
+            <div key={area}>
+              <div className="mb-1.5 text-xs font-bold tracking-wide text-slate-500">
+                {area.toLocaleUpperCase("tr-TR")} · {ts.filter((t) => t.designated).length}/{ts.length}
+              </div>
+              <div className="grid gap-0.5">
+                {ts.map((t) => (
+                  <label key={t.id} className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-slate-50">
+                    <input
+                      type="checkbox"
+                      className="size-4 accent-brand-600"
+                      checked={t.designated}
+                      disabled={save.isPending}
+                      onChange={() => set(t.designated ? on.filter((x) => x.id !== t.id).map((x) => x.id) : [...on.map((x) => x.id), t.id])}
+                    />
+                    <span className="text-sm font-semibold text-ink">{t.fullName}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </Card>
   );
 }

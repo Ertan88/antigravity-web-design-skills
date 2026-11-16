@@ -1,4 +1,4 @@
-import { SCHOOL_TYPE_OPTIONS, SPECIAL_DAYS, specialDayFor, splitSchoolName, updateSchoolSchema, type SchoolSettings, errorText } from '@okulpano/shared';
+import { RESPONSIBILITY_AREAS, SCHOOL_TYPE_OPTIONS, shortTitle, SPECIAL_DAYS, type Member, type ResponsibilityArea, specialDayFor, splitSchoolName, updateSchoolSchema, type SchoolSettings, errorText } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Download, ExternalLink, FileText, MapPin, Search } from '../components/icons.tsx';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -205,6 +205,69 @@ function PrivacySection({ value, onChange, slug }: { value: string; onChange: (v
   );
 }
 
+/**
+ * Görev dağılımı: her iş için bildirim ve onayın gideceği yöneticiler (bir işe birden çok kişi seçilebilir). Seçilmeyen
+ * işte yetkisi olan bütün yöneticilere gider. Ders görevlendirme o günün nöbetçi müdür yardımcısına, mesleki eğitim
+ * koordinatör müdür yardımcısına gider (sabit satırlar).
+ */
+function ResponsibilitiesTable({ value, onChange, internship }: { value: SchoolSettings['responsibilities']; onChange: (v: SchoolSettings['responsibilities']) => void; internship: boolean }) {
+  const { schoolId } = useAuth();
+  const path = useSchoolPath('members');
+  const list = useQuery({ queryKey: [schoolId, 'members'], queryFn: () => api<Member[]>(path) });
+  const managers = (list.data ?? []).filter((m) => m.role === 'owner' || m.role === 'admin').sort((a, b) => (a.role === b.role ? a.fullName.localeCompare(b.fullName, 'tr') : a.role === 'owner' ? 1 : -1));
+  const toggle = (area: ResponsibilityArea, userId: string) => {
+    const cur = value?.[area] ?? [];
+    onChange({ ...value, [area]: cur.includes(userId) ? cur.filter((x) => x !== userId) : [...cur, userId] });
+  };
+  if (list.isLoading) return <Spinner />;
+  const fixed = (label: string, text: string) => (
+    <tr className="border-t border-slate-200">
+      <td className="py-2.5 pr-3 font-semibold text-ink">{label}</td>
+      <td colSpan={managers.length} className="py-2.5 text-center text-sm font-semibold text-brand-700 dark:text-slate-100">
+        {text}
+      </td>
+    </tr>
+  );
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-xs font-bold text-slate-500">
+            <th className="py-2 pr-3 text-left">İş</th>
+            {managers.map((m) => (
+              <th key={m.userId} className="px-2 py-2 text-center">
+                {m.fullName}
+                <div className="font-medium">{m.role === 'owner' ? 'Müdür' : shortTitle('Müdür Yardımcısı')}</div>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {RESPONSIBILITY_AREAS.map((a) => (
+            <tr key={a.key} className="border-t border-slate-200">
+              <td className="py-2.5 pr-3">
+                <div className="font-semibold text-ink">{a.label}</div>
+                <div className="text-xs text-slate-500">{a.text}</div>
+              </td>
+              {managers.map((m) => {
+                const on = (value?.[a.key] ?? []).includes(m.userId);
+                return (
+                  <td key={m.userId} className="px-2 py-2.5 text-center">
+                    <input type="checkbox" className="size-4 accent-brand-600" checked={on} onChange={() => toggle(a.key, m.userId)} aria-label={`${a.label}: ${m.fullName}`} />
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+          {fixed('Ders görevlendirme', 'O günün nöbetçi müdür yardımcısı (Nöbet Çizelgesi)')}
+          {internship && fixed('Mesleki eğitim', 'Koordinatör müdür yardımcısı (aşağıda Modüller bölümünde)')}
+        </tbody>
+      </table>
+      <p className="mt-2 text-xs text-slate-500">Bir işte kimse işaretlenmezse bildirim, o işin yetkisi olan bütün yöneticilere gider. Okul sorunlarında kategori sorumluları ayrıca bildirim alır.</p>
+    </div>
+  );
+}
+
 /** Koordinatör müdür yardımcısı: işletmede devamsızlık (D) ve rapor (R) bildirimlerini alır */
 /**
  * Koordinatör müdür yardımcısı (KVKK): bütün işletmeleri ve öğrencileri görür. Seçimi okul müdürü ve "Mesleki eğitimi
@@ -393,6 +456,14 @@ export function Settings() {
           <Field label="Saat dilimi" error={form.errors.timezone} help="Zil sayacı ve tarih bu saat dilimine göre hesaplanır; cihaz saati yanlış olsa da pano doğru çalışır.">
             {(id) => <Input id={id} value={v.timezone} onChange={(e) => set('timezone', e.target.value)} />}
           </Field>
+        </Section>
+
+        <Section title="Görev dağılımı" description="Hangi işin bildirimi ve onayı hangi yöneticiye gider.">
+          <ResponsibilitiesTable
+            value={s.responsibilities ?? { leaves: [], duties: [], issues: [], announcements: [] }}
+            onChange={(x) => setting('responsibilities', x)}
+            internship={Boolean(s.internshipEnabled)}
+          />
         </Section>
 
         <Section title="Modüller" description="Okulunuzda kullanılan isteğe bağlı bölümler.">

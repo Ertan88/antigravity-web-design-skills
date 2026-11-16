@@ -1,4 +1,4 @@
-import { applyPersonRole, DUTY_PACKAGES, normalizeName, PERSON_ROLES, PERSON_STATUS, toggleDuty, type DutyKey, type Person } from '@okulpano/shared';
+import { applyPersonRole, DUTY_PACKAGES, normalizeName, PERSON_ROLES, PERSON_STATUS, shortTitle, toggleDuty, type DutyKey, type Person } from '@okulpano/shared';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
@@ -8,7 +8,7 @@ import { STATUS_BADGE, usePeople } from '../src/people.ts';
 import { Sheet } from '../src/sheet.tsx';
 import { Text } from '../src/text.tsx';
 import { colors, radius } from '../src/theme.ts';
-import { Avatar, Badge, Button, Card, Chip, confirm, EditIconButton, Empty, ErrorNote, Field, Icon, Loading, Screen, Segmented, T } from '../src/ui.tsx';
+import { AddFab, Avatar, Badge, Button, Card, Chip, confirm, EditIconButton, Empty, ErrorNote, Field, Icon, Loading, Screen, Segmented, T, type IconName } from '../src/ui.tsx';
 
 type Filter = 'all' | 'none' | 'invited' | 'pending' | 'management';
 type Tab = 'people' | 'duties';
@@ -60,11 +60,7 @@ export default function Kisiler() {
       subtitle={people.length ? `${people.length} kişi · ${counts.none} kişinin hesabı yok` : undefined}
       refreshing={refreshing}
       onRefresh={refresh}
-      right={
-        <Button size="sm" icon="person-add-outline" onPress={() => router.push('/hesap-ac')}>
-          Hesap aç
-        </Button>
-      }
+      fab={<AddFab label="Hesap aç" onPress={() => router.push('/hesap-ac')} />}
     >
       {full && (
         <Segmented
@@ -131,25 +127,33 @@ export default function Kisiler() {
   );
 }
 
+/** Hesap durumu kişinin baş harf rozetinin köşesinde: yeşil onay (hesabı var), kırmızı çarpı (yok), bekleyenler kum saati */
+const STATUS_DOT: Record<Person['status'], { icon: IconName; bg: string; label: string }> = {
+  account: { icon: 'checkmark', bg: '#16a34a', label: 'Hesabı var' },
+  none: { icon: 'close', bg: '#e11d48', label: 'Hesabı yok' },
+  invited: { icon: 'hourglass-outline', bg: '#2563eb', label: 'Davet gönderildi' },
+  code: { icon: 'hourglass-outline', bg: '#2563eb', label: 'Kod verildi' },
+  pending: { icon: 'hourglass-outline', bg: '#d97706', label: 'Onay bekliyor' },
+};
+
 function PersonRow({ p, last, onPress }: { p: Person; last: boolean; onPress: () => void }) {
-  const st = PERSON_STATUS[p.status];
-  const duties = p.role === 'owner' || p.role === 'admin' ? 'Tüm bölümler' : p.duties.map((d) => dutyLabel[d]).join(', ');
+  const dot = STATUS_DOT[p.status];
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, borderBottomWidth: last ? 0 : 1, borderBottomColor: colors.border }}>
-      <Avatar name={p.fullName} size={40} />
+      <View accessibilityLabel={dot.label}>
+        <Avatar name={p.fullName} size={40} />
+        <View style={{ position: 'absolute', right: -3, bottom: -3, width: 19, height: 19, borderRadius: 10, backgroundColor: dot.bg, borderWidth: 2, borderColor: colors.card, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name={dot.icon} size={11} color="#fff" />
+        </View>
+      </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={{ fontSize: 15, fontWeight: '800', color: colors.ink }} numberOfLines={1}>
           {p.fullName}
         </Text>
         <Text style={{ fontSize: 12.5, color: colors.muted }} numberOfLines={1}>
-          {[PERSON_ROLES[p.role].label, duties || null, p.sub].filter(Boolean).join(' · ')}
+          {shortTitle(p.sub)}
         </Text>
-      </View>
-      <View style={{ alignItems: 'flex-end', gap: 3 }}>
-        <Badge tone={STATUS_BADGE[st.tone]}>{st.label}</Badge>
-        {p.member?.promotionRequest && (
-          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.warning }}>Öneri bekliyor</Text>
-        )}
+        {p.member?.promotionRequest && <Text style={{ fontSize: 11, fontWeight: '700', color: colors.warning }}>Öneri bekliyor</Text>}
       </View>
       <EditIconButton label={`${p.fullName} düzenle`} onPress={onPress} />
     </View>

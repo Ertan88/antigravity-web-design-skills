@@ -1,4 +1,5 @@
 import { errorText, shortTitle } from '@okulpano/shared';
+import { reportScroll, resetScrollChrome, useChromeHidden } from './scrollChrome.ts';
 import { router, usePathname, useRoute } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ComponentRef, type ReactNode } from 'react';
 import { ActivityIndicator, Animated, Easing, Keyboard, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, TextInput as NativeTextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
@@ -6,7 +7,7 @@ import { centeredText, Text, TextInput } from './text.tsx';
 import { ICONS, type IconName } from './icons.tsx';
 import { openConfirm, type ConfirmOptions } from './confirm.tsx';
 import { SpecialDayStrip } from './specialDay.tsx';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scrollMemory, scrollRestore } from './scroll.ts';
 import { colors, dark, radius, space, tiles, type TileTone } from './theme.ts';
 import { shortSchoolName } from '@okulpano/shared/schoolName';
@@ -166,7 +167,10 @@ export function Screen({
   tone = 'default',
   scroll = true,
   onBack,
+  fab,
 }: {
+  /** Sağ alttaki ekle düğmesi (AddFab); son kartlar düğmenin altında kalmasın diye alta boşluk bırakılır */
+  fab?: ReactNode;
   title?: string;
   subtitle?: ReactNode;
   back?: boolean;
@@ -182,6 +186,10 @@ export function Screen({
 }) {
   const bg = tone === 'danger' ? colors.dangerTint : colors.bg;
   const tabInset = useContext(TabBarInset);
+  // Yeni ekran açılınca alt menü yeniden görünür (önceki ekranda gizlenmiş olabilir)
+  useEffect(() => {
+    resetScrollChrome();
+  }, []);
   // Kaydırma konumu saklanır; tema değişince ekran yeniden kurulduğunda aynı yere dönülür
   const path = useScrollKey();
   const scroller = useRef<ComponentRef<typeof ScrollView>>(null);
@@ -278,6 +286,7 @@ export function Screen({
           onScroll={(e) => {
             // Geri yükleme sürerken gelen kaydırma olayları (yeniden kurulumdaki 0 gibi) saklı konumu ezmesin
             if (!settling.current) scrollMemory.set(path, e.nativeEvent.contentOffset.y);
+            reportScroll(e.nativeEvent.contentOffset.y);
           }}
           onScrollBeginDrag={() => {
             // Kullanıcı kaydırmaya başladı: geri yükleme biter, artık onun konumu geçerli
@@ -297,7 +306,7 @@ export function Screen({
             contentH.current = h;
             tryRestore();
           }}
-          contentContainerStyle={{ paddingBottom: 32 + (footer ? 0 : tabInset), flexGrow: 1 }}
+          contentContainerStyle={{ paddingBottom: 32 + (footer ? 0 : tabInset) + (fab ? 72 : 0), flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
           refreshControl={onRefresh ? <RefreshControl refreshing={pulled} onRefresh={pull} tintColor={colors.primary} colors={[colors.primary]} /> : undefined}
         >
@@ -306,6 +315,7 @@ export function Screen({
       ) : (
         <View style={{ flex: 1, paddingBottom: footer ? 0 : tabInset }}>{body}</View>
       )}
+      {fab}
       {footer && (
         <SafeAreaView edges={tabInset ? [] : ['bottom']} style={[styles.footer, tabInset ? { paddingBottom: 12 + tabInset } : null]}>
           {footer}
@@ -1109,4 +1119,46 @@ export function switchColors() {
   const on = dark ? '#22a55a' : '#16a34a';
   const off = dark ? '#c53030' : '#dc2626';
   return { trackColor: { true: on, false: off }, thumbColor: '#ffffff', ios_backgroundColor: off };
+}
+
+/**
+ * Sağ alttaki "+" (ekle) düğmesi: sayfanın başında "＋ Ekle" yazılı hap; aşağı kaydırınca yazı kaybolur, yuvarlak
+ * "+" olur. Alt menülü sekmede alt menünün üstünde durur; alt menü gizlenince onun boşalttığı yere iner.
+ */
+export function AddFab({ label = 'Ekle', onPress }: { label?: string; onPress: () => void }) {
+  const tabInset = useContext(TabBarInset);
+  const insets = useSafeAreaInsets();
+  const small = useChromeHidden();
+  const base = Math.max(insets.bottom, 8) + 14;
+  const bottom = tabInset && !small ? tabInset + 4 : base;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        position: 'absolute',
+        right: 18,
+        bottom,
+        height: small ? 52 : 54,
+        minWidth: small ? 52 : undefined,
+        paddingHorizontal: small ? 0 : 20,
+        borderRadius: 27,
+        backgroundColor: colors.primary,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        opacity: pressed ? 0.88 : 1,
+        shadowColor: '#000',
+        shadowOpacity: 0.28,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 6 },
+        elevation: 8,
+      })}
+    >
+      <Icon name="add" size={small ? 26 : 20} color={colors.onPrimary} />
+      {!small && <Text style={{ fontSize: 15, fontWeight: '800', color: colors.onPrimary }}>{label}</Text>}
+    </Pressable>
+  );
 }

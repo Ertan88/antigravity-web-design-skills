@@ -4,6 +4,7 @@ import { Animated, AppState, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useInbox, useInboxActions, type InboxItem } from './data.ts';
 import { Text } from './text.tsx';
+import { storage } from './storage.ts';
 import { colors, radius } from './theme.ts';
 import { useThemeMode } from './themeMode.tsx';
 import { Icon, type IconName } from './ui.tsx';
@@ -37,7 +38,10 @@ const ICONS: Record<string, IconName> = {
   emergency: 'warning',
 };
 
-type Notice = { mode: 'quiet' | 'action' | 'emergency'; item: InboxItem | null; count: number };
+type Notice = { mode: 'quiet' | 'action' | 'emergency'; item: InboxItem | null; count: number; away?: InboxItem[] };
+
+/** Uygulamanın son açıkken gördüğü en yeni bildirimin zamanı: "siz yokken" özetinin sınırı */
+const LAST_SEEN_KEY = 'okulpano.inboxLastSeen';
 
 /*
  * Deneme (Menü → Hatırlatmalar): üç kutu sırayla yalnızca bu telefonda görünür; sunucuya hiçbir şey gitmez, bildirim
@@ -80,11 +84,23 @@ export function InAppNotices() {
   useEffect(() => {
     const items = inbox.data?.items;
     if (!items) return;
-    // İlk yüklemede kutudakiler "görüldü" sayılır: uygulama açılınca eski bildirimler üstten inmez
+    // İlk yüklemede kutudakiler tek tek üstten inmez. Uygulama kapalıyken gelen okunmamışlar (son görülenden yeni)
+    // tek bir "Siz yokken" kutusunda toplanır; acil durum varsa onun bandı önce gelir.
     if (!seen.current) {
       seen.current = new Set(items.map((i) => i.id));
+      const newest = items.reduce((m, i) => (i.at > m ? i.at : m), '');
+      void storage.get(LAST_SEEN_KEY).then((last) => {
+        if (newest) void storage.set(LAST_SEEN_KEY, newest);
+        if (!last || pathname.startsWith('/bildirimler')) return;
+        const away = items.filter((i) => i.at > last && !i.readAt && !i.resolvedAt);
+        const emergency = away.find((i) => i.kind === 'emergency');
+        if (emergency) push({ mode: 'emergency', item: emergency, count: 1 });
+        else if (away.length) push({ mode: 'action', item: null, count: away.length, away });
+      });
       return;
     }
+    const latest = items.reduce((m, i) => (i.at > m ? i.at : m), '');
+    if (latest) void storage.set(LAST_SEEN_KEY, latest);
     const fresh = items.filter((i) => !seen.current!.has(i.id) && !i.readAt && !i.resolvedAt);
     for (const i of items) seen.current.add(i.id);
     if (!fresh.length || pathname.startsWith('/bildirimler')) return;
@@ -125,8 +141,8 @@ function NoticeView({ notice, onOpen, onClose }: { notice: Notice; onOpen: () =>
   }, []);
 
   const it = notice.item;
-  const title = it ? it.title : `${notice.count} yeni bildirim`;
-  const body = it ? it.body : 'Görmek için dokunun.';
+  const title = it ? it.title : notice.away ? `Siz yokken ${notice.count} bildirim geldi` : `${notice.count} yeni bildirim`;
+  const body = it ? it.body : notice.away ? awaySummary(notice.away) : 'Görmek için dokunun.';
   const icon = (it && ICONS[it.kind]) ?? 'notifications-outline';
 
   if (notice.mode === 'emergency')
@@ -234,4 +250,14 @@ function NoticeView({ notice, onOpen, onClose }: { notice: Notice; onOpen: () =>
       </Pressable>
     </Animated.View>
   );
+}
+
+/** "2 izin bildirimi · 1 onay bekleyen duyuru" gibi kısa özet: başlığa göre gruplanır, en çok iki grup */
+function awaySummary(items: InboxItem[]): string {
+  const groups = new Map<string, number>();
+  for (const i of items) groups.set(i.title, (groups.get(i.title) ?? 0) + 1);
+  const parts = [...groups.entries()].sort((a, b) => b[1] - a[1]);
+  const shown = parts.slice(0, 2).map(([t, n]) => (n > 1 ? `${n} × ${t}` : t));
+  const rest = parts.slice(2).reduce((a, [, n]) => a + n, 0);
+  return [...shown, ...(rest ? [`${rest} diğer`] : [])].join(' · ');
 }

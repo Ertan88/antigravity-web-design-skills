@@ -54,4 +54,17 @@ describe('kendi izni', () => {
     expectStatus(await owner.post(path(`leaves/${r.json().id}/approve`), {}), 403);
     expectStatus(await deputy.post(path(`leaves/${r.json().id}/approve`), {}), 200);
   });
+
+  it('görev dağılımında izinlerin sorumlusu seçilince yalnızca ona görünür', async () => {
+    expectStatus(await owner.post(path('members'), { email: 'yrd2@izin.local', fullName: 'İkinci Yardımcı', password: 'Yardimci123!', role: 'admin' }), 201);
+    const second = client(t.app, (await login(t.app, 'yrd2@izin.local', 'Yardimci123!')).token);
+    const members = (await owner.get(path('members'))).json() as { id: string; email: string; userId: string }[];
+    const yrd2 = members.find((m) => m.email === 'yrd2@izin.local')!;
+    expectStatus(await owner.patch(`/api/schools/${schoolId}`, { settings: { responsibilities: { leaves: [yrd2.userId] } } }), 200);
+    const r = await owner.post(path('me/leaves'), { startDate: later(20), endDate: later(20) });
+    expectStatus(r, 201);
+    const kinds = async (c: ReturnType<typeof client>) => ((await c.get(path('notifications'))).json() as { kind: string; key: string }[]).filter((n) => n.key === `leave-request:${r.json().id}`).length;
+    expect(await kinds(second)).toBe(1);
+    expect(await kinds(deputy)).toBe(0);
+  });
 });

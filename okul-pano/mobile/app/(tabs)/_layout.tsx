@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { useEffect, useState, type ComponentProps, type ReactElement } from "react";
+import { useEffect, useRef, useState, type ComponentProps, type ReactElement } from "react";
 import { useDutyReminders, useExamReminders } from "../../src/reminders.ts";
 import { SpecialDayPopup } from "../../src/specialDay.tsx";
 import { centeredText, Text } from "../../src/text.tsx";
@@ -8,7 +8,8 @@ import { useAuth, type AppRole } from "../../src/auth.tsx";
 import { visibleTabs, type TabName } from "../../src/tabs.ts";
 import { useControlCenter, useInbox } from "../../src/data.ts";
 import { colors, dark } from "../../src/theme.ts";
-import { Keyboard, Platform, Pressable, View } from "react-native";
+import { Animated, Keyboard, Platform, Pressable, View } from "react-native";
+import { useChromeHidden } from "../../src/scrollChrome.ts";
 import { Icon, TabBarInset, type IconName } from "../../src/ui.tsx";
 
 // Sekme ekranlarında beklenmeyen bir hata olursa uygulama kapanmaz, "Yeniden dene" görünür
@@ -41,6 +42,12 @@ type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>
 function FloatingTabBar({ state, descriptors, emitter, navigateToTab, bottom }: TabBarProps & { bottom: number }) {
   const [keyboard, setKeyboard] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
+  // Aşağı kaydırırken alt menü ekranın altına kayar, yukarı kaydırınca geri gelir
+  const hidden = useChromeHidden();
+  const slide = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(slide, { toValue: hidden ? BAR_HEIGHT + bottom + 24 : 0, duration: 220, useNativeDriver: Platform.OS !== "web" }).start();
+  }, [hidden, bottom, slide]);
   useEffect(() => {
     const a = Keyboard.addListener("keyboardDidShow", () => setKeyboard(true));
     const b = Keyboard.addListener("keyboardDidHide", () => setKeyboard(false));
@@ -63,7 +70,7 @@ function FloatingTabBar({ state, descriptors, emitter, navigateToTab, bottom }: 
   // Yarı saydam zemin: web'de arkası gerçekten bulanır; Android'de bulanıklık yok, biraz daha az saydam
   const glass = dark ? `rgba(43,39,35,${web ? 0.7 : 0.86})` : `rgba(255,255,255,${web ? 0.7 : 0.86})`;
   return (
-    <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom, alignItems: "center" }}>
+    <Animated.View pointerEvents={hidden ? "none" : "box-none"} style={{ position: "absolute", left: 0, right: 0, bottom, alignItems: "center", transform: [{ translateY: slide }] }}>
       {hint && (
         <View style={{ marginBottom: 8, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5, backgroundColor: colors.elevated, borderWidth: 1, borderColor: colors.elevatedBorder }}>
           <Text style={{ fontSize: 12.5, fontWeight: "700", color: colors.ink }}>{hint}</Text>
@@ -130,7 +137,7 @@ function FloatingTabBar({ state, descriptors, emitter, navigateToTab, bottom }: 
           );
         })}
       </View>
-    </View>
+    </Animated.View>
   );
 }
 

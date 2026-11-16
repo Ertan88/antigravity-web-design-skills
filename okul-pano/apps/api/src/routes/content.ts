@@ -7,10 +7,12 @@ import {
   classGroupSchema,
   examSchema,
   leaveSchema,
+  responsibleFor,
   reviewSchema,
   schoolEventSchema,
   schoolSettingsSchema,
   tickerSchema,
+  zonedParts,
 } from '@okulpano/shared';
 import { and, asc, desc, eq, getTableColumns, inArray } from 'drizzle-orm';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
@@ -32,6 +34,8 @@ import {
 import { badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 import { notifyUsers, usersWithPermission } from '../lib/push.ts';
 import { registerResource } from './crud.ts';
+import { tell } from './issues.ts';
+import { notifyCoverNeed } from '../lib/responsibility.ts';
 
 /**
  * Onay akışı açıksa onay yetkisi olmayanın eklediği / değiştirdiği duyuru onay bekler. Onay akışı kapalı olsa da
@@ -109,7 +113,7 @@ export async function contentRoutes(app: FastifyInstance) {
     afterWrite: async (req, row) => {
       if (row.approvalStatus !== 'pending') return;
       const [u] = await app.deps.db.select({ fullName: users.fullName }).from(users).where(eq(users.id, req.ctx.userId));
-      const approvers = (await usersWithPermission(app.deps, req.ctx.schoolId, 'announcements.approve')).filter((id) => id !== req.ctx.userId);
+      const approvers = responsibleFor(req.ctx.school.settings?.responsibilities?.announcements, (await usersWithPermission(app.deps, req.ctx.schoolId, 'announcements.approve')).filter((id) => id !== req.ctx.userId));
       notifyUsers(app.deps, approvers, {
         title: 'Onay bekleyen duyuru',
         body: `${u?.fullName ?? 'Bir kullanıcı'} “${String(row.title)}” duyurusunu onaya gönderdi.`,
@@ -216,7 +220,19 @@ export async function contentRoutes(app: FastifyInstance) {
     orderBy: [desc(teacherLeaves.startDate)],
     refs: { teacherId: teachers },
     summary: (r) => `${r.startDate} – ${r.endDate}`,
+    // Yöneticinin girdiği izin hemen geçerlidir: o günlerin nöbetçi müdür yardımcısına ders görevlendirme bildirimi
+    afterWrite: async (req, row, op) => {
+      if (op === 'create' && row.approvalStatus !== 'pending') await coverNeed(req, row as typeof teacherLeaves.$inferSelect);
+    },
   });
+
+  async function coverNeed(req: FastifyRequest, leave: { teacherId: string; startDate: string; endDate: string }) {
+    const [t] = await app.deps.db.select({ fullName: teachers.fullName }).from(teachers).where(eq(teachers.id, leave.teacherId));
+    const today = zonedParts(new Date(), req.ctx.school.timezone).isoDate;
+    await notifyCoverNeed(app.deps, req.ctx.schoolId, req.ctx.school.settings, today, { teacherName: t?.fullName ?? 'Bir öğretmen', startDate: leave.startDate, endDate: leave.endDate }, (ids, n) =>
+      tell(app.deps, ids, n),
+    );
+  }
 
   // Öğretmenin mobil uygulamadan bildirdiği izin: izin yetkisi olan onaylar ya da notla reddeder
   const leaveReview = { preHandler: [app.authenticate, schoolGuard('leaves.manage')] };
@@ -238,6 +254,7 @@ export async function contentRoutes(app: FastifyInstance) {
     if (!updated) throw notFound();
     await audit(req, status === 'approved' ? 'approve' : 'reject', 'İzin', id, `${updated.startDate} – ${updated.endDate}`);
     app.deps.bus.contentChanged(req.ctx.schoolId);
+    if (status === 'approved') await coverNeed(req, updated);
     if (updated.requestedBy && updated.requestedBy !== req.ctx.userId) {
       const range = updated.startDate === updated.endDate ? updated.startDate : `${updated.startDate} – ${updated.endDate}`;
       notifyUsers(app.deps, [updated.requestedBy], {

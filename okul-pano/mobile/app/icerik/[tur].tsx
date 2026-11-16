@@ -10,7 +10,7 @@ import { useAuth, useSchoolPath } from '../../src/auth.tsx';
 import { useSchoolQuery } from '../../src/data.ts';
 import { clock, fullDate, localIso } from '../../src/day.ts';
 import { colors } from '../../src/theme.ts';
-import { Badge, Button, Card, Choice, confirm, Empty, ErrorNote, Field, Loading, Screen, T, ToggleRow, type IconName } from '../../src/ui.tsx';
+import { AddFab, Badge, Button, Card, Choice, confirm, Empty, ErrorNote, Field, Loading, Screen, T, ToggleRow, type IconName } from '../../src/ui.tsx';
 
 type Row = Record<string, unknown> & { id: string; isActive?: boolean };
 type FieldDef =
@@ -172,13 +172,7 @@ export default function Icerik() {
       title={kind.title}
       refreshing={list.isRefetching}
       onRefresh={() => void list.refetch()}
-      right={
-        writable ? (
-          <Button size="sm" icon="add" onPress={() => setEditing('new')}>
-            Ekle
-          </Button>
-        ) : undefined
-      }
+      fab={writable ? <AddFab onPress={() => setEditing('new')} /> : undefined}
     >
       <ErrorNote error={list.error ?? toggle.error ?? remove.error} />
       {list.isLoading ? (
