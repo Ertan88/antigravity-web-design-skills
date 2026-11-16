@@ -23,6 +23,7 @@ import {
   Plus,
   Printer,
   Search,
+  Settings2,
   Trash2,
   Undo2,
   Users,
@@ -55,6 +56,7 @@ import { api } from "../lib/api.ts";
 import { useAuth } from "../lib/auth.tsx";
 import { useInternshipAccess, useList, useSchoolPath, type Teacher } from "../lib/data.ts";
 import { FormsDialog, VISIT_DAYS, VisitDayPicker } from "./InternshipForms.tsx";
+import { InternshipSettingsDialog } from "./InternshipSettings.tsx";
 
 /*
  * İşletmelerde mesleki eğitim: işletmeler ve aylık işletmede devam çizelgesi. Okul günleri ders programından,
@@ -1195,6 +1197,7 @@ export function Businesses() {
   const [viewing, setViewing] = useState<Business | null>(null);
   const [areasOpen, setAreasOpen] = useState(false);
   const [formsOpen, setFormsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [area, setArea] = useState<string>("");
   const [coordinator, setCoordinator] = useState("");
   const [q, setQ] = useState("");
@@ -1262,6 +1265,11 @@ export function Businesses() {
         }
         actions={
           <div className="flex flex-wrap gap-2">
+            {manager && (
+              <Button variant="secondary" icon={<Settings2 className="size-4" />} onClick={() => setSettingsOpen(true)}>
+                Ayarlar
+              </Button>
+            )}
             {manager && (
               <Button
                 variant="secondary"
@@ -1452,6 +1460,7 @@ export function Businesses() {
         <AreasDialog open={areasOpen} onClose={() => setAreasOpen(false)} />
       )}
       <FormsDialog open={formsOpen} onClose={() => setFormsOpen(false)} />
+      <InternshipSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }

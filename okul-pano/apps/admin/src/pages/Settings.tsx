@@ -1,4 +1,4 @@
-import { compareClassNames, RESPONSIBILITY_AREAS, SCHOOL_TYPE_OPTIONS, shortTitle, SPECIAL_DAYS, type Member, type ResponsibilityArea, specialDayFor, splitSchoolName, updateSchoolSchema, type SchoolSettings, errorText } from '@okulpano/shared';
+import { RESPONSIBILITY_AREAS, SCHOOL_TYPE_OPTIONS, shortTitle, SPECIAL_DAYS, type Member, type ResponsibilityArea, specialDayFor, splitSchoolName, updateSchoolSchema, type SchoolSettings, errorText } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Download, ExternalLink, FileText, MapPin, Search } from '../components/icons.tsx';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -10,11 +10,10 @@ import { useToast } from '../components/Toast.tsx';
 import { Alert, Badge, Button, Card, Field, Input, PageHeader, Select, Spinner, Textarea, Toggle } from '../components/ui.tsx';
 import { confirm } from '../components/confirm.tsx';
 import { downloadJson } from '../lib/download.ts';
-import { useInternshipAccess } from '../lib/data.ts';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
-import { useList, useSchool, useSchoolPath, type ClassGroup, type School } from '../lib/data.ts';
+import { useSchool, useSchoolPath, type School } from '../lib/data.ts';
 import { useForm } from '../lib/form.ts';
 
 interface GeoResult {
@@ -260,104 +259,10 @@ function ResponsibilitiesTable({ value, onChange, internship }: { value: SchoolS
             </tr>
           ))}
           {fixed('Ders görevlendirme', 'O günün nöbetçi müdür yardımcısı (Nöbet Çizelgesi)')}
-          {internship && fixed('Mesleki eğitim', 'Koordinatör müdür yardımcısı (aşağıda Modüller bölümünde)')}
+          {internship && fixed('Mesleki eğitim', 'Koordinatör müdür yardımcısı (İşletmeler › Ayarlar)')}
         </tbody>
       </table>
       <p className="mt-2 text-xs text-slate-500">Bir işte kimse işaretlenmezse bildirim, o işin yetkisi olan bütün yöneticilere gider. Okul sorunlarında kategori sorumluları ayrıca bildirim alır.</p>
-    </div>
-  );
-}
-
-/** Koordinatör müdür yardımcısı: işletmede devamsızlık (D) ve rapor (R) bildirimlerini alır */
-/**
- * Koordinatör müdür yardımcısı (KVKK): bütün işletmeleri ve öğrencileri görür. Seçimi okul müdürü ve "Mesleki eğitimi
- * yönetir" yetkisi verilenler yapar; seçilebilenler müdür yardımcıları ve bu yetkiyi alanlar. Koordinatör öğretmenler
- * Mesleki Eğitim › İşletmeler sayfasında işaretlenir; alan şefleri kadrodaki ünvandan tanınır.
- */
-function InternshipManagerField({ value, onChange }: { value: string | null; onChange: (v: string | null) => void }) {
-  const path = useSchoolPath('internship/manager-candidates');
-  const { schoolId } = useAuth();
-  const access = useInternshipAccess();
-  const canPick = Boolean(access.data?.canPickManager);
-  const list = useQuery({ queryKey: [schoolId, 'internship', 'candidates'], queryFn: () => api<{ userId: string; fullName: string }[]>(path) });
-  const people = list.data ?? [];
-  return (
-    <div className="grid gap-3">
-      <Field
-        label="Koordinatör müdür yardımcısı"
-        help="Bütün işletmeleri ve öğrencileri görür, koordinatör öğretmenleri işaretler; devamsızlık (D) ve rapor (R) bildirimlerini alır. Müdür yardımcıları ve “Mesleki eğitimi yönetir” yetkisi verilenler arasından seçilir."
-      >
-        {(id) => (
-          <Select id={id} value={value ?? ''} disabled={!canPick} onChange={(e) => onChange(e.target.value || null)} className="max-w-sm">
-            <option value="">Seçilmedi</option>
-            {value && !people.some((u) => u.userId === value) && <option value={value}>Seçili kişi</option>}
-            {people.map((u) => (
-              <option key={u.userId} value={u.userId}>
-                {u.fullName}
-              </option>
-            ))}
-          </Select>
-        )}
-      </Field>
-      {!value && <Alert tone="amber">Koordinatör müdür yardımcısı seçilmedi: devamsızlık bildirimi kimseye gitmez; işletmeleri okul müdürü ve yetki verilenler görür.</Alert>}
-      {!canPick && <p className="text-xs text-slate-500">Bu seçimi okul müdürü ve “Mesleki eğitimi yönetir” yetkisi verilenler değiştirebilir.</p>}
-      <p className="text-xs text-slate-500">
-        Koordinatör öğretmenler <b>Mesleki Eğitim › İşletmeler</b> sayfasında işaretlenir. Alan şefi, kadroda ünvanı “Alan Şefi” olan öğretmendir; yalnızca kendi alanını görür.
-      </p>
-    </div>
-  );
-}
-
-type Technical = SchoolSettings['internshipTechnical'];
-
-/**
- * Teknik program (12. sınıf, yılda belli tarihler arası tam gün staj): seçilen sınıfların öğrencileri staj tarihleri
- * arasında her iş günü işletmededir; devam çizelgesinde okul günü yoktur.
- */
-function TechnicalProgramField({ value, onChange }: { value: Technical | undefined; onChange: (v: Technical) => void }) {
-  const classes = useList<ClassGroup>('classes');
-  const v: Technical = value ?? { classIds: [], start: null, end: null };
-  const list = [...(classes.data ?? [])].sort((a, b) => compareClassNames(a.name, b.name));
-  const toggle = (id: string) => onChange({ ...v, classIds: v.classIds.includes(id) ? v.classIds.filter((x) => x !== id) : [...v.classIds, id] });
-  const badRange = Boolean(v.start && v.end && v.start > v.end);
-  return (
-    <div className="grid gap-3 rounded-2xl p-4 ring-1 ring-slate-200 dark:ring-white/10">
-      <div>
-        <p className="text-sm font-bold text-ink">Teknik program stajı</p>
-        <p className="text-xs text-slate-500">Seçilen sınıflar staj tarihleri arasında her iş günü işletmededir; bu günlerde devam çizelgesinde okul günü olmaz. Tarihlerin dışında ders programı geçerlidir.</p>
-      </div>
-      {classes.isLoading ? (
-        <Spinner />
-      ) : !list.length ? (
-        <p className="text-sm text-slate-500">Henüz sınıf yok. Sınıflar Ders Programı sayfasında eklenir.</p>
-      ) : (
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Teknik program sınıfları">
-          {list.map((c) => {
-            const on = v.classIds.includes(c.id);
-            return (
-              <button
-                key={c.id}
-                type="button"
-                aria-pressed={on}
-                onClick={() => toggle(c.id)}
-                className={`min-h-9 rounded-full px-3 text-sm font-semibold ring-1 transition ${on ? 'bg-brand-600 text-white ring-brand-600' : 'bg-white text-slate-700 ring-slate-200 hover:ring-slate-300 dark:bg-white/5 dark:text-slate-200 dark:ring-white/15'}`}
-              >
-                {c.name}
-              </button>
-            );
-          })}
-        </div>
-      )}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Staj başlangıcı">
-          {(id) => <Input id={id} type="date" value={v.start ?? ''} onChange={(e) => onChange({ ...v, start: e.target.value || null })} />}
-        </Field>
-        <Field label="Staj bitişi">
-          {(id) => <Input id={id} type="date" value={v.end ?? ''} onChange={(e) => onChange({ ...v, end: e.target.value || null })} />}
-        </Field>
-      </div>
-      {badRange && <Alert tone="amber">Bitiş tarihi başlangıçtan önce olamaz.</Alert>}
-      {v.classIds.length > 0 && (!v.start || !v.end) && <Alert tone="amber">Staj tarihleri girilmedi. Bu sınıfların devam çizelgesi tarihler girilince oluşur.</Alert>}
     </div>
   );
 }
@@ -540,13 +445,15 @@ export function Settings() {
             label="İşletmelerde mesleki eğitim"
             description="Meslek liseleri için: işletmeler, koordinatör öğretmenler ve aylık işletmede devam çizelgesi. Koordinatör öğretmenler devamsızlık ve raporu mobil uygulamadan girer."
           />
-          {s.internshipEnabled && <InternshipManagerField value={s.internshipManagerUserId ?? null} onChange={(x) => setting('internshipManagerUserId', x)} />}
           {s.internshipEnabled && (
-            <Field label="Program adı" help="Günlük rehberlik formunda okul adının yanına yazılır (ör. Anadolu Meslek Programı). Boş bırakılırsa yazılmaz.">
-              {(id) => <Input id={id} value={s.internshipProgramName ?? ''} maxLength={80} onChange={(e) => setting('internshipProgramName', e.target.value)} />}
-            </Field>
+            <p className="text-sm text-slate-500">
+              Koordinatör müdür yardımcısı, program adı ve teknik program stajı{' '}
+              <Link to="/isletmeler" className="font-semibold text-brand-700 hover:underline dark:text-slate-100">
+                İşletmeler
+              </Link>{' '}
+              sayfasındaki <b>Ayarlar</b> düğmesindedir.
+            </p>
           )}
-          {s.internshipEnabled && <TechnicalProgramField value={s.internshipTechnical} onChange={(x) => setting('internshipTechnical', x)} />}
           <p className="text-sm text-slate-500">
             Panodaki kartların yeri, renkler ve slayt süreleri{' '}
             <Link to="/ekranlar" className="font-semibold text-brand-700 hover:underline">

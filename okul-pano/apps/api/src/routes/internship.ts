@@ -407,6 +407,63 @@ export async function internshipRoutes(app: FastifyInstance) {
    * Koordinatör müdür yardımcısı adayları: müdür yardımcıları ve "Mesleki eğitimi yönetir" yetkisi verilenler.
    * Listeyi okul müdürü ve bu yetkiyi alanlar görür (seçimi yalnızca onlar değiştirir).
    */
+  /**
+   * Mesleki eğitim ayarları (İşletmeler › Ayarlar): koordinatör müdür yardımcısı, program adı ve teknik program stajı.
+   * Modülü yönetenler değiştirir (Genel Ayarlar yetkisi gerekmez). Koordinatör müdür yardımcısını yalnızca okul müdürü
+   * ve "Mesleki eğitimi yönetir" yetkisi verilenler seçer.
+   */
+  const settingsBody = z.object({
+    internshipManagerUserId: z.uuid().nullable().optional(),
+    internshipProgramName: z.string().trim().max(80).optional(),
+    internshipTechnical: z
+      .object({
+        classIds: z.array(z.uuid()).max(200),
+        start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+        end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+      })
+      .optional(),
+  });
+  const canPickManager = (req: FastifyRequest) => !req.ctx.isSupport && (req.ctx.role === 'owner' || isGranted(req));
+  app.get(`${base}/settings`, manage, async (req) => {
+    const st = settingsOf(req);
+    return {
+      internshipManagerUserId: st.internshipManagerUserId ?? null,
+      internshipProgramName: st.internshipProgramName,
+      internshipTechnical: st.internshipTechnical,
+      canPickManager: canPickManager(req),
+    };
+  });
+  app.put(`${base}/settings`, manage, async (req) => {
+    const body = parse(settingsBody, req.body);
+    const current = settingsOf(req);
+    if (body.internshipManagerUserId !== undefined && body.internshipManagerUserId !== (current.internshipManagerUserId ?? null)) {
+      if (!canPickManager(req)) throw forbidden('Koordinatör müdür yardımcısını yalnızca okul müdürü ve "Mesleki eğitimi yönetir" yetkisi verilenler değiştirebilir.');
+      if (body.internshipManagerUserId) {
+        const [m] = await db
+          .select({ role: memberships.role, permissions: memberships.permissions })
+          .from(memberships)
+          .where(and(eq(memberships.userId, body.internshipManagerUserId), eq(memberships.schoolId, req.ctx.schoolId)));
+        if (!m || !(m.role === 'admin' || m.permissions.includes('internship.manage')))
+          throw badRequest('Koordinatör müdür yardımcısı, müdür yardımcılarından ya da "Mesleki eğitimi yönetir" yetkisi verilenlerden seçilir.');
+      }
+    }
+    const tech = body.internshipTechnical;
+    if (tech) {
+      if (tech.start && tech.end && tech.start > tech.end) throw badRequest('Staj bitişi başlangıçtan önce olamaz.');
+      const own = new Set((await db.select({ id: classGroups.id }).from(classGroups).where(eq(classGroups.schoolId, req.ctx.schoolId))).map((c) => c.id));
+      if (tech.classIds.some((id) => !own.has(id))) throw badRequest('Seçilen sınıflardan biri bu okulda yok.');
+    }
+    const settings = schoolSettingsSchema.parse({
+      ...(req.ctx.school.settings ?? {}),
+      ...(body.internshipManagerUserId !== undefined ? { internshipManagerUserId: body.internshipManagerUserId } : {}),
+      ...(body.internshipProgramName !== undefined ? { internshipProgramName: body.internshipProgramName } : {}),
+      ...(tech ? { internshipTechnical: tech } : {}),
+    });
+    await db.update(schools).set({ settings }).where(eq(schools.id, req.ctx.schoolId));
+    await audit(req, 'update', 'Mesleki eğitim ayarları', null, null);
+    return { ok: true };
+  });
+
   app.get(`${base}/manager-candidates`, member, async (req) => {
     if (req.ctx.isSupport || !(req.ctx.role === 'owner' || isGranted(req) || req.ctx.permissions.includes('settings.manage'))) throw forbidden();
     const rows = await db

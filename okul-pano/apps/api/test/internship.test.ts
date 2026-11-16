@@ -461,4 +461,17 @@ describe('mesleki eğitim yetkileri: yönetim, işaretli koordinatör, alan şef
     expect(bad.students.find((s: { fullName: string }) => s.fullName === 'Arda Kaya').cells[6]).toEqual(['O', 'O']);
     expectStatus(await owner.patch(base, { settings: { internshipTechnical: { classIds: [], start: null, end: null } } }), 200);
   });
+
+  it('mesleki eğitim ayarları: yönetim değiştirir, koordinatör öğretmen değiştiremez; tarih ve sınıf denetlenir', async () => {
+    expect((await coord.put(`${base}/internship/settings`, { internshipProgramName: 'Deneme' })).statusCode).toBe(403);
+    expectStatus(await vp.put(`${base}/internship/settings`, { internshipProgramName: 'Anadolu Meslek Programı', internshipTechnical: { classIds: [classId], start: '2027-02-01', end: '2027-06-11' } }), 200);
+    const got = (await vp.get(`${base}/internship/settings`)).json();
+    expect(got.internshipTechnical).toEqual({ classIds: [classId], start: '2027-02-01', end: '2027-06-11' });
+    expect(got.internshipManagerUserId).toBe(vpId);
+    expect((await vp.put(`${base}/internship/settings`, { internshipTechnical: { classIds: [], start: '2027-06-11', end: '2027-02-01' } })).statusCode).toBe(400);
+    expect((await vp.put(`${base}/internship/settings`, { internshipTechnical: { classIds: ['00000000-0000-4000-8000-000000000000'], start: null, end: null } })).statusCode).toBe(400);
+    // Koordinatör müdür yardımcısının kendisi (yetki verilmemişse) seçimi değiştiremez
+    expect((await vp.put(`${base}/internship/settings`, { internshipManagerUserId: null })).statusCode).toBe(403);
+    expectStatus(await owner.put(`${base}/internship/settings`, { internshipTechnical: { classIds: [], start: null, end: null } }), 200);
+  });
 });
