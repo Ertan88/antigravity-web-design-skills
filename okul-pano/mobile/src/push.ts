@@ -76,16 +76,25 @@ export async function registerForPush(opts: { auto?: boolean } = {}): Promise<'o
   const current = await Notifications.getPermissionsAsync();
   const granted = current.granted || (await Notifications.requestPermissionsAsync()).granted;
   if (!granted) return 'denied';
-  const projectId = (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId ?? Constants.easConfig?.projectId;
-  if (!projectId) return 'local';
   let token: string;
   try {
-    token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+    if (Platform.OS === 'android') {
+      // Android: telefonun doğrudan Firebase (FCM) anahtarı; sunucu Firebase'e kendisi gönderir (Expo hesabı gerekmez).
+      // Uygulama Firebase ayarı (google-services.json) olmadan derlendiyse anahtar alınamaz: yalnızca yerel hatırlatmalar.
+      token = String((await Notifications.getDevicePushTokenAsync()).data);
+    } else {
+      const projectId = (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId ?? Constants.easConfig?.projectId;
+      if (!projectId) return 'local';
+      token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+    }
   } catch (err) {
     console.warn('Bildirim anahtarı alınamadı:', (err as Error).message);
     return 'local';
   }
+  const previous = await storage.get(TOKEN_KEY);
   await api('/api/me/push-tokens', { method: 'POST', body: { token, platform: Platform.OS } });
+  // Anahtar değiştiyse (ör. Expo'dan Firebase'e geçiş) eskisi bu hesaptan kaldırılır
+  if (previous && previous !== token) await api('/api/me/push-tokens', { method: 'DELETE', body: { token: previous } }).catch(() => undefined);
   await storage.set(TOKEN_KEY, token);
   return 'ok';
 }

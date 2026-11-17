@@ -75,6 +75,8 @@ interface AuthValue {
   rememberAccount: (email: string, password: string) => Promise<void>;
   /** Kayıtlı (etkin olmayan) hesabı bu telefondan kaldırır */
   forgetAccount: (userId: string) => Promise<void>;
+  /** Telefonun bildirim anahtarı alındıktan / değiştikten sonra diğer kayıtlı hesapları da bu anahtara bağlar */
+  linkOtherAccounts: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
@@ -254,6 +256,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Yeni kayıtlı hesabın bildirimleri de bu telefona gelir (kapatılmadıysa)
         const token = await deviceToken();
         if (token && !(await isMuted(r.me.id))) await deviceAccount(session.server, r.refreshToken, 'link', token).catch(() => undefined);
+      },
+      linkOtherAccounts: async () => {
+        const token = await deviceToken();
+        if (!token) return;
+        for (const a of accounts) {
+          if (a.userId === me?.user.id || !a.refresh || (await isMuted(a.userId))) continue;
+          await deviceAccount(a.server, a.refresh, 'link', token).catch(() => undefined);
+        }
       },
       forgetAccount: async (userId) => {
         const a = accounts.find((x) => x.userId === userId);

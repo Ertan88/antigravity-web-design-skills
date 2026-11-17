@@ -64,6 +64,11 @@ const schema = z.object({
   MEB_INDEX_URLS: z.string().default('https://www.meb.gov.tr/,https://www.meb.gov.tr/meb_haberindex.php?dil=tr'),
   /** Expo hesabında "push güvenliği" açıksa erişim anahtarı */
   PUSH_ACCESS_TOKEN: z.string().optional().transform((v) => v || undefined),
+  /**
+   * Firebase hizmet hesabı (JSON içeriği; Render'da gizli değişken). Tanımlıysa Android bildirimleri doğrudan
+   * Firebase Cloud Messaging (FCM v1) ile gönderilir; Expo hesabı gerekmez. Değer hiçbir yere yazılmaz, loglanmaz.
+   */
+  FIREBASE_SERVICE_ACCOUNT: z.string().optional().transform((v) => v?.trim() || undefined),
 });
 
 export type Env = z.infer<typeof schema>;

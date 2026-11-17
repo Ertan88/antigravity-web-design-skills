@@ -805,8 +805,9 @@ export const pushTokenSchema = z.object({
     .string()
     .trim()
     .min(10)
-    .max(300)
-    .regex(/^(ExponentPushToken|ExpoPushToken)\[[^\]]+\]$/, 'Geçersiz bildirim anahtarı'),
+    .max(500)
+    // Expo anahtarı ya da telefonun doğrudan Firebase (FCM) anahtarı
+    .regex(/^((ExponentPushToken|ExpoPushToken)\[[^\]]+\]|[A-Za-z0-9_:\-]{100,500})$/, 'Geçersiz bildirim anahtarı'),
   platform: z.enum(['ios', 'android', 'web']).default('android'),
 });
 

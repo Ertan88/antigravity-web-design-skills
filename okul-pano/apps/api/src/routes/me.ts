@@ -282,7 +282,7 @@ export async function meRoutes(app: FastifyInstance) {
   app.post('/api/me/exam-reminders', { preHandler: app.authenticate }, async (req, reply) => {
     const { sub } = accessUser(req);
     const body = parse(
-      z.object({ token: z.string().min(10).max(300), items: z.array(z.object({ examId: z.uuid(), notifyAt: z.iso.datetime({ offset: true }) })).max(60) }),
+      z.object({ token: z.string().min(10).max(500), items: z.array(z.object({ examId: z.uuid(), notifyAt: z.iso.datetime({ offset: true }) })).max(60) }),
       req.body,
     );
     const [own] = await db.select({ id: pushTokens.id }).from(pushTokens).where(and(eq(pushTokens.token, body.token), eq(pushTokens.userId, sub)));
@@ -297,7 +297,7 @@ export async function meRoutes(app: FastifyInstance) {
 
   app.delete('/api/me/push-tokens', { preHandler: app.authenticate }, async (req, reply) => {
     const { sub } = accessUser(req);
-    const { token } = parse(z.object({ token: z.string().min(10).max(300) }), req.body);
+    const { token } = parse(z.object({ token: z.string().min(10).max(500) }), req.body);
     await db.delete(pushTokens).where(and(eq(pushTokens.token, token), eq(pushTokens.userId, sub)));
     return reply.status(204).send();
   });

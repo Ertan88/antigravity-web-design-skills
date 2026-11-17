@@ -92,6 +92,8 @@ function BrandSplash({ finishing, onHidden }: { finishing: boolean; onHidden: ()
 function Gate({ fontsReady }: { fontsReady: boolean }) {
   const auth = useAuth();
   const { status, school } = auth;
+  const authRef = useRef(auth);
+  authRef.current = auth;
   const theme = useThemeMode();
   const nav = useNavigationContainerRef();
   const segments = useSegments();
@@ -124,13 +126,14 @@ function Gate({ fontsReady }: { fontsReady: boolean }) {
   }, [status, onLogin, onEnroll]);
 
   useEffect(() => {
-    if (status === 'signedIn') void registerForPush({ auto: true }).catch(() => undefined);
+    if (status === 'signedIn')
+      void registerForPush({ auto: true })
+        .then((r) => (r === 'ok' ? authRef.current.linkOtherAccounts() : undefined))
+        .catch(() => undefined);
   }, [status, school?.id]);
 
   // Bildirime dokununca ilgili ekran açılır (ör. onay bekleyen duyuru → Onaylar). Bildirim telefonda kayıtlı başka bir
   // hesaba aitse önce o hesaba geçilir (hızlı hesap geçişi); hesap telefondan kaldırılmışsa kısa bir uyarı çıkar.
-  const authRef = useRef(auth);
-  authRef.current = auth;
   useEffect(() => {
     if (Platform.OS === 'web') return;
     const sub = Notifications.addNotificationResponseReceivedListener((r) => {

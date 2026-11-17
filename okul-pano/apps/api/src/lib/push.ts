@@ -3,6 +3,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import type { AppDeps } from '../context.ts';
 import { memberships, pushTokens, users } from '../db/schema.ts';
 import type { Permission } from '@okulpano/shared';
+import { parseServiceAccount, sendFcm } from './fcm.ts';
 
 export interface PushMessage {
   title: string;
@@ -72,8 +73,21 @@ export async function sendToTokens(deps: Pick<AppDeps, "db" | "env">, tokens: re
     sentPushes.push({ to: [...tokens], message, ...extra });
     return;
   }
-  for (let i = 0; i < tokens.length; i += CHUNK) {
-    const batch = tokens.slice(i, i + CHUNK);
+  // Telefon anahtarının türü: Expo ("ExponentPushToken[…]") ya da doğrudan Firebase (FCM). Firebase anahtarları,
+  // hizmet hesabı tanımlıysa Google'ın bildirim servisine gider; Expo hesabı gerekmez.
+  const isExpo = (t: string) => /^Expo(nent)?PushToken\[/.test(t);
+  const fcmTokens = tokens.filter((t) => !isExpo(t));
+  const expoTokens = tokens.filter(isExpo);
+  const sa = parseServiceAccount(deps.env.FIREBASE_SERVICE_ACCOUNT);
+  if (fcmTokens.length && sa) {
+    const data: Record<string, string> = { url: message.url ?? '/', ...(extra.userId ? { userId: extra.userId } : {}) };
+    const { gone } = await sendFcm(sa, fcmTokens, { title: message.title, body: message.body, data });
+    if (gone.length) await deps.db.delete(pushTokens).where(inArray(pushTokens.token, gone));
+  } else if (fcmTokens.length) {
+    console.warn('Firebase hizmet hesabı tanımlı değil (FIREBASE_SERVICE_ACCOUNT): telefon bildirimi gönderilmedi');
+  }
+  for (let i = 0; i < expoTokens.length; i += CHUNK) {
+    const batch = expoTokens.slice(i, i + CHUNK);
     const res = await fetch(deps.env.PUSH_URL, {
       method: 'POST',
       headers: {
