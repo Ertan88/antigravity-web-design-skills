@@ -186,12 +186,14 @@ export function Screen({
 }) {
   const bg = tone === 'danger' ? colors.dangerTint : colors.bg;
   const tabInset = useContext(TabBarInset);
-  // Yeni ekran açılınca alt menü yeniden görünür (önceki ekranda gizlenmiş olabilir)
-  useEffect(() => {
-    resetScrollChrome();
-  }, []);
   // Kaydırma konumu saklanır; tema değişince ekran yeniden kurulduğunda aynı yere dönülür
   const path = useScrollKey();
+  // Ekran açılınca ya da sekmeye geri dönülünce alt menü yeniden görünür (başka ekranda kaydırırken gizlenmiş
+  // olabilir; sekmeler açık kaldığı için yalnızca ilk açılışta sıfırlamak yetmez, kısa sayfada menü hiç geri gelmezdi)
+  const focused = useIsFocused();
+  useEffect(() => {
+    if (focused) resetScrollChrome(scrollMemory.get(path) ?? 0);
+  }, [focused, path]);
   const scroller = useRef<ComponentRef<typeof ScrollView>>(null);
   const viewH = useRef(0);
   const contentH = useRef(0);

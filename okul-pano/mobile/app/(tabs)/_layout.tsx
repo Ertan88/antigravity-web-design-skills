@@ -57,6 +57,11 @@ function FloatingTabBar({ state, descriptors, emitter, navigateToTab, bottom }: 
       b.remove();
     };
   }, []);
+  // Sekme değişince klavye durumu yeniden okunur: klavye başka ekranda kapanıp "kapandı" olayı kaçarsa alt menü
+  // hiç geri gelmiyordu
+  useEffect(() => {
+    setKeyboard(Keyboard.isVisible());
+  }, [state.index]);
   useEffect(() => {
     if (!hint) return;
     const t = setTimeout(() => setHint(null), 1600);
@@ -116,7 +121,16 @@ function FloatingTabBar({ state, descriptors, emitter, navigateToTab, bottom }: 
               style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 3, height: BAR_HEIGHT - 8 }}
             >
               {/* Alt menü A: simge üstte (seçiliyse hafif zeminde), adı her zaman altında */}
-              <View style={{ paddingHorizontal: 14, paddingVertical: 3, borderRadius: 14, backgroundColor: focused ? colors.primarySoft : "transparent" }}>
+              <View style={{ paddingHorizontal: 14, paddingVertical: 3 }}>
+                {/* Seçili zemin ayrı katmanda: Android bazı cihazlarda zemin rengi olan kutunun köşesini yuvarlamıyor,
+                    seçili sekme kare görünüyordu */}
+                {focused && (
+                  <View
+                    collapsable={false}
+                    pointerEvents="none"
+                    style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, borderRadius: 999, overflow: "hidden", backgroundColor: colors.primarySoft }}
+                  />
+                )}
                 {options.tabBarIcon?.({ focused, color, size: 22 })}
                 {badge != null && badge !== "" && (
                   <View style={{ position: "absolute", top: -4, right: 2, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: colors.danger, alignItems: "center", justifyContent: "center" }}>

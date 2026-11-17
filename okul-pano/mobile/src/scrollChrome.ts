@@ -23,9 +23,13 @@ export function reportScroll(y: number) {
   else if (dy < -6) set(false);
 }
 
-/** Yeni ekran açılınca alt menü yeniden görünür */
-export function resetScrollChrome() {
-  lastY = 0;
+/**
+ * Bir ekran açılınca ya da sekmeye geri dönülünce alt menü yeniden görünür. Sekmeler açık kaldığı için yalnızca ilk
+ * açılışta değil her odaklanmada çağrılır; ekranın kendi kaydırma konumu verilir (yoksa sonraki ilk kaydırma
+ * aradaki farkı "aşağı kaydırma" sanıp menüyü yeniden gizler).
+ */
+export function resetScrollChrome(y = 0) {
+  lastY = y;
   set(false);
 }
 
