@@ -53,6 +53,8 @@ Böyle bir durum varsa kullanıcı **onaylanmaz**. Yanlış açıkça söylenir;
 
 - **Ortak arayüz standartları** (acil düğmesi yalnızca ana sayfada, menüde açıklama yok, kısa düğme yazıları,
   "Md. Yrd." kısaltması, okul adı türüyle, formlarda "Ayşe YILMAZ" yazımı): `KURALLAR.md` 3.3 ve 3.4.
+- **Okul adı her yerde türüyle yazılır** (menü, hesap listesi, başlık, bildirim, e-posta, platform listeleri, API
+  yanıtı): `schoolFullName(ad, schoolType)`, dar yerde `shortSchoolName`. Yalnızca `name` tek başına gösterilmez.
 
 ## 4a. Türkçe yazım
 

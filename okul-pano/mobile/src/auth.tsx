@@ -1,12 +1,44 @@
-import { appView, type Permission, type Role } from '@okulpano/shared/permissions';
-import { useQueryClient } from '@tanstack/react-query';
-import { router } from 'expo-router';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { loadAccounts, saveAccounts, upsert, type SavedAccount } from './accounts.ts';
-import { api, deviceAccount, login, loginOther, logout, session } from './api.ts';
-import { clearSaved, restoreQueries, startSaving } from './persist.ts';
-import { deviceToken, isMuted, registerForPush, setMuted, setPushUser, unregisterPush } from './push.ts';
-import { storage } from './storage.ts';
+import { schoolFullName } from "@okulpano/shared/schoolName";
+import {
+  appView,
+  type Permission,
+  type Role,
+} from "@okulpano/shared/permissions";
+import { useQueryClient } from "@tanstack/react-query";
+import { router } from "expo-router";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  loadAccounts,
+  saveAccounts,
+  upsert,
+  type SavedAccount,
+} from "./accounts.ts";
+import {
+  api,
+  deviceAccount,
+  login,
+  loginOther,
+  logout,
+  session,
+} from "./api.ts";
+import { clearSaved, restoreQueries, startSaving } from "./persist.ts";
+import {
+  deviceToken,
+  isMuted,
+  registerForPush,
+  setMuted,
+  setPushUser,
+  unregisterPush,
+} from "./push.ts";
+import { storage } from "./storage.ts";
 
 export interface SchoolAccess {
   id: string;
@@ -36,7 +68,14 @@ export interface Me {
 }
 
 /** Yönetici ekranlarını (kontrol merkezi, onaylar, pano kumandası) açan yetkiler */
-const MANAGER_PERMISSIONS: Permission[] = ['announcements.approve', 'board.control', 'screens.manage', 'emergency.manage', 'duties.manage', 'leaves.manage'];
+const MANAGER_PERMISSIONS: Permission[] = [
+  "announcements.approve",
+  "board.control",
+  "screens.manage",
+  "emergency.manage",
+  "duties.manage",
+  "leaves.manage",
+];
 
 /**
  * Uygulamadaki rol: menüler buna göre kurulur.
@@ -44,10 +83,10 @@ const MANAGER_PERMISSIONS: Permission[] = ['announcements.approve', 'board.contr
  * - owner: okul müdürü · admin: yönetici · editor: verilen yetkiler · teacher: öğretmen
  * Platform yöneticisi üyesi olduğu okulda üyeliğindeki rolle (okul müdürü, öğretmen…) çalışır; o görünüme geçebilir.
  */
-export type AppRole = 'platform' | 'owner' | 'admin' | 'editor' | 'teacher';
+export type AppRole = "platform" | "owner" | "admin" | "editor" | "teacher";
 
 interface AuthValue {
-  status: 'loading' | 'signedOut' | 'signedIn';
+  status: "loading" | "signedOut" | "signedIn";
   me: Me | null;
   school: SchoolAccess | null;
   server: string;
@@ -80,43 +119,58 @@ interface AuthValue {
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
-const PLATFORM_KEY = 'okulpano.platformMode';
+const PLATFORM_KEY = "okulpano.platformMode";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
-  const [status, setStatus] = useState<AuthValue['status']>('loading');
+  const [status, setStatus] = useState<AuthValue["status"]>("loading");
   const [me, setMe] = useState<Me | null>(null);
   const [schoolId, setSchoolId] = useState<string | null>(null);
-  const [server, setServer] = useState('');
+  const [server, setServer] = useState("");
   // Platform yöneticisi açılışta platform görünümündedir; okuluna geçince hatırlanır
   const [platformMode, setPlatformModeState] = useState(true);
   const [accounts, setAccounts] = useState<SavedAccount[]>([]);
   const [switching, setSwitching] = useState<SavedAccount | null>(null);
-  const updateAccounts = useCallback(async (fn: (list: SavedAccount[]) => SavedAccount[]) => {
-    const next = fn(await loadAccounts());
-    await saveAccounts(next);
-    setAccounts(next);
-    return next;
-  }, []);
+  const updateAccounts = useCallback(
+    async (fn: (list: SavedAccount[]) => SavedAccount[]) => {
+      const next = fn(await loadAccounts());
+      await saveAccounts(next);
+      setAccounts(next);
+      return next;
+    },
+    [],
+  );
 
   const applyMe = useCallback((data: Me, preferred: string | null) => {
     setPushUser(data.user.id);
     setMe(data);
     const pick =
-      data.schools.find((s) => s.id === preferred) ?? data.schools.find((s) => s.id === data.lastSchoolId) ?? data.schools[0] ?? null;
+      data.schools.find((s) => s.id === preferred) ??
+      data.schools.find((s) => s.id === data.lastSchoolId) ??
+      data.schools[0] ??
+      null;
     setSchoolId(pick?.id ?? null);
-    setStatus('signedIn');
+    setStatus("signedIn");
     return pick?.id ?? null;
   }, []);
 
   const loadMe = useCallback(
     async (preferred: string | null) => {
-      const data = await api<Me>('/api/me');
+      const data = await api<Me>("/api/me");
       const picked = applyMe(data, preferred);
       startSaving(qc, `${session.server}|${data.user.id}`);
-      await Promise.all([session.setSchool(picked), session.setMe(JSON.stringify(data))]);
+      await Promise.all([
+        session.setSchool(picked),
+        session.setMe(JSON.stringify(data)),
+      ]);
       // Etkin hesap listede (yenileme anahtarı oturumda durur, listede tutulmaz)
-      await updateAccounts((list) => upsert(list, { ...accountMeta(data), server: session.server, refresh: null }));
+      await updateAccounts((list) =>
+        upsert(list, {
+          ...accountMeta(data),
+          server: session.server,
+          refresh: null,
+        }),
+      );
     },
     [applyMe, qc, updateAccounts],
   );
@@ -125,14 +179,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session.onSignedOut(() => {
       void clearSaved();
       setMe(null);
-      setStatus('signedOut');
+      setStatus("signedOut");
     });
     void (async () => {
-      const [s, mode, saved] = await Promise.all([session.load(), storage.get(PLATFORM_KEY), loadAccounts()]);
+      const [s, mode, saved] = await Promise.all([
+        session.load(),
+        storage.get(PLATFORM_KEY),
+        loadAccounts(),
+      ]);
       setAccounts(saved);
       setServer(s.server);
-      setPlatformModeState(mode !== 'school');
-      if (!s.hasSession || !s.server) return setStatus('signedOut');
+      setPlatformModeState(mode !== "school");
+      if (!s.hasSession || !s.server) return setStatus("signedOut");
       // Son bilinen kullanıcı bilgisiyle ekran hemen açılır; güncel bilgi arkada gelir (yetki değiştiyse ekran yenilenir)
       let cached: Me | null = null;
       try {
@@ -149,7 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await loadMe(s.schoolId);
       } catch {
         // Bağlantı yoksa saklanan bilgiyle devam edilir; oturum geçersizse (401) api() zaten çıkış yapar
-        if (!cached) setStatus('signedOut');
+        if (!cached) setStatus("signedOut");
       }
     })();
   }, [loadMe, applyMe, qc]);
@@ -159,16 +217,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const can = (p: Permission) => Boolean(school?.permissions.includes(p));
     const role: AppRole =
       me?.user.isSuperAdmin && (platformMode || !school)
-        ? 'platform'
-        : school?.role === 'owner'
-          ? 'owner'
-          : school?.role === 'admin'
-            ? 'admin'
+        ? "platform"
+        : school?.role === "owner"
+          ? "owner"
+          : school?.role === "admin"
+            ? "admin"
             : // Öğretmen kaydı olan herkes görevi olsa da öğretmen görünümünde kalır (görevi alt menüde ve Menü'de);
               // editör görünümü yalnızca kadroda olmayan görevliler içindir (ör. memur). Kural panelle ortak.
-              school && appView(school) === 'editor'
-              ? 'editor'
-              : 'teacher';
+              school && appView(school) === "editor"
+              ? "editor"
+              : "teacher";
     return {
       status,
       me,
@@ -180,7 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role,
       setPlatformMode: async (on) => {
         setPlatformModeState(on);
-        await storage.set(PLATFORM_KEY, on ? 'platform' : 'school');
+        await storage.set(PLATFORM_KEY, on ? "platform" : "school");
         qc.clear();
       },
       reloadMe: async () => loadMe(schoolId),
@@ -195,20 +253,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await unregisterPush().catch(() => undefined);
         await clearSaved();
         await logout();
-        if (id) await updateAccounts((list) => list.filter((a) => !(a.userId === id && a.server === session.server)));
+        if (id)
+          await updateAccounts((list) =>
+            list.filter(
+              (a) => !(a.userId === id && a.server === session.server),
+            ),
+          );
         qc.clear();
         setMe(null);
-        setStatus('signedOut');
+        setStatus("signedOut");
       },
       accounts,
       switchAccount: async (userId) => {
         const target = accounts.find((a) => a.userId === userId);
         if (!target || target.userId === me?.user.id) return;
-        if (!target.refresh) throw new Error('Bu hesabın oturumu kapanmış. Şifreyle yeniden giriş yapın.');
+        if (!target.refresh)
+          throw new Error(
+            "Bu hesabın oturumu kapanmış. Şifreyle yeniden giriş yapın.",
+          );
         setSwitching(target);
         // Arkada süren oturum yenilemesi bitmeden etkin hesabın anahtarı saklanmaz
         await session.settle();
-        const current = me ? { ...accountMeta(me), server: session.server, refresh: session.refresh } : null;
+        const current = me
+          ? {
+              ...accountMeta(me),
+              server: session.server,
+              refresh: session.refresh,
+            }
+          : null;
         // Önceki hesabın bildirimleri bu telefona gelmeye devam eder (hesap başına ayar); yeni hesap da bağlanır
         await clearSaved();
         await updateAccounts((list) => {
@@ -224,64 +296,122 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await loadMe(null);
         } catch (e) {
           // Oturum düşmüşse önceki hesaba dönülür
-          await updateAccounts((list) => upsert(list, { ...target, refresh: null }));
+          await updateAccounts((list) =>
+            upsert(list, { ...target, refresh: null }),
+          );
           if (current?.refresh) {
             await session.setServer(current.server);
             await session.setTokens(null, current.refresh);
             await loadMe(null).catch(() => undefined);
           }
           setSwitching(null);
-          throw e instanceof Error ? e : new Error('Hesaba geçilemedi');
+          throw e instanceof Error ? e : new Error("Hesaba geçilemedi");
         }
         void registerForPush({ auto: true }).catch(() => undefined);
         // Yeni hesabın ana sayfası açılır; geçiş ekranı kısa bir süre görünür kalır
-        router.replace('/');
+        router.replace("/");
         setTimeout(() => setSwitching(null), 700);
       },
       switching,
       addAccount: async () => {
         await session.settle();
-        if (me) await updateAccounts((list) => upsert(list, { ...accountMeta(me), server: session.server, refresh: session.refresh }));
+        if (me)
+          await updateAccounts((list) =>
+            upsert(list, {
+              ...accountMeta(me),
+              server: session.server,
+              refresh: session.refresh,
+            }),
+          );
         await clearSaved();
         // Sunucudaki oturum kapatılmaz: hesap listede kalır, geri geçilebilir
         await session.setTokens(null, null);
         qc.clear();
         setMe(null);
-        setStatus('signedOut');
+        setStatus("signedOut");
       },
       rememberAccount: async (email, password) => {
         const r = await loginOther(email, password);
-        const meta = { userId: r.me.id, email: r.me.email, fullName: r.me.fullName, kind: r.me.isSuperAdmin ? ('platform' as const) : ('school' as const), detail: r.me.isSuperAdmin ? 'Platform yöneticisi' : '' };
-        await updateAccounts((list) => upsert(list, { ...meta, server: session.server, refresh: r.refreshToken }));
+        const meta = {
+          userId: r.me.id,
+          email: r.me.email,
+          fullName: r.me.fullName,
+          kind: r.me.isSuperAdmin ? ("platform" as const) : ("school" as const),
+          detail: r.me.isSuperAdmin ? "Platform yöneticisi" : "",
+        };
+        await updateAccounts((list) =>
+          upsert(list, {
+            ...meta,
+            server: session.server,
+            refresh: r.refreshToken,
+          }),
+        );
         // Yeni kayıtlı hesabın bildirimleri de bu telefona gelir (kapatılmadıysa)
         const token = await deviceToken();
-        if (token && !(await isMuted(r.me.id))) await deviceAccount(session.server, r.refreshToken, 'link', token).catch(() => undefined);
+        if (token && !(await isMuted(r.me.id)))
+          await deviceAccount(
+            session.server,
+            r.refreshToken,
+            "link",
+            token,
+          ).catch(() => undefined);
       },
       linkOtherAccounts: async () => {
         const token = await deviceToken();
         if (!token) return;
         for (const a of accounts) {
-          if (a.userId === me?.user.id || !a.refresh || (await isMuted(a.userId))) continue;
-          await deviceAccount(a.server, a.refresh, 'link', token).catch(() => undefined);
+          if (
+            a.userId === me?.user.id ||
+            !a.refresh ||
+            (await isMuted(a.userId))
+          )
+            continue;
+          await deviceAccount(a.server, a.refresh, "link", token).catch(
+            () => undefined,
+          );
         }
       },
       forgetAccount: async (userId) => {
         const a = accounts.find((x) => x.userId === userId);
         if (!a || a.userId === me?.user.id) return;
         const token = await deviceToken();
-        if (a.refresh && token) await deviceAccount(a.server, a.refresh, 'unlink', token).catch(() => undefined);
+        if (a.refresh && token)
+          await deviceAccount(a.server, a.refresh, "unlink", token).catch(
+            () => undefined,
+          );
         await setMuted(a.userId, false);
-        if (a.refresh) void fetch(`${a.server}/api/auth/logout`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ refreshToken: a.refresh }) }).catch(() => undefined);
-        await updateAccounts((list) => list.filter((x) => !(x.userId === userId && x.server === a.server)));
+        if (a.refresh)
+          void fetch(`${a.server}/api/auth/logout`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ refreshToken: a.refresh }),
+          }).catch(() => undefined);
+        await updateAccounts((list) =>
+          list.filter((x) => !(x.userId === userId && x.server === a.server)),
+        );
       },
       selectSchool: async (id) => {
         setSchoolId(id);
         await session.setSchool(id);
         qc.clear();
-        void api('/api/me/school', { method: 'PUT', body: { schoolId: id } }).catch(() => undefined);
+        void api("/api/me/school", {
+          method: "PUT",
+          body: { schoolId: id },
+        }).catch(() => undefined);
       },
     };
-  }, [status, me, schoolId, server, platformMode, loadMe, qc, accounts, updateAccounts, switching]);
+  }, [
+    status,
+    me,
+    schoolId,
+    server,
+    platformMode,
+    loadMe,
+    qc,
+    accounts,
+    updateAccounts,
+    switching,
+  ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
@@ -292,32 +422,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
  */
 export function membershipLabel(s: SchoolAccess): string {
   if (s.teacherTitle) return s.teacherTitle;
-  if (s.role === 'owner') return 'Okul müdürü';
-  if (s.role === 'admin') return 'Yönetici';
+  if (s.role === "owner") return "Okul müdürü";
+  if (s.role === "admin") return "Yönetici";
   // Kadroda olmayan kişi (ör. memur) panelde olduğu gibi "Görevli"
-  return s.teacherId ? 'Öğretmen' : 'Görevli';
+  return s.teacherId ? "Öğretmen" : "Görevli";
 }
 
 /** Hesap listesinde görünen bilgiler: platform hesabı ya da okul (ilk okul ve görevi) */
-function accountMeta(data: Me): Omit<SavedAccount, 'server' | 'refresh'> {
+function accountMeta(data: Me): Omit<SavedAccount, "server" | "refresh"> {
   const own = data.schools.filter((s) => !s.support);
   return {
     userId: data.user.id,
     email: data.user.email,
     fullName: data.user.fullName,
-    kind: data.user.isSuperAdmin ? 'platform' : 'school',
-    detail: data.user.isSuperAdmin ? 'Platform yöneticisi' : own.map((s) => `${s.name} · ${membershipLabel(s)}`).join(', '),
+    kind: data.user.isSuperAdmin ? "platform" : "school",
+    detail: data.user.isSuperAdmin
+      ? "Platform yöneticisi"
+      : own
+          .map(
+            (s) =>
+              `${schoolFullName(s.name, s.schoolType)} · ${membershipLabel(s)}`,
+          )
+          .join(", "),
   };
 }
 
 export function useAuth(): AuthValue {
   const v = useContext(AuthContext);
-  if (!v) throw new Error('AuthProvider eksik');
+  if (!v) throw new Error("AuthProvider eksik");
   return v;
 }
 
 /** Seçili okulun API yolu: /api/schools/:id/<resource> */
-export function useSchoolPath(resource = ''): string {
+export function useSchoolPath(resource = ""): string {
   const { school } = useAuth();
-  return `/api/schools/${school?.id ?? '_'}${resource ? `/${resource}` : ''}`;
+  return `/api/schools/${school?.id ?? "_"}${resource ? `/${resource}` : ""}`;
 }

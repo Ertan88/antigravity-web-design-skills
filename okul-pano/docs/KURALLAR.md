@@ -141,6 +141,9 @@ kalır; burada tekrarlanmaz.
 - Dar yerlerde (kart, rozet, başlık) ad ve ünvan kesilmez: ünvan kısaltılır ("Md. Yrd.", ortak `shortTitle`), ad
   soyad iki satıra bölünür ya da sığacak kadar küçülür.
 - Okul adı türüyle birlikte yazılır (ör. "Atatürk Mesleki ve Teknik Anadolu Lisesi"); dar yerde tür kısaltılır
+- Okul adının göründüğü her yerde (menü, hesap listesi, okul seçimi, ekran başlığı, bildirim, e-posta, davet metni,
+  platform listeleri, sunucunun döndürdüğü `schoolName`) tür de yazılır: `schoolFullName(ad, schoolType)` ya da dar yerde
+  `shortSchoolName`. Yalnızca `name` alanı tek başına gösterilmez.
   ("Atatürk MTAL").
 
 ### 3.4 Türkçe

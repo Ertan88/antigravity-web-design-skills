@@ -1,35 +1,71 @@
-import clsx from 'clsx';
-import { appView } from '@okulpano/shared';
-import { Building2, Download, Inbox, Lifebuoy2, ChevronDown, Mail, ChevronRight, ChevronsUpDown, LogOut, Menu, Moon, MonitorSmartphone, School, Sun, X } from './icons.tsx';
-import { Suspense, useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { useAuth } from '../lib/auth.tsx';
-import { useInternshipAccess, useSchool } from '../lib/data.ts';
-import { openCount, useCoverDay } from '../pages/covers/Covers.tsx';
-import { findNav, NAV, type NavItem } from '../lib/nav.ts';
-import { isPhoneWidth, openAppView, panelChosenOnPhone } from '../lib/appView.ts';
-import { useTheme } from '../lib/theme.ts';
-import { BrandMark, BrandName } from './Brand.tsx';
-import { EmergencyBanner, EmergencyButton } from './Emergency.tsx';
-import { WelcomeDialog } from './Onboarding.tsx';
-import { TrialBanner } from './TrialBanner.tsx';
-import { NotificationBell } from './Notifications.tsx';
-import { Select, Spinner } from './ui.tsx';
+import clsx from "clsx";
+import { appView, schoolFullName } from "@okulpano/shared";
+import {
+  Building2,
+  Download,
+  Inbox,
+  Lifebuoy2,
+  ChevronDown,
+  Mail,
+  ChevronRight,
+  ChevronsUpDown,
+  LogOut,
+  Menu,
+  Moon,
+  MonitorSmartphone,
+  School,
+  Sun,
+  X,
+} from "./icons.tsx";
+import { Suspense, useEffect, useState } from "react";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { useAuth } from "../lib/auth.tsx";
+import { useInternshipAccess, useSchool } from "../lib/data.ts";
+import { openCount, useCoverDay } from "../pages/covers/Covers.tsx";
+import { findNav, NAV, type NavItem } from "../lib/nav.ts";
+import {
+  isPhoneWidth,
+  openAppView,
+  panelChosenOnPhone,
+} from "../lib/appView.ts";
+import { useTheme } from "../lib/theme.ts";
+import { BrandMark, BrandName } from "./Brand.tsx";
+import { EmergencyBanner, EmergencyButton } from "./Emergency.tsx";
+import { WelcomeDialog } from "./Onboarding.tsx";
+import { TrialBanner } from "./TrialBanner.tsx";
+import { NotificationBell } from "./Notifications.tsx";
+import { Select, Spinner } from "./ui.tsx";
 
 function SchoolSwitcher() {
   const { me, school, setSchoolId } = useAuth();
   if (!me || me.schools.length === 0) return null;
   const body = (
     <>
-      <SchoolBadge name={school?.name ?? ''} logo={school?.logoUrl ?? null} />
+      <SchoolBadge name={school?.name ?? ""} logo={school?.logoUrl ?? null} />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-semibold text-ink">{school?.name ?? 'Okul seçin'}</div>
-        <div className="text-xs text-slate-500">{me.schools.length > 1 ? `${me.schools.length} okul` : school ? (school.support ? 'Destek erişimi' : roleLabel(school)) : ''}</div>
+        <div className="truncate text-sm font-semibold text-ink">
+          {school
+            ? schoolFullName(school.name, school.schoolType)
+            : "Okul seçin"}
+        </div>
+        <div className="text-xs text-slate-500">
+          {me.schools.length > 1
+            ? `${me.schools.length} okul`
+            : school
+              ? school.support
+                ? "Destek erişimi"
+                : roleLabel(school)
+              : ""}
+        </div>
       </div>
     </>
   );
   if (me.schools.length === 1) {
-    return <div className="flex items-center gap-3 rounded-2xl bg-surface p-2.5 ring-1 ring-slate-200">{body}</div>;
+    return (
+      <div className="flex items-center gap-3 rounded-2xl bg-surface p-2.5 ring-1 ring-slate-200">
+        {body}
+      </div>
+    );
   }
   return (
     <label className="relative flex items-center gap-3 rounded-2xl bg-surface p-2.5 ring-1 ring-slate-200 transition hover:ring-slate-300 focus-within:ring-ink">
@@ -39,12 +75,14 @@ function SchoolSwitcher() {
         plain
         aria-label="Okul seç"
         className="absolute inset-0 opacity-0"
-        value={school?.id ?? ''}
+        value={school?.id ?? ""}
         onChange={(e) => setSchoolId(e.target.value)}
       >
         {me.schools.map((s) => (
           <option key={s.id} value={s.id}>
-            {s.support ? `${s.name} (destek erişimi)` : s.name}
+            {s.support
+              ? `${schoolFullName(s.name, s.schoolType)} (destek erişimi)`
+              : schoolFullName(s.name, s.schoolType)}
           </option>
         ))}
       </Select>
@@ -53,34 +91,57 @@ function SchoolSwitcher() {
 }
 
 function SchoolBadge({ name, logo }: { name: string; logo: string | null }) {
-  if (logo) return <img src={logo} alt="" className="size-10 shrink-0 rounded-xl bg-surface object-contain p-0.5" />;
+  if (logo)
+    return (
+      <img
+        src={logo}
+        alt=""
+        className="size-10 shrink-0 rounded-xl bg-surface object-contain p-0.5"
+      />
+    );
   return (
     <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-tile-sun text-sm font-extrabold text-tile-sun-ink">
-      {name.trim().charAt(0).toLocaleUpperCase('tr-TR') || <School className="size-4" />}
+      {name.trim().charAt(0).toLocaleUpperCase("tr-TR") || (
+        <School className="size-4" />
+      )}
     </div>
   );
 }
 
 /** Öğretmen kaydı bağlıysa kadrodaki ünvan (Müdür Yardımcısı, Uzman Öğretmen…), değilse rol */
-const roleLabel = (s: { role: string; teacherId?: string | null; teacherTitle?: string | null }) =>
-  s.teacherTitle || (({ owner: 'Okul müdürü', admin: 'Yönetici', editor: s.teacherId ? 'Öğretmen' : 'Editör' }) as Record<string, string>)[s.role] || s.role;
+const roleLabel = (s: {
+  role: string;
+  teacherId?: string | null;
+  teacherTitle?: string | null;
+}) =>
+  s.teacherTitle ||
+  (
+    {
+      owner: "Okul müdürü",
+      admin: "Yönetici",
+      editor: s.teacherId ? "Öğretmen" : "Editör",
+    } as Record<string, string>
+  )[s.role] ||
+  s.role;
 
 const initials = (name: string | undefined) =>
-  (name ?? '')
-    .split(' ')
+  (name ?? "")
+    .split(" ")
     .map((p) => p.charAt(0))
     .slice(0, 2)
-    .join('')
-    .toLocaleUpperCase('tr-TR');
+    .join("")
+    .toLocaleUpperCase("tr-TR");
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   clsx(
-    'group relative flex items-center gap-3 rounded-full px-3.5 py-2 text-[13.5px] font-semibold transition-all',
-    isActive ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-200/60 hover:text-ink',
+    "group relative flex items-center gap-3 rounded-full px-3.5 py-2 text-[13.5px] font-semibold transition-all",
+    isActive
+      ? "bg-brand-600 text-white"
+      : "text-slate-600 hover:bg-slate-200/60 hover:text-ink",
   );
 
 /** Kenar menüde katlanan grupların adları (tarayıcıda saklanır) */
-const COLLAPSE_KEY = 'okulpano.navCollapsed';
+const COLLAPSE_KEY = "okulpano.navCollapsed";
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { me, can, logout, school: access } = useAuth();
@@ -101,14 +162,16 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const current = findNav(useLocation().pathname)?.item.to;
   const [collapsed, setCollapsed] = useState<string[]>(() => {
     try {
-      return JSON.parse(localStorage.getItem(COLLAPSE_KEY) ?? '[]') as string[];
+      return JSON.parse(localStorage.getItem(COLLAPSE_KEY) ?? "[]") as string[];
     } catch {
       return [];
     }
   });
   const toggleGroup = (title: string) =>
     setCollapsed((c) => {
-      const next = c.includes(title) ? c.filter((t) => t !== title) : [...c, title];
+      const next = c.includes(title)
+        ? c.filter((t) => t !== title)
+        : [...c, title];
       try {
         localStorage.setItem(COLLAPSE_KEY, JSON.stringify(next));
       } catch {
@@ -118,12 +181,13 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     });
   return (
     <div className="relative flex h-full flex-col overflow-hidden border-r border-slate-200 bg-slate-50 text-slate-600 dark:bg-[#161412]">
-
       <div className="relative flex items-center gap-2.5 px-5 pt-5 pb-4">
         <BrandMark className="size-9 shrink-0 drop-shadow-sm" />
         <div className="leading-tight">
           <BrandName className="block text-[17px] font-extrabold tracking-tight text-ink" />
-          <div className="text-[11px] font-medium text-slate-500">Yönetim Paneli</div>
+          <div className="text-[11px] font-medium text-slate-500">
+            Yönetim Paneli
+          </div>
         </div>
       </div>
       <div className="relative px-3 pb-4">
@@ -133,24 +197,47 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         {/* Telefonda açılan menü: uygulama şeridi ve en sık kullanılan sayfaların kısayolları, altında tam liste */}
         {onNavigate && (
           <PhoneShortcuts
-            items={NAV.flatMap((g) => g.items).filter((i) => (!i.permission || can(i.permission)) && (!i.when || i.when(settings, who)))}
+            items={NAV.flatMap((g) => g.items).filter(
+              (i) =>
+                (!i.permission || can(i.permission)) &&
+                (!i.when || i.when(settings, who)),
+            )}
             badges={badges}
             onNavigate={onNavigate}
           />
         )}
         {NAV.map((group) => {
-          const items = group.items.filter((i) => (!i.permission || can(i.permission)) && (!i.when || i.when(settings, who)));
+          const items = group.items.filter(
+            (i) =>
+              (!i.permission || can(i.permission)) &&
+              (!i.when || i.when(settings, who)),
+          );
           if (!items.length) return null;
           const links = (
             <div id={`nav-${group.title}`} className="space-y-0.5">
               {items.map((item) => (
-                <NavLink key={item.to} to={item.to} end={item.to === '/'} onClick={onNavigate} className={navLinkClass}>
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === "/"}
+                  onClick={onNavigate}
+                  className={navLinkClass}
+                >
                   {({ isActive }) => (
                     <>
-                      <item.icon className={clsx('size-[18px] shrink-0 transition-colors', isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-600')} />
+                      <item.icon
+                        className={clsx(
+                          "size-[18px] shrink-0 transition-colors",
+                          isActive
+                            ? "text-white"
+                            : "text-slate-400 group-hover:text-slate-600",
+                        )}
+                      />
                       <span className="truncate">{item.label}</span>
                       {item.badge && badges[item.badge] > 0 && (
-                        <span className="ml-auto rounded-full bg-rose-600 px-1.5 py-px text-[11px] font-extrabold text-white tabular-nums">{badges[item.badge]}</span>
+                        <span className="ml-auto rounded-full bg-rose-600 px-1.5 py-px text-[11px] font-extrabold text-white tabular-nums">
+                          {badges[item.badge]}
+                        </span>
                       )}
                     </>
                   )}
@@ -173,8 +260,18 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                 className="flex w-full items-center gap-1.5 rounded-full px-3.5 pb-1.5 text-left text-xs font-bold text-slate-400 transition hover:text-slate-600 disabled:cursor-default disabled:hover:text-slate-400"
               >
                 <span className="flex-1">{group.title}</span>
-                {!open && <span className="rounded-full bg-slate-200/70 px-1.5 text-[10.5px] font-bold text-slate-500">{items.length}</span>}
-                <ChevronDown className={clsx('size-3.5 transition-transform', !open && '-rotate-90', active && 'opacity-0')} />
+                {!open && (
+                  <span className="rounded-full bg-slate-200/70 px-1.5 text-[10.5px] font-bold text-slate-500">
+                    {items.length}
+                  </span>
+                )}
+                <ChevronDown
+                  className={clsx(
+                    "size-3.5 transition-transform",
+                    !open && "-rotate-90",
+                    active && "opacity-0",
+                  )}
+                />
               </button>
               {open && links}
             </div>
@@ -182,17 +279,36 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         })}
         {me?.user.isSuperAdmin && (
           <div>
-            <div className="px-3.5 pb-1.5 text-xs font-bold text-slate-400">Platform</div>
-            <NavLink to="/platform" end onClick={onNavigate} className={navLinkClass}>
+            <div className="px-3.5 pb-1.5 text-xs font-bold text-slate-400">
+              Platform
+            </div>
+            <NavLink
+              to="/platform"
+              end
+              onClick={onNavigate}
+              className={navLinkClass}
+            >
               <Building2 className="size-[18px]" /> Okullar ve Abonelikler
             </NavLink>
-            <NavLink to="/platform/destek" onClick={onNavigate} className={navLinkClass}>
+            <NavLink
+              to="/platform/destek"
+              onClick={onNavigate}
+              className={navLinkClass}
+            >
               <Lifebuoy2 className="size-[18px]" /> Destek talepleri
             </NavLink>
-            <NavLink to="/platform/iletisim" onClick={onNavigate} className={navLinkClass}>
+            <NavLink
+              to="/platform/iletisim"
+              onClick={onNavigate}
+              className={navLinkClass}
+            >
               <Inbox className="size-[18px]" /> İletişim talepleri
             </NavLink>
-            <NavLink to="/platform/e-posta" onClick={onNavigate} className={navLinkClass}>
+            <NavLink
+              to="/platform/e-posta"
+              onClick={onNavigate}
+              className={navLinkClass}
+            >
               <Mail className="size-[18px]" /> E-posta ayarları
             </NavLink>
           </div>
@@ -200,13 +316,21 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
       <div className="relative border-t border-slate-200 p-3">
         <div className="flex items-center gap-1">
-          <NavLink to="/hesap" onClick={onNavigate} className="flex min-w-0 flex-1 items-center gap-2.5 rounded-2xl px-2 py-2 transition hover:bg-slate-200/60">
+          <NavLink
+            to="/hesap"
+            onClick={onNavigate}
+            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-2xl px-2 py-2 transition hover:bg-slate-200/60"
+          >
             <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-tile-sky text-xs font-extrabold text-tile-sky-ink">
               {initials(me?.user.fullName)}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold text-ink">{me?.user.fullName}</div>
-              <div className="truncate text-xs text-slate-500">{me?.user.email}</div>
+              <div className="truncate text-sm font-semibold text-ink">
+                {me?.user.fullName}
+              </div>
+              <div className="truncate text-xs text-slate-500">
+                {me?.user.email}
+              </div>
             </div>
           </NavLink>
           <button
@@ -226,25 +350,35 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
 function ThemeToggle() {
   const { theme, toggle } = useTheme();
-  const dark = theme === 'dark';
+  const dark = theme === "dark";
   return (
     <button
       type="button"
       onClick={toggle}
       role="switch"
       aria-checked={dark}
-      aria-label={dark ? 'Açık temaya geç' : 'Koyu temaya geç'}
-      title={dark ? 'Açık tema' : 'Koyu tema'}
+      aria-label={dark ? "Açık temaya geç" : "Koyu temaya geç"}
+      title={dark ? "Açık tema" : "Koyu tema"}
       className="relative flex h-9 w-[4.5rem] items-center rounded-full bg-slate-100 p-1 ring-1 ring-slate-200 transition hover:ring-slate-300"
     >
       <span
         className={clsx(
-          'absolute top-1 flex size-7 items-center justify-center rounded-full bg-surface shadow-[0_1px_3px_rgba(15,23,42,0.2)] transition-all duration-300',
-          dark ? 'left-[2.375rem]' : 'left-1',
+          "absolute top-1 flex size-7 items-center justify-center rounded-full bg-surface shadow-[0_1px_3px_rgba(15,23,42,0.2)] transition-all duration-300",
+          dark ? "left-[2.375rem]" : "left-1",
         )}
       />
-      <Sun className={clsx('relative z-10 ml-1.5 size-4 transition-colors', dark ? 'text-slate-400' : 'text-amber-500')} />
-      <Moon className={clsx('relative z-10 ml-auto mr-1.5 size-4 transition-colors', dark ? 'text-sky-300' : 'text-slate-400')} />
+      <Sun
+        className={clsx(
+          "relative z-10 ml-1.5 size-4 transition-colors",
+          dark ? "text-slate-400" : "text-amber-500",
+        )}
+      />
+      <Moon
+        className={clsx(
+          "relative z-10 ml-auto mr-1.5 size-4 transition-colors",
+          dark ? "text-sky-300" : "text-slate-400",
+        )}
+      />
     </button>
   );
 }
@@ -255,18 +389,30 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
   return (
     <header className="border-b border-slate-200/70 bg-slate-50/80 backdrop-blur-xl dark:bg-[#161412]/80">
       <div className="mx-auto flex h-14 w-full max-w-[1680px] items-center gap-3 px-4 sm:px-6 lg:h-16 lg:px-8">
-        <button type="button" aria-label="Menüyü aç" className="-ml-1 rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 lg:hidden" onClick={onMenu}>
+        <button
+          type="button"
+          aria-label="Menüyü aç"
+          className="-ml-1 rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 lg:hidden"
+          onClick={onMenu}
+        >
           <Menu className="size-5" />
         </button>
-        <nav aria-label="Konum" className="flex min-w-0 items-center gap-1.5 text-sm">
+        <nav
+          aria-label="Konum"
+          className="flex min-w-0 items-center gap-1.5 text-sm"
+        >
           <BrandName className="font-extrabold tracking-tight text-ink lg:hidden" />
           {nav?.group && (
             <>
-              <span className="hidden font-medium text-slate-400 lg:inline">{nav.group}</span>
+              <span className="hidden font-medium text-slate-400 lg:inline">
+                {nav.group}
+              </span>
               <ChevronRight className="hidden size-3.5 text-slate-300 lg:block" />
             </>
           )}
-          <span className="hidden truncate font-semibold text-slate-800 lg:inline">{nav?.item.label ?? ''}</span>
+          <span className="hidden truncate font-semibold text-slate-800 lg:inline">
+            {nav?.item.label ?? ""}
+          </span>
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <EmergencyButton />
@@ -287,7 +433,12 @@ export function Layout() {
   const [leaving, setLeaving] = useState(false);
   useEffect(() => {
     if (!me || !school || school.support || me.user.isSuperAdmin) return;
-    if (appView(school) !== 'teacher' || !isPhoneWidth() || panelChosenOnPhone()) return;
+    if (
+      appView(school) !== "teacher" ||
+      !isPhoneWidth() ||
+      panelChosenOnPhone()
+    )
+      return;
     setLeaving(true);
     void openAppView(me.user.id, school.id).then((ok) => {
       if (!ok) setLeaving(false);
@@ -297,7 +448,9 @@ export function Layout() {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-3 px-6 text-center">
         <Spinner />
-        <p className="text-sm font-semibold text-slate-500">Telefon için uygulama görünümü açılıyor…</p>
+        <p className="text-sm font-semibold text-slate-500">
+          Telefon için uygulama görünümü açılıyor…
+        </p>
       </div>
     );
   }
@@ -310,7 +463,10 @@ export function Layout() {
 
       {open && (
         <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm dark:bg-black/65" onClick={() => setOpen(false)} />
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm dark:bg-black/65"
+            onClick={() => setOpen(false)}
+          />
           <aside className="absolute inset-y-0 left-0 w-72 max-w-[85vw] shadow-2xl dark:border-r dark:border-white/15">
             <button
               type="button"
@@ -343,21 +499,45 @@ export function Layout() {
 }
 
 /** Telefondaki menünün başı: önce uygulama şeridi, sonra en çok dört kısayol (kişinin görebildiği sayfalardan) */
-const SHORTCUT_ORDER = ['/', '/duyurular', '/gorevlendirme', '/nobet', '/izinler', '/ekranlar', '/sinav-takvimi', '/sorunlar'];
+const SHORTCUT_ORDER = [
+  "/",
+  "/duyurular",
+  "/gorevlendirme",
+  "/nobet",
+  "/izinler",
+  "/ekranlar",
+  "/sinav-takvimi",
+  "/sorunlar",
+];
 
-function PhoneShortcuts({ items, badges, onNavigate }: { items: NavItem[]; badges: Record<'coverOpen', number>; onNavigate: () => void }) {
+function PhoneShortcuts({
+  items,
+  badges,
+  onNavigate,
+}: {
+  items: NavItem[];
+  badges: Record<"coverOpen", number>;
+  onNavigate: () => void;
+}) {
   const { me, school } = useAuth();
   const [opening, setOpening] = useState(false);
-  const shortcuts = SHORTCUT_ORDER.map((to) => items.find((i) => i.to === to)).filter((i): i is NavItem => Boolean(i)).slice(0, 4);
+  const shortcuts = SHORTCUT_ORDER.map((to) => items.find((i) => i.to === to))
+    .filter((i): i is NavItem => Boolean(i))
+    .slice(0, 4);
   return (
     <div className="space-y-3">
       <div className="space-y-2.5 rounded-2xl bg-[#0E5E66] p-3 text-white">
         <div className="flex items-center gap-2">
           <MonitorSmartphone className="size-5 shrink-0" />
-          <span className="text-sm font-extrabold">Telefonda uygulamada daha kolay</span>
+          <span className="text-sm font-extrabold">
+            Telefonda uygulamada daha kolay
+          </span>
         </div>
         <div className="flex gap-2">
-          <a href="/indir" className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-white px-3 py-2 text-xs font-extrabold text-[#0E5E66]">
+          <a
+            href="/indir"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-white px-3 py-2 text-xs font-extrabold text-[#0E5E66]"
+          >
             <Download className="size-3.5" />
             İndir
           </a>
@@ -367,17 +547,21 @@ function PhoneShortcuts({ items, badges, onNavigate }: { items: NavItem[]; badge
             onClick={() => {
               if (!me) return;
               setOpening(true);
-              void openAppView(me.user.id, school?.id ?? null).then((ok) => !ok && setOpening(false));
+              void openAppView(me.user.id, school?.id ?? null).then(
+                (ok) => !ok && setOpening(false),
+              );
             }}
             className="flex-1 rounded-xl bg-white/15 px-3 py-2 text-xs font-extrabold text-white ring-1 ring-white/30 disabled:opacity-60"
           >
-            {opening ? 'Açılıyor…' : 'Tarayıcıda aç'}
+            {opening ? "Açılıyor…" : "Tarayıcıda aç"}
           </button>
         </div>
       </div>
       {shortcuts.length > 1 && (
         <div>
-          <div className="px-3.5 pb-1.5 text-xs font-bold text-slate-400">Kısayollar</div>
+          <div className="px-3.5 pb-1.5 text-xs font-bold text-slate-400">
+            Kısayollar
+          </div>
           <div className="grid grid-cols-2 gap-2">
             {shortcuts.map((item) => {
               const badge = item.badge ? badges[item.badge] : 0;
@@ -385,18 +569,24 @@ function PhoneShortcuts({ items, badges, onNavigate }: { items: NavItem[]; badge
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  end={item.to === '/'}
+                  end={item.to === "/"}
                   onClick={onNavigate}
                   className={({ isActive }) =>
                     clsx(
-                      'relative flex flex-col gap-1.5 rounded-2xl p-2.5 text-[13px] font-bold ring-1 transition',
-                      isActive ? 'bg-ink text-white ring-ink dark:text-[#1c1917]' : 'bg-surface text-ink ring-slate-200 hover:ring-slate-300',
+                      "relative flex flex-col gap-1.5 rounded-2xl p-2.5 text-[13px] font-bold ring-1 transition",
+                      isActive
+                        ? "bg-ink text-white ring-ink dark:text-[#1c1917]"
+                        : "bg-surface text-ink ring-slate-200 hover:ring-slate-300",
                     )
                   }
                 >
                   <item.icon className="size-5" />
                   <span className="truncate">{item.label}</span>
-                  {badge > 0 && <span className="absolute top-2 right-2 rounded-full bg-rose-600 px-1.5 text-[10.5px] font-extrabold text-white tabular-nums">{badge}</span>}
+                  {badge > 0 && (
+                    <span className="absolute top-2 right-2 rounded-full bg-rose-600 px-1.5 text-[10.5px] font-extrabold text-white tabular-nums">
+                      {badge}
+                    </span>
+                  )}
                 </NavLink>
               );
             })}
