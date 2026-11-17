@@ -257,10 +257,14 @@ export function PersonCard({ person, ctx }: { person: Person; ctx: CardContext }
             </div>
           )}
 
-          {/* Kadro bağı: kadro dışı hesap bir öğretmen kaydına bağlanabilir (mobilde kendi programı ve nöbeti görünür) */}
-          {ctx.full && m.role !== 'owner' && !person.roster && (
+          {/* Kadro bağı: kadro dışı hesap (okul müdürü dahil) bir öğretmen kaydına bağlanabilir; ders ve nöbeti olan
+              müdür / müdür yardımcısı kendi kaydını seçer, mobilde Ders programım ve Nöbetlerim görünür */}
+          {ctx.full && !person.roster && (
             <div className="mt-5">
-              <div className="text-sm font-semibold text-slate-700">Kadro</div>
+              <div className="text-sm font-semibold text-slate-700">Öğretmen kaydı (kadro)</div>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Ders ya da nöbeti varsa Öğretmen Kadrosu'ndaki kendi kaydını seçin: mobilde Ders programım ve Nöbetlerim görünür. Kayıt yoksa önce Öğretmen Kadrosu'na ekleyin.
+              </p>
               <div className="mt-1.5">
                 <Select
                   value={m.teacherId ?? ''}

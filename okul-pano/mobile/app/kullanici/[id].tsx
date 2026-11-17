@@ -271,9 +271,9 @@ function Detail({ p, ctx }: { p: Person; ctx: ReturnType<typeof usePeople> }) {
             </Button>
           )}
 
-          {ctx.full && m.role !== 'owner' && !p.roster && (
+          {ctx.full && !p.roster && (
             <>
-              <SectionTitle>Kadro</SectionTitle>
+              <SectionTitle>Öğretmen kaydı (kadro)</SectionTitle>
               <Card style={{ gap: 8 }}>
                 <TeacherPicker
                   value={m.teacherId}
@@ -282,7 +282,7 @@ function Detail({ p, ctx }: { p: Person; ctx: ReturnType<typeof usePeople> }) {
                   onChange={(t) => void run('teacher', () => api(`${ctx.membersPath}/${m.id}/teacher`, { method: 'PUT', body: { teacherId: t } }))}
                 />
                 <T size={12.5} color={colors.muted}>
-                  Kadro dışı kişi (ör. memur) öğretmen değildir. Öğretmense kadrodaki kaydını seçin: kendi programı ve nöbeti görünür.
+                  Ders ya da nöbeti olan müdür, müdür yardımcısı ya da öğretmen kadrodaki kendi kaydını seçer: Ders programım ve Nöbetlerim görünür. Kadro dışı kişi (ör. memur) öğretmen değildir.
                 </T>
               </Card>
             </>
