@@ -1,5 +1,6 @@
 import { Tabs } from "expo-router";
-import { useEffect, useRef, useState, type ComponentProps, type ReactElement } from "react";
+import { useCallback, useEffect, useRef, useState, type ComponentProps, type ReactElement } from "react";
+import { useTabsBackGuard } from "../../src/exitGuard.ts";
 import { useDutyReminders, useExamReminders } from "../../src/reminders.ts";
 import { SpecialDayPopup } from "../../src/specialDay.tsx";
 import { centeredText, Text } from "../../src/text.tsx";
@@ -45,6 +46,13 @@ function FloatingTabBar({ state, descriptors, emitter, navigateToTab, bottom }: 
   const { width: winWidth } = useWindowDimensions();
   // Aşağı kaydırırken alt menü ekranın altına kayar, yukarı kaydırınca geri gelir
   const hidden = useChromeHidden();
+  // Geri tuşu: başka sekmede önce ana ekrana, ana ekranda iki kez basınca çıkış
+  const homeKey = state.routes.find((r) => r.name === "index")?.key;
+  const onHome = state.routes[state.index]?.name === "index";
+  const goHome = useCallback(() => {
+    if (homeKey) navigateToTab(homeKey);
+  }, [homeKey, navigateToTab]);
+  useTabsBackGuard(onHome || !homeKey, goHome);
   const slide = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.timing(slide, { toValue: hidden ? BAR_HEIGHT + bottom + 24 : 0, duration: 220, useNativeDriver: Platform.OS !== "web" }).start();
@@ -369,7 +377,7 @@ export default function TabsLayout() {
       {/* Geri hareketi bir önceki sekmeye döner (ör. Menü → İzinlerim → geri: Menü); varsayılan ana sayfaya atıyordu */}
       <TabBarInset.Provider value={barInset}>
       <Tabs
-        backBehavior="history"
+        backBehavior="firstRoute"
         safeAreaInsets={{ bottom: 0 }}
         tabBar={(props) => <FloatingTabBar {...props} bottom={barBottom} />}
         screenOptions={{
