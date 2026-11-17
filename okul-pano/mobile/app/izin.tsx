@@ -9,6 +9,7 @@ import { addDays, dayTitle } from '../src/day.ts';
 import { Text } from '../src/text.tsx';
 import { colors, tiles, type TileTone } from '../src/theme.ts';
 import { Badge, Button, Card, Choice, confirm, DeleteIconButton, Empty, Field, Icon, Screen, T, type IconName } from '../src/ui.tsx';
+import { RangeCalendar } from '../src/rangeCalendar.tsx';
 
 type Preset = 'today' | 'tomorrow' | 'custom';
 type Tab = 'new' | 'list';
@@ -77,7 +78,7 @@ export default function Izin() {
   const valid = r && r[1] >= r[0] ? r : null;
 
   const submit = async () => {
-    if (!r) return setMessage({ ok: false, text: 'Tarihi GG.AA.YYYY biçiminde yazın (ör. 29.10.2026).' });
+    if (!r) return setMessage({ ok: false, text: 'Takvimden izin gününe dokunun.' });
     if (!valid) return setMessage({ ok: false, text: 'Bitiş tarihi başlangıçtan önce olamaz.' });
     if (!kind) return setMessage({ ok: false, text: 'İzin nedenini seçin.' });
     setBusy(true);
@@ -196,14 +197,21 @@ export default function Izin() {
               ]}
             />
             {preset === 'custom' && (
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <View style={{ flex: 1 }}>
-                  <Field label="Başlangıç" value={start} onChangeText={setStart} placeholder="29.10.2026" keyboardType="numbers-and-punctuation" maxLength={10} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Field label="Bitiş (dahil)" value={end} onChangeText={setEnd} placeholder="aynı gün" keyboardType="numbers-and-punctuation" maxLength={10} />
-                </View>
-              </View>
+              <>
+                <RangeCalendar
+                  min={base}
+                  start={start}
+                  end={end}
+                  onChange={(a, b) => {
+                    setStart(a);
+                    setEnd(b);
+                    setMessage(null);
+                  }}
+                />
+                <T size={12} color={colors.faint}>
+                  {!start ? 'Başlangıç gününe dokunun.' : !end ? 'Bitiş gününe dokunun. Tek gün için aynı güne yeniden dokunun.' : 'Değiştirmek için yeni başlangıç gününe dokunun.'}
+                </T>
+              </>
             )}
             {valid && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
