@@ -32,7 +32,7 @@ import {
   users,
 } from '../db/schema.ts';
 import { badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
-import { notifyUsers, usersWithPermission } from '../lib/push.ts';
+import { notifyUsers, tell as tellUser, usersWithPermission } from '../lib/push.ts';
 import { registerResource } from './crud.ts';
 import { tell } from './issues.ts';
 import { notifyCoverNeed } from '../lib/responsibility.ts';
@@ -52,6 +52,10 @@ function approvalFor(req: FastifyRequest, durationSec?: number | null) {
 }
 
 const toDate = (v: string | null | undefined) => (v ? new Date(v) : null);
+
+/** Bildirim metni için "20 Kasım" ya da "20 – 21 Kasım" */
+const trDay = (iso: string) => new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));
+const trRange = (a: string, b: string) => (a === b ? trDay(a) : `${trDay(a)} – ${trDay(b)}`);
 
 export async function contentRoutes(app: FastifyInstance) {
   registerResource(app, {
@@ -255,11 +259,17 @@ export async function contentRoutes(app: FastifyInstance) {
     await audit(req, status === 'approved' ? 'approve' : 'reject', 'İzin', id, `${updated.startDate} – ${updated.endDate}`);
     app.deps.bus.contentChanged(req.ctx.schoolId);
     if (status === 'approved') await coverNeed(req, updated);
+    // İzin sahibine sonuç: bildirim kutusuna yazılır ve telefona gider; izin türü / mazereti ve (onaylanmadıysa)
+    // yöneticinin gerekçesi metinde yer alır
     if (updated.requestedBy && updated.requestedBy !== req.ctx.userId) {
-      const range = updated.startDate === updated.endDate ? updated.startDate : `${updated.startDate} – ${updated.endDate}`;
-      notifyUsers(app.deps, [updated.requestedBy], {
+      const range = trRange(updated.startDate, updated.endDate);
+      const reason = updated.note?.trim() ? ` (${updated.note.trim()})` : '';
+      const why = note?.trim() ? ` Gerekçe: ${note.trim()}` : '';
+      await tellUser(app.deps, req.ctx.schoolId, [updated.requestedBy], {
+        kind: 'leave-reviewed',
         title: status === 'approved' ? 'İzniniz onaylandı' : 'İzin talebiniz onaylanmadı',
-        body: status === 'approved' ? `${range} izniniz onaylandı.` : `${range}${note?.trim() ? `: ${note.trim()}` : ''}`,
+        body: status === 'approved' ? `${range} izniniz${reason} onaylandı.` : `${range} izin talebiniz${reason} onaylanmadı.${why}`,
+        to: '/',
         url: '/izin',
       });
     }

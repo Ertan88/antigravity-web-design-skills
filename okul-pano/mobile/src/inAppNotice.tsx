@@ -1,8 +1,9 @@
 import { router, usePathname } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, AppState, Pressable, View } from 'react-native';
+import { Animated, AppState, Modal, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useInbox, useInboxActions, type InboxItem } from './data.ts';
+import { inboxRoute } from './inboxRoutes.ts';
 import { Text } from './text.tsx';
 import { storage } from './storage.ts';
 import { colors, radius } from './theme.ts';
@@ -118,7 +119,8 @@ export function InAppNotices() {
     if (it?.id.startsWith('test-')) return;
     if (it) {
       read.mutate({ ids: [it.id] });
-      router.push((it.to || '/bildirimler') as never);
+      // Bildirimin `to` alanı web panelin adresidir: uygulamadaki ekranına çevrilir, yoksa bildirim kutusu açılır
+      router.push((inboxRoute(it) ?? '/bildirimler') as never);
     } else router.push('/bildirimler');
   };
   return <NoticeView key={`${notice.item?.id ?? 'many'}-${notice.count}-${queue.length}`} notice={notice} onOpen={open} onClose={next} />;
@@ -173,42 +175,66 @@ function NoticeView({ notice, onOpen, onClose }: { notice: Notice; onOpen: () =>
 
   const wrap = { position: 'absolute' as const, left: 12, right: 12, top: insets.top + 8, zIndex: 50, elevation: 50, transform: [{ translateY: y }] };
 
+  // Yapılacak iş (onay bekleyen izin, duyuru…): karartılmış zeminde ayrı katman. Belirgindir ve dokunuşlar her
+  // zaman karta gider (ekranın üstündeki gezinme katmanları araya giremez). Zemine dokunmak "Sonra" ile aynıdır.
   if (notice.mode === 'action')
     return (
-      <Animated.View style={wrap}>
-        <View style={{ backgroundColor: colors.elevated, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.elevatedBorder, padding: 14, shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 18, shadowOffset: { width: 0, height: 10 } }}>
-          <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
-            <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: colors.warningSoft, alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name={icon} size={19} color={colors.warning} />
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={{ fontSize: 14.5, fontWeight: '800', color: colors.ink }} numberOfLines={2}>
-                {title}
-              </Text>
-              {body ? (
-                <Text style={{ fontSize: 12.5, fontWeight: '600', color: colors.faint, marginTop: 2 }} numberOfLines={3}>
-                  {body}
-                </Text>
-              ) : null}
-            </View>
-            <Pressable accessibilityRole="button" accessibilityLabel="Kapat" hitSlop={10} onPress={hide}>
-              <Icon name="close" size={18} color={colors.subtle} />
-            </Pressable>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-            <Pressable accessibilityRole="button" onPress={onOpen} style={({ pressed }) => ({ flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 12, backgroundColor: colors.primary, opacity: pressed ? 0.8 : 1 })}>
-              <Text style={{ fontSize: 13.5, fontWeight: '800', color: colors.onPrimary }}>Aç</Text>
-            </Pressable>
+      <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={hide}>
+        <Pressable accessibilityLabel="Sonra" onPress={hide} style={{ flex: 1, backgroundColor: colors.scrim }}>
+          <Animated.View style={{ marginTop: insets.top + 12, marginHorizontal: 12, transform: [{ translateY: y }] }}>
             <Pressable
-              accessibilityRole="button"
-              onPress={hide}
-              style={({ pressed }) => ({ flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 12, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderStrong, opacity: pressed ? 0.8 : 1 })}
+              onPress={() => undefined}
+              accessibilityRole="alert"
+              style={{
+                backgroundColor: colors.elevated,
+                borderRadius: radius.lg,
+                borderWidth: 1,
+                borderColor: colors.elevatedBorder,
+                borderLeftWidth: 5,
+                borderLeftColor: colors.warning,
+                padding: 16,
+                shadowColor: '#000',
+                shadowOpacity: 0.3,
+                shadowRadius: 20,
+                shadowOffset: { width: 0, height: 10 },
+                elevation: 12,
+              }}
             >
-              <Text style={{ fontSize: 13.5, fontWeight: '800', color: colors.ink }}>Sonra</Text>
+              <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
+                <View style={{ width: 42, height: 42, borderRadius: 13, backgroundColor: colors.warningSoft, alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name={icon} size={21} color={colors.warning} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '800', color: colors.ink }} numberOfLines={2}>
+                    {title}
+                  </Text>
+                  {body ? (
+                    <Text style={{ fontSize: 13.5, fontWeight: '600', color: colors.muted, marginTop: 3 }} numberOfLines={4}>
+                      {body}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={onOpen}
+                  style={({ pressed }) => ({ flex: 1, alignItems: 'center', minHeight: 46, justifyContent: 'center', borderRadius: 14, backgroundColor: colors.primary, opacity: pressed ? 0.8 : 1 })}
+                >
+                  <Text style={{ fontSize: 14.5, fontWeight: '800', color: colors.onPrimary }}>Aç</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={hide}
+                  style={({ pressed }) => ({ flex: 1, alignItems: 'center', minHeight: 46, justifyContent: 'center', borderRadius: 14, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderStrong, opacity: pressed ? 0.8 : 1 })}
+                >
+                  <Text style={{ fontSize: 14.5, fontWeight: '800', color: colors.ink }}>Sonra</Text>
+                </Pressable>
+              </View>
             </Pressable>
-          </View>
-        </View>
-      </Animated.View>
+          </Animated.View>
+        </Pressable>
+      </Modal>
     );
 
   // Sıradan bildirim: küçük koyu kutu (koyu temada katmanlar ayrışsın diye açık yüzey ve ince çerçeve)

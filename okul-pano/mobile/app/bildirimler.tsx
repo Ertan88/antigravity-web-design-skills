@@ -2,35 +2,13 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useInbox, useInboxActions, type InboxItem } from '../src/data.ts';
+import { inboxRoute } from '../src/inboxRoutes.ts';
 import { timeAgo } from '../src/day.ts';
 import { Sheet } from '../src/sheet.tsx';
 import { Text } from '../src/text.tsx';
 import { colors } from '../src/theme.ts';
 import { Badge, Button, Card, confirm, Empty, Icon, ListRow, Loading, Screen, Segmented, T, type IconName } from '../src/ui.tsx';
 
-/** Paneldeki adresleri uygulamadaki ekranlara çevirir */
-const ROUTES: Record<string, string> = {
-  approval: '/onaylar',
-  'leave-request': '/onaylar',
-  returned: '/duyurular',
-  approved: '/duyurular',
-  'duty-gap': '/nobet',
-  'month-student': '/duyuru-yeni',
-  'support-access': '/okullar',
-  'support-revoked': '/okullar',
-  'support-expired': '/okullar',
-  'meb-calendar': '/takvim',
-  internship: '/isletme-devam',
-  enroll: '/kullanicilar?filtre=onay',
-  exam: '/sinav-takvimi',
-  bell: '/programim',
-  conduct: '/rehberlik',
-  'duty-assign': '/nobet',
-  emergency: '/acil',
-  'screen-security': '/panolar',
-  // Görev dersi ana ekranda ve ders programında "GÖREV" etiketiyle görünür
-  'lesson-cover': '/',
-};
 const ICONS: Record<string, { icon: IconName; tone: 'primary' | 'warning' | 'danger' | 'gold' | 'muted' }> = {
   approval: { icon: 'checkmark-done-outline', tone: 'primary' },
   'leave-request': { icon: 'calendar-outline', tone: 'primary' },
@@ -54,6 +32,8 @@ const ICONS: Record<string, { icon: IconName; tone: 'primary' | 'warning' | 'dan
   emergency: { icon: 'alert-triangle', tone: 'danger' },
   'screen-security': { icon: 'tv-outline', tone: 'warning' },
   'lesson-cover': { icon: 'school-outline', tone: 'primary' },
+  'leave-reviewed': { icon: 'calendar-outline', tone: 'primary' },
+  'cover-needed': { icon: 'people-outline', tone: 'warning' },
   enroll: { icon: 'people-outline', tone: 'primary' },
 };
 const FALLBACK = { icon: 'notifications-outline' as IconName, tone: 'muted' as const };
@@ -89,18 +69,7 @@ export function InboxScreen({ back }: { back?: boolean }) {
     if (!n.readAt) read.mutate({ ids: [n.id] });
     setDetail(n);
   };
-  // İşletmede devamsızlık: bildirilen ayın çizelgesi açılır
-  const routeOf = (n: InboxItem) => {
-    // Sorun ve destek bildirimleri doğrudan ilgili yazışmayı açar
-    const id = /[?&]id=([\w-]+)/.exec(n.to)?.[1];
-    if (n.kind === 'issue') return id ? `/sorun/${id}` : '/sorunlar';
-    if (n.kind === 'support-reply') return id ? `/talep/${id}` : '/platforma-yaz';
-    if (n.kind === 'support-ticket') return id ? `/talep/${id}?p=1` : '/platform/destek';
-    const day = n.kind === 'exam' ? /[?&]gun=(\d{4}-\d{2}-\d{2})/.exec(n.to)?.[1] : null;
-    if (day) return `/sinav-takvimi?gun=${day}`;
-    const month = n.kind === 'internship' ? /[?&]gun=(\d{4}-\d{2})-\d{2}/.exec(n.to)?.[1] : null;
-    return month ? `/isletme-devam?ay=${month}` : ROUTES[n.kind];
-  };
+  const routeOf = inboxRoute;
 
   return (
     <Screen back={back} title="Bildirimler" refreshing={inbox.isRefetching} onRefresh={() => void inbox.refetch()}>

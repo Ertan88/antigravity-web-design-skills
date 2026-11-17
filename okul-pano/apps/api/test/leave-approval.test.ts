@@ -62,6 +62,17 @@ describe('kendi izni', () => {
     expectStatus(await owner.post(path(`leaves/${r.json().id}/approve`), {}), 200);
   });
 
+  it('onaylanmayan izin, mazereti ve gerekçesiyle izin sahibinin bildirim kutusuna yazılır', async () => {
+    const r = await deputy.post(path('me/leaves'), { startDate: later(12), endDate: later(12), note: 'Mazeret izni · Hastane randevusu' });
+    expectStatus(r, 201);
+    expectStatus(await owner.post(path(`leaves/${r.json().id}/reject`), { note: 'Sınav haftası' }), 200);
+    const inbox = (await deputy.get(path('inbox'))).json() as { items: { kind: string; title: string; body: string }[] };
+    const n = inbox.items.find((i) => i.kind === 'leave-reviewed')!;
+    expect(n.title).toBe('İzin talebiniz onaylanmadı');
+    expect(n.body).toContain('Mazeret izni · Hastane randevusu');
+    expect(n.body).toContain('Gerekçe: Sınav haftası');
+  });
+
   it('görev dağılımında izinlerin sorumlusu seçilince yalnızca ona görünür', async () => {
     expectStatus(await owner.post(path('members'), { email: 'yrd2@izin.local', fullName: 'İkinci Yardımcı', password: 'Yardimci123!', role: 'admin' }), 201);
     const second = client(t.app, (await login(t.app, 'yrd2@izin.local', 'Yardimci123!')).token);
