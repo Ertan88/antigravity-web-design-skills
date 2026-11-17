@@ -41,10 +41,16 @@ describe('bir telefonda birden fazla hesap', () => {
     // Etkin olmayan hesap yenileme anahtarıyla bağlanır (anahtar değişmez)
     expectStatus(await t.app.inject({ method: 'POST', url: '/api/auth/device-account', payload: { refreshToken: platformRefresh, op: 'link', token: TOKEN } }), 200);
     sentPushes.length = 0;
-    notifyUsers(t.app.deps, [schoolUser.id, platformId], { title: 'Deneme', body: 'Gövde', url: '/' });
+    notifyUsers(t.app.deps, [schoolUser.id], { title: 'Deneme', body: 'Gövde', url: '/' });
+    notifyUsers(t.app.deps, [platformId], { title: 'Deneme', body: 'Gövde', url: '/' });
     await flush();
     expect(sentTo(schoolUser.id)[0]?.message.title).toBe('Deneme');
     expect(sentTo(platformId)[0]?.message.title).toBe('Platform · Deneme');
+    // Aynı bildirim aynı telefondaki iki hesaba birden gidiyorsa telefona bir kez gönderilir
+    sentPushes.length = 0;
+    notifyUsers(t.app.deps, [schoolUser.id, platformId], { title: 'Ortak', body: 'Gövde' });
+    await flush();
+    expect(sentPushes.filter((p) => p.to.includes(TOKEN))).toHaveLength(1);
     // Okunmamış sayısı anahtarla okunur
     const sum = await t.app.inject({ method: 'POST', url: '/api/auth/device-account', payload: { refreshToken: platformRefresh, op: 'summary' } });
     expect(typeof sum.json().unread).toBe('number');

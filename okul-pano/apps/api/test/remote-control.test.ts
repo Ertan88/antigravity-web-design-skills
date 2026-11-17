@@ -165,6 +165,16 @@ describe('izin bildirimi ve boş nöbet', () => {
     expect((await plain.get(path('me/duties'))).json()).toMatchObject({ teacher: false, days: [] });
   });
 
+  it('nöbetlerim: nöbetçi müdür yardımcısının günleri de görünür', async () => {
+    const sup = await owner.post(path('duty-supervisors'), { date: today.isoDate, name: 'AYŞE DEMİR' });
+    expectStatus(sup, 201);
+    const res = (await teacherUser.get(path('me/duties'))).json();
+    const day = res.days.find((d: { date: string }) => d.date === today.isoDate);
+    expect(day.duties[0]).toMatchObject({ area: 'Nöbetçi müdür yardımcısı' });
+    expect(day.duties.map((x: { area: string }) => x.area)).toContain('Bahçe');
+    expectStatus(await owner.del(path(`duty-supervisors/${sup.json().id}`)), 204);
+  });
+
   it('kim nerede: haftanın iş günleri tek istekte', async () => {
     const week = (await teacherUser.get(path(`duty-week?date=${today.isoDate}`))).json();
     expect(week.days).toHaveLength(5);

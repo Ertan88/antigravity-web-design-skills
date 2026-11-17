@@ -1,4 +1,4 @@
-import { trCompare } from '@okulpano/shared';
+import { normalizeName, trCompare } from '@okulpano/shared';
 import { and, asc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import type { DB } from '../db/client.ts';
 import { duties, dutySubstitutions, dutySupervisors, schools, teacherLeaves, teachers, transportDuties } from '../db/schema.ts';
@@ -180,6 +180,9 @@ export async function teacherDutyDays(
           .orderBy(asc(transportDuties.sortOrder))
       : Promise.resolve([]),
   ]);
+  // Nöbetçi müdür yardımcısı: çizelgedeki adı öğretmen kaydının adıyla eşleşen günler onun nöbetidir
+  const [me] = await db.select({ fullName: teachers.fullName }).from(teachers).where(eq(teachers.id, teacherId));
+  const myKey = me ? normalizeName(me.fullName) : null;
   const holidayOf = new Map(holidays.map((h) => [h.date, h.name]));
   const supervisorOf = new Map(supervisors.map((s) => [s.date, s.name]));
   const out: TeacherDutyDay[] = [];
@@ -198,15 +201,18 @@ export async function teacherDutyDays(
     const mine = entries.filter((e) => e.teacherId === teacherId || e.sub?.teacherId === teacherId);
     const dayTransport = transport.filter((t) => t.date === date);
     const transportMine = dayTransport.some((t) => t.teacherId === teacherId);
-    if (!mine.length && !transportMine) continue;
+    const supName = supervisorOf.get(date) ?? null;
+    const iSupervise = Boolean(myKey && supName && normalizeName(supName) === myKey);
+    if (!mine.length && !transportMine && !iSupervise) continue;
+    const supervising = iSupervise ? [{ dutyId: `supervisor:${date}`, area: 'Nöbetçi müdür yardımcısı', partners: [] as string[], substituteFor: null, coveredBy: null }] : [];
     out.push({
       date,
       weekday,
       holiday,
       supervisor: supervisorOf.get(date) ?? null,
       duties: holiday
-        ? mine.map((e) => ({ dutyId: e.dutyId, area: e.area, partners: [], substituteFor: null, coveredBy: null }))
-        : mine.map((e) => {
+        ? [...supervising, ...mine.map((e) => ({ dutyId: e.dutyId, area: e.area, partners: [], substituteFor: null, coveredBy: null }))]
+        : [...supervising, ...mine.map((e) => {
             const covering = e.sub?.teacherId === teacherId;
             return {
               dutyId: e.dutyId,
@@ -217,7 +223,7 @@ export async function teacherDutyDays(
               substituteFor: covering ? e.teacherName : null,
               coveredBy: e.teacherId === teacherId && e.sub ? e.sub.teacherName : null,
             };
-          }),
+          })],
       transport: transportMine && !holiday ? { partners: dayTransport.filter((t) => t.teacherId !== teacherId).map((t) => t.teacherName) } : null,
     });
   }

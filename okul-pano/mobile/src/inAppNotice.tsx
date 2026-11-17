@@ -1,6 +1,7 @@
 import { router, usePathname } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, AppState, Modal, Pressable, View } from 'react-native';
+import * as Notifications from 'expo-notifications';
+import { Animated, AppState, Modal, Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useInbox, useInboxActions, type InboxItem } from './data.ts';
 import { inboxRoute } from './inboxRoutes.ts';
@@ -67,6 +68,15 @@ export function InAppNotices() {
     return () => sub.remove();
   }, []);
   const inbox = useInbox('unread', active ? 30_000 : false);
+  // Uygulama açıkken sunucudan bildirim gelince kutu hemen yenilenir: kart beklemeden çıkar
+  const refetch = inbox.refetch;
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    const sub = Notifications.addNotificationReceivedListener((n) => {
+      if ((n.request.trigger as { type?: string } | null)?.type === 'push') void refetch();
+    });
+    return () => sub.remove();
+  }, [refetch]);
   const { read } = useInboxActions();
   const seen = useRef<Set<string> | null>(null);
   const [queue, setQueue] = useState<Notice[]>([]);

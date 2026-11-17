@@ -31,7 +31,12 @@ export const deviceToken = () => storage.get(TOKEN_KEY);
 // Uygulama açıkken gelen bildirim de üstte görünsün
 if (Platform.OS !== 'web') {
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
+    // Uygulama açıkken sunucudan gelen bildirim için telefonun şeridi gösterilmez: aynı bildirim uygulamanın üstten
+    // çıkan kartında görünür (iki kez görünmesin). Telefondaki hatırlatmalar (nöbet, sınav) her zaman gösterilir.
+    handleNotification: async (n) => {
+      const remote = (n.request.trigger as { type?: string } | null)?.type === 'push';
+      return { shouldShowBanner: !remote, shouldShowList: true, shouldPlaySound: !remote, shouldSetBadge: false };
+    },
   });
 }
 

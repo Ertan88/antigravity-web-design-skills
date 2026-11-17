@@ -61,8 +61,13 @@ async function send(deps: AppDeps, userIds: string[], message: PushMessage) {
     g.tokens.push(r.token);
     byUser.set(r.userId, g);
   }
+  // Aynı telefon bu bildirimin birden fazla alıcısına bağlıysa (ör. aynı telefonda müdür ve müdür yardımcısı hesabı)
+  // telefona bir kez gider; dokununca ilk alıcının hesabı açılır
+  const sent = new Set<string>();
   for (const [userId, g] of byUser) {
-    await sendToTokens(deps, g.tokens, { ...message, title: g.sa ? `Platform · ${message.title}` : message.title }, { userId });
+    const tokens = g.tokens.filter((t) => !sent.has(t));
+    tokens.forEach((t) => sent.add(t));
+    if (tokens.length) await sendToTokens(deps, tokens, { ...message, title: g.sa ? `Platform · ${message.title}` : message.title }, { userId });
   }
 }
 
