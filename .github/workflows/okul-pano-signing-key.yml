@@ -8,6 +8,12 @@
 name: Okul Pano · İmza anahtarı oluştur
 
 on:
+  # Elle çalıştırma yalnızca ana dalda görünür; bu dalda iş akışı dosyası değişince bir kez çalışır. Anahtar zaten
+  # tanımlıysa ön koşul adımı durur, üzerine yazılmaz.
+  push:
+    branches: [claude/okul-dijital-pano-4oao0y]
+    paths:
+      - .github/workflows/okul-pano-signing-key.yml
   workflow_dispatch:
     inputs:
       replace:
