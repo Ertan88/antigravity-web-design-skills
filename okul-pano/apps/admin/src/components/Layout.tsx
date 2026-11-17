@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 import { appView, schoolFullName } from '@okulpano/shared';
-import { Building2, Download, Inbox, Lifebuoy2, ChevronDown, Mail, ChevronRight, ChevronsUpDown, LogOut, Menu, Moon, MonitorSmartphone, School, Sun, X } from './icons.tsx';
+import { Building2, CalendarRange, Download, Inbox, Lifebuoy2, ChevronDown, Mail, ChevronRight, ChevronsUpDown, LogOut, Menu, Moon, MonitorSmartphone, School, Sun, X } from './icons.tsx';
 import { Suspense, useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth.tsx';
@@ -98,6 +98,10 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     internship: internship.data ?? null,
     can,
   };
+  // Platform yöneticisi okul üyesi değildir (KVKK): okul seçili değilken okul menüsü (Genel Bakış, Sınav Takvimi,
+  // Okul Sorunları…) gösterilmez, yalnızca Platform menüsü görünür. Destek erişimiyle bir okul açınca okul menüsü gelir.
+  const platformOnly = Boolean(me?.user.isSuperAdmin && !access);
+  const nav = platformOnly ? [] : NAV;
   const current = findNav(useLocation().pathname)?.item.to;
   const [collapsed, setCollapsed] = useState<string[]>(() => {
     try {
@@ -133,12 +137,12 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         {/* Telefonda açılan menü: uygulama şeridi ve en sık kullanılan sayfaların kısayolları, altında tam liste */}
         {onNavigate && (
           <PhoneShortcuts
-            items={NAV.flatMap((g) => g.items).filter((i) => (!i.permission || can(i.permission)) && (!i.when || i.when(settings, who)))}
+            items={nav.flatMap((g) => g.items).filter((i) => (!i.permission || can(i.permission)) && (!i.when || i.when(settings, who)))}
             badges={badges}
             onNavigate={onNavigate}
           />
         )}
-        {NAV.map((group) => {
+        {nav.map((group) => {
           const items = group.items.filter((i) => (!i.permission || can(i.permission)) && (!i.when || i.when(settings, who)));
           if (!items.length) return null;
           const links = (
@@ -182,9 +186,12 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         })}
         {me?.user.isSuperAdmin && (
           <div>
-            <div className="px-3.5 pb-1.5 text-xs font-bold text-slate-400">Platform</div>
+            {!platformOnly && <div className="px-3.5 pb-1.5 text-xs font-bold text-slate-400">Platform</div>}
             <NavLink to="/platform" end onClick={onNavigate} className={navLinkClass}>
-              <Building2 className="size-[18px]" /> Okullar ve Abonelikler
+              <Building2 className="size-[18px]" /> Abonelikler
+            </NavLink>
+            <NavLink to="/tatil-takvimi" onClick={onNavigate} className={navLinkClass}>
+              <CalendarRange className="size-[18px]" /> MEB çalışma takvimi
             </NavLink>
             <NavLink to="/platform/destek" onClick={onNavigate} className={navLinkClass}>
               <Lifebuoy2 className="size-[18px]" /> Destek talepleri
@@ -346,7 +353,7 @@ export function Layout() {
 }
 
 /** Telefondaki menünün başı: önce uygulama şeridi, sonra en çok dört kısayol (kişinin görebildiği sayfalardan) */
-const SHORTCUT_ORDER = ['/', '/duyurular', '/gorevlendirme', '/nobet', '/izinler', '/ekranlar', '/sinav-takvimi', '/sorunlar'];
+const SHORTCUT_ORDER = ['/duyurular', '/gorevlendirme', '/nobet', '/izinler', '/ekranlar', '/sinav-takvimi', '/sorunlar'];
 
 function PhoneShortcuts({ items, badges, onNavigate }: { items: NavItem[]; badges: Record<'coverOpen', number>; onNavigate: () => void }) {
   const { me, school } = useAuth();

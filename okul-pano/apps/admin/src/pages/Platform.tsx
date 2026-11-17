@@ -120,7 +120,7 @@ export function Platform() {
   return (
     <>
       <PageHeader
-        title="Okullar ve Abonelikler"
+        title="Abonelikler"
         description="Platformdaki tüm okulların kayıt ve abonelik bilgileri. Okulların içeriğini (öğretmen, öğrenci, nöbet…) yalnızca kendi okulunuzda ya da okul yöneticisinin süreli destek erişimi verdiği okullarda açabilirsiniz (KVKK)."
         actions={
           <div className="flex flex-wrap gap-2">
