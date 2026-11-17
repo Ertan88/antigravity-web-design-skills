@@ -136,6 +136,7 @@ export const Type = wrap(T.IconTypography, 'Type');
 export const Undo2 = wrap(T.IconArrowBackUp, 'Undo2');
 export const Unlink2 = wrap(T.IconUnlink, 'Unlink2');
 export const Upload = wrap(T.IconUpload, 'Upload');
+export const UserCircle = wrap(T.IconUserCircle, 'UserCircle');
 export const UserCog = wrap(T.IconUserCog, 'UserCog');
 export const UserMinus = wrap(T.IconUserMinus, 'UserMinus');
 export const UserPlus = wrap(T.IconUserPlus, 'UserPlus');

@@ -27,6 +27,7 @@ import {
   Trophy,
   UserCog,
   UserMinus,
+  UserCircle,
   Users,
   type LucideIcon,
 } from '../components/icons.tsx';
@@ -73,7 +74,14 @@ function internshipVisible(s: SchoolSettings | undefined, who: { internship: Int
 }
 
 export const NAV: NavGroup[] = [
-  { title: '', items: [{ to: '/', label: 'Genel Bakış', icon: LayoutDashboard }] },
+  {
+    title: '',
+    items: [
+      { to: '/', label: 'Genel Bakış', icon: LayoutDashboard },
+      // Kendi ders programı, nöbetleri ve izinleri: müdür, müdür yardımcısı ve kadroda kaydı olan (görevli öğretmen)
+      { to: '/benim', label: 'Benim', icon: UserCircle, when: (_s, who) => who.role === 'owner' || who.role === 'admin' || Boolean(who.teacherId) },
+    ],
+  },
   {
     title: 'Pano',
     items: [

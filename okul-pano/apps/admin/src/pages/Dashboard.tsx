@@ -1,3 +1,5 @@
+import { schoolFullName } from '@okulpano/shared';
+import { ApprovalsCard } from '../components/Approvals.tsx';
 import { resolveScreenDisplay } from '@okulpano/shared';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
@@ -133,9 +135,11 @@ export function Dashboard() {
           {greeting()}, {me?.user.fullName.split(' ')[0]}
           <span className="block text-slate-400">{new Intl.DateTimeFormat('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}</span>
         </h1>
-        <p className="mt-2 text-sm font-medium text-slate-500">{school?.name} panosunun anlık durumu.</p>
+        <p className="mt-2 text-sm font-medium text-slate-500">{school ? schoolFullName(school.name, school.schoolType) : ''} panosunun anlık durumu.</p>
       </div>
 
+      {/* Onay bekleyen duyurular ve izinler (3A): onay karttan verilir; bekleyen yoksa görünmez */}
+      <ApprovalsCard />
       {/* İzinli öğretmenin boş kalan dersleri ve nöbet yeri: tek satır uyarı, atama Görevlendirme sayfasında */}
       <CoverBand />
       {/* Öğretmenin izinli yerine görevi (ders ya da nöbet yeri); gün bitince sonraki okul günü */}
