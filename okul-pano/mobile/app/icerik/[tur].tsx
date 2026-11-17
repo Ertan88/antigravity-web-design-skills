@@ -1,3 +1,4 @@
+import { galleryPermission } from '../../src/gallery.ts';
 import { errorText } from '@okulpano/shared';
 import type { Permission } from '@okulpano/shared/permissions';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -307,7 +308,7 @@ function Editor({ kind, row, path, onDone }: { kind: Kind; row: Row | null; path
 
   const pick = async (key: string, aspect: [number, number], camera: boolean) => {
     setError(null);
-    const perm = camera ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const perm = camera ? await ImagePicker.requestCameraPermissionsAsync() : await galleryPermission();
     if (!perm.granted && Platform.OS !== 'web') return setError(camera ? 'Kamera izni verilmedi.' : 'Galeri izni verilmedi.');
     const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.8, allowsEditing: true, aspect };
     const res = camera ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);

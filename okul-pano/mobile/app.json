@@ -3,7 +3,7 @@
     "name": "Okul Yayın",
     "slug": "okul-pano",
     "scheme": "okulpano",
-    "version": "1.20.75",
+    "version": "1.20.76",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#f7f6f3",
@@ -32,11 +32,22 @@
         "READ_CALENDAR",
         "WRITE_CALENDAR"
       ],
-      "versionCode": 1149,
+      "versionCode": 1150,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0E5E66"
-      }
+      },
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -75,7 +86,8 @@
         "expo-image-picker",
         {
           "cameraPermission": "Duyuru ve başarı fotoğrafı çekmek için kamera kullanılır.",
-          "photosPermission": "Duyuru ve başarı fotoğrafı seçmek için galeri kullanılır."
+          "photosPermission": "Duyuru ve başarı fotoğrafı seçmek için galeri kullanılır.",
+          "microphonePermission": false
         }
       ],
       [

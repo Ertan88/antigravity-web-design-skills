@@ -1,3 +1,4 @@
+import { galleryPermission } from '../src/gallery.ts';
 import { errorText } from '@okulpano/shared';
 import { parseYouTubeUrl } from '@okulpano/shared/youtube';
 import { ANNOUNCEMENT_TEMPLATES, designFields, designTemplate, designTitle, type AnnouncementDesign } from '@okulpano/shared/designs';
@@ -410,7 +411,7 @@ export default function DuyuruYeni() {
 
   const pick = async (camera: boolean) => {
     setError(null);
-    const perm = camera ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const perm = camera ? await ImagePicker.requestCameraPermissionsAsync() : await galleryPermission();
     if (!perm.granted && Platform.OS !== 'web') return setError(camera ? 'Kamera izni verilmedi.' : 'Galeri izni verilmedi.');
     // Kırpma yok: panoda fotoğrafın tamamı gösterilir, boşluklar bulanık fotoğrafla dolar (büyük fotoğraf
     // yüklenmeden önce küçültülür: api.ts uploadImage)

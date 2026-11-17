@@ -1,3 +1,4 @@
+import { galleryPermission } from '../../src/gallery.ts';
 import { errorText } from '@okulpano/shared';
 import { SUPPORT_AREAS, SUPPORT_KIND_KEYS, SUPPORT_KINDS, type SupportArea, type SupportKind, type SupportTicket } from '@okulpano/shared/issues';
 import { useQueryClient } from '@tanstack/react-query';
@@ -29,7 +30,7 @@ export default function YeniTalep() {
 
   const attach = async () => {
     setError(null);
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const perm = await galleryPermission();
     if (!perm.granted && Platform.OS !== 'web') return setError('Galeri izni verilmedi.');
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
     const asset = res.assets?.[0];
