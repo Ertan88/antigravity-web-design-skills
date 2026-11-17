@@ -186,11 +186,12 @@ export async function meRoutes(app: FastifyInstance) {
     if (!teacherId) throw badRequest('Hesabınız bir öğretmen kaydına bağlı değil. Okul yöneticinizden hesabınızı öğretmen kaydınızla eşleştirmesini isteyin.');
     const body = parse(leaveRequestSchema, req.body);
     // Kişi kendi iznini onaylamaz: izin yetkisi olan başka biri varsa onaya düşer. Onaylayacak başka kimse yoksa
-    // (ör. tek yöneticili okulda müdürün kendi izni) doğrudan geçerli olur.
+    // doğrudan geçerli olur. Okul müdürünün izni okulda onaylanmaz (üst makam il/ilçe MEM'dir): yöneticilerin
+    // onayına düşmez, doğrudan geçerli olur; ders görevlendirme bildirimi o günün nöbetçi müdür yardımcısına gider.
     const eligible = (await usersWithPermission(app.deps, schoolId, 'leaves.manage')).filter((id) => id !== userId);
     // Görev dağılımında izinlerin sorumlusu seçildiyse yalnızca ona gider
-    const approvers = responsibleFor(req.ctx.school.settings?.responsibilities?.leaves, eligible);
-    const autoApprove = permissions.includes('leaves.manage') && approvers.length === 0;
+    const approvers = req.ctx.role === 'owner' ? [] : responsibleFor(req.ctx.school.settings?.responsibilities?.leaves, eligible);
+    const autoApprove = req.ctx.role === 'owner' || (permissions.includes('leaves.manage') && approvers.length === 0);
     const [row] = await db
       .insert(teacherLeaves)
       .values({

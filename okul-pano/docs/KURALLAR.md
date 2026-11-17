@@ -96,7 +96,8 @@ kalır; burada tekrarlanmaz.
   Hiçbir okulda (geliştiricinin kendi okulu dahil) yapılan işlem platform yöneticisine görünmez, bildirim olarak
   gitmez. Okul verisine yalnızca müdürün verdiği süreli destek erişimiyle, o süre içinde girilir.
 - Kişi kendi talebini onaylamaz (ör. kendi izin bildirimi): onay başka bir yetkiliden gelir; onaylayacak başka kimse
-  yoksa kayıt doğrudan geçerli olur.
+  yoksa kayıt doğrudan geçerli olur. Okul müdürünün izni okulda onaylanmaz (üst makam il/ilçe MEM): yöneticilerin
+  onayına düşmez, doğrudan geçerli olur; ders görevlendirmesi için o günün nöbetçi müdür yardımcısı bilgilendirilir.
 
 ---
 
