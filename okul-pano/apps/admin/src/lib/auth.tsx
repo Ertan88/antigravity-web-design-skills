@@ -1,15 +1,7 @@
-import type { Permission, Role } from "@okulpano/shared";
-import { useQueryClient } from "@tanstack/react-query";
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
-import { api, refreshSession, sessionEvents, setAccessToken } from "./api.ts";
+import type { Permission, Role } from '@okulpano/shared';
+import { useQueryClient } from '@tanstack/react-query';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { api, refreshSession, sessionEvents, setAccessToken } from './api.ts';
 
 export interface SchoolAccess {
   id: string;
@@ -51,13 +43,13 @@ interface AuthState {
 }
 
 const AuthContext = createContext<AuthState | null>(null);
-const SCHOOL_KEY = "okulpano.admin.school";
+const SCHOOL_KEY = 'okulpano.admin.school';
 
 function storedSchool(): string {
   try {
-    return localStorage.getItem(SCHOOL_KEY) ?? "";
+    return localStorage.getItem(SCHOOL_KEY) ?? '';
   } catch {
-    return "";
+    return '';
   }
 }
 
@@ -68,12 +60,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
 
   const reloadMe = useCallback(async () => {
-    const data = await api<Me>("/api/me");
+    const data = await api<Me>('/api/me');
     setMe(data);
     setSchoolIdState((current) =>
-      data.schools.some((s) => s.id === current)
-        ? current
-        : (data.lastSchoolId ?? data.schools[0]?.id ?? ""),
+      data.schools.some((s) => s.id === current) ? current : (data.lastSchoolId ?? data.schools[0]?.id ?? ''),
     );
   }, []);
 
@@ -91,8 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setMe(null);
       queryClient.clear();
     };
-    sessionEvents.addEventListener("expired", onExpired);
-    return () => sessionEvents.removeEventListener("expired", onExpired);
+    sessionEvents.addEventListener('expired', onExpired);
+    return () => sessionEvents.removeEventListener('expired', onExpired);
   }, [queryClient]);
 
   const setSchoolId = useCallback(
@@ -105,23 +95,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       queryClient.removeQueries();
       // Başka cihazdan girişte de aynı okul açılsın
-      void api("/api/me/school", {
-        method: "PUT",
-        body: { schoolId: id },
-      }).catch(() => undefined);
+      void api('/api/me/school', { method: 'PUT', body: { schoolId: id } }).catch(() => undefined);
     },
     [queryClient],
   );
 
   const login = useCallback(
     async (email: string, password: string) => {
-      const { accessToken } = await api<{ accessToken: string }>(
-        "/api/auth/login",
-        {
-          method: "POST",
-          body: { email, password },
-        },
-      );
+      const { accessToken } = await api<{ accessToken: string }>('/api/auth/login', {
+        method: 'POST',
+        body: { email, password },
+      });
       setAccessToken(accessToken);
       await reloadMe();
     },
@@ -129,7 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    await api("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+    await api('/api/auth/logout', { method: 'POST' }).catch(() => undefined);
     setAccessToken(null);
     setMe(null);
     queryClient.clear();
@@ -141,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       me,
       loading,
       school,
-      schoolId: school?.id ?? "",
+      schoolId: school?.id ?? '',
       setSchoolId,
       can: (p) => Boolean(school?.permissions.includes(p)),
       login,
@@ -155,6 +139,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth(): AuthState {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("AuthProvider eksik");
+  if (!ctx) throw new Error('AuthProvider eksik');
   return ctx;
 }

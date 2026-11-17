@@ -1,33 +1,15 @@
-import { schoolFullName } from "@okulpano/shared";
-import { and, asc, count, eq } from "drizzle-orm";
-import type { FastifyInstance } from "fastify";
-import { z } from "zod";
-import { accessUser } from "../context.ts";
-import {
-  auditLogs,
-  memberships,
-  schools,
-  sessions,
-  users,
-} from "../db/schema.ts";
-import {
-  hashPassword,
-  readablePassword,
-  verifyPassword,
-} from "../lib/crypto.ts";
-import {
-  badRequest,
-  conflict,
-  forbidden,
-  notFound,
-  parse,
-} from "../lib/errors.ts";
-import { trySendMail } from "../lib/mailer.ts";
-import { INVITE_PENDING } from "./members.ts";
+import { schoolFullName } from '@okulpano/shared';
+import { and, asc, count, eq } from 'drizzle-orm';
+import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import { accessUser } from '../context.ts';
+import { auditLogs, memberships, schools, sessions, users } from '../db/schema.ts';
+import { hashPassword, readablePassword, verifyPassword } from '../lib/crypto.ts';
+import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
+import { trySendMail } from '../lib/mailer.ts';
+import { INVITE_PENDING } from './members.ts';
 
-const findSchema = z.object({
-  email: z.email("Geçerli bir e-posta girin").max(160),
-});
+const findSchema = z.object({ email: z.email('Geçerli bir e-posta girin').max(160) });
 
 /**
  * Platform yöneticisi: hesabı tam e-postayla bulur (hesaplar toplu listelenmez, KVKK), hangi okulda hangi rolde olduğunu
@@ -45,16 +27,11 @@ export async function platformAccountsRoutes(app: FastifyInstance) {
   };
 
   const load = async (id: string) => {
-    if (!z.uuid().safeParse(id).success) throw notFound("Hesap bulunamadı.");
+    if (!z.uuid().safeParse(id).success) throw notFound('Hesap bulunamadı.');
     const [user] = await db.select().from(users).where(eq(users.id, id));
-    if (!user) throw notFound("Hesap bulunamadı.");
+    if (!user) throw notFound('Hesap bulunamadı.');
     const schoolsOf = await db
-      .select({
-        schoolId: schools.id,
-        schoolName: schools.name,
-        schoolSettings: schools.settings,
-        role: memberships.role,
-      })
+      .select({ schoolId: schools.id, schoolName: schools.name, schoolSettings: schools.settings, role: memberships.role })
       .from(memberships)
       .innerJoin(schools, eq(schools.id, memberships.schoolId))
       .where(eq(memberships.userId, id))
@@ -63,20 +40,9 @@ export async function platformAccountsRoutes(app: FastifyInstance) {
     const withOwners = await Promise.all(
       schoolsOf.map(async (m) => {
         const { schoolSettings, ...rest } = m;
-        const named = {
-          ...rest,
-          schoolName: schoolFullName(m.schoolName, schoolSettings?.schoolType),
-        };
-        if (m.role !== "owner") return { ...named, soleOwner: false };
-        const [{ n }] = (await db
-          .select({ n: count() })
-          .from(memberships)
-          .where(
-            and(
-              eq(memberships.schoolId, m.schoolId),
-              eq(memberships.role, "owner"),
-            ),
-          )) as [{ n: number }];
+        const named = { ...rest, schoolName: schoolFullName(m.schoolName, schoolSettings?.schoolType) };
+        if (m.role !== 'owner') return { ...named, soleOwner: false };
+        const [{ n }] = (await db.select({ n: count() }).from(memberships).where(and(eq(memberships.schoolId, m.schoolId), eq(memberships.role, 'owner')))) as [{ n: number }];
         return { ...named, soleOwner: Number(n) <= 1 };
       }),
     );
@@ -94,24 +60,8 @@ export async function platformAccountsRoutes(app: FastifyInstance) {
     memberships: schoolsOf,
   });
 
-  const log = async (
-    byUserId: string,
-    schoolIds: string[],
-    action: string,
-    summary: string,
-  ) => {
-    if (schoolIds.length)
-      await db
-        .insert(auditLogs)
-        .values(
-          schoolIds.map((schoolId) => ({
-            schoolId,
-            userId: byUserId,
-            action,
-            entity: "Hesap",
-            summary: summary.slice(0, 200),
-          })),
-        );
+  const log = async (byUserId: string, schoolIds: string[], action: string, summary: string) => {
+    if (schoolIds.length) await db.insert(auditLogs).values(schoolIds.map((schoolId) => ({ schoolId, userId: byUserId, action, entity: 'Hesap', summary: summary.slice(0, 200) })));
   };
 
   /**
@@ -120,108 +70,60 @@ export async function platformAccountsRoutes(app: FastifyInstance) {
    * eşleşmesi, geçmiş) yerinde durur, platform görünümü kapanır. Uygulamada iki hesap arasında hızlı geçiş yapılır.
    */
   const splitSchema = z.object({
-    email: z.email("Geçerli bir e-posta girin").max(160),
-    password: z.string().min(8, "Şifre en az 8 karakter olmalı").max(200),
-    currentPassword: z.string().min(1, "Mevcut şifrenizi girin").max(200),
+    email: z.email('Geçerli bir e-posta girin').max(160),
+    password: z.string().min(8, 'Şifre en az 8 karakter olmalı').max(200),
+    currentPassword: z.string().min(1, 'Mevcut şifrenizi girin').max(200),
   });
-  app.post("/api/platform/split", platform, async (req) => {
+  app.post('/api/platform/split', platform, async (req) => {
     const body = parse(splitSchema, req.body);
     const me = accessUser(req).sub;
     const [user] = await db.select().from(users).where(eq(users.id, me));
     if (!user?.isSuperAdmin) throw forbidden();
-    if (!(await verifyPassword(body.currentPassword, user.passwordHash)))
-      throw badRequest("Mevcut şifre hatalı.");
-    const own = await db
-      .select({ schoolId: memberships.schoolId })
-      .from(memberships)
-      .where(eq(memberships.userId, me));
-    if (!own.length)
-      throw badRequest("Bu hesap hiçbir okula üye değil; ayırmaya gerek yok.");
+    if (!(await verifyPassword(body.currentPassword, user.passwordHash))) throw badRequest('Mevcut şifre hatalı.');
+    const own = await db.select({ schoolId: memberships.schoolId }).from(memberships).where(eq(memberships.userId, me));
+    if (!own.length) throw badRequest('Bu hesap hiçbir okula üye değil; ayırmaya gerek yok.');
     const email = body.email.trim().toLowerCase();
-    const [taken] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.email, email));
-    if (taken) throw conflict("Bu e-posta başka bir hesapta kullanılıyor.");
+    const [taken] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
+    if (taken) throw conflict('Bu e-posta başka bir hesapta kullanılıyor.');
     const [created] = await db.transaction(async (tx) => {
-      const rows = await tx
-        .insert(users)
-        .values({
-          email,
-          fullName: user.fullName,
-          passwordHash: await hashPassword(body.password),
-          isSuperAdmin: true,
-        })
-        .returning({ id: users.id, email: users.email });
-      await tx
-        .update(users)
-        .set({ isSuperAdmin: false })
-        .where(eq(users.id, me));
+      const rows = await tx.insert(users).values({ email, fullName: user.fullName, passwordHash: await hashPassword(body.password), isSuperAdmin: true }).returning({ id: users.id, email: users.email });
+      await tx.update(users).set({ isSuperAdmin: false }).where(eq(users.id, me));
       return rows;
     });
     return { platformEmail: created!.email };
   });
 
-  app.get("/api/platform/accounts", platform, async (req) => {
+  app.get('/api/platform/accounts', platform, async (req) => {
     const { email } = parse(findSchema, req.query);
-    const [user] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.email, email.trim().toLowerCase()));
-    if (!user) throw notFound("Bu e-postayla kayıtlı hesap yok.");
+    const [user] = await db.select({ id: users.id }).from(users).where(eq(users.email, email.trim().toLowerCase()));
+    if (!user) throw notFound('Bu e-postayla kayıtlı hesap yok.');
     return view(await load(user.id));
   });
 
-  app.delete("/api/platform/accounts/:id", platform, async (req, reply) => {
+  app.delete('/api/platform/accounts/:id', platform, async (req, reply) => {
     const a = await load((req.params as { id: string }).id);
-    if (a.user.id === accessUser(req).sub)
-      throw badRequest("Kendi hesabınızı buradan silemezsiniz.");
-    if (a.user.isSuperAdmin)
-      throw badRequest("Platform yöneticisi hesabı silinemez.");
+    if (a.user.id === accessUser(req).sub) throw badRequest('Kendi hesabınızı buradan silemezsiniz.');
+    if (a.user.isSuperAdmin) throw badRequest('Platform yöneticisi hesabı silinemez.');
     const owned = a.schoolsOf.filter((m) => m.soleOwner);
-    if (owned.length)
-      throw conflict(
-        `Bu kişi ${owned.map((m) => m.schoolName).join(", ")} okulunun müdürü. Önce okul listesinden "Müdürü değiştir" ile müdürlüğü devredin.`,
-      );
-    await log(
-      accessUser(req).sub,
-      a.schoolsOf.map((m) => m.schoolId),
-      "delete",
-      `Platform yöneticisi ${a.user.fullName} (${a.user.email}) hesabını sildi`,
-    );
+    if (owned.length) throw conflict(`Bu kişi ${owned.map((m) => m.schoolName).join(', ')} okulunun müdürü. Önce okul listesinden "Müdürü değiştir" ile müdürlüğü devredin.`);
+    await log(accessUser(req).sub, a.schoolsOf.map((m) => m.schoolId), 'delete', `Platform yöneticisi ${a.user.fullName} (${a.user.email}) hesabını sildi`);
     await db.delete(users).where(eq(users.id, a.user.id));
     return reply.code(204).send();
   });
 
   /** Yeni geçici şifre: bütün oturumlar kapanır; e-posta ayarlıysa kişiye gönderilir */
-  app.post("/api/platform/accounts/:id/password", platform, async (req) => {
+  app.post('/api/platform/accounts/:id/password', platform, async (req) => {
     const a = await load((req.params as { id: string }).id);
-    if (a.user.isSuperAdmin)
-      throw badRequest(
-        "Platform yöneticisinin şifresi Hesabım sayfasından değiştirilir.",
-      );
+    if (a.user.isSuperAdmin) throw badRequest('Platform yöneticisinin şifresi Hesabım sayfasından değiştirilir.');
     const password = readablePassword();
-    await db
-      .update(users)
-      .set({ passwordHash: await hashPassword(password) })
-      .where(eq(users.id, a.user.id));
+    await db.update(users).set({ passwordHash: await hashPassword(password) }).where(eq(users.id, a.user.id));
     await db.delete(sessions).where(eq(sessions.userId, a.user.id));
-    await log(
-      accessUser(req).sub,
-      a.schoolsOf.map((m) => m.schoolId),
-      "update",
-      `Platform yöneticisi ${a.user.fullName} şifresini yeniledi`,
-    );
+    await log(accessUser(req).sub, a.schoolsOf.map((m) => m.schoolId), 'update', `Platform yöneticisi ${a.user.fullName} şifresini yeniledi`);
     const emailed = await trySendMail(env, {
       to: a.user.email,
-      subject: "Okulyayın şifreniz yenilendi",
-      text: `Merhaba ${a.user.fullName},\n\nOkulyayın şifreniz yenilendi.\n\nAdres: ${env.PUBLIC_URL.replace(/\/$/, "")}/admin/\nE-posta: ${a.user.email}\nŞifre: ${password}\n\nGiriş yaptıktan sonra Hesabım sayfasından şifrenizi değiştirin.\n`,
+      subject: 'Okulyayın şifreniz yenilendi',
+      text: `Merhaba ${a.user.fullName},\n\nOkulyayın şifreniz yenilendi.\n\nAdres: ${env.PUBLIC_URL.replace(/\/$/, '')}/admin/\nE-posta: ${a.user.email}\nŞifre: ${password}\n\nGiriş yaptıktan sonra Hesabım sayfasından şifrenizi değiştirin.\n`,
     });
-    return {
-      password,
-      emailed,
-      email: a.user.email,
-      fullName: a.user.fullName,
-    };
+    return { password, emailed, email: a.user.email, fullName: a.user.fullName };
   });
 }
