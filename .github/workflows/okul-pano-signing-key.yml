@@ -1,0 +1,89 @@
+# Okul Yayın: APK imza anahtarını bilgisayar gerekmeden oluşturur (yalnızca elle çalışır, bir kez).
+# Önce depoya iki gizli değer eklenir: SIGNING_PASSWORD (anahtarın şifresi, en az 16 karakter) ve SECRETS_TOKEN
+# (yalnızca bu depoda "Secrets: Read and write" yetkili, kısa süreli erişim anahtarı). İş:
+#   1. anahtarı bu şifreyle oluşturur (RSA 4096, PKCS12, ~27 yıl geçerli),
+#   2. telefon ve TV APK iş akışlarının kullandığı 8 gizli değeri kendisi kaydeder,
+#   3. anahtar dosyasını yedeklensin diye 1 gün indirilebilir bırakır (dosya şifreyle korunur).
+# Anahtar zaten tanımlıysa üzerine yazmaz: yanlışlıkla değişirse uygulamalar güncellenemez.
+name: Okul Pano · İmza anahtarı oluştur
+
+on:
+  workflow_dispatch:
+    inputs:
+      replace:
+        description: 'Var olan anahtarın yerine yenisini yaz (DİKKAT: uygulamalar silinip yeniden kurulmalı)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  key:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Ön koşullar
+        env:
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+          SECRETS_TOKEN: ${{ secrets.SECRETS_TOKEN }}
+          EXISTING: ${{ secrets.APP_KEYSTORE_BASE64 }}
+          REPLACE: ${{ inputs.replace }}
+        run: |
+          if [ -z "$SIGNING_PASSWORD" ] || [ -z "$SECRETS_TOKEN" ]; then
+            echo "::error::SIGNING_PASSWORD ve SECRETS_TOKEN gizli değerleri eklenmeli (Settings › Secrets and variables › Actions)."
+            exit 1
+          fi
+          if [ "${#SIGNING_PASSWORD}" -lt 16 ]; then
+            echo "::error::SIGNING_PASSWORD en az 16 karakter olmalı."
+            exit 1
+          fi
+          if [ -n "$EXISTING" ] && [ "$REPLACE" != "true" ]; then
+            echo "::error::İmza anahtarı zaten tanımlı; üzerine yazılmadı. Gerçekten değiştirmek için 'replace' seçeneğiyle çalıştırın."
+            exit 1
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Anahtarı oluştur
+        env:
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/imza"
+          keytool -genkeypair -noprompt \
+            -keystore "$RUNNER_TEMP/imza/okulyayin.keystore" -storetype PKCS12 \
+            -alias okulyayin -keyalg RSA -keysize 4096 -validity 10000 \
+            -dname "CN=Okul Yayin, O=Okul Yayin, C=TR" \
+            -storepass:env SIGNING_PASSWORD -keypass:env SIGNING_PASSWORD
+          keytool -list -keystore "$RUNNER_TEMP/imza/okulyayin.keystore" -storetype PKCS12 -storepass:env SIGNING_PASSWORD | grep -q okulyayin
+          echo "Anahtar oluşturuldu."
+
+      - name: Gizli değerleri kaydet
+        env:
+          GH_TOKEN: ${{ secrets.SECRETS_TOKEN }}
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+          REPO: ${{ github.repository }}
+        run: |
+          B64=$(base64 -w0 "$RUNNER_TEMP/imza/okulyayin.keystore")
+          for P in APP TV; do
+            printf '%s' "$B64" | gh secret set "${P}_KEYSTORE_BASE64" --repo "$REPO"
+            printf '%s' "$SIGNING_PASSWORD" | gh secret set "${P}_KEYSTORE_PASSWORD" --repo "$REPO"
+            printf '%s' "$SIGNING_PASSWORD" | gh secret set "${P}_KEY_PASSWORD" --repo "$REPO"
+            printf '%s' "okulyayin" | gh secret set "${P}_KEY_ALIAS" --repo "$REPO"
+          done
+          echo "8 gizli değer kaydedildi. SECRETS_TOKEN artık silinebilir."
+
+      - name: Yedek (1 gün indirilebilir, şifreyle korunur)
+        uses: actions/upload-artifact@v4
+        with:
+          name: okulyayin-imza-anahtari-YEDEK
+          path: ${{ runner.temp }}/imza/okulyayin.keystore
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Geçici dosyayı sil
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/imza"
