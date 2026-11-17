@@ -46,7 +46,7 @@ export default function PersonScreen() {
 }
 
 function Detail({ p, ctx }: { p: Person; ctx: ReturnType<typeof usePeople> }) {
-  const { me, role: myRole } = useAuth();
+  const { me, role: myRole, can } = useAuth();
   const iAmOwner = myRole === 'owner';
   const m = p.member;
   const teachers = useTeachers();
@@ -67,11 +67,14 @@ function Detail({ p, ctx }: { p: Person; ctx: ReturnType<typeof usePeople> }) {
   }, [p.role, m?.permissions]);
 
   const isMe = m?.userId === me?.user.id;
-  const editable = Boolean(m) && ctx.full && m!.role !== 'owner' && !isMe && (m!.role !== 'admin' || iAmOwner);
+  // "Rol ve görev verir" yetkisiyle yalnızca öğretmen, rehber öğretmen ve editör; yalnızca kendisindeki görevler
+  const limited = !ctx.full;
+  const editable = Boolean(m) && m!.role !== 'owner' && !isMe && (ctx.full ? m!.role !== 'admin' || iAmOwner : ctx.assign && m!.role === 'editor');
+  const grantable = (x: string) => !limited || (x !== 'roles.assign' && x !== 'users.manage' && can(x as never));
   const dirty = Boolean(m) && (role !== p.role || [...perms].sort().join() !== [...(m?.permissions ?? [])].sort().join());
   const duties = dutiesOf(perms);
   const partial = partialDutyPermissions(perms);
-  const roleChoices: PersonRole[] = [...(iAmOwner || p.role === 'admin' ? (['admin'] as const) : []), 'counselor', p.teacherId ? 'teacher' : 'staff'];
+  const roleChoices: PersonRole[] = [...(!limited && (iAmOwner || p.role === 'admin') ? (['admin'] as const) : []), 'counselor', p.teacherId ? 'teacher' : 'staff'];
   const st = PERSON_STATUS[p.status];
   const r = p.roster;
 
@@ -173,7 +176,7 @@ function Detail({ p, ctx }: { p: Person; ctx: ReturnType<typeof usePeople> }) {
                 }}
                 options={roleChoices.map((k) => ({ value: k, label: PERSON_ROLES[k].label, description: PERSON_ROLES[k].text }))}
               />
-              {!iAmOwner && m.role === 'editor' && <Promotion p={p} ctx={ctx} busy={busy} run={run} />}
+              {ctx.full && !iAmOwner && m.role === 'editor' && <Promotion p={p} ctx={ctx} busy={busy} run={run} />}
             </Card>
           ) : (
             <Card>
@@ -203,7 +206,7 @@ function Detail({ p, ctx }: { p: Person; ctx: ReturnType<typeof usePeople> }) {
                         icon={on ? 'checkmark' : 'add'}
                         selected={on}
                         onPress={
-                          editable
+                          editable && d.permissions.every(grantable)
                             ? () => {
                                 setPerms((x) => toggleDuty(x, d.key, !on));
                                 setSaved(false);
@@ -222,14 +225,14 @@ function Detail({ p, ctx }: { p: Person; ctx: ReturnType<typeof usePeople> }) {
                 <T size={12.5} weight="800" color={colors.muted} style={{ marginTop: 4 }}>
                   DİĞER YETKİLER
                 </T>
-                {EXTRA_PERMISSIONS.map((e) => (
+                {EXTRA_PERMISSIONS.filter((e) => grantable(e.key) || perms.includes(e.key)).map((e) => (
                   <ToggleRow
                     key={e.key}
                     label={e.label}
                     description={e.text}
                     value={perms.includes(e.key)}
                     onChange={(on) => {
-                      if (!editable) return;
+                      if (!editable || !grantable(e.key)) return;
                       setPerms((x) => (on ? [...x, e.key] : x.filter((y) => y !== e.key)));
                       setSaved(false);
                     }}
@@ -271,7 +274,7 @@ function Detail({ p, ctx }: { p: Person; ctx: ReturnType<typeof usePeople> }) {
             </Button>
           )}
 
-          {ctx.full && !p.roster && (
+          {(ctx.full || (ctx.assign && m.role === 'editor')) && !p.roster && (
             <>
               <SectionTitle>Öğretmen kaydı (kadro)</SectionTitle>
               <Card style={{ gap: 8 }}>
@@ -281,14 +284,19 @@ function Detail({ p, ctx }: { p: Person; ctx: ReturnType<typeof usePeople> }) {
                   disabled={busy === 'teacher'}
                   onChange={(t) => void run('teacher', () => api(`${ctx.membersPath}/${m.id}/teacher`, { method: 'PUT', body: { teacherId: t } }))}
                 />
+                {!m.teacherId && (
+                  <T size={12.5} weight="700" color={colors.warning}>
+                    Kadro kaydıyla eşleşmedi. Ders ya da nöbeti varsa kaydını seçin.
+                  </T>
+                )}
                 <T size={12.5} color={colors.muted}>
-                  Ders ya da nöbeti olan müdür, müdür yardımcısı ya da öğretmen kadrodaki kendi kaydını seçer: Ders programım ve Nöbetlerim görünür. Kadro dışı kişi (ör. memur) öğretmen değildir.
+                  Hesap, kadroda aynı adla kayıtlı öğretmenle kendiliğinden bağlanır; ders programı ve nöbetleri görünür. Ad farklı yazılmışsa ya da aynı adda iki kayıt varsa buradan seçin.
                 </T>
               </Card>
             </>
           )}
 
-          {editable && (
+          {editable && ctx.full && (
             <>
               <SectionTitle>Giriş</SectionTitle>
               <Card style={{ gap: 10 }}>

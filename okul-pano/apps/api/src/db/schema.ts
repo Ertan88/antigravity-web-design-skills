@@ -109,6 +109,8 @@ export const memberships = pgTable(
     permissions: jsonb('permissions').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
     /** Kullanıcı bu okulda öğretmense: mobil uygulamada kendi nöbetleri ve ders programı */
     teacherId: uuid('teacher_id').references((): AnyPgColumn => teachers.id, { onDelete: 'set null' }),
+    /** Öğretmen bağını yetkili elle kurdu ya da kaldırdı: kendiliğinden eşleştirme bu hesaba dokunmaz */
+    teacherLinkManual: boolean('teacher_link_manual').notNull().default(false),
     /** Bir yönetici bu kişinin Yönetici yapılmasını önerdiyse: müdür onaylar ya da reddeder */
     promotionRequestedBy: uuid('promotion_requested_by').references((): AnyPgColumn => users.id, { onDelete: 'set null' }),
     promotionRequestedAt: timestamp('promotion_requested_at', { withTimezone: true }),

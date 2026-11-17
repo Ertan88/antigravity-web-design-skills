@@ -30,4 +30,10 @@ describe('nöbetçi müdür yardımcısı', () => {
     expect(days.map((d) => d.date)).toEqual(['2026-12-02']);
     expect(days[0]!.duties).toEqual([{ dutyId: 'supervisor:2026-12-02', area: 'Nöbetçi müdür yardımcısı', partners: [], substituteFor: null, coveredBy: null }]);
   });
+
+  it('kadroda olmayan müdür yardımcısının günleri hesaptaki adına göre bulunur', async () => {
+    const days = await teacherDutyDays(t.database.db, schoolId, null, '2026-12-01', '2026-12-31', { name: 'Başka  Kişi' });
+    expect(days.map((d) => d.date)).toEqual(['2026-12-03']);
+    expect(await teacherDutyDays(t.database.db, schoolId, null, '2026-12-01', '2026-12-31')).toEqual([]);
+  });
 });

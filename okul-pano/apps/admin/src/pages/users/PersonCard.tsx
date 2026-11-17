@@ -23,6 +23,8 @@ import { initials, ROLE_TONE, STATUS, type Person } from './people.ts';
 
 export interface CardContext {
   full: boolean;
+  /** Rol ve görev verebilir (müdür, müdür yardımcısı ya da "Rol ve görev verir" yetkisi) */
+  assign: boolean;
   isOwner: boolean;
   membersPath: string;
   enrollPath: string;
@@ -47,7 +49,7 @@ export const RolePill = ({ role }: { role: PersonRole }) => (
  * yapar; yönetici müdüre önerir. Müdürün kendi kartında müdürlük devri.
  */
 export function PersonCard({ person, ctx }: { person: Person; ctx: CardContext }) {
-  const { me, school } = useAuth();
+  const { me, school, can } = useAuth();
   const toast = useToast();
   const m = person.member;
   const [role, setRole] = useState<PersonRole>(person.role);
@@ -65,12 +67,15 @@ export function PersonCard({ person, ctx }: { person: Person; ctx: CardContext }
   const isMe = m?.userId === me?.user.id;
   const iAmOwner = school?.role === 'owner';
   // Müdürün ve kendi hesabının yetkileri değişmez; yöneticiyi yalnızca müdür değiştirir
-  const editable = Boolean(m) && ctx.full && m!.role !== 'owner' && !isMe && (m!.role !== 'admin' || iAmOwner);
+  // "Rol ve görev verir" yetkisiyle yalnızca öğretmen, rehber öğretmen ve editör; yalnızca kendisindeki görevler
+  const limited = !ctx.full;
+  const editable = Boolean(m) && m!.role !== 'owner' && !isMe && (ctx.full ? m!.role !== 'admin' || iAmOwner : ctx.assign && m!.role === 'editor');
+  const grantable = (p: string) => !limited || (p !== 'roles.assign' && p !== 'users.manage' && can(p as never));
   const baseline = m ? m.permissions : [];
   const dirty = Boolean(m) && (role !== person.role || [...perms].sort().join() !== [...baseline].sort().join());
   const duties = dutiesOf(perms);
   const partial = partialDutyPermissions(perms);
-  const roleChoices: PersonRole[] = ['admin', 'counselor', person.teacherId ? 'teacher' : 'staff'];
+  const roleChoices: PersonRole[] = [...(limited ? [] : (['admin'] as const)), 'counselor', person.teacherId ? 'teacher' : 'staff'];
 
   const run = async (key: string, fn: () => Promise<unknown>, ok?: string) => {
     setBusy(key);
@@ -174,12 +179,13 @@ export function PersonCard({ person, ctx }: { person: Person; ctx: CardContext }
                 {DUTY_PACKAGES.map((d) => {
                   const on = duties.includes(d.key);
                   const half = !on && d.permissions.some((p) => partial.includes(p));
+                  const mine = d.permissions.every(grantable);
                   return (
                     <button
                       key={d.key}
                       type="button"
-                      title={d.text}
-                      disabled={!editable}
+                      title={mine ? d.text : `${d.text} · sizde olmayan görev verilemez`}
+                      disabled={!editable || !mine}
                       onClick={() => setDuty(d.key, !on)}
                       className={clsx(
                         'rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap transition-colors disabled:cursor-not-allowed',
@@ -200,14 +206,15 @@ export function PersonCard({ person, ctx }: { person: Person; ctx: CardContext }
               </button>
               {extra && (
                 <div className="mt-2 grid gap-1.5">
-                  {EXTRA_PERMISSIONS.map((e) => {
+                  {EXTRA_PERMISSIONS.filter((e) => grantable(e.key) || perms.includes(e.key)).map((e) => {
                     const on = perms.includes(e.key);
+                    const allowed = editable && grantable(e.key);
                     return (
-                      <label key={e.key} className={clsx('flex items-start gap-2.5 rounded-xl px-3 py-2 ring-1', on ? 'bg-brand-50 ring-brand-200' : 'ring-slate-200', editable ? 'cursor-pointer' : 'cursor-not-allowed opacity-70')}>
+                      <label key={e.key} className={clsx('flex items-start gap-2.5 rounded-xl px-3 py-2 ring-1', on ? 'bg-brand-50 ring-brand-200' : 'ring-slate-200', allowed ? 'cursor-pointer' : 'cursor-not-allowed opacity-70')}>
                         <input
                           type="checkbox"
                           className="mt-0.5 size-4 accent-brand-600"
-                          disabled={!editable}
+                          disabled={!allowed}
                           checked={on}
                           onChange={() => setPerms((p) => (on ? p.filter((x) => x !== e.key) : [...p, e.key]))}
                         />
@@ -259,12 +266,13 @@ export function PersonCard({ person, ctx }: { person: Person; ctx: CardContext }
 
           {/* Kadro bağı: kadro dışı hesap (okul müdürü dahil) bir öğretmen kaydına bağlanabilir; ders ve nöbeti olan
               müdür / müdür yardımcısı kendi kaydını seçer, mobilde Ders programım ve Nöbetlerim görünür */}
-          {ctx.full && !person.roster && (
+          {(ctx.full || (ctx.assign && m.role === 'editor')) && !person.roster && (
             <div className="mt-5">
               <div className="text-sm font-semibold text-slate-700">Öğretmen kaydı (kadro)</div>
               <p className="mt-0.5 text-xs text-slate-500">
-                Ders ya da nöbeti varsa Öğretmen Kadrosu'ndaki kendi kaydını seçin: mobilde Ders programım ve Nöbetlerim görünür. Kayıt yoksa önce Öğretmen Kadrosu'na ekleyin.
+                Hesap, kadroda aynı adla kayıtlı öğretmenle kendiliğinden bağlanır; ders programı ve nöbetleri görünür. Ad farklı yazılmışsa ya da aynı adda iki kayıt varsa buradan seçin.
               </p>
+              {!m.teacherId && <p className="mt-1 text-xs font-semibold text-amber-700">Kadro kaydıyla eşleşmedi. Ders ya da nöbeti varsa kaydını seçin.</p>}
               <div className="mt-1.5">
                 <Select
                   value={m.teacherId ?? ''}

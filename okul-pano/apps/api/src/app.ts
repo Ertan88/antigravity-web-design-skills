@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import cookie from '@fastify/cookie';
+import { autoLinkTeachers, autoLinkTeachersForUser } from './lib/teacherLink.ts';
 import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
 import multipart from '@fastify/multipart';
@@ -50,6 +51,9 @@ import { studentRoutes } from './routes/students.ts';
 import { teacherRoutes } from './routes/teachers.ts';
 import { timetableRoutes } from './routes/timetable.ts';
 import { timetableImportRoutes } from './routes/timetableImport.ts';
+
+/** Hesap ile öğretmen kaydı eşleşmesini etkileyen yazma istekleri (kadro, ders programı, nöbet, taşımalı, hesaplar) */
+const TEACHER_LINK_PATHS = /^\/api\/schools\/[^/]+\/(teacher|timetable|duties|transport|members|enrollments)/;
 
 export interface BuildOptions {
   env?: Partial<Record<keyof Env, unknown>>;
@@ -114,6 +118,23 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   ].join('; ');
   app.addHook('onSend', async (_req, reply, payload) => {
     if (String(reply.getHeader('content-type') ?? '').startsWith('text/html')) reply.header('Content-Security-Policy', CSP);
+    return payload;
+  });
+  // Kadro, ders programı, nöbet ya da hesap değişince hesaplar kadrodaki öğretmen kaydına kendiliğinden bağlanır
+  // (müdür ve müdür yardımcısı da öğretmendir; bkz. lib/teacherLink.ts). Yanıttan önce çalışır: ekran güncel veriyle açılır.
+  app.addHook('onSend', async (req, reply, payload) => {
+    if (req.method === 'GET' || reply.statusCode >= 400) return payload;
+    const path = req.url.split('?')[0]!;
+    try {
+      if (path === '/api/me') {
+        const sub = (req.user as { sub?: string } | undefined)?.sub;
+        if (sub) await autoLinkTeachersForUser(app.deps.db, sub);
+      } else if (req.ctx?.schoolId && TEACHER_LINK_PATHS.test(path)) {
+        await autoLinkTeachers(app.deps.db, req.ctx.schoolId);
+      }
+    } catch (err) {
+      req.log.warn({ err }, 'öğretmen kaydı eşleştirilemedi');
+    }
     return payload;
   });
   await app.register(cookie);

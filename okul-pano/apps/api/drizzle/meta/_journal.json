@@ -365,6 +365,13 @@
       "when": 1796900000000,
       "tag": "0051_push_tokens_multi_account",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1797000000000,
+      "tag": "0052_teacher_link_manual",
+      "breakpoints": true
     }
   ]
 }

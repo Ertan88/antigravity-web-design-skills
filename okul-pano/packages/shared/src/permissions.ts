@@ -20,6 +20,12 @@ export const PERMISSIONS = {
   'settings.manage': 'Okul ayarları',
   'labels.manage': 'Başlıkları düzenleme',
   'users.manage': 'Kullanıcılar ve yetkiler',
+  /**
+   * Rol ve görev verir (müdür ve müdür yardımcısının yetkilendirdiği kişi): öğretmen, rehber öğretmen ve editörlere rol
+   * ve görev verir. Yalnızca kendisinde olan görevleri verebilir; kendi yetkilerini, müdürü ve müdür yardımcılarını
+   * değiştiremez, bu yetkiyi başkasına veremez, hesap açamaz, şifre sıfırlayamaz.
+   */
+  'roles.assign': 'Rol ve görev verir',
   /** Dar yetki: yalnızca "Öğretmen" rolüyle hesap açar (giriş kodu, toplantı QR'ı, onay, davet); yetki veremez, şifre sıfırlayamaz */
   'accounts.enroll': 'Öğretmen hesabı açma',
   'conduct.manage': 'Gözlem kriterleri ve ayın öğrencisi',
@@ -53,6 +59,21 @@ export const ADMIN_GRANTABLE: readonly Permission[] = ['internship.manage'];
 
 /** Editörlere verilemeyen yetkiler: yetki yükseltmeyi engeller. */
 export const ADMIN_ONLY_PERMISSIONS: readonly Permission[] = ['users.manage'];
+
+/** "Rol ve görev verir" yetkisini yalnızca okul müdürü ve müdür yardımcısı verir; bu yetkiyle başkasına verilemez */
+export const ASSIGNER_GRANTABLE_EXCLUDED: readonly Permission[] = ['users.manage', 'roles.assign'];
+
+/**
+ * "Rol ve görev verir" yetkisiyle yapılan değişiklikte kişinin yeni yetkileri: verenin kendisinde olmayan yetkiler
+ * olduğu gibi kalır (veren onlara dokunamaz), verenin kendisinde olanlar istenene göre verilir ya da alınır. Rehber
+ * öğretmen (conduct.counsel) bir roldür; veren kişide olmasa da verilebilir.
+ */
+export function assignablePermissions(assigner: readonly string[], current: readonly string[], requested: readonly string[]): Permission[] {
+  const mine = new Set<string>([...assigner.filter((p) => !(ASSIGNER_GRANTABLE_EXCLUDED as readonly string[]).includes(p)), 'conduct.counsel']);
+  const kept = current.filter((p) => !mine.has(p));
+  const given = requested.filter((p) => mine.has(p));
+  return effectivePermissions('editor', [...new Set([...kept, ...given])]);
+}
 
 export function effectivePermissions(role: Role, granted: readonly string[]): Permission[] {
   if (role === 'owner' || role === 'admin') return [...PERMISSION_KEYS];

@@ -257,7 +257,17 @@ export async function enrollRoutes(app: FastifyInstance) {
    * Kadro listesi (hesap durumu ile): web Kullanıcılar → Kadro ve mobil "Öğretmen hesabı aç".
    * İletişimden yalnızca kadrodaki e-posta döner (davet için); telefon dönmez.
    */
-  app.get(`${base}/roster`, manage, async (req) => {
+  // Kadro ve hesap listesi "Rol ve görev verir" yetkisiyle de okunur (yalnızca görüntüleme; hesap açma yetkisi vermez)
+  const rosterRead = {
+    preHandler: [
+      app.authenticate,
+      schoolGuard(),
+      async (req: FastifyRequest) => {
+        if (!['users.manage', 'accounts.enroll', 'roles.assign'].some((p) => req.ctx.permissions.includes(p as never))) throw forbidden();
+      },
+    ],
+  };
+  app.get(`${base}/roster`, rosterRead, async (req) => {
     const schoolId = req.ctx.schoolId;
     const [list, accounts, open, [s]] = await Promise.all([
       db

@@ -142,10 +142,10 @@ export interface TeacherDutyDay {
 export async function teacherDutyDays(
   db: DB,
   schoolId: string,
-  teacherId: string,
+  teacherId: string | null,
   from: string,
   to: string,
-  opts: { transport?: boolean } = {},
+  opts: { transport?: boolean; /** Öğretmen kaydı yoksa (kadroda olmayan müdür yardımcısı) nöbetçi yönetici günleri bu ada göre */ name?: string } = {},
 ): Promise<TeacherDutyDay[]> {
   // Okulda taşımalı eğitim kapalıysa taşımalı kayıtları hiç okunmaz (silinmez, gizlenir; panodaki gibi)
   const withTransport = opts.transport !== false;
@@ -181,8 +181,9 @@ export async function teacherDutyDays(
       : Promise.resolve([]),
   ]);
   // Nöbetçi müdür yardımcısı: çizelgedeki adı öğretmen kaydının adıyla eşleşen günler onun nöbetidir
-  const [me] = await db.select({ fullName: teachers.fullName }).from(teachers).where(eq(teachers.id, teacherId));
-  const myKey = me ? normalizeName(me.fullName) : null;
+  const [me] = teacherId ? await db.select({ fullName: teachers.fullName }).from(teachers).where(eq(teachers.id, teacherId)) : [];
+  const myName = me?.fullName ?? opts.name;
+  const myKey = myName ? normalizeName(myName) : null;
   const holidayOf = new Map(holidays.map((h) => [h.date, h.name]));
   const supervisorOf = new Map(supervisors.map((s) => [s.date, s.name]));
   const out: TeacherDutyDay[] = [];

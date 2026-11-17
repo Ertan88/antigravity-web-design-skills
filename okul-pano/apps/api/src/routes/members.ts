@@ -1,4 +1,4 @@
-import { ADMIN_GRANTABLE, createMemberSchema, effectivePermissions, resetPasswordSchema, updateMemberSchema } from '@okulpano/shared';
+import { ADMIN_GRANTABLE, assignablePermissions, createMemberSchema, effectivePermissions, resetPasswordSchema, updateMemberSchema } from '@okulpano/shared';
 import { and, asc, count, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
@@ -22,6 +22,17 @@ export async function memberRoutes(app: FastifyInstance) {
   const { db } = app.deps;
   const base = '/api/schools/:schoolId/members';
   const manage = { preHandler: [app.authenticate, schoolGuard('users.manage')] };
+  // Kişi listesi, rol ve görev verme: müdür, müdür yardımcısı ya da "Rol ve görev verir" yetkisi verilen kişi
+  const assign = {
+    preHandler: [
+      app.authenticate,
+      schoolGuard(),
+      async (req: FastifyRequest) => {
+        if (!req.ctx.permissions.includes('users.manage') && !req.ctx.permissions.includes('roles.assign')) throw forbidden();
+      },
+    ],
+  };
+  const limited = (req: FastifyRequest) => !req.ctx.permissions.includes('users.manage');
 
   /** Bağlanacak öğretmen bu okula ait olmalı */
   async function checkTeacher(req: FastifyRequest, teacherId: string | null | undefined) {
@@ -49,7 +60,7 @@ export async function memberRoutes(app: FastifyInstance) {
     return m;
   }
 
-  app.get(base, manage, async (req) => {
+  app.get(base, assign, async (req) => {
     const rows = await db
       .select({
         id: memberships.id,
@@ -182,6 +193,7 @@ export async function memberRoutes(app: FastifyInstance) {
         role: body.role,
         permissions: body.role === 'editor' ? effectivePermissions('editor', body.permissions) : body.role === 'admin' ? adminGrants(body.permissions) : [],
         teacherId: body.teacherId ?? null,
+        teacherLinkManual: Boolean(body.teacherId),
       })
       .returning();
     await audit(req, 'create', 'Kullanıcı', m!.id, `${body.fullName} (${email})`);
@@ -220,21 +232,25 @@ export async function memberRoutes(app: FastifyInstance) {
     return invite;
   });
 
-  app.patch(`${base}/:memberId`, manage, async (req) => {
+  app.patch(`${base}/:memberId`, assign, async (req) => {
     const m = await loadMember(req);
     const body = parse(updateMemberSchema, req.body);
     if (body.role && body.role !== 'editor' && req.ctx.role !== 'owner') throw forbidden('Yönetici atamayı yalnızca okul müdürü yapabilir.');
     const role = body.role ?? m.membership.role;
+    // "Rol ve görev verir" yetkisi: yalnızca öğretmen, rehber öğretmen ve editör; yalnızca kendisinde olan görevler
+    if (limited(req) && m.membership.role !== 'editor') throw forbidden('Müdür yardımcılarını yalnızca okul müdürü değiştirebilir.');
     const permissions =
       role === 'editor'
-        ? effectivePermissions('editor', body.permissions ?? m.membership.permissions)
+        ? limited(req)
+          ? assignablePermissions(req.ctx.permissions, m.membership.permissions, body.permissions ?? m.membership.permissions)
+          : effectivePermissions('editor', body.permissions ?? m.membership.permissions)
         : role === 'admin'
           ? adminGrants(body.permissions ?? m.membership.permissions)
           : [];
     await checkTeacher(req, body.teacherId);
     await db
       .update(memberships)
-      .set({ role, permissions, ...(role === 'admin' ? { promotionRequestedBy: null, promotionRequestedAt: null } : {}), ...(body.teacherId !== undefined ? { teacherId: body.teacherId } : {}) })
+      .set({ role, permissions, ...(role === 'admin' ? { promotionRequestedBy: null, promotionRequestedAt: null } : {}), ...(body.teacherId !== undefined ? { teacherId: body.teacherId, teacherLinkManual: true } : {}) })
       .where(eq(memberships.id, m.membership.id));
     await audit(req, 'update', 'Kullanıcı yetkisi', m.membership.id, m.fullName);
     return { ok: true };
@@ -244,14 +260,18 @@ export async function memberRoutes(app: FastifyInstance) {
    * Kullanıcıyı öğretmen kaydıyla eşleştirir (mobilde kendi nöbetleri ve ders programı). Yetki değişikliği
    * olmadığı için okul müdürüne ve kişinin kendisine de uygulanabilir (ör. ders veren müdür yardımcısı).
    */
-  app.put(`${base}/:memberId/teacher`, manage, async (req) => {
+  app.put(`${base}/:memberId/teacher`, assign, async (req) => {
     const { memberId } = req.params as { memberId: string };
     if (!UUID_RE.test(memberId)) throw notFound();
     const { teacherId } = parse(z.object({ teacherId: z.uuid().nullable() }), req.body);
     await checkTeacher(req, teacherId);
+    if (limited(req)) {
+      const [target] = await db.select({ role: memberships.role }).from(memberships).where(and(eq(memberships.id, memberId), eq(memberships.schoolId, req.ctx.schoolId)));
+      if (target && target.role !== 'editor') throw forbidden('Müdür ve müdür yardımcılarının öğretmen kaydını müdür ya da müdür yardımcısı bağlar.');
+    }
     const [m] = await db
       .update(memberships)
-      .set({ teacherId })
+      .set({ teacherId, teacherLinkManual: true })
       .where(and(eq(memberships.id, memberId), eq(memberships.schoolId, req.ctx.schoolId)))
       .returning();
     if (!m) throw notFound('Kullanıcı bulunamadı.');

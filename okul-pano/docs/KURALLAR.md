@@ -36,6 +36,14 @@ kalır; burada tekrarlanmaz.
 - Arayüzde düğmeyi gizlemek güvenlik sayılmaz; aynı denetim sunucuda da yapılır.
 - Destek erişimi (`isSupport`) kişisel verileri (öğrenci devamı, gözlem, rehberlik) göremez.
 - Toplu işlemlerde her öğenin okula ve kullanıcının kapsamına ait olduğu tek tek denetlenir.
+- Roller: Okul müdürü, Müdür yardımcısı, Rehber öğretmen, Öğretmen, Editör (kadro dışı ya da içerik sorumlusu).
+  Müdür yardımcısını yalnızca müdür atar. Diğer rolleri ve görevleri müdür, müdür yardımcısı ve "Rol ve görev verir"
+  (`roles.assign`) yetkisi verilen kişi verir. Bu yetkiyle yalnızca kendisinde olan görevler verilir (rehber öğretmen
+  rolü hariç); kendi yetkisi, müdür ve müdür yardımcıları değiştirilemez; bu yetki başkasına verilemez; hesap açılamaz,
+  şifre sıfırlanamaz.
+- Müdür ve müdür yardımcısı da öğretmendir: hesap, kadroda aynı adla tek kayıtlı öğretmenle kendiliğinden bağlanır
+  (`lib/teacherLink.ts`); ders programı ve nöbetleri ayrıca işlem yapmadan görünür. Kişi kendi bağını kuramaz; ad
+  eşleşmezse ya da aynı adda iki kayıt varsa yetkili bağlar. Yetkilinin kurduğu ya da kaldırdığı bağa dokunulmaz.
 
 ### 1.3 Girdi, çıktı ve dosyalar
 - Bütün istek gövdeleri ve sorgu parametreleri `zod` şemasıyla doğrulanır (`parse(...)`). Şemalar

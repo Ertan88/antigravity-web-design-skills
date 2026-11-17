@@ -12,12 +12,14 @@ export const STATUS = PERSON_STATUS;
 export function usePeople() {
   const { schoolId, can } = useAuth();
   const full = can('users.manage');
+  // "Rol ve görev verir": hesapları görür, öğretmen / rehber / editöre kendisindeki görevleri verir
+  const assign = full || can('roles.assign');
   const membersPath = useSchoolPath('members');
   const enrollPath = useSchoolPath('enrollments');
   const qc = useQueryClient();
   const roster = useQuery({ queryKey: [schoolId, 'enrollments'], queryFn: () => api<Roster>(`${enrollPath}/roster`), enabled: Boolean(schoolId), refetchInterval: 15_000 });
-  const members = useQuery({ queryKey: [schoolId, 'members'], queryFn: () => api<Member[]>(membersPath), enabled: Boolean(schoolId) && full });
-  const people = roster.data ? mergePeople(roster.data.rows, full ? members.data : undefined) : [];
+  const members = useQuery({ queryKey: [schoolId, 'members'], queryFn: () => api<Member[]>(membersPath), enabled: Boolean(schoolId) && assign });
+  const people = roster.data ? mergePeople(roster.data.rows, assign ? members.data : undefined) : [];
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: [schoolId, 'enrollments'] });
     void qc.invalidateQueries({ queryKey: [schoolId, 'members'] });
@@ -25,8 +27,9 @@ export function usePeople() {
   };
   return {
     people,
-    loading: roster.isLoading || (full && members.isLoading),
+    loading: roster.isLoading || (assign && members.isLoading),
     full,
+    assign,
     mail: Boolean(roster.data?.mail),
     isOwner: Boolean(roster.data?.owner),
     membersPath,

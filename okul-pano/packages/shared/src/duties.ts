@@ -19,6 +19,7 @@ export type DutyKey = (typeof DUTY_PACKAGES)[number]['key'];
 /** Pakete girmeyen, tek tek verilen yetkiler (dikkatli verilmeli) */
 export const EXTRA_PERMISSIONS: readonly { key: Permission; label: string; text: string }[] = [
   { key: 'announcements.approve', label: 'Duyuruları onaylar', text: 'Onay bekleyen duyuruları yayına alır' },
+  { key: 'roles.assign', label: 'Rol ve görev verir', text: 'Öğretmen, rehber öğretmen ve editörlere rol ve görev verir (yalnızca kendisinde olan görevleri)' },
   { key: 'accounts.enroll', label: 'Öğretmen hesabı açar', text: 'Kadrodaki öğretmenlere hesap açar (yalnızca Öğretmen rolüyle)' },
   { key: 'emergency.manage', label: 'Acil durum uyarısı', text: 'Bütün panolarda acil durum uyarısı başlatır' },
   { key: 'settings.manage', label: 'Okul ayarları', text: 'Okul bilgileri, konum ve modüller' },
@@ -43,7 +44,7 @@ export function toggleDuty(permissions: readonly string[], key: DutyKey, on: boo
 
 /**
  * Kişinin paneldeki rolü (5 sabit rol). Veritabanındaki owner/admin/editor + yetki + kadro bağına göre:
- * müdür yardımcısı = Yönetici; rehber öğretmen = gözlem kayıtlarını gören; kadroda olan Öğretmen, olmayan Görevli.
+ * müdür yardımcısı = Yönetici; rehber öğretmen = gözlem kayıtlarını gören; kadroda olan Öğretmen, olmayan Editör.
  */
 export type PersonRole = 'owner' | 'admin' | 'counselor' | 'teacher' | 'staff';
 export const PERSON_ROLES: Record<PersonRole, { label: string; text: string }> = {
@@ -51,7 +52,7 @@ export const PERSON_ROLES: Record<PersonRole, { label: string; text: string }> =
   admin: { label: 'Müdür yardımcısı', text: 'Bütün bölümler, kullanıcı ekler' },
   counselor: { label: 'Rehber öğretmen', text: 'Bütün öğrencilerin gözlem kayıtlarını görür' },
   teacher: { label: 'Öğretmen', text: 'Kendi ders programı, nöbeti ve izni; verilen görevler' },
-  staff: { label: 'Görevli', text: 'Kadro dışı (ör. memur); yalnızca verilen görevler' },
+  staff: { label: 'Editör', text: 'Kadro dışı (ör. memur, içerik sorumlusu); yalnızca verilen görevler' },
 };
 
 export function personRole(m: { role: string; permissions: readonly string[]; teacherId?: string | null }): PersonRole {

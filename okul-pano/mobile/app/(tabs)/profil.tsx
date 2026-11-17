@@ -313,7 +313,7 @@ export default function Menu() {
       (managerial || can('support.contact')) && { title: 'Platforma yaz', subtitle: 'Okul Yayın ekibine sorun, öneri ya da soru', icon: 'lifebuoy', to: '/platforma-yaz' },
     ]);
     add('Yönetim', [
-      (can('users.manage') || can('accounts.enroll')) && {
+      (can('users.manage') || can('accounts.enroll') || can('roles.assign')) && {
         title: 'Kişiler ve yetkiler',
         subtitle: can('users.manage') ? 'Hesap aç · rol ve görev ver · iş bölümü' : 'Öğretmen hesabı aç · onay bekleyenler',
         icon: 'people-outline',

@@ -143,7 +143,7 @@ export function App() {
         {/* Sınıflar artık ders programı sayfasında */}
         <Route path="siniflar" element={<Navigate to="/ders-programi" replace />} />
         <Route path="ekranlar" element={needsSchool(<Guard permission="screens.manage"><Screens /></Guard>)} />
-        <Route path="kullanicilar" element={needsSchool(<Guard permission={['users.manage', 'accounts.enroll']}><Users /></Guard>)} />
+        <Route path="kullanicilar" element={needsSchool(<Guard permission={['users.manage', 'accounts.enroll', 'roles.assign']}><Users /></Guard>)} />
         <Route path="ayarlar" element={needsSchool(<Guard permission="settings.manage"><Settings /></Guard>)} />
         <Route path="basliklar" element={needsSchool(<Guard permission="labels.manage"><Labels /></Guard>)} />
         <Route path="gecmis" element={needsSchool(<Guard permission="users.manage"><Audit /></Guard>)} />

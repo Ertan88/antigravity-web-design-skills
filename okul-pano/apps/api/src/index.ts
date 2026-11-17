@@ -3,6 +3,7 @@ import { buildApp } from './app.ts';
 import { memberships, schools, users } from './db/schema.ts';
 import { hashPassword } from './lib/crypto.ts';
 import { seedDemo } from './seed-data.ts';
+import { autoLinkAllSchools } from './lib/teacherLink.ts';
 
 const app = await buildApp();
 const { PORT, HOST, NODE_ENV } = app.deps.env;
@@ -48,6 +49,14 @@ if (ownSlugs.length) {
   }
   const missing = ownSlugs.filter((x) => !own.some((s) => s.slug === x));
   if (missing.length) console.warn(`PLATFORM_OWNER_SCHOOLS: bulunamayan okul kısa adı: ${missing.join(', ')}`);
+}
+
+// Eski hesaplar: kadrodaki öğretmen kaydıyla kendiliğinden eşleştirme (ad tek kayıtla birebir eşleşiyorsa)
+try {
+  const linked = await autoLinkAllSchools(app.deps.db);
+  if (linked) console.log(`${linked} hesap kadrodaki öğretmen kaydıyla eşleştirildi.`);
+} catch (err) {
+  console.warn('Öğretmen kaydı eşleştirmesi yapılamadı:', err);
 }
 
 try {

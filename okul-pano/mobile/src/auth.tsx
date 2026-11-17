@@ -295,8 +295,8 @@ export function membershipLabel(s: SchoolAccess): string {
   if (s.teacherTitle) return s.teacherTitle;
   if (s.role === 'owner') return 'Okul müdürü';
   if (s.role === 'admin') return 'Yönetici';
-  // Kadroda olmayan kişi (ör. memur) panelde olduğu gibi "Görevli"
-  return s.teacherId ? 'Öğretmen' : 'Görevli';
+  // Kadroda olmayan kişi (ör. memur, içerik sorumlusu) panelde olduğu gibi "Editör"
+  return s.teacherId ? 'Öğretmen' : 'Editör';
 }
 
 /** Hesap listesinde görünen bilgiler: platform hesabı ya da okul (ilk okul ve görevi) */

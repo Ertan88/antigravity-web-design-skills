@@ -3,7 +3,7 @@ import { and, asc, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { accessUser, audit, schoolGuard } from '../context.ts';
-import { bellOverrides, bellSchedules, classGroups, examReminderAcks, examSchedule, pushTokens, teacherLeaves, teachers, timetableEntries } from '../db/schema.ts';
+import { bellOverrides, bellSchedules, classGroups, examReminderAcks, examSchedule, pushTokens, teacherLeaves, teachers, timetableEntries, users } from '../db/schema.ts';
 import { addDays, dutyDay, dutyScheduleStatus, effectiveHolidays, holidaysAndHalfDays, monthEnd, teacherDutyDays } from '../lib/dayinfo.ts';
 import { badRequest, notFound, parse } from '../lib/errors.ts';
 import { notifyUsers, usersWithPermission } from '../lib/push.ts';
@@ -135,24 +135,28 @@ export async function meRoutes(app: FastifyInstance) {
    * girilmemişse (son girilen ayınki gösterilir) ve ay sonu yaklaşırken yeni ay girilmemişse bildirilir.
    */
   app.get('/api/schools/:schoolId/me/duties', member, async (req) => {
-    const { schoolId, school, teacherId } = req.ctx;
+    const { schoolId, school, teacherId, role, userId } = req.ctx;
     const today = zonedParts(new Date(), school.timezone).isoDate;
     const month = today.slice(0, 7);
     const end = monthEnd(month);
+    // Kadroda olmayan (dersi olmayan) müdür ve müdür yardımcısı: nöbetçi yönetici günleri hesaptaki ada göre
+    const [account] = !teacherId && (role === 'owner' || role === 'admin') ? await db.select({ fullName: users.fullName }).from(users).where(eq(users.id, userId)) : [];
+    const name = account?.fullName;
+    const hasDuties = Boolean(teacherId || name);
     const nextMonth = addDays(end, 1).slice(0, 7);
     const transport = schoolSettingsSchema.parse(school.settings ?? {}).hasTransport;
     const monthStart = `${month}-01`;
     const [current, next, wholeMonth] = await Promise.all([
       dutyScheduleStatus(db, schoolId, month),
       dutyScheduleStatus(db, schoolId, nextMonth),
-      teacherId ? teacherDutyDays(db, schoolId, teacherId, monthStart, end, { transport }) : Promise.resolve([]),
+      hasDuties ? teacherDutyDays(db, schoolId, teacherId, monthStart, end, { transport, name }) : Promise.resolve([]),
     ]);
     const thisMonth = wholeMonth.filter((d) => d.date >= today);
     // Bu ay kalan nöbet yoksa ve gelecek ayın çizelgesi girildiyse gelecek ayın nöbetleri gösterilir
     const remaining = thisMonth.some((d) => !d.holiday);
-    const showNext = Boolean(teacherId) && !remaining && next.entered;
+    const showNext = hasDuties && !remaining && next.entered;
     const showing = showNext ? nextMonth : month;
-    const monthDays = showNext ? await teacherDutyDays(db, schoolId, teacherId!, addDays(end, 1), monthEnd(nextMonth), { transport }) : wholeMonth;
+    const monthDays = showNext ? await teacherDutyDays(db, schoolId, teacherId, addDays(end, 1), monthEnd(nextMonth), { transport, name }) : wholeMonth;
     const [[teacher], holidays] = await Promise.all([
       teacherId ? db.select({ fullName: teachers.fullName }).from(teachers).where(eq(teachers.id, teacherId)) : Promise.resolve([]),
       effectiveHolidays(db, schoolId, `${showing}-01`, monthEnd(showing)),

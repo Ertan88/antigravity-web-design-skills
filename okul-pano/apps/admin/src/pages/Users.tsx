@@ -28,7 +28,7 @@ export function Users() {
   const { me, school, schoolId, reloadMe } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
-  const { people, loading, full, mail, isOwner, membersPath, enrollPath, refresh } = usePeople();
+  const { people, loading, full, assign, mail, isOwner, membersPath, enrollPath, refresh } = usePeople();
   const schoolPath = useSchoolPath();
   const schoolData = useSchool();
   const titles = useList<TeacherOption>('teacher-titles');
@@ -77,6 +77,7 @@ export function Users() {
 
   const ctx: CardContext = {
     full,
+    assign,
     isOwner,
     membersPath,
     enrollPath,
