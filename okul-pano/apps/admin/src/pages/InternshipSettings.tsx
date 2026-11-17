@@ -31,7 +31,7 @@ export function InternshipSettingsDialog({ open, onClose }: { open: boolean; onC
   const toast = useToast();
   const q = useQuery({ queryKey: [schoolId, 'internship', 'settings'], queryFn: () => api<InternshipSettings>(`${path}/settings`), enabled: open });
   const candidates = useQuery({
-    queryKey: [schoolId, 'internship', 'candidates'],
+    queryKey: [schoolId, 'internship', 'manager-candidates'],
     queryFn: () => api<{ userId: string; fullName: string }[]>(`${path}/manager-candidates`),
     enabled: open,
   });
