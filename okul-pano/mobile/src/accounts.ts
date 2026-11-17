@@ -40,3 +40,10 @@ export function upsert(list: SavedAccount[], a: Omit<SavedAccount, 'refresh'> & 
   const next: SavedAccount = { ...a, refresh: a.refresh === undefined ? (prev?.refresh ?? null) : a.refresh };
   return i >= 0 ? list.map((x, j) => (j === i ? next : x)) : [...list, next];
 }
+
+/** E-postayı yarı gizler (giriş ekranında yanından geçen görmesin): "ayse.yilmaz@ornek.test" → "ay•••@ornek.test" */
+export function maskEmail(email: string): string {
+  const at = email.indexOf('@');
+  if (at < 1) return email;
+  return `${email.slice(0, Math.min(2, at))}•••${email.slice(at)}`;
+}

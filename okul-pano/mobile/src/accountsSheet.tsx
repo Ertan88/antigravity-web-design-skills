@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { deviceAccount } from './api.ts';
 import { Modal, Pressable, View } from 'react-native';
-import type { SavedAccount } from './accounts.ts';
+import { maskEmail, type SavedAccount } from './accounts.ts';
 import { useAuth } from './auth.tsx';
 import { Sheet } from './sheet.tsx';
 import { Text } from './text.tsx';
@@ -19,13 +19,30 @@ export function AccountKind({ kind }: { kind: SavedAccount['kind'] }) {
 }
 
 /** Tek hesap satırı: dokununca o hesaba geçilir; etkin hesap işaretli */
-export function AccountRow({ a, active, busy, unread, onPress, onForget }: { a: SavedAccount; active: boolean; busy?: boolean; unread?: number; onPress: () => void; onForget?: () => void }) {
+export function AccountRow({
+  a,
+  active,
+  busy,
+  unread,
+  compact,
+  onPress,
+  onForget,
+}: {
+  a: SavedAccount;
+  active: boolean;
+  busy?: boolean;
+  unread?: number;
+  /** Giriş ekranı: e-posta yarı gizli, okul ve görev yazmaz */
+  compact?: boolean;
+  onPress: () => void;
+  onForget?: () => void;
+}) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ selected: active, busy }}
-        accessibilityLabel={`${a.fullName}, ${a.kind === 'platform' ? 'platform hesabı' : 'okul hesabı'}, ${a.email}${active ? ', etkin hesap' : ''}`}
+        accessibilityLabel={`${a.fullName}, ${a.kind === 'platform' ? 'platform hesabı' : 'okul hesabı'}${compact ? '' : `, ${a.email}`}${active ? ', etkin hesap' : ''}`}
         onPress={onPress}
         disabled={active || busy}
         style={({ pressed }) => ({
@@ -50,9 +67,9 @@ export function AccountRow({ a, active, busy, unread, onPress, onForget }: { a: 
             <AccountKind kind={a.kind} />
           </View>
           <T size={12.5} color={colors.muted} lines={1}>
-            {a.email}
+            {compact ? maskEmail(a.email) : a.email}
           </T>
-          {a.kind === 'school' && a.detail ? (
+          {!compact && a.kind === 'school' && a.detail ? (
             <T size={12.5} color={colors.faint} lines={2}>
               {a.detail}
             </T>

@@ -6,6 +6,7 @@ import { router } from 'expo-router';
 import { DEFAULT_SERVER, normalizeServer, session } from '../src/api.ts';
 import { useAuth } from '../src/auth.tsx';
 import { AccountRow } from '../src/accountsSheet.tsx';
+import { Sheet } from '../src/sheet.tsx';
 // Marka kutusu temadan bağımsızdır (koyu turkuaz); üzerindeki etiketler her iki temada açık pastel renklerle
 import { colors, LIGHT_TILES, type TileTone } from '../src/theme.ts';
 import { Button, Card, Field, Icon, Screen, T, type IconName } from '../src/ui.tsx';
@@ -23,6 +24,7 @@ const FEATURES: { label: string; icon: IconName; tone: TileTone }[] = [
 export default function Login() {
   const { signIn, server: saved, accounts, switchAccount } = useAuth();
   const [switching, setSwitching] = useState<string | null>(null);
+  const [accountsOpen, setAccountsOpen] = useState(false);
   const [server, setServer] = useState(saved || DEFAULT_SERVER);
   const [editServer, setEditServer] = useState(!(saved || DEFAULT_SERVER));
   const [email, setEmail] = useState('');
@@ -73,34 +75,6 @@ export default function Login() {
           </View>
         </View>
 
-        {/* Bu telefonda kayıtlı hesaplar: dokununca şifresiz geçilir (oturumu kapanmış olanda e-posta doldurulur) */}
-        {accounts.length > 0 && (
-          <Card style={{ gap: 4 }}>
-            <Text style={{ fontSize: 15, fontWeight: '800', color: colors.ink, marginBottom: 4 }}>Kayıtlı hesaplar</Text>
-            {accounts.map((a) => (
-              <AccountRow
-                key={`${a.server}|${a.userId}`}
-                a={a}
-                active={false}
-                busy={switching === a.userId}
-                onPress={() => {
-                  setError(null);
-                  if (!a.refresh) {
-                    setEmail(a.email);
-                    return;
-                  }
-                  setSwitching(a.userId);
-                  switchAccount(a.userId)
-                    .catch((e: unknown) => {
-                      setEmail(a.email);
-                      setError(errorText(e, 'Hesaba geçilemedi'));
-                    })
-                    .finally(() => setSwitching(null));
-                }}
-              />
-            ))}
-          </Card>
-        )}
         <Card style={{ gap: 14 }}>
           <View style={{ gap: 2 }}>
             <Text style={{ fontSize: 19, fontWeight: '800', color: colors.ink }} accessibilityRole="header">
@@ -174,6 +148,43 @@ export default function Login() {
             Giriş kodum var
           </Button>
         </Card>
+
+        {/* Kayıtlı hesaplar (B): giriş ekranında açıkta durmaz; düğmeyle alt sayfada açılır, e-posta yarı gizli, okul ve
+            görev yazmaz. Dokununca şifresiz geçilir (oturumu kapanmış olanda e-posta doldurulur). */}
+        {accounts.length > 0 && (
+          <Button variant="secondary" icon="people-outline" onPress={() => setAccountsOpen(true)}>
+            {`Kayıtlı hesaplar (${accounts.length})`}
+          </Button>
+        )}
+        <Sheet open={accountsOpen} onClose={() => setAccountsOpen(false)}>
+          <Text style={{ fontSize: 17, fontWeight: '800', color: colors.ink, marginBottom: 8 }}>Kayıtlı hesaplar</Text>
+          <View style={{ gap: 4 }}>
+            {accounts.map((a) => (
+              <AccountRow
+                key={`${a.server}|${a.userId}`}
+                a={a}
+                active={false}
+                compact
+                busy={switching === a.userId}
+                onPress={() => {
+                  setError(null);
+                  setAccountsOpen(false);
+                  if (!a.refresh) {
+                    setEmail(a.email);
+                    return;
+                  }
+                  setSwitching(a.userId);
+                  switchAccount(a.userId)
+                    .catch((e: unknown) => {
+                      setEmail(a.email);
+                      setError(errorText(e, 'Hesaba geçilemedi'));
+                    })
+                    .finally(() => setSwitching(null));
+                }}
+              />
+            ))}
+          </View>
+        </Sheet>
 
         <View style={{ alignItems: 'center', gap: 2 }}>
           {Boolean(server.trim()) && (
