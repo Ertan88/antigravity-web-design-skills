@@ -210,7 +210,7 @@ export default function Menu() {
           title: 'Destek erişimi olan okullar',
           icon: 'key-outline',
           right: support.length ? <Badge tone="primary">{String(support.length)}</Badge> : undefined,
-          to: '/okullar',
+          to: '/platform/destek-okullar',
         },
       ],
     });
