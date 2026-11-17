@@ -282,12 +282,15 @@ export function Layout() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
   useEffect(() => setOpen(false), [location.pathname]);
-  // Telefonda öğretmen görünümündeki kişi uygulamanın web sürümüne geçer (kural mobil uygulamayla ortak: appView)
+  // Öğretmen görünümündeki kişi uygulamanın web sürümüne (/app) geçer (kural mobil uygulamayla ortak: appView).
+  // Telefonda her zaman; bilgisayarda görevi olmayan öğretmen (ders programı, nöbet, izin, gözlem /app'te). Görevi olan
+  // öğretmen (ör. nöbet çizelgesi, duyurular) bilgisayarda panelde kalır: Excel ve geniş tablolar paneldedir.
   const { me, school } = useAuth();
   const [leaving, setLeaving] = useState(false);
   useEffect(() => {
     if (!me || !school || school.support || me.user.isSuperAdmin) return;
-    if (appView(school) !== 'teacher' || !isPhoneWidth() || panelChosenOnPhone()) return;
+    if (appView(school) !== 'teacher' || panelChosenOnPhone()) return;
+    if (!isPhoneWidth() && school.permissions.some((p) => p !== 'support.contact')) return;
     setLeaving(true);
     void openAppView(me.user.id, school.id).then((ok) => {
       if (!ok) setLeaving(false);
@@ -297,7 +300,7 @@ export function Layout() {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-3 px-6 text-center">
         <Spinner />
-        <p className="text-sm font-semibold text-slate-500">Telefon için uygulama görünümü açılıyor…</p>
+        <p className="text-sm font-semibold text-slate-500">Uygulama görünümü açılıyor…</p>
       </div>
     );
   }

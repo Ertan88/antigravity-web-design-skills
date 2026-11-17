@@ -170,12 +170,15 @@ function Gate({ fontsReady }: { fontsReady: boolean }) {
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <StatusBar style={theme.isDark ? 'light' : 'dark'} />
       {status !== 'loading' && fontsReady && (
-        <Stack key={theme.key} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="login" />
-          <Stack.Screen name="duyuru-yeni" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="izin" options={{ presentation: 'modal' }} />
-        </Stack>
+        // Web sürümü (/app) bilgisayarda da açılır: ekranlar telefon genişliğinde ortada kalır, yayılmaz
+        <View style={Platform.OS === 'web' ? { flex: 1, width: '100%', maxWidth: WEB_MAX_WIDTH, alignSelf: 'center' } : { flex: 1 }}>
+          <Stack key={theme.key} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="login" />
+            <Stack.Screen name="duyuru-yeni" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="izin" options={{ presentation: 'modal' }} />
+          </Stack>
+        </View>
       )}
       {status === 'signedIn' && fontsReady && splashHidden && <InAppNotices />}
       <ConfirmHost />
@@ -189,6 +192,9 @@ function Gate({ fontsReady }: { fontsReady: boolean }) {
     </View>
   );
 }
+
+/** Bilgisayarda açılan web sürümünde içerik genişliği */
+const WEB_MAX_WIDTH = 760;
 
 export { ErrorBoundary } from '../src/errorBoundary.tsx';
 

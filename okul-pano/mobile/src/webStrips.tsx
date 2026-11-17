@@ -35,8 +35,8 @@ export function WebAppStrips() {
     <View style={{ gap: 10 }}>
       {panel && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#1c1917', borderRadius: 16, paddingVertical: 10, paddingHorizontal: 14 }}>
-          <Icon name="phone-portrait-outline" size={18} color="#f5f3ef" />
-          <Text style={{ flex: 1, color: '#f5f3ef', fontSize: 13, fontWeight: '600' }}>Telefon için uygulama görünümü açıldı.</Text>
+          <Icon name="grid-outline" size={18} color="#f5f3ef" />
+          <Text style={{ flex: 1, color: '#f5f3ef', fontSize: 13, fontWeight: '600' }}>Uygulama görünümü açıldı.</Text>
           <Pressable accessibilityRole="link" onPress={() => window.location.assign('/admin/?panel=1')} hitSlop={8}>
             <Text style={{ color: '#99f6e4', fontSize: 13, fontWeight: '800' }}>Paneli aç</Text>
           </Pressable>
