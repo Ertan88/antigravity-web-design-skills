@@ -41,6 +41,10 @@ export interface Bill {
   shared: boolean;
   /** Ödendi işaretlenen dönemler: aylıklarda 'YYYY-MM', tek seferlikte 'once'. */
   paidPeriods: string[];
+  /** Dönem → ödendi işaretlendiği an (ISO). Zamanında ödeme skorunda kullanılır. */
+  paidLog?: Record<string, string>;
+  /** Ev bütçesi: dönem → ödeyen kişi ('Ben' veya üye adı). */
+  paidBy?: Record<string, string>;
   createdAt: string; // YYYY-MM-DD
 }
 
@@ -73,7 +77,11 @@ export interface AppSettings {
   appLock?: boolean;
   /** İlk kurulum (maaş günü, varsayılan hatırlatma) tamamlandı mı. */
   onboardingDone?: boolean;
+  /** Ev bütçesi üyeleri (kullanıcının kendisi hariç). */
+  household?: { members: string[] };
 }
+
+export const ME = 'Ben';
 
 export interface AppState {
   version: 1;

@@ -21,7 +21,7 @@ export type Action =
   | { type: 'bill/add'; bill: Bill }
   | { type: 'bill/update'; bill: Bill }
   | { type: 'bill/remove'; id: string }
-  | { type: 'bill/markPaid'; id: string; period: string }
+  | { type: 'bill/markPaid'; id: string; period: string; paidAt?: string; paidBy?: string }
   | { type: 'bill/unmarkPaid'; id: string; period: string }
   | { type: 'expense/add'; expense: Expense }
   | { type: 'expense/remove'; id: string }
@@ -58,13 +58,25 @@ export function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         bills: state.bills.map((b) =>
-          b.id === action.id && !b.paidPeriods.includes(action.period) ? { ...b, paidPeriods: [...b.paidPeriods, action.period] } : b,
+          b.id === action.id && !b.paidPeriods.includes(action.period)
+            ? {
+                ...b,
+                paidPeriods: [...b.paidPeriods, action.period],
+                paidLog: { ...b.paidLog, [action.period]: action.paidAt ?? new Date().toISOString() },
+                paidBy: action.paidBy ? { ...b.paidBy, [action.period]: action.paidBy } : b.paidBy,
+              }
+            : b,
         ),
       };
     case 'bill/unmarkPaid':
       return {
         ...state,
-        bills: state.bills.map((b) => (b.id === action.id ? { ...b, paidPeriods: b.paidPeriods.filter((p) => p !== action.period) } : b)),
+        bills: state.bills.map((b) => {
+          if (b.id !== action.id) return b;
+          const { [action.period]: _log, ...paidLog } = b.paidLog ?? {};
+          const { [action.period]: _by, ...paidBy } = b.paidBy ?? {};
+          return { ...b, paidPeriods: b.paidPeriods.filter((p) => p !== action.period), paidLog, paidBy };
+        }),
       };
     case 'expense/add':
       return { ...state, expenses: [...state.expenses, action.expense] };

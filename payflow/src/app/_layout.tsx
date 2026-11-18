@@ -43,6 +43,7 @@ function RootStack() {
           <Stack.Screen name="flow-settings" options={{ presentation: 'modal' }} />
           <Stack.Screen name="notifications" />
           <Stack.Screen name="settings" />
+          <Stack.Screen name="expenses" />
         </Stack.Protected>
         <Stack.Protected guard={!inside}>
           <Stack.Screen name="(auth)" />

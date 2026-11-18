@@ -9,7 +9,7 @@ import { useNotifications } from '../notifications/NotificationsProvider';
 import { useStore } from '../store/StoreProvider';
 import { ThemeMode, useTheme } from '../theme/ThemeProvider';
 import { fonts } from '../theme/tokens';
-import { ChoiceChip, SectionLabel, ToggleRow } from '../ui/form';
+import { ChoiceChip, SectionLabel, TextField, ToggleRow } from '../ui/form';
 import { AnyIconKey, Icon } from '../ui/icons';
 import { AppText, IconButton, Surface } from '../ui/primitives';
 
@@ -23,6 +23,15 @@ export default function SettingsScreen() {
   const sync = useCloudSync();
   const { permission } = useNotifications();
   const [bio, setBio] = useState(false);
+  const [member, setMember] = useState('');
+  const members = state.settings.household?.members ?? [];
+  const setMembers = (m: string[]) => dispatch({ type: 'settings/update', settings: { household: { members: m } } });
+  const addMember = () => {
+    const n = member.trim();
+    if (!n || n === 'Ben' || members.includes(n)) return;
+    setMembers([...members, n]);
+    setMember('');
+  };
 
   useEffect(() => {
     biometricsAvailable().then(setBio);
@@ -119,6 +128,46 @@ export default function SettingsScreen() {
         value={!!state.settings.appLock}
         onChange={(v) => bio && dispatch({ type: 'settings/update', settings: { appLock: v } })}
       />
+
+      <SectionLabel>EV BÜTÇESİ</SectionLabel>
+      <Surface style={{ padding: 14, gap: 10 }}>
+        <AppText variant="label" muted style={{ fontFamily: fonts.body }}>
+          Faturayı eklerken "Ev bütçesiyle paylaş"ı açarsan, ödendi işaretlerken kimin ödediği sorulur; Raporlar'da kimin kime ne borçlu olduğu çıkar.
+        </AppText>
+        {members.length ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {members.map((m) => (
+              <Pressable
+                key={m}
+                accessibilityRole="button"
+                accessibilityLabel={`${m}, kaldırmak için basılı tut`}
+                onLongPress={() =>
+                  Alert.alert(m, 'Ev bütçesinden çıkarılsın mı?', [
+                    { text: 'Vazgeç', style: 'cancel' },
+                    { text: 'Çıkar', style: 'destructive', onPress: () => setMembers(members.filter((x) => x !== m)) },
+                  ])
+                }
+                style={{ paddingHorizontal: 14, minHeight: 40, borderRadius: 20, backgroundColor: palette.infoBg, justifyContent: 'center' }}
+              >
+                <AppText variant="label" color={palette.info}>
+                  {m}
+                </AppText>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
+          <TextField style={{ flex: 1 }} label="Üye ekle" placeholder="Ör. Ayşe" value={member} onChangeText={setMember} onSubmitEditing={addMember} />
+          <Pressable accessibilityRole="button" accessibilityLabel="Üyeyi ekle" onPress={addMember} style={{ height: 50, paddingHorizontal: 16, borderRadius: 14, backgroundColor: palette.button, justifyContent: 'center' }}>
+            <AppText variant="bodyStrong" color={palette.onButton}>
+              Ekle
+            </AppText>
+          </Pressable>
+        </View>
+        <AppText variant="caption" muted>
+          Şimdilik bu cihazda tutulur; üyelerin kendi telefonundan ortak görmesi sonraki sürümde.
+        </AppText>
+      </Surface>
 
       <SectionLabel>DİĞER</SectionLabel>
       <Surface style={{ overflow: 'hidden' }}>

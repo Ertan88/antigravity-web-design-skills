@@ -28,7 +28,7 @@ npm start         # telefonda Expo Go uygulamasıyla QR kodu okut
 | `src/core/model.ts` | Kalıcı veri modeli: kart, fatura, harcama, kart ödemesi, ayarlar |
 | `src/core/ledger.ts` | Kart ekstre defteri (devir zinciri) ve fatura vade hesabı |
 | `src/core/parse.ts` | Türkçe tutar/faiz girişi okuma, tuş takımı |
-| `src/store/` | Durum ağacı + AsyncStorage kalıcılığı, ana sayfa seçicileri, Zaman Nehri projeksiyonu, örnek veri |
+| `src/store/` | Durum ağacı + AsyncStorage kalıcılığı, ana sayfa seçicileri, Zaman Nehri projeksiyonu, raporlar (Ödeme Sağlığı Skoru, aylık rapor, abonelik dedektörü, ev bütçesi), CSV/PDF çıktısı, örnek veri |
 | `src/notifications/` | Bildirim planı (3 gün / 1 gün / son gün + ekstre kesimi), kurulum, izin, Ödedim/Ertele butonları |
 | `src/auth/` | Kimlik doğrulama arayüzü, Firebase uygulaması, bulut yedek senkronu, Google düğmesi, Face ID kilidi |
 | `src/features/` | Harcama ve fatura formları, kategori ızgarası, hatırlatma seçici |

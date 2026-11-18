@@ -5,6 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatTL } from '../../core/money';
 import { dueLabel, formatLongDate, greetingFor, Urgency, urgencyFor } from '../../core/schedule';
 import { useNotifications } from '../../notifications/NotificationsProvider';
+import { markBillPaid } from '../../features/markPaid';
+import { healthReport } from '../../store/analytics';
 import { demoState } from '../../store/demoSeed';
 import { DueItem, homeSummary } from '../../store/selectors';
 import { useStore } from '../../store/StoreProvider';
@@ -41,6 +43,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const now = useMemo(() => new Date(), []);
   const s = useMemo(() => homeSummary(state, now), [state, now]);
+  const health = useMemo(() => healthReport(state, now), [state, now]);
   const [whole, cents] = splitMoney(formatTL(s.monthTotal));
   const g = s.byGroup;
 
@@ -49,7 +52,7 @@ export default function HomeScreen() {
   const onItemPress = (item: DueItem) => {
     if (item.kind === 'card') return router.push(`/card/${item.refId}`);
     Alert.alert(item.title, `${formatTL(item.amount)} · ${dueLabel(item.daysLeft)}`, [
-      { text: 'Ödedim', onPress: () => item.period && dispatch({ type: 'bill/markPaid', id: item.refId, period: item.period }) },
+      { text: 'Ödedim', onPress: () => item.period && markBillPaid(state, dispatch, item.refId, item.period) },
       { text: 'Düzenle', onPress: () => router.push({ pathname: '/add', params: { billId: item.refId } }) },
       { text: 'Vazgeç', style: 'cancel' },
     ]);
@@ -137,13 +140,13 @@ export default function HomeScreen() {
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <Pressable accessibilityRole="button" onPress={() => router.navigate('/reports')} style={{ flex: 1 }}>
               <Surface style={{ padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 20 }}>
-                <ScoreRing score={s.healthScore} />
+                <ScoreRing score={health.score} />
                 <View style={{ flexShrink: 1 }}>
                   <AppText variant="caption" muted>
                     Ödeme sağlığı
                   </AppText>
-                  <AppText variant="bodyStrong" color={s.overdueCount ? palette.danger : palette.accent}>
-                    {s.overdueCount ? `${s.overdueCount} gecikme` : s.healthScore >= 80 ? 'İyi gidiyor' : 'Dikkat'}
+                  <AppText variant="bodyStrong" color={s.overdueCount || health.score < 50 ? palette.danger : health.score < 70 ? palette.warn : palette.accent}>
+                    {s.overdueCount ? `${s.overdueCount} gecikme` : health.label}
                   </AppText>
                 </View>
               </Surface>
@@ -185,6 +188,7 @@ export default function HomeScreen() {
             )}
           </View>
 
+          <Pressable accessibilityRole="button" accessibilityHint="Harcama geçmişini açar" onPress={() => router.push('/expenses')}>
           <Surface tone="surface2" style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, paddingHorizontal: 14, borderRadius: 18 }}>
             <View style={{ flex: 1 }}>
               <AppText variant="caption" muted>
@@ -200,6 +204,7 @@ export default function HomeScreen() {
               </View>
             ))}
           </Surface>
+          </Pressable>
         </>
       )}
     </ScrollView>

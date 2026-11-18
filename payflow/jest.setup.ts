@@ -38,3 +38,16 @@ jest.mock('expo-web-browser', () => ({ maybeCompleteAuthSession: () => ({ type: 
 jest.mock('expo-auth-session/providers/google', () => ({
   useIdTokenAuthRequest: () => [null, null, async () => ({ type: 'dismiss' })],
 }));
+
+jest.mock('expo-print', () => {
+  const { jest: j } = require('@jest/globals');
+  return { printToFileAsync: j.fn(async () => ({ uri: 'file:///cache/rapor.pdf' })) };
+});
+jest.mock('expo-sharing', () => {
+  const { jest: j } = require('@jest/globals');
+  return { isAvailableAsync: j.fn(async () => true), shareAsync: j.fn(async () => undefined) };
+});
+jest.mock('expo-file-system/legacy', () => {
+  const { jest: j } = require('@jest/globals');
+  return { cacheDirectory: 'file:///cache/', writeAsStringAsync: j.fn(async () => undefined) };
+});
