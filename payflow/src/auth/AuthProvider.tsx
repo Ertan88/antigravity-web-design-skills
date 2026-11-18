@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { isFirebaseConfigured } from '../config/env';
+import { CLOUD_ENABLED, isFirebaseConfigured } from '../config/env';
 import { AuthService, AuthUser } from './types';
 
 export type AuthStatus = 'loading' | 'signedOut' | 'signedIn' | 'guest';
@@ -10,6 +10,8 @@ interface AuthValue {
   user: AuthUser | null;
   /** Firebase yapılandırıldı mı (değilse yalnızca hesapsız kullanım). */
   available: boolean;
+  /** Bulut kapalı: uygulama yalnızca cihazda çalışır, giriş ekranı gösterilmez. */
+  localOnly: boolean;
   service: AuthService | null;
   continueAsGuest: () => void;
   signOut: () => Promise<void>;
@@ -57,10 +59,20 @@ export function AuthProvider({ children, service: injected }: { children: ReactN
     if (service && user) await service.signOut();
   }, [service, user]);
 
-  const status: AuthStatus = !authResolved || guest === null ? 'loading' : user ? 'signedIn' : guest ? 'guest' : 'signedOut';
+  // Testler hizmeti doğrudan verir; uygulamada bulut kapalıysa her zaman cihaz modu.
+  const localOnly = injected === undefined && !CLOUD_ENABLED;
+  const status: AuthStatus = localOnly
+    ? 'guest'
+    : !authResolved || guest === null
+      ? 'loading'
+      : user
+        ? 'signedIn'
+        : guest
+          ? 'guest'
+          : 'signedOut';
 
   return (
-    <Ctx.Provider value={{ status, user, available: !!service, service, continueAsGuest, signOut }}>{children}</Ctx.Provider>
+    <Ctx.Provider value={{ status, user, available: !!service, localOnly, service, continueAsGuest, signOut }}>{children}</Ctx.Provider>
   );
 }
 

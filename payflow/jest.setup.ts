@@ -49,5 +49,5 @@ jest.mock('expo-sharing', () => {
 });
 jest.mock('expo-file-system/legacy', () => {
   const { jest: j } = require('@jest/globals');
-  return { cacheDirectory: 'file:///cache/', writeAsStringAsync: j.fn(async () => undefined) };
+  return { cacheDirectory: 'file:///cache/', writeAsStringAsync: j.fn(async () => undefined), readAsStringAsync: j.fn(async () => '') };
 });

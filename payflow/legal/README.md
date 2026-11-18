@@ -1,53 +1,32 @@
-# Yasal metinler — nasıl çalışır, yayından önce ne yapılmalı
+# Yasal metinler
 
-> Bu metinler, mevzuat ve mağaza kuralları araştırılarak hazırlanmış **taslaklardır**; hukuki görüş
-> değildir. Yayından önce bir avukata (tercihen KVKK alanında) okutman önerilir.
+> Mevzuat ve mağaza kuralları araştırılarak hazırlanmış taslaklardır; hukuki görüş değildir.
 
-## Dosyalar
+Sürüm 1.0 **yalnızca cihazda** çalışır (hesap yok, sunucu yok). Bu yüzden iki metin yeterli:
+**Gizlilik Politikası** (KVKK bölümü içinde) ve **Kullanım Koşulları**.
 
 | Dosya | İçerik |
 |---|---|
-| `controller.json` | Veri sorumlusu adı, adresi, e-postası, yürürlük tarihi — **tek doldurulacak yer** |
-| `documents.json` | Gizlilik Politikası, KVKK Aydınlatma Metni, Kullanım Koşulları (tek kaynak) |
-| `../scripts/build-legal.mjs` | Web sayfalarını üretir → `docs/payflow/*.html` |
+| `controller.json` | Geliştirici adı, iletişim e-postası, yürürlük tarihi — **tek doldurulacak yer** |
+| `documents.json` | Metinlerin tek kaynağı |
+| `../scripts/build-legal.mjs` | Web sayfalarını üretir → `docs/payflow/*.html` (`npm run legal`) |
 
-Metinler uygulamada **Ayarlar › Yasal** altında ve kayıt/giriş ekranlarındaki bağlantılarda
-çevrimdışı gösterilir; aynı içerik web'de yayımlanır. Bir metni değiştirince:
+## Yayından önce
 
-```bash
-cd payflow && npm run legal   # web sayfalarını yeniden üretir; testler eskiyse uyarır
-```
+1. `controller.json`'daki köşeli parantezli alanları doldur, `npm run legal` çalıştır.
+   Doldurulana kadar uygulamada ve web'de "Taslak" uyarısı görünür.
+2. GitHub › Settings › Pages › *Deploy from a branch* → bu dal (birleştirince `main`), klasör `/docs`.
+   Gizlilik Politikası adresi: `https://ertan88.github.io/antigravity-web-design-skills/payflow/gizlilik.html`
 
-## Yayından önce senin yapacakların
+## Neden KVKK aydınlatma metni, standart sözleşme, VERBİS yok?
 
-1. **`controller.json`'u doldur.** Köşeli parantezli alanlar kaldıkça uygulamada ve web'de
-   "Taslak" uyarısı görünür. Şahıs olarak yayımlıyorsan veri sorumlusu sensin (ad soyad + tebligat
-   adresi); şirket kurarsan şirket unvanı. Mağazadaki geliştirici adıyla tutarlı olmalı.
-2. **Web'de yayınla (GitHub Pages):** GitHub › Settings › Pages › *Deploy from a branch* →
-   bu çalışmanın olduğu dal (birleştirince `main`) ve klasör **`/docs`**. Adresler:
-   - Gizlilik Politikası: `https://ertan88.github.io/antigravity-web-design-skills/payflow/gizlilik.html`
-   - Hesap silme (Play "hesap silme bağlantısı"): `.../payflow/hesap-silme.html`
-   - KVKK: `.../payflow/kvkk.html` · Koşullar: `.../payflow/kosullar.html`
-3. **Yurt dışına aktarım (KVKK m.9):** Hesaplı kullanımda veriler Google Firebase'e (yurt dışı)
-   gider. 7499 sayılı Kanun'la (1.6.2024) açık rıza artık sürekli aktarım için dayanak değil;
-   uygun güvence olarak **standart sözleşme** gerekir ve imzadan sonra Kurum'a **5 iş günü içinde**
-   bildirilmelidir (KVKK "Standart Sözleşme Bildirim Modülü"). Google'ın veri işleme sözleşmesinin
-   bu amaçla nasıl kullanılacağı netleştirilmeli — **avukata sorulacak ilk konu bu.**
-   Hesapsız mod hiçbir veriyi yurt dışına göndermez.
-4. **VERBİS kaydı:** Küçük ölçekli veri sorumluları istisna kapsamında olabilir; durumunu
-   KVKK'nın güncel istisna kararlarından kontrol et.
-5. **İletişim e-postası:** Hesap silme ve KVKK başvuruları buraya gelecek; 30 gün içinde
-   yanıtlanmalı.
+Uygulamaya girilen bilgiler cihazdan çıkmaz ve geliştirici bunlara erişmez; geliştirici açısından
+bir kişisel veri işleme faaliyeti yoktur, yurt dışına aktarım da yoktur. Gizlilik Politikası'ndaki
+"Kişisel verilerin korunması (KVKK)" bölümü bunu açıkça yazar. Bize e-posta ile yazanların
+adresi yalnızca yanıt için kullanılır.
 
-## Araştırmada uyulan kurallar
+## Bulut (hesap) açılırsa geri gelecekler
 
-- **KVKK m.10 + Aydınlatma Tebliği:** veri sorumlusu, amaçlar, aktarılan kişiler ve amaçları,
-  toplama yöntemi, hukuki sebep, m.11 hakları — aydınlatma verinin toplandığı anda (kayıt ekranı).
-- **Aydınlatma ≠ açık rıza:** Aydınlatma metni "okudum, onaylıyorum" kutusuyla onaylatılmaz
-  (Kurul 2026/347 ilke kararı: ikisi ayrı düzenlenir; rızaya dayanmayan işlemede rıza istenmez).
-  Bu yüzden kayıt ekranında KVKK kutusu kaldırıldı; yerine bilgilendirme bağlantısı ve yalnızca
-  Kullanım Koşulları'nın kabulü var.
-- **Google Play:** hesap açılabiliyorsa uygulama içi silme + Veri güvenliği formunda **web
-  bağlantısı**; sayfa uygulama/geliştirici adını anmalı, silme yolu belirgin olmalı.
-- **App Store 5.1.1:** gizlilik politikası bağlantısı (App Store Connect + uygulama içi) ve
-  uygulama içinden hesap silme.
+`CLOUD_ENABLED = true` yapılırsa önce: ayrı KVKK aydınlatma metni (m.10), Firebase için KVKK m.9
+standart sözleşme + 5 iş günü içinde Kurum'a bildirim, hesap silme web sayfası (Google Play),
+uygulama içi hesap silme (hazır) ve iOS'ta Apple ile giriş. Avukat görüşü önerilir.

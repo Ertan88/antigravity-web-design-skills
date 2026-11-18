@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { biometricsAvailable } from '../auth/AppLock';
 import { useAuth } from '../auth/AuthProvider';
 import { useCloudSync } from '../auth/CloudSync';
+import { exportBackup, importBackup } from '../features/backup';
 import { useNotifications } from '../notifications/NotificationsProvider';
 import { useStore } from '../store/StoreProvider';
 import { ThemeMode, useTheme } from '../theme/ThemeProvider';
@@ -19,7 +20,7 @@ export default function SettingsScreen() {
   const { palette, mode, setMode } = useTheme();
   const insets = useSafeAreaInsets();
   const { state, dispatch } = useStore();
-  const { status, user, available, signOut } = useAuth();
+  const { status, user, available, signOut, localOnly } = useAuth();
   const sync = useCloudSync();
   const { permission } = useNotifications();
   const [bio, setBio] = useState(false);
@@ -64,6 +65,41 @@ export default function SettingsScreen() {
         <View style={{ width: 44 }} />
       </View>
 
+      {localOnly ? (
+        <>
+          <SectionLabel>VERİLERİN</SectionLabel>
+          <Surface style={{ padding: 16, gap: 12 }}>
+            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
+              <Icon name="shield" size={20} color={palette.accent} />
+              <AppText variant="label" style={{ flex: 1, fontFamily: fonts.body, lineHeight: 20 }}>
+                Tüm bilgilerin yalnızca bu telefonda saklanır; hiçbir sunucuya gönderilmez. Telefonunun kendi yedeği (Google / iCloud) bunları da yedekler.
+              </AppText>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => exportBackup(state).catch(() => Alert.alert('Yedeklenemedi', 'Lütfen tekrar dene.'))}
+                style={{ flex: 1, height: 46, borderRadius: 14, backgroundColor: palette.button, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <AppText variant="bodyStrong" color={palette.onButton}>
+                  Yedekle
+                </AppText>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => importBackup(state, dispatch).catch(() => Alert.alert('Yedek yüklenemedi', 'Dosya okunamadı.'))}
+                style={{ flex: 1, height: 46, borderRadius: 14, borderWidth: 1, borderColor: palette.line, backgroundColor: palette.surface, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <AppText variant="bodyStrong">Geri yükle</AppText>
+              </Pressable>
+            </View>
+            <AppText variant="caption" muted>
+              Yedekle, tüm verilerini tek bir dosya olarak kaydetmeni sağlar (Drive, iCloud, e-posta…). Yeni telefonda Geri yükle ile aynen açılır.
+            </AppText>
+          </Surface>
+        </>
+      ) : (
+        <>
       <SectionLabel>HESAP</SectionLabel>
       <Surface style={{ padding: 16, gap: 10 }}>
         {status === 'signedIn' && user ? (
@@ -114,6 +150,8 @@ export default function SettingsScreen() {
           </>
         )}
       </Surface>
+        </>
+      )}
 
       <SectionLabel>GÖRÜNÜM</SectionLabel>
       <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -179,7 +217,6 @@ export default function SettingsScreen() {
       <SectionLabel>YASAL</SectionLabel>
       <Surface style={{ overflow: 'hidden' }}>
         <Row icon="shield" label="Gizlilik Politikası" onPress={() => router.push('/legal/privacy')} />
-        <Row icon="doc" label="KVKK Aydınlatma Metni" onPress={() => router.push('/legal/kvkk')} />
         <Row icon="book" label="Kullanım Koşulları" onPress={() => router.push('/legal/terms')} last />
       </Surface>
 

@@ -7,9 +7,9 @@ import { useTheme } from '../../theme/ThemeProvider';
 import { fonts } from '../../theme/tokens';
 import { AppText, IconButton } from '../../ui/primitives';
 
-const IDS: LegalDocId[] = ['privacy', 'kvkk', 'terms'];
+const IDS: LegalDocId[] = ['privacy', 'terms'];
 
-/** Gizlilik Politikası / KVKK Aydınlatma Metni / Kullanım Koşulları — çevrimdışı okunabilir. */
+/** Gizlilik Politikası / Kullanım Koşulları — çevrimdışı okunabilir. */
 export default function LegalScreen() {
   const { palette } = useTheme();
   const insets = useSafeAreaInsets();
@@ -28,7 +28,7 @@ export default function LegalScreen() {
       {legalHasPlaceholders() ? (
         <View style={{ backgroundColor: palette.warnBg, borderRadius: 12, padding: 12 }}>
           <AppText variant="caption" color={palette.warn}>
-            Taslak: veri sorumlusu bilgileri henüz doldurulmadı.
+            Taslak: geliştirici bilgileri henüz doldurulmadı.
           </AppText>
         </View>
       ) : null}

@@ -33,48 +33,36 @@ npx eas-cli@latest submit -p ios --profile production      # TestFlight
 Sürüm numaraları (versionCode / buildNumber) EAS sunucusunda tutulur ve her üretim
 derlemesinde otomatik artar. Görünen sürüm `app.json › version` (şu an 1.0.0).
 
-## 3. Firebase'e eklenecek SHA-1 parmak izleri (Google ile giriş için)
+## 3. Veri yaklaşımı: yalnızca cihazda (1.0)
 
-Firebase › Proje ayarları › Android uygulaması › **Parmak izi ekle**:
+İlk sürümde hesap ve bulut **kapalı** (`src/config/env.ts › CLOUD_ENABLED = false`). Hiçbir veri
+cihazdan çıkmaz. Bu sayede şunlara **gerek yok**: Firebase, yurt dışı aktarım / standart sözleşme,
+VERBİS, uygulama içi hesap silme, Apple ile giriş, KVKK aydınlatma metni (geliştirici veri işlemiyor).
+Telefon değişiminde veriler telefonun kendi yedeğiyle (Android `allowBackup`, iCloud) veya
+Ayarlar › **Yedekle / Geri yükle** dosyasıyla taşınır.
 
-1. Test derlemeleri: `5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25`
-2. EAS yükleme anahtarı: `npx eas-cli@latest credentials` → Android → production → SHA-1
-3. Google Play uygulama imzalama anahtarı: Play Console › Uygulama › **Test ve yayınla › Uygulama bütünlüğü › Uygulama imzalama** › SHA-1
-
-Üçü de eklenmezse Google ile giriş o derlemede "geliştirici hatası" verir.
-
-iOS'ta Google ile giriş için Firebase'e **iOS uygulaması** (bundle kimliği aynı) eklenip
-`EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` doldurulmalı.
+Bulut ileride açılırsa: `CLOUD_ENABLED = true`, Firebase kurulumu (README), KVKK aydınlatma metni +
+yurt dışı aktarım adımları, hesap silme web sayfası ve Apple ile giriş geri gelir.
 
 ## 4. Mağaza kuralları — durum
 
 | Gereklilik | Durum |
 |---|---|
-| Uygulama içinden hesap silme | ✅ Ayarlar › Hesabımı sil |
-| Hesap silme için **web bağlantısı** (Play zorunlu) | ✅ `docs/payflow/hesap-silme.html` (GitHub Pages açılınca yayında) |
-| Gizlilik politikası URL'si | ✅ taslak hazır (`docs/payflow/gizlilik.html`) — ⏳ `legal/controller.json` doldurulacak, avukat kontrolü önerilir |
-| KVKK aydınlatma metni | ✅ taslak hazır, kayıt/giriş ve Ayarlar › Yasal'da · ⏳ yurt dışı aktarım için standart sözleşme + KVKK bildirimi (bkz. `legal/README.md`) |
-| **Apple ile giriş** (Google girişi sunan iOS uygulamaları için) | ⏳ Apple geliştirici hesabı açılınca eklenecek |
+| Gizlilik politikası URL'si | ✅ `docs/payflow/gizlilik.html` — ⏳ `legal/controller.json` doldurulacak, GitHub Pages açılacak |
+| Kullanım koşulları | ✅ `docs/payflow/kosullar.html` |
+| Hesap silme (uygulama içi + web) | Gerekmez — hesap yok |
+| Apple ile giriş | Gerekmez — üçüncü taraf giriş yok |
 | Face ID kullanım açıklaması | ✅ |
-| Şifreleme beyanı (ITSAppUsesNonExemptEncryption) | ✅ standart HTTPS, beyan "hayır" |
-| Uygulama ikonu, uyarlanabilir ikon, bildirim ikonu, açılış ekranı | ✅ `assets/` |
-| Bildirim izni yalnızca kullanıcı isteyince | ✅ |
-| Tahmini faiz uyarısı | ✅ ekranlarda "≈ tahmini" ve oran kaynağı |
+| Şifreleme beyanı (ITSAppUsesNonExemptEncryption) | ✅ "hayır" |
+| İkonlar, açılış ekranı, bildirim ikonu | ✅ |
+| Tahmini faiz uyarısı | ✅ ekranlarda ve Kullanım Koşulları'nda |
 
-## 5. Google Play "Veri güvenliği" formu — taslak
+## 5. Mağaza veri formları
 
-Bağlantılar: Gizlilik Politikası → `https://ertan88.github.io/antigravity-web-design-skills/payflow/gizlilik.html` · Hesap silme → `https://ertan88.github.io/antigravity-web-design-skills/payflow/hesap-silme.html`
-
-| Veri | Toplanıyor mu | Amaç | Paylaşılıyor mu |
-|---|---|---|---|
-| Ad, e-posta | Evet (hesap açılırsa) | Hesap yönetimi | Hayır |
-| Kullanıcının girdiği finansal bilgiler (kart limiti, harcama, fatura tutarları) | Evet (hesap açılırsa, bulut yedek) | Uygulama işlevi | Hayır |
-| Kart numarası, banka şifresi | **Hayır** (yalnızca kartın son 4 hanesi, isteğe bağlı) | — | — |
-| Konum, kişiler, fotoğraf | Hayır | — | — |
-
-- Veriler aktarımda şifreli (HTTPS/TLS) — **Evet**
-- Kullanıcı verilerinin silinmesini isteyebilir — **Evet** (uygulama içi + web)
-- Hesapsız kullanımda veriler yalnızca cihazda kalır.
+- **Google Play › Veri güvenliği:** "Uygulama kullanıcı verisi topluyor veya paylaşıyor mu?" → **Hayır**.
+  (Veriler yalnızca cihazda işlenir; geliştiriciye/sunucuya aktarılmaz — Google'ın tanımına göre bu
+  "toplama" sayılmaz.) Gizlilik politikası: `https://ertan88.github.io/antigravity-web-design-skills/payflow/gizlilik.html`
+- **App Store › App Privacy:** **"Data Not Collected"**.
 
 ## 6. Mağaza metni — taslak
 
@@ -90,7 +78,8 @@ PayFlow faturalarını, kredi kartı ekstrelerini ve günlük harcamalarını te
 - Taksitleri gelecek ekstrelere otomatik dağıtır
 - Abonelik dedektörü, ay sonu raporu, PDF / Excel dışa aktarma
 - Ev bütçesi: paylaşılan faturalarda kim kime ne borçlu
-- Hesapsız kullanım veya bulut yedekli hesap; Face ID kilidi
+- Verilerin yalnızca telefonunda kalır: hesap yok, reklam yok, takip yok
+- Yedekle / Geri yükle ile yeni telefona taşı; Face ID kilidi
 
 PayFlow bir banka uygulaması değildir; banka şifren istenmez, ödeme yapmaz. Faiz tutarları
 TCMB azami oranlarına göre tahminidir.
@@ -99,8 +88,8 @@ TCMB azami oranlarına göre tahminidir.
 
 ## 7. İnceleme notu (Apple / Google'a)
 
-İnceleyicinin her ekranı görebilmesi için: *"Giriş ekranında 'Hesapsız devam et' → Ana Sayfa'da
-'Örnek verilerle dene'."* Hesaplı akış için bir test hesabı (e-posta/şifre) da verilmeli.
+İnceleyicinin her ekranı görebilmesi için: *"İlk kurulumu 'Şimdilik atla' ile geç → Ana Sayfa'da
+'Örnek verilerle dene'. Uygulama hesap gerektirmez; tüm veriler cihazda tutulur."*
 
 ## 8. Ekran görüntüleri
 

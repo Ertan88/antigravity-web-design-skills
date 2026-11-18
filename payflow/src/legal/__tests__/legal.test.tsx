@@ -2,7 +2,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { render, screen } from '@testing-library/react-native';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import LegalScreen from '../../app/legal/[doc]';
 import { ThemeProvider } from '../../theme/ThemeProvider';
@@ -16,53 +16,44 @@ const text = (id: LegalDocId) => {
   return [d.intro, ...d.sections.flatMap((s) => [s.heading, ...s.blocks.flatMap((b) => ('p' in b ? [b.p] : b.ul))])].join('\n');
 };
 
-describe('yasal metinler', () => {
-  it('yer tutucular dışında doldurulmamış alan kalmaz', () => {
-    for (const id of ['privacy', 'kvkk', 'terms'] as const) expect(text(id)).not.toMatch(/\{\{\w+\}\}/);
+describe('yasal metinler (yalnızca cihazda çalışan sürüm)', () => {
+  it('doldurulmamış şablon alanı kalmaz', () => {
+    for (const id of ['privacy', 'terms'] as const) expect(text(id)).not.toMatch(/\{\{\w+\}\}/);
   });
 
-  it('KVKK aydınlatma metni zorunlu unsurları içerir (m.10 + Tebliğ)', () => {
-    const t = text('kvkk');
-    for (const must of ['Veri sorumlusu', 'İşleme amaçları ve hukuki sebepler', 'Toplama yöntemi', 'Aktarım', '11. maddesi', 'Başvuru', 'm.5/2-c', 'yurt dışına aktarım', 'standart sözleşme'])
+  it('gizlilik politikası mağazaların ve KVKK\'nın istediği konuları kapsar', () => {
+    const t = text('privacy');
+    for (const must of ['yalnızca cihazında', 'Hesap yok', 'Reklam, analitik veya takip aracı yok', 'Bildirimler', 'Face ID', 'Verilerini silme', 'KVKK', 'aktarım yapılmaz', 'İletişim', 'Çocuklar'])
       expect(t).toContain(must);
-    // 11. madde: 9 hak
-    expect(legalDoc('kvkk').sections.find((s) => s.id === 'haklar')!.blocks[0]).toMatchObject({ ul: expect.arrayContaining([expect.any(String)]) });
-    expect((legalDoc('kvkk').sections.find((s) => s.id === 'haklar')!.blocks[0] as { ul: string[] }).ul).toHaveLength(9);
-    expect(t).toMatch(/onay istenmez/);
+    expect(legalUrl('privacy')).toBe('https://ertan88.github.io/antigravity-web-design-skills/payflow/gizlilik.html');
   });
 
-  it('gizlilik politikası mağaza kurallarını karşılar: hesap silme bölümü, uygulama adı, saklama, paylaşım', () => {
-    const p = legalDoc('privacy');
-    const del = p.sections.find((s) => s.id === 'hesap-silme')!;
-    expect(del.heading).toMatch(/silme/);
-    const delText = del.blocks.map((b) => ('p' in b ? b.p : b.ul.join(' '))).join(' ');
-    expect(delText).toContain('PayFlow');
-    expect(delText).toContain('Ayarlar › Hesabımı sil');
-    expect(delText).toMatch(/e-posta/);
-    for (const id of ['veriler', 'amaclar', 'saklama', 'sure', 'haklar', 'cocuklar']) expect(p.sections.some((s) => s.id === id)).toBe(true);
-    expect(legalUrl('privacy', 'hesap-silme')).toBe('https://ertan88.github.io/antigravity-web-design-skills/payflow/gizlilik.html#hesap-silme');
+  it('kullanım koşulları tahmin ve yedek sorumluluğunu açıkça yazar', () => {
+    const t = text('terms');
+    expect(t).toContain('TAHMİNLERDİR');
+    expect(t).toContain('Yedekle');
   });
 
-  it('web sayfaları JSON kaynağıyla güncel', () => {
+  it('web sayfaları JSON kaynağıyla güncel; hesaplı sürüme ait sayfalar kalmadı', () => {
     const root = join(__dirname, '..', '..', '..');
-    const before = readFileSync(join(root, '..', 'docs', 'payflow', 'gizlilik.html'), 'utf8');
+    const docs = join(root, '..', 'docs', 'payflow');
+    const before = readFileSync(join(docs, 'gizlilik.html'), 'utf8');
     execFileSync('node', [join(root, 'scripts', 'build-legal.mjs')]);
-    const after = readFileSync(join(root, '..', 'docs', 'payflow', 'gizlilik.html'), 'utf8');
-    expect(after).toBe(before); // fark varsa: npm run legal çalıştırıp commit et
-    expect(after).toContain('id="hesap-silme"');
-    const del = readFileSync(join(root, '..', 'docs', 'payflow', 'hesap-silme.html'), 'utf8');
-    expect(del).toContain('PayFlow — hesap ve veri silme');
+    expect(readFileSync(join(docs, 'gizlilik.html'), 'utf8')).toBe(before); // fark varsa: npm run legal
+    expect(existsSync(join(docs, 'kosullar.html'))).toBe(true);
+    expect(existsSync(join(docs, 'kvkk.html'))).toBe(false);
+    expect(existsSync(join(docs, 'hesap-silme.html'))).toBe(false);
   });
 
   it('uygulama içi ekran metni gösterir', async () => {
-    mockParams.doc = 'kvkk';
+    mockParams.doc = 'privacy';
     await render(
       <ThemeProvider>
         <LegalScreen />
       </ThemeProvider>,
     );
-    expect(screen.getByText('KVKK Aydınlatma Metni')).toBeTruthy();
-    expect(screen.getByText('6. Kanun\'un 11. maddesi kapsamındaki hakların')).toBeTruthy();
-    expect(screen.getByText(/Taslak: veri sorumlusu/)).toBeTruthy();
+    expect(screen.getByText('Gizlilik Politikası')).toBeTruthy();
+    expect(screen.getByText('6. Kişisel verilerin korunması (KVKK)')).toBeTruthy();
+    expect(screen.getByText(/Taslak: geliştirici bilgileri/)).toBeTruthy();
   });
 });

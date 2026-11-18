@@ -4,6 +4,13 @@
  * anahtar DEĞİLDİR (Firebase web yapılandırması ve OAuth istemci kimlikleri herkese açıktır).
  * Güvenlik Firestore kurallarıyla sağlanır (firestore.rules).
  */
+/**
+ * Hesap + bulut yedek özelliği. İlk sürüm "sadece telefonda" çalışır: hesap açılmaz,
+ * hiçbir veri cihazdan çıkmaz (KVKK yurt dışı aktarım, hesap silme, Apple ile giriş
+ * yükümlülükleri doğmaz). İleride açmak için true yap ve Firebase ayarlarını gir.
+ */
+export const CLOUD_ENABLED = false;
+
 export const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? '',
   authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? '',
@@ -19,5 +26,5 @@ export const googleClientIds = {
   androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ?? '',
 };
 
-export const isFirebaseConfigured = () => !!(firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId);
+export const isFirebaseConfigured = () => CLOUD_ENABLED && !!(firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId);
 export const isGoogleConfigured = () => !!(googleClientIds.webClientId && (googleClientIds.iosClientId || googleClientIds.androidClientId));

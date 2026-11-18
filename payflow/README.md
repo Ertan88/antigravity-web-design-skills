@@ -31,16 +31,16 @@ npm start         # telefonda Expo Go uygulamasıyla QR kodu okut
 | `src/store/` | Durum ağacı + AsyncStorage kalıcılığı, ana sayfa seçicileri, Zaman Nehri projeksiyonu, raporlar (Ödeme Sağlığı Skoru, aylık rapor, abonelik dedektörü, ev bütçesi), CSV/PDF çıktısı, örnek veri |
 | `src/notifications/` | Bildirim planı (3 gün / 1 gün / son gün + ekstre kesimi), kurulum, izin, Ödedim/Ertele butonları |
 | `src/auth/` | Kimlik doğrulama arayüzü, Firebase uygulaması, bulut yedek senkronu, Google düğmesi, Face ID kilidi |
-| `legal/`, `src/legal/` | Gizlilik Politikası, KVKK Aydınlatma Metni, Kullanım Koşulları (tek kaynak JSON → uygulama içi ekran + `docs/payflow` web sayfaları; `npm run legal`) |
+| `legal/`, `src/legal/` | Gizlilik Politikası, Kullanım Koşulları (tek kaynak JSON → uygulama içi ekran + `docs/payflow` web sayfaları; `npm run legal`) |
 | `src/features/` | Harcama ve fatura formları, kategori ızgarası, hatırlatma seçici |
 
 > Faiz hesapları **tahminidir**. Oranlar TCMB'nin aylık duyurusuna göre güncellenmelidir
 > (`src/core/finance/rates.ts`). Kullanıcı kart bazında kendi bankasının oranını girebilir.
 
-## Hesap ve bulut yedek (Firebase) kurulumu
+## Hesap ve bulut yedek (Firebase) — ileride
 
-Firebase ayarı girilmeden uygulama **hesapsız modda** çalışır (veriler yalnızca cihazda).
-Hesapları açmak için:
+Sürüm 1.0'da kapalı: `src/config/env.ts › CLOUD_ENABLED = false`, uygulama yalnızca cihazda çalışır
+(yedek: Ayarlar › Yedekle / Geri yükle). Açmak istersen önce `legal/README.md`'deki adımları oku, sonra:
 
 1. [Firebase Console](https://console.firebase.google.com)'da proje oluştur.
 2. **Authentication → Sign-in method**: *E-posta/Şifre* ve *Google* sağlayıcılarını aç.

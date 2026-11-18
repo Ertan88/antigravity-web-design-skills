@@ -5,7 +5,7 @@ import documents from '../../legal/documents.json';
  * Yasal metinler — tek kaynak `payflow/legal/*.json`.
  * Uygulama içi ekran ve web sayfaları (scripts/build-legal.mjs) aynı içerikten üretilir.
  */
-export type LegalDocId = 'privacy' | 'kvkk' | 'terms';
+export type LegalDocId = 'privacy' | 'terms';
 export type LegalBlock = { p: string } | { ul: string[] };
 export interface LegalSection {
   id: string;

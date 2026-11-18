@@ -43,9 +43,9 @@ footer{margin-top:40px;font-size:13px;color:var(--muted)}
 <body><main>
 <header><span class="logo" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0B1220" stroke-width="2.4" stroke-linecap="round"><path d="M3 9c3-5 6-5 9 0s6 5 9 0M3 16c3-5 6-5 9 0s6 5 9 0"/></svg></span><strong>${esc(controller.appName)}</strong></header>
 <nav>${nav}</nav>
-${draft ? '<p class="draft">Taslak: veri sorumlusu bilgileri henüz doldurulmadı.</p>' : ''}
+${draft ? '<p class="draft">Taslak: geliştirici bilgileri henüz doldurulmadı.</p>' : ''}
 ${body}
-<footer>${esc(controller.appName)} · ${t('{{controllerName}}')} · <a href="mailto:${t('{{contactEmail}}')}">${t('{{contactEmail}}')}</a></footer>
+<footer>${esc(controller.appName)} · ${t('{{developerName}}')} · <a href="mailto:${t('{{contactEmail}}')}">${t('{{contactEmail}}')}</a></footer>
 </main></body></html>
 `;
 
@@ -56,7 +56,7 @@ for (const d of Object.values(docs)) {
     d.sections
       .map(
         (s) =>
-          `<section id="${s.id}"${s.id === 'hesap-silme' ? ' class="card"' : ''}><h2>${t(s.heading)}</h2>` +
+          `<section id="${s.id}"${s.id === 'ozet' ? ' class="card"' : ''}><h2>${t(s.heading)}</h2>` +
           s.blocks.map((b) => ('p' in b ? `<p>${t(b.p)}</p>` : `<ul>${b.ul.map((li) => `<li>${t(li)}</li>`).join('')}</ul>`)).join('') +
           `</section>`,
       )
@@ -65,18 +65,5 @@ for (const d of Object.values(docs)) {
   console.log(`docs/payflow/${d.slug}.html`);
 }
 
-// Hesap silme için kısa yol (Google Play "hesap silme bağlantısı" alanı)
-const del = docs.privacy.sections.find((s) => s.id === 'hesap-silme');
-writeFileSync(
-  join(out, 'hesap-silme.html'),
-  page(
-    'Hesap ve veri silme',
-    `<h1>${esc(controller.appName)} — hesap ve veri silme</h1><section id="hesap-silme" class="card"><h2>${t(del.heading)}</h2>` +
-      del.blocks.map((b) => ('p' in b ? `<p>${t(b.p)}</p>` : `<ul>${b.ul.map((li) => `<li>${t(li)}</li>`).join('')}</ul>`)).join('') +
-      `</section><p>Ayrıntılar: <a href="gizlilik.html#hesap-silme">Gizlilik Politikası</a></p>`,
-  ),
-);
-console.log('docs/payflow/hesap-silme.html');
-
-writeFileSync(join(out, 'index.html'), page('Yasal metinler', `<h1>${esc(controller.appName)} — yasal metinler</h1><ul>${Object.values(docs).map((d) => `<li><a href="${d.slug}.html">${esc(d.title)}</a></li>`).join('')}<li><a href="hesap-silme.html">Hesap ve veri silme</a></li></ul>`));
+writeFileSync(join(out, 'index.html'), page('Yasal metinler', `<h1>${esc(controller.appName)} — yasal metinler</h1><ul>${Object.values(docs).map((d) => `<li><a href="${d.slug}.html">${esc(d.title)}</a></li>`).join('')}</ul>`));
 console.log('docs/payflow/index.html');

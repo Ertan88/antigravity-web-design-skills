@@ -157,7 +157,7 @@ describe('Kayıt', () => {
     expect(screen.getByText(/Kullanım Koşulları'nı kabul etmelisin/)).toBeTruthy();
     // Aydınlatma metni onaylatılmaz, yalnızca bildirilir (KVKK).
     expect(screen.queryByLabelText(/Aydınlatma Metni'ni okudum, kabul ediyorum/)).toBeNull();
-    expect(screen.getByText(/KVKK Aydınlatma Metni/)).toBeTruthy();
+    expect(screen.getByText(/Gizlilik Politikası/)).toBeTruthy();
 
     await fireEvent.changeText(screen.getByLabelText('Şifre tekrar'), 'Akis-2026!');
     await fireEvent(screen.getByLabelText("Kullanım Koşulları'nı kabul ediyorum"), 'valueChange', true);
