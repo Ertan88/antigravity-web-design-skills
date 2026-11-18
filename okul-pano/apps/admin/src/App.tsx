@@ -32,6 +32,7 @@ const Events = page(() => import('./pages/SchoolLife.tsx'), 'Events');
 const Books = page(() => import('./pages/SchoolLife.tsx'), 'Books');
 const Leaves = page(() => import('./pages/Leaves.tsx'), 'Leaves');
 const Me = page(() => import('./pages/Me.tsx'), 'Me');
+const PlatformHome = page(() => import('./pages/PlatformHome.tsx'), 'PlatformHome');
 const Platform = page(() => import('./pages/Platform.tsx'), 'Platform');
 const HolidayCalendar = page(() => import('./pages/HolidayCalendar.tsx'), 'HolidayCalendar');
 const NotificationsPage = page(() => import('./pages/NotificationsPage.tsx'), 'NotificationsPage');
@@ -92,7 +93,7 @@ export function App() {
     school ? (
       el
     ) : me.user.isSuperAdmin ? (
-      <Navigate to="/platform" replace />
+      <Navigate to="/" replace />
     ) : (
       <EmptyState
         icon={<SearchX className="size-6" />}
@@ -114,7 +115,8 @@ export function App() {
       <Route path="davet" element={<SignedInLink kind="invite" />} />
       <Route path="dogrula" element={<SignedInLink kind="verify" />} />
       <Route element={<Layout />}>
-        <Route index element={needsSchool(<Dashboard />)} />
+        {/* Platform yöneticisi (okul açık değilken) ana sayfada platformun yapılacaklarını görür */}
+        <Route index element={!school && me.user.isSuperAdmin ? <PlatformHome /> : needsSchool(<Dashboard />)} />
         <Route path="benim" element={needsSchool(<Me />)} />
         <Route path="duyurular" element={needsSchool(<Guard permission="announcements.manage"><Announcements /></Guard>)} />
         <Route path="kayan-yazi" element={needsSchool(<Guard permission="ticker.manage"><Ticker /></Guard>)} />

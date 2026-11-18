@@ -297,11 +297,16 @@ export async function schoolRoutes(app: FastifyInstance) {
     const own = new Set((await db.select({ id: memberships.schoolId }).from(memberships).where(eq(memberships.userId, accessUser(req).sub))).map((m) => m.id));
     const owners = await schoolOwners(app.deps);
     const now = Date.now();
+    // Çevrimiçi pano sayısı (cihaz bağlantısı; okulun içeriği değil)
+    const screenRows = await db.select({ id: screens.id, schoolId: screens.schoolId }).from(screens);
+    const online = new Map<string, number>();
+    for (const sc of screenRows) if (app.deps.bus.isOnline(sc.id)) online.set(sc.schoolId, (online.get(sc.schoolId) ?? 0) + 1);
     return rows.map((r) => ({
       ...publicSchool(r.school),
       // Okul müdürünün adı ve e-postası (müdürü değiştirmek için; okulun diğer verileri KVKK gereği kapalı)
       owner: owners.get(r.school.id) ?? null,
       screenCount: r.screens,
+      screensOnline: online.get(r.school.id) ?? 0,
       contactPhone: r.school.contactPhone,
       createdAt: r.school.createdAt,
       member: own.has(r.school.id),
