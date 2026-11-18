@@ -33,7 +33,16 @@ function addDays(iso: string, days: number): string {
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
 }
 
-/** Yılın resmi ve dini tatilleri: YYYY-AA-GG -> ad */
+/** Sabit tarihli resmî tatiller (dini bayramla aynı güne düşse de kendi adıyla): YYYY-AA-GG -> ad */
+export function fixedHolidays(year: number): [string, string][] {
+  return Object.entries(FIXED).map(([md, name]) => [`${year}-${md}`, name]);
+}
+
+/**
+ * Yılın resmi ve dini tatilleri: YYYY-AA-GG -> ad. Bir güne tek ad düşer; sabit tatil dini bayramın içine denk gelirse
+ * (ör. 19 Mayıs 2027 Kurban Bayramı'nın 4. günü) bayramın adı kalır. Takvim görünümü ikisini de göstermek için
+ * fixedHolidays'i ayrıca kullanır.
+ */
 export function officialHolidays(year: number): Map<string, string> {
   const out = new Map<string, string>();
   for (const [md, name] of Object.entries(FIXED)) out.set(`${year}-${md}`, name);

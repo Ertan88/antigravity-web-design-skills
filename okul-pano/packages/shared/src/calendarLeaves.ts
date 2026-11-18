@@ -1,5 +1,5 @@
 import { semesterBreak, summerBreak, type AcademicCalendarData } from './academicCalendar.ts';
-import { officialHolidays } from './holidays.ts';
+import { fixedHolidays, officialHolidays } from './holidays.ts';
 
 /*
  * MEB takvimi "takvim yaprakları" görünümü (C): eğitim yılının olayları sırayla, iki grupta (1. dönem, 2. dönem).
@@ -39,9 +39,12 @@ function lengthText(start: string, end: string) {
 function holidayRuns(startYear: number) {
   const from = `${startYear}-09-01`;
   const to = `${startYear + 1}-08-31`;
-  const all = [...officialHolidays(startYear), ...officialHolidays(startYear + 1)]
+  // Dini bayramlar ve sabit tatiller ayrı alınır: aynı güne düşen ikisi de görünsün (19 Mayıs 2027 = Kurban 4. gün)
+  const religious = [...officialHolidays(startYear), ...officialHolidays(startYear + 1)].filter(([, name]) => /Ramazan|Kurban/.test(name));
+  const fixed = [...fixedHolidays(startYear), ...fixedHolidays(startYear + 1)];
+  const all = [...religious, ...fixed]
     .filter(([d]) => d >= from && d <= to)
-    .sort(([a], [b]) => a.localeCompare(b));
+    .sort(([a, an], [b, bn]) => a.localeCompare(b) || an.localeCompare(bn));
   const runs: { name: string; start: string; end: string; eve?: string; religious: boolean }[] = [];
   const eves = new Map<string, string>();
   for (const [d, name] of all) {
@@ -50,8 +53,8 @@ function holidayRuns(startYear: number) {
       continue;
     }
     const base = name.replace(/ \d+\. Gün$/, '');
-    const last = runs.at(-1);
-    if (last && last.name === base && addDays(last.end, 1) === d) last.end = d;
+    const last = [...runs].reverse().find((r) => r.name === base);
+    if (last && addDays(last.end, 1) === d) last.end = d;
     else runs.push({ name: base, start: d, end: d, religious: /Ramazan|Kurban/.test(base) });
   }
   for (const r of runs) r.eve = eves.get(r.name);
@@ -78,13 +81,16 @@ export function calendarLeaves(data: AcademicCalendarData, startYear: number): C
       (b): CalendarLeaf => ({ key: `b-${b.start}`, kind: 'break', name: breakName(b.name), start: b.start, end: b.end, note: lengthText(b.start, b.end), group: groupOf(b.start) }),
     ),
   ];
-  for (const h of holidayRuns(startYear)) {
+  const runs = holidayRuns(startYear);
+  for (const h of runs) {
     const notes: string[] = [];
     if (h.end !== h.start) notes.push(lengthText(h.start, h.end));
     if (h.eve) notes.push(`arife ${dayMonth(h.eve)} öğleden sonra`);
     const inBreak = breaks.find((b) => h.start >= b.start && h.start <= b.end);
+    const inBayram = !h.religious && runs.find((r) => r.religious && h.start >= r.start && h.start <= r.end);
     const allWeekend = Array.from({ length: span(h.start, h.end) }, (_, i) => weekday(addDays(h.start, i))).every((w) => w === 0 || w === 6);
-    if (inBreak) notes.push(`${inBreak.name.toLocaleLowerCase('tr-TR').replace(/^birinci dönem /, '').replace(/^ikinci dönem /, '')} içinde`);
+    if (inBayram) notes.push(`${inBayram.name} içinde`);
+    else if (inBreak) notes.push(`${inBreak.name.toLocaleLowerCase('tr-TR').replace(/^birinci dönem /, '').replace(/^ikinci dönem /, '')} içinde`);
     else if (allWeekend) notes.push('hafta sonuna denk geliyor');
     leaves.push({ key: `h-${h.start}`, kind: h.religious ? 'religious' : 'official', name: h.name, start: h.start, ...(h.end !== h.start ? { end: h.end } : {}), note: notes.join(' · ') || undefined, group: groupOf(h.start) });
   }

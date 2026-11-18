@@ -39,5 +39,8 @@ describe('takvim yaprakları', () => {
     // Yaz tatilindeki günler
     expect(byName('Zafer Bayramı').note).toBe('yaz tatili içinde');
     expect(leaves.some((l) => l.name.includes('Arifesi'))).toBe(false);
+    // 19 Mayıs 2027 Kurban Bayramı'nın 4. günü: ikisi de görünür
+    expect(byName("Atatürk'ü Anma, Gençlik ve Spor Bayramı")).toMatchObject({ start: '2027-05-19', kind: 'official', note: 'Kurban Bayramı içinde' });
+    expect(byName('Kurban Bayramı').end).toBe('2027-05-19');
   });
 });
