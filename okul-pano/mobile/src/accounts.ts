@@ -12,6 +12,10 @@ export interface SavedAccount {
   kind: 'platform' | 'school';
   /** "Örnek Anadolu Lisesi · Öğretmen" */
   detail: string;
+  /** Okul adı türüyle ("Örnek Anadolu Lisesi"); eski kayıtlarda yok, detail kullanılır */
+  school?: string;
+  /** Ünvan ve branş ("Müdür Yardımcısı · Matematik") */
+  role?: string;
   /** Etkin olmayan hesabın yenileme anahtarı; null: yeniden giriş gerekir ya da etkin hesap */
   refresh: string | null;
 }

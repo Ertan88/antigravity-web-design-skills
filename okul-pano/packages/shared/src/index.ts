@@ -14,6 +14,7 @@ export * from './holidays.ts';
 export * from './schoolDay.ts';
 export * from './bellPlan.ts';
 export * from './academicCalendar.ts';
+export * from './calendarLeaves.ts';
 export * from './subscription.ts';
 export * from './layout.ts';
 export * from './themes.ts';

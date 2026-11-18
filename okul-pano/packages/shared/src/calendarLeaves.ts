@@ -1,8 +1,9 @@
-import { semesterBreak, summerBreak, type AcademicCalendarData } from './academicCalendar.ts';
+import { semesterBreak, type AcademicCalendarData } from './academicCalendar.ts';
 import { fixedHolidays, officialHolidays } from './holidays.ts';
 
 /*
  * MEB takvimi "takvim yaprakları" görünümü (C): eğitim yılının olayları sırayla, iki grupta (1. dönem, 2. dönem).
+ * Liste "Ders yılı biter" ile biter: yaz tatili ve içindeki resmî günler gösterilmez.
  * MEB tarihlerinin yanına resmî ve dini tatiller eklenir. Çok günlü bayramlar tek satırdır; arife (yarım gün) notta
  * yazar. Hafta sonuna ya da okul tatiline denk gelen bayram ayrıca belirtilir (ders günü kaybı olmaz).
  */
@@ -67,8 +68,7 @@ export const breakName = (name: string) =>
 
 export function calendarLeaves(data: AcademicCalendarData, startYear: number): CalendarLeaf[] {
   const sem = semesterBreak(data);
-  const summer = summerBreak(data, startYear);
-  const breaks = [...data.breaks.map((b) => ({ name: b.name, start: b.start, end: b.end })), { name: 'Yarıyıl tatili', ...sem }, { name: 'Yaz tatili', ...summer }];
+  const breaks = [...data.breaks.map((b) => ({ name: b.name, start: b.start, end: b.end })), { name: 'Yarıyıl tatili', ...sem }];
   const groupOf = (iso: string): 1 | 2 => (iso < data.term2Start ? 1 : 2);
   const leaves: CalendarLeaf[] = [
     { key: 'start', kind: 'term', name: 'Dersler başlar', start: data.lessonsStart, group: 1 },
@@ -76,12 +76,12 @@ export function calendarLeaves(data: AcademicCalendarData, startYear: number): C
     { key: 'sem', kind: 'break', name: 'Yarıyıl tatili', start: sem.start, end: sem.end, note: lengthText(sem.start, sem.end), group: 1 },
     { key: 't2', kind: 'term', name: '2. dönem başlar', start: data.term2Start, group: 2 },
     { key: 'end', kind: 'term', name: 'Ders yılı biter', start: data.lessonsEnd, group: 2 },
-    { key: 'summer', kind: 'summer', name: 'Yaz tatili', start: summer.start, end: summer.end, group: 2 },
     ...data.breaks.map(
       (b): CalendarLeaf => ({ key: `b-${b.start}`, kind: 'break', name: breakName(b.name), start: b.start, end: b.end, note: lengthText(b.start, b.end), group: groupOf(b.start) }),
     ),
   ];
-  const runs = holidayRuns(startYear);
+  // Yaz tatili ve içindeki günler listede yer almaz (ders yılı biter son olaydır); tatil hesabı (zil, pano) bundan etkilenmez
+  const runs = holidayRuns(startYear).filter((h) => h.start <= data.lessonsEnd);
   for (const h of runs) {
     const notes: string[] = [];
     if (h.end !== h.start) notes.push(lengthText(h.start, h.end));

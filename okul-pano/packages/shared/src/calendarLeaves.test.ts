@@ -36,8 +36,9 @@ describe('takvim yaprakları', () => {
     expect(cumhuriyet.note).toContain('arife 28 Ekim');
     // 1 Mayıs 2027 cumartesi
     expect(byName('Emek ve Dayanışma Günü').note).toBe('hafta sonuna denk geliyor');
-    // Yaz tatilindeki günler
-    expect(byName('Zafer Bayramı').note).toBe('yaz tatili içinde');
+    // Yaz tatili ve içindeki günler listede yok; son olay ders yılının bitişi
+    expect(leaves.find((l) => l.name === 'Zafer Bayramı' || l.name === 'Yaz tatili')).toBeUndefined();
+    expect(leaves.at(-1)!.name).toBe('Ders yılı biter');
     expect(leaves.some((l) => l.name.includes('Arifesi'))).toBe(false);
     // 19 Mayıs 2027 Kurban Bayramı'nın 4. günü: ikisi de görünür
     expect(byName("Atatürk'ü Anma, Gençlik ve Spor Bayramı")).toMatchObject({ start: '2027-05-19', kind: 'official', note: 'Kurban Bayramı içinde' });

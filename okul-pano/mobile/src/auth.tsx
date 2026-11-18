@@ -23,6 +23,8 @@ export interface SchoolAccess {
   schoolType?: string | null;
   /** Öğretmen kadrosundaki ünvan (Müdür Yardımcısı, Uzman Öğretmen…) */
   teacherTitle?: string | null;
+  /** Kadrodaki branş */
+  teacherBranch?: string | null;
   /** Meslek öğretmeni (branşı meslek alanı ya da işletme dersi var) */
   vocational?: boolean;
   /** Üyelik yok, okulun (müdürün) verdiği süreli destek erişimi (platform yöneticisi) */
@@ -338,6 +340,13 @@ function accountMeta(data: Me): Omit<SavedAccount, 'server' | 'refresh'> {
     fullName: data.user.fullName,
     kind: data.user.isSuperAdmin ? 'platform' : 'school',
     detail: data.user.isSuperAdmin ? 'Platform yöneticisi' : own.map((s) => `${schoolFullName(s.name, s.schoolType)} · ${membershipLabel(s)}`).join(', '),
+    // Hesap geçiş ekranında: okul adı (türüyle) ayrı satırda, altında ünvan ve branş
+    ...(own[0]
+      ? {
+          school: schoolFullName(own[0].name, own[0].schoolType) + (own.length > 1 ? ` +${own.length - 1} okul` : ''),
+          role: [membershipLabel(own[0]), own[0].teacherBranch].filter(Boolean).join(' · '),
+        }
+      : {}),
   };
 }
 

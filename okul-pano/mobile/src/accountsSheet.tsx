@@ -42,7 +42,7 @@ export function AccountRow({
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ selected: active, busy }}
-        accessibilityLabel={`${a.fullName}, ${a.kind === 'platform' ? 'platform hesabı' : 'okul hesabı'}${compact ? '' : `, ${a.email}`}${active ? ', etkin hesap' : ''}`}
+        accessibilityLabel={`${a.fullName}, ${a.kind === 'platform' ? 'platform hesabı' : 'okul hesabı'}${compact ? '' : `, ${a.email}${a.school ? `, ${a.school}` : ''}${a.role ? `, ${a.role}` : ''}`}${active ? ', etkin hesap' : ''}`}
         onPress={onPress}
         disabled={active || busy}
         style={({ pressed }) => ({
@@ -69,7 +69,18 @@ export function AccountRow({
           <T size={12.5} color={colors.muted} lines={1}>
             {compact ? maskEmail(a.email) : a.email}
           </T>
-          {!compact && a.kind === 'school' && a.detail ? (
+          {!compact && a.kind === 'school' && a.school ? (
+            <View style={{ marginTop: 3, gap: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.ink }} numberOfLines={2}>
+                {a.school}
+              </Text>
+              {a.role ? (
+                <T size={12.5} color={colors.muted} lines={1}>
+                  {a.role}
+                </T>
+              ) : null}
+            </View>
+          ) : !compact && a.kind === 'school' && a.detail ? (
             <T size={12.5} color={colors.faint} lines={2}>
               {a.detail}
             </T>

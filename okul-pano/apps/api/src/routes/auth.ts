@@ -214,6 +214,23 @@ export async function authRoutes(app: FastifyInstance) {
     return { session, user };
   }
 
+  /** Okul hesabının ilk üyeliği: okul adı (türüyle), kadrodaki ünvan ve branş (hesap geçiş düğmesinde) */
+  async function firstMembership(userId: string) {
+    const [row] = await db
+      .select({ name: schools.name, settings: schools.settings, role: memberships.role, title: teacherTitles.name, branch: teacherBranches.name })
+      .from(memberships)
+      .innerJoin(schools, eq(schools.id, memberships.schoolId))
+      .leftJoin(teachers, eq(teachers.id, memberships.teacherId))
+      .leftJoin(teacherTitles, eq(teacherTitles.id, teachers.titleId))
+      .leftJoin(teacherBranches, eq(teacherBranches.id, teachers.branchId))
+      .where(eq(memberships.userId, userId))
+      .orderBy(asc(memberships.createdAt))
+      .limit(1);
+    if (!row) return null;
+    const roleLabel = row.role === 'owner' ? 'Okul müdürü' : row.role === 'admin' ? 'Yönetici' : null;
+    return { schoolName: schoolFullName(row.name, row.settings?.schoolType), title: row.title?.trim() || roleLabel, branch: row.branch?.trim() || null };
+  }
+
   /** Okul hesabının ilk okulu (türüyle) ya da hiç üyeliği yoksa null */
   async function firstSchoolName(userId: string) {
     const [row] = await db
@@ -250,7 +267,7 @@ export async function authRoutes(app: FastifyInstance) {
       side: found.side,
       linked: true,
       name: other?.fullName ?? '',
-      schoolName: await firstSchoolName(found.link.schoolUserId),
+      ...((await firstMembership(found.link.schoolUserId)) ?? { schoolName: null, title: null, branch: null }),
       needsPassword: Date.now() - found.link.verifiedAt.getTime() > LINK_FRESH_MS,
     };
   }
@@ -381,7 +398,7 @@ export async function authRoutes(app: FastifyInstance) {
     // Öğretmen kaydına bağlı üyelikler: kadrodaki ünvan (ör. Müdür Yardımcısı) ve meslek öğretmeni mi
     // (branşı meslek alanı ya da programında işletmelerde mesleki eğitim dersi var)
     const teacherIds = rows.map((r) => r.teacherId).filter((x): x is string => Boolean(x));
-    const info = new Map<string, { title: string | null; vocational: boolean }>();
+    const info = new Map<string, { title: string | null; branch: string | null; vocational: boolean }>();
     if (teacherIds.length) {
       const [rowsT, internship] = await Promise.all([
         db
@@ -399,6 +416,7 @@ export async function authRoutes(app: FastifyInstance) {
       for (const t of rowsT)
         info.set(t.id, {
           title: t.title?.trim() || null,
+          branch: t.branchName?.trim() || null,
           vocational: (t.branchName ? branchIsVocational({ name: t.branchName, vocational: t.branchVocational }) : false) || teachesInternship.has(t.id),
         });
     }
@@ -420,6 +438,8 @@ export async function authRoutes(app: FastifyInstance) {
         teacherId: r.teacherId,
         /** Öğretmen kadrosundaki ünvan (Müdür Yardımcısı, Uzman Öğretmen…); kayıt yoksa ya da ünvan girilmemişse null */
         teacherTitle: r.teacherId ? (info.get(r.teacherId)?.title ?? null) : null,
+        /** Kadrodaki branş (hesap geçiş ekranında ünvanla birlikte) */
+        teacherBranch: r.teacherId ? (info.get(r.teacherId)?.branch ?? null) : null,
         /** Meslek öğretmeni: branşı meslek alanı ya da işletmelerde mesleki eğitim dersi var */
         vocational: r.teacherId ? (info.get(r.teacherId)?.vocational ?? false) : false,
         /** Üyelik yok, okulun verdiği süreli destek erişimi */

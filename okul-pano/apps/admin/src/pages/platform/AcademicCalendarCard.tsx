@@ -1,4 +1,4 @@
-import { semesterBreak, summerBreak, type AcademicCalendarData } from '@okulpano/shared';
+import { calendarLeaves, semesterBreak, type AcademicCalendarData, type LeafKind } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarRange, Check, ExternalLink, Pencil, Plus, RefreshCw, Trash2, X } from '../../components/icons.tsx';
 import { useState } from 'react';
@@ -35,7 +35,7 @@ const SOURCE: Record<CalendarRow['source'], { label: string; tone: 'green' | 'bl
 
 /** Takvimin satır satır özeti (karşılaştırmada da kullanılır) */
 function Summary({ data, startYear }: { data: AcademicCalendarData; startYear: number }) {
-  const summer = summerBreak(data, startYear);
+  void startYear;
   const rows: [string, string][] = [
     ['Dersler başlar', d(data.lessonsStart)],
     ...data.breaks.filter((b) => b.start < data.term1End).map((b): [string, string] => [b.name, span(b.start, b.end)]),
@@ -44,7 +44,6 @@ function Summary({ data, startYear }: { data: AcademicCalendarData; startYear: n
     ['İkinci dönem başlar', d(data.term2Start)],
     ...data.breaks.filter((b) => b.start > data.term1End).map((b): [string, string] => [b.name, span(b.start, b.end)]),
     ['Ders yılı biter', d(data.lessonsEnd)],
-    ['Yaz tatili', span(summer.start, summer.end)],
   ];
   return (
     <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
@@ -55,6 +54,82 @@ function Summary({ data, startYear }: { data: AcademicCalendarData; startYear: n
         </div>
       ))}
     </dl>
+  );
+}
+
+const MONTHS_SHORT = ['', 'OCA', 'ŞUB', 'MAR', 'NİS', 'MAY', 'HAZ', 'TEM', 'AĞU', 'EYL', 'EKİ', 'KAS', 'ARA'];
+const MONTHS = ['', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+const WEEKDAYS = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+const dmText = (iso: string) => `${Number(iso.slice(8))} ${MONTHS[Number(iso.slice(5, 7))]}`;
+const rangeText = (a: string, b: string) => (a.slice(5, 7) === b.slice(5, 7) ? `${Number(a.slice(8))}–${dmText(b)}` : `${dmText(a)} – ${dmText(b)}`);
+const LEAF_TONE: Record<LeafKind, string> = {
+  term: 'bg-tile-sky text-tile-sky-ink',
+  break: 'bg-tile-mint text-tile-mint-ink',
+  summer: 'bg-tile-sun text-tile-sun-ink',
+  official: 'bg-tile-rose text-tile-rose-ink',
+  religious: 'bg-tile-lilac text-tile-lilac-ink',
+};
+const LEGEND: [LeafKind, string][] = [
+  ['term', 'Ders'],
+  ['break', 'Okul tatili'],
+  ['official', 'Resmî tatil'],
+  ['religious', 'Dini bayram'],
+];
+const todayIso = () => new Date().toISOString().slice(0, 10);
+
+/**
+ * Takvim yaprakları (mobil ile aynı, C): 1. ve 2. dönem yan yana; her olayın solunda gün-ay yaprağı. MEB tarihlerine
+ * resmî ve dini tatiller eklenir. Geçenler listede kalır, soluk görünür; süren olay "Şu an", yalnızca sıradaki tatilde
+ * kaç gün kaldığı rozetle yazar. Liste "Ders yılı biter" ile biter (yaz tatili gösterilmez).
+ */
+function Leaves({ data, startYear }: { data: AcademicCalendarData; startYear: number }) {
+  const t = todayIso();
+  const leaves = calendarLeaves(data, startYear);
+  const next = leaves.find((l) => l.kind !== 'term' && l.start > t);
+  const nextIn = next ? Math.round((Date.parse(next.start) - Date.parse(t)) / 86400_000) : 0;
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-1.5">
+        {LEGEND.map(([k, label]) => (
+          <span key={k} className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${LEAF_TONE[k]}`}>
+            {label}
+          </span>
+        ))}
+      </div>
+      <div className="grid gap-3 xl:grid-cols-2">
+        {([1, 2] as const).map((g) => (
+          <div key={g} className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10">
+            <div className="mb-1 text-xs font-extrabold tracking-wide text-slate-500">{g === 1 ? '1. DÖNEM' : '2. DÖNEM'}</div>
+            <ul className="divide-y divide-slate-200/70 dark:divide-white/10">
+              {leaves
+                .filter((l) => l.group === g)
+                .map((l) => {
+                  const end = l.end ?? l.start;
+                  const past = end < t;
+                  const now = l.start <= t && t <= end;
+                  const sub = l.end ? [rangeText(l.start, l.end), l.note].filter(Boolean).join(' · ') : [WEEKDAYS[new Date(`${l.start}T12:00:00Z`).getUTCDay()], l.note].filter(Boolean).join(' · ');
+                  return (
+                    <li key={l.key} className={`flex items-center gap-3 py-2 ${past ? 'opacity-60' : ''}`}>
+                      <div className={`flex w-12 shrink-0 flex-col items-center rounded-xl py-1 ${LEAF_TONE[l.kind]}`}>
+                        <span className="text-lg leading-tight font-extrabold">{Number(l.start.slice(8))}</span>
+                        <span className="text-[10px] font-extrabold">{MONTHS_SHORT[Number(l.start.slice(5, 7))]}</span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5 text-sm font-bold text-ink">
+                          {l.name}
+                          {now && <Badge tone="green">Şu an</Badge>}
+                          {l === next && <Badge tone="blue">{nextIn === 1 ? 'Yarın' : `${nextIn} gün sonra`}</Badge>}
+                        </div>
+                        <div className="text-xs text-slate-500">{sub}</div>
+                      </div>
+                    </li>
+                  );
+                })}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -154,7 +229,7 @@ export function AcademicCalendarCard() {
               {r.checkedAt && <div className="text-xs text-slate-400">Son tarama: {formatDateTime(r.checkedAt)}</div>}
             </div>
             <div className="min-w-0 space-y-3">
-              <Summary data={r.data} startYear={r.startYear} />
+              <Leaves data={r.data} startYear={r.startYear} />
               {r.pending && (
                 <div className="rounded-xl bg-amber-50 p-3 ring-1 ring-amber-200">
                   <div className="mb-2 text-sm font-semibold text-amber-900">MEB duyurusunda farklı tarihler bulundu — onaylarsanız bunlar uygulanır:</div>

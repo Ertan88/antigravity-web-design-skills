@@ -1,3 +1,4 @@
+import { SUMMER_BREAK } from '@okulpano/shared/academicCalendar';
 import { View } from 'react-native';
 import { useUpcomingHolidays, type HolidayList } from '../src/data.ts';
 import { addDays, dateSpan, dayTitle, fullDate, localIso } from '../src/day.ts';
@@ -22,6 +23,8 @@ const groupName = (name: string) => name.replace(/ \d+\. Gün$/, '');
 function group(list: HolidayList['holidays']) {
   const out: Extract<Entry, { kind: 'holiday' }>[] = [];
   for (const h of list) {
+    // Yaz tatili listede gösterilmez (ders yılı bitince bütün yaz tatildir; günler hesapta tatil sayılmaya devam eder)
+    if (h.name === SUMMER_BREAK) continue;
     const last = out[out.length - 1];
     if (last && last.source === h.source && groupName(last.name) === groupName(h.name) && addDays(last.end, 1) === h.date) {
       last.end = h.date;

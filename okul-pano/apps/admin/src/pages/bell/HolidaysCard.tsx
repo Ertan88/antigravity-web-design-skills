@@ -1,4 +1,4 @@
-import { academicYearOf, semesterBreak, type AcademicCalendarData } from '@okulpano/shared';
+import { academicYearOf, semesterBreak, SUMMER_BREAK, type AcademicCalendarData } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { CalendarDays, CalendarPlus, GraduationCap, Plus, Sunset, Trash2 } from '../../components/icons.tsx';
@@ -63,6 +63,8 @@ const groupName = (name: string) => name.replace(/ \d+\. Gün$/, '');
 function groupHolidays(list: Upcoming['holidays']): Extract<Row, { kind: 'holiday' }>[] {
   const out: Extract<Row, { kind: 'holiday' }>[] = [];
   for (const h of list) {
+    // Yaz tatili listede gösterilmez (günler hesapta tatil sayılmaya devam eder)
+    if (h.name === SUMMER_BREAK) continue;
     const last = out[out.length - 1];
     if (last && h.source !== 'school' && last.source === h.source && groupName(last.name) === groupName(h.name) && nextDay(last.end ?? last.date) === h.date) {
       last.end = h.date;
@@ -268,7 +270,7 @@ const dm = formatDate;
 
 /**
  * Eğitim yılının MEB takvimi (bu ve varsa gelecek yıl): ders başlangıcı, ara tatiller, yarıyıl, ders yılı sonu.
- * Okul "MEB takvimini uygula"yı kapatırsa ara tatil, yarıyıl ve yaz tatili okulda tatil sayılmaz.
+ * Okul "MEB takvimini uygula"yı kapatırsa MEB takvimindeki tatiller (ara tatil, yarıyıl, yaz) okulda tatil sayılmaz.
  */
 function AcademicYearBox({ canSettings }: { canSettings: boolean }) {
   const { schoolId } = useAuth();
@@ -322,7 +324,7 @@ function AcademicYearBox({ canSettings }: { canSettings: boolean }) {
         <p className="mt-2 text-xs text-slate-600">Bu eğitim yılının takvimi henüz yayımlanmadı. MEB yayımlayınca kendiliğinden eklenir.</p>
       )}
       <div className="mt-3 border-t border-emerald-200 pt-2">
-        <Toggle checked={cal.data.follow} disabled={!canSettings} onChange={(v) => toggle.mutate(v)} label="Ara tatil, yarıyıl ve yaz tatilini uygula" />
+        <Toggle checked={cal.data.follow} disabled={!canSettings} onChange={(v) => toggle.mutate(v)} label="MEB takvimindeki tatilleri uygula" />
       </div>
       <p className="mt-1 text-[11px] text-slate-500">Takvim her yıl haziran ortasından itibaren MEB'in sitesinden otomatik alınır.</p>
     </div>

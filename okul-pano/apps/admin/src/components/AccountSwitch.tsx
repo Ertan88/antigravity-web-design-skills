@@ -16,6 +16,9 @@ export interface LinkStatus {
   linked: boolean;
   name?: string;
   schoolName?: string | null;
+  /** Okul hesabının kadrodaki ünvanı (yoksa müdür/yönetici) ve branşı */
+  title?: string | null;
+  branch?: string | null;
   needsPassword?: boolean;
 }
 
@@ -108,7 +111,12 @@ export function AccountSwitchButton() {
           <span className="block truncate text-sm font-semibold text-ink">
             {toSchool ? (status.linked ? 'Okul hesabıma geç' : 'Okul hesabımı bağla') : 'Platform hesabına dön'}
           </span>
-          {toSchool && status.linked && status.schoolName && <span className="block truncate text-xs text-slate-500">{status.schoolName}</span>}
+          {toSchool && status.linked && status.schoolName && (
+            <>
+              <span className="mt-0.5 block text-[13px] leading-snug font-semibold text-slate-700 dark:text-slate-200">{status.schoolName}</span>
+              {(status.title || status.branch) && <span className="block truncate text-xs text-slate-500">{[status.title, status.branch].filter(Boolean).join(' · ')}</span>}
+            </>
+          )}
         </span>
       </button>
       <ReauthDialog open={askPassword} onClose={() => setAskPassword(false)} onSubmit={doSwitch} />
@@ -256,7 +264,8 @@ export function LinkedAccountCard() {
         <div className="flex flex-wrap items-center gap-3">
           <div className="min-w-0 flex-1 text-sm">
             <div className="font-semibold text-ink">{status.name}</div>
-            {status.schoolName && <div className="text-slate-500">{status.schoolName}</div>}
+            {status.schoolName && <div className="font-semibold text-slate-700 dark:text-slate-200">{status.schoolName}</div>}
+            {(status.title || status.branch) && <div className="text-slate-500">{[status.title, status.branch].filter(Boolean).join(' · ')}</div>}
           </div>
           <Button variant="delete" loading={busy} onClick={() => void unlink()}>
             Bağlantıyı kaldır

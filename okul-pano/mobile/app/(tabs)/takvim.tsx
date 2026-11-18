@@ -1,4 +1,4 @@
-import { academicYearLabel, academicYearOf, semesterBreak, summerBreak, type AcademicCalendarData } from '@okulpano/shared/academicCalendar';
+import { academicYearLabel, academicYearOf, semesterBreak, type AcademicCalendarData } from '@okulpano/shared/academicCalendar';
 import { breakName, calendarLeaves, type LeafKind } from '@okulpano/shared/calendarLeaves';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -17,7 +17,6 @@ type Row = { key: string; label: string; value: string };
 /** Onay kartı için satır satır özet (eski ve yeni tarihler yan yana): tarihler kısaltmasız */
 function rowsOf(data: AcademicCalendarData, startYear: number): Row[] {
   const sem = semesterBreak(data);
-  const summer = summerBreak(data, startYear);
   const brk = (b: AcademicCalendarData['breaks'][number]): Row => ({ key: `b-${b.name}`, label: b.name, value: dateSpan(b.start, b.end) });
   return [
     { key: 'start', label: 'Dersler başlar', value: fullDate(data.lessonsStart) },
@@ -27,7 +26,6 @@ function rowsOf(data: AcademicCalendarData, startYear: number): Row[] {
     { key: 't2', label: 'İkinci dönem başlar', value: fullDate(data.term2Start) },
     ...data.breaks.filter((b) => b.start > data.term1End).map(brk),
     { key: 'end', label: 'Ders yılı biter', value: fullDate(data.lessonsEnd) },
-    { key: 'summer', label: 'Yaz tatili', value: dateSpan(summer.start, summer.end) },
   ];
 }
 
@@ -40,8 +38,8 @@ type Now = { title: string; until: string | null; next: { name: string; inDays: 
 /** Bugün eğitim yılının neresinde: dönem ya da tatil, bitişi, sonraki tatil ve geçen süre */
 function nowOf(data: AcademicCalendarData, startYear: number, t: string): Now {
   const sem = semesterBreak(data);
-  const summer = summerBreak(data, startYear);
-  const holidays = [...data.breaks.map((b) => ({ name: breakName(b.name), start: b.start, end: b.end })), { name: 'Yarıyıl tatili', ...sem }, { name: 'Yaz tatili', ...summer }].sort((a, b) =>
+  // Yaz tatili ayrıca adlandırılmaz: ders yılı bitince "Ders yılı bitti"
+  const holidays = [...data.breaks.map((b) => ({ name: breakName(b.name), start: b.start, end: b.end })), { name: 'Yarıyıl tatili', ...sem }].sort((a, b) =>
     a.start.localeCompare(b.start),
   );
   const inHoliday = holidays.find((h) => h.start <= t && t <= h.end);
@@ -261,7 +259,7 @@ function DatesCard({ c, scanning, onScan }: { c: CalendarRow; scanning: boolean;
       {([1, 2] as const).map((g) => (
         <Card key={g} style={{ paddingVertical: 6, gap: 0 }}>
           <T size={11.5} weight="800" color={colors.muted} style={{ paddingTop: 6, paddingBottom: 2, letterSpacing: 0.4 }}>
-            {g === 1 ? '1. DÖNEM' : '2. DÖNEM VE YAZ'}
+            {g === 1 ? '1. DÖNEM' : '2. DÖNEM'}
           </T>
           {leaves
             .filter((l) => l.group === g)
