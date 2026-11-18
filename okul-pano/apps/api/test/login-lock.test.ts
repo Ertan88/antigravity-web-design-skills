@@ -25,6 +25,16 @@ describe('giriş güvenliği', () => {
     expect((await tryLogin('baska@ornek.test', 'yanlis-sifre')).statusCode).toBe(401);
   });
 
+  it('aynı ağdan farklı hesaplarla dakikada 10 girişten fazlası yapılabilir (sınır adres + e-posta başına)', async () => {
+    const codes: number[] = [];
+    for (let i = 0; i < 14; i++) codes.push((await t.app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: `ogr${i}@ornek.test`, password: 'yanlis-sifre' } })).statusCode);
+    expect(codes.every((c) => c === 401)).toBe(true);
+    // Aynı e-postayla 10'dan fazlası sınıra takılır
+    const same: number[] = [];
+    for (let i = 0; i < 12; i++) same.push((await t.app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'tek@ornek.test', password: 'yanlis-sifre' } })).statusCode);
+    expect(same).toContain(429);
+  });
+
   it('kilit sunucu yeniden başlayınca da sürer; veritabanında e-posta değil özeti tutulur', async () => {
     // Aynı veritabanıyla yeni bir sunucu (yeniden başlama ya da ikinci kopya)
     const again = await buildApp({ database: t.database, env: { NODE_ENV: 'test', UPLOAD_DIR: t.uploadDir }, logger: false });

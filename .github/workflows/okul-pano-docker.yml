@@ -4,6 +4,10 @@ name: Okul Pano · Docker imajı
 
 on:
   workflow_dispatch:
+  # Haftalık yedek/geri yükleme sınaması (uydurma veriyle). GitHub zamanlanmış işleri yalnızca ana daldan çalıştırır:
+  # bu dal ana dala alınana kadar sınama her gönderimde çalışır.
+  schedule:
+    - cron: '37 2 * * 1'
   push:
     branches: [claude/okul-dijital-pano-4oao0y]
     paths:
@@ -55,6 +59,21 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' -X POST localhost:3000/api/auth/login -H 'content-type: application/json' \
             -d '{"email":"mudur@okulpano.local","password":"Mudur2026!"}')" = 401
           echo "eski şifre reddedildi"
+      - name: Tarayıcı testleri (giriş, panel, iki adımlı doğrulama, hesap geçişi, pano, uygulama)
+        run: |
+          npm install --no-save --prefix /tmp/pw playwright@1.49.1
+          npx --prefix /tmp/pw playwright install --with-deps chromium
+          PLAYWRIGHT_PATH=/tmp/pw/node_modules/playwright/index.js BASE_URL=http://localhost:3000 \
+            ADMIN_EMAIL=ci@ornek.com ADMIN_PASSWORD=Ci-Deneme-2026 MUDUR_PASSWORD=Ci-Deneme-2026 OGRETMEN_PASSWORD=Ci-Deneme-2026 \
+            node okul-pano/e2e/smoke.mjs
+      - name: Tarayıcı testi hata görüntüleri (yalnızca örnek veri)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-hata
+          path: e2e-hata
+          retention-days: 7
+          if-no-files-found: ignore
       - name: Sunucu kaydı
         if: always()
         run: docker logs app 2>&1 | grep -v '"level":30' | tail -40 || true
@@ -76,9 +95,28 @@ jobs:
           sudo ls -la /opt/okul-pano/yedekler
           test -f /etc/cron.d/okul-pano
           echo "gece yedeği zamanlandı"
+          cd /opt/okul-pano
+          # Yedeğin bütünlüğü: uygulama durdurulur, yedek alınır, yedek ayrı bir veritabanına açılır ve BÜTÜN tabloların
+          # satır sayıları kaynakla karşılaştırılır (veriler örnek kurulumun uydurma verileridir)
+          sudo docker compose stop app
+          sudo ./yedekle.sh
+          son=$(sudo ls -t yedekler | head -1)
+          sayim() {
+            sudo docker compose exec -T db psql -U okulpano -d "$1" -tA -F' ' -c "select table_name, (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from public.%I', table_name), false, true, '')))[1]::text from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE' order by 1"
+          }
+          sayim okulpano > /tmp/kaynak.txt
+          sudo docker compose exec -T db createdb -U okulpano yedek_kontrol
+          sudo cat "yedekler/$son" | sudo docker compose exec -T db pg_restore -U okulpano -d yedek_kontrol --no-owner
+          sayim yedek_kontrol > /tmp/yedek.txt
+          if ! diff -u /tmp/kaynak.txt /tmp/yedek.txt; then echo "HATA: yedekten açılan veritabanı kaynakla aynı değil"; exit 1; fi
+          dolu=$(awk '$2 > 0' /tmp/kaynak.txt | wc -l)
+          if [ "$dolu" -lt 10 ]; then echo "HATA: örnek veri eksik ($dolu dolu tablo)"; exit 1; fi
+          echo "yedek bütünlüğü tamam: $(wc -l < /tmp/kaynak.txt) tablo, $dolu tablo dolu, satır sayıları aynı"
+          sudo docker compose exec -T db dropdb -U okulpano yedek_kontrol
+          sudo docker compose start app
+          for i in $(seq 1 60); do curl -fsk https://localhost/api/health >/dev/null && break; sleep 2; done
           # Geri yükleme: veriyi sil, yedeği yükle, geri geldiğini gör
           f=$(sudo ls /opt/okul-pano/yedekler | head -1)
-          cd /opt/okul-pano
           count() { sudo docker compose exec -T db psql -U okulpano -d okulpano -tAc 'select count(*) from announcements'; }
           before=$(count)
           sudo docker compose exec -T db psql -U okulpano -d okulpano -c 'delete from announcements'

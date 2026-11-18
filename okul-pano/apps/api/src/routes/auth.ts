@@ -70,6 +70,9 @@ export async function authRoutes(app: FastifyInstance) {
         rateLimit: {
           max: 10,
           timeWindow: '1 minute',
+          // Sınır gövde okunduktan sonra uygulanır: anahtardaki e-posta ancak o zaman bilinir. (Varsayılan onRequest'te
+          // gövde henüz yoktur; anahtar yalnızca adres olur ve aynı okul ağındaki herkes dakikada toplam 10 girişle kalırdı.)
+          hook: 'preHandler',
           keyGenerator: (req: FastifyRequest) => `${req.ip}|${String((req.body as { email?: unknown } | undefined)?.email ?? '').toLowerCase().slice(0, 200)}`,
         },
       },

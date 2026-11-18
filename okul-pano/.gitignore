@@ -5,3 +5,4 @@ uploads/
 .env
 *.log
 coverage/
+e2e-hata/

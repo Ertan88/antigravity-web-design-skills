@@ -249,6 +249,14 @@ Zayıf TV işlemcilerinde edinilen dersler:
 - Teslimden önce: `tsc` (api, admin, display, mobile), API ve shared testleri temiz geçer.
 - Arayüz değişikliği mobil web ya da panelde, uydurma veriyle, açık ve koyu temada ekran görüntüsüyle kontrol edilir.
 - Gerçek cihazda (telefon, TV) denenmeyen davranış "denendi" diye bildirilmez; neyin denendiği açıkça yazılır.
+- **Tarayıcı testleri** (`e2e/smoke.mjs`): her gönderimde Docker iş akışında, örnek okulla (uydurma veri) çalışır:
+  müdür girişi ve panel sayfaları, Güvenlik ve oturumlar, platform hesabında zorunlu iki adımlı doğrulama, kodla giriş
+  ve cihazı hatırla, hesap bağlama ve geçiş, pano, uygulamanın web sürümü. Yeni temel akış eklenince buraya da eklenir.
+  Yerelde: `BASE_URL=http://localhost:3000 node e2e/smoke.mjs` (temiz örnek veritabanıyla).
+- **Yedek sınaması:** Docker iş akışı kurulum betiğiyle örnek okulu kurar, yedek alır, yedeği ayrı bir veritabanına
+  açıp bütün tabloların satır sayılarını kaynakla karşılaştırır ve `geri-yukle.sh` ile silinen veriyi geri getirir.
+  Haftalık zamanlama ana dalda çalışır. Gerçek okul verisi GitHub'a gönderilmez (KVKK, yurt dışına aktarım); canlı
+  verinin yedeği barındırma tarafında alınır (Neon geçmişi ya da VPS gece yedeği).
 
 ---
 
