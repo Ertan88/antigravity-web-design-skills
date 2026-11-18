@@ -35,7 +35,7 @@ function splitMoney(text: string) {
 }
 
 export default function HomeScreen() {
-  const { palette, mode, setMode } = useTheme();
+  const { palette } = useTheme();
   const { state, dispatch } = useStore();
   const { permission, request } = useNotifications();
   const insets = useSafeAreaInsets();
@@ -44,22 +44,7 @@ export default function HomeScreen() {
   const [whole, cents] = splitMoney(formatTL(s.monthTotal));
   const g = s.byGroup;
 
-  const openProfile = () =>
-    Alert.alert('Ayarlar', `Tema: ${mode === 'system' ? 'Sistem' : mode === 'dark' ? 'Koyu' : 'Açık'}`, [
-      { text: 'Sistem teması', onPress: () => setMode('system') },
-      { text: 'Koyu tema', onPress: () => setMode('dark') },
-      { text: 'Açık tema', onPress: () => setMode('light') },
-      {
-        text: 'Tüm verileri sil',
-        style: 'destructive',
-        onPress: () =>
-          Alert.alert('Emin misin?', 'Kartlar, faturalar ve harcamalar bu cihazdan silinir.', [
-            { text: 'Vazgeç', style: 'cancel' },
-            { text: 'Sil', style: 'destructive', onPress: () => dispatch({ type: 'reset' }) },
-          ]),
-      },
-      { text: 'Kapat', style: 'cancel' },
-    ]);
+  const openProfile = () => router.push('/settings');
 
   const onItemPress = (item: DueItem) => {
     if (item.kind === 'card') return router.push(`/card/${item.refId}`);

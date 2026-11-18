@@ -46,6 +46,7 @@ export function demoState(now: Date): AppState {
       ...initialState.settings,
       salaryDay: day(27).getDate(),
       salaryAmount: tl(52_000),
+      onboardingDone: true,
       balance: { amount: tl(31_480), asOf: endOfToday.toISOString() },
     },
     cards: [

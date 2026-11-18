@@ -69,6 +69,10 @@ export interface AppSettings {
   /** Zaman Nehri bakiye çizgisi için kullanıcının girdiği hesap bakiyesi. */
   balance?: { amount: Kurus; asOf: string }; // asOf: ISO an
   defaultReminders: ReminderSettings;
+  /** Face ID / parmak izi ile uygulama kilidi. */
+  appLock?: boolean;
+  /** İlk kurulum (maaş günü, varsayılan hatırlatma) tamamlandı mı. */
+  onboardingDone?: boolean;
 }
 
 export interface AppState {

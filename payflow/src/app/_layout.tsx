@@ -5,6 +5,9 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AppLock } from '../auth/AppLock';
+import { AuthProvider, useAuth } from '../auth/AuthProvider';
+import { CloudSync } from '../auth/CloudSync';
 import { NotificationsProvider } from '../notifications/NotificationsProvider';
 import { StoreProvider, useStore } from '../store/StoreProvider';
 import { ThemeProvider, useTheme } from '../theme/ThemeProvider';
@@ -14,28 +17,38 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 function RootStack() {
   const { palette, isDark } = useTheme();
   const { ready } = useStore();
+  const { status } = useAuth();
+  const loaded = ready && status !== 'loading';
+  const inside = status === 'signedIn' || status === 'guest';
 
   useEffect(() => {
-    if (ready) SplashScreen.hideAsync().catch(() => {});
-  }, [ready]);
+    if (loaded) SplashScreen.hideAsync().catch(() => {});
+  }, [loaded]);
 
-  if (!ready) return null;
+  if (!loaded) return null;
 
   return (
-    <>
+    <AppLock>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.bg } }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="add" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="card-new" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="category-new" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="card/[id]" />
-        <Stack.Screen name="card-pay" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="simulator" />
-        <Stack.Screen name="flow-settings" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="notifications" />
+        <Stack.Protected guard={inside}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
+          <Stack.Screen name="add" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="card-new" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="category-new" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="card/[id]" />
+          <Stack.Screen name="card-pay" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="simulator" />
+          <Stack.Screen name="flow-settings" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="notifications" />
+          <Stack.Screen name="settings" />
+        </Stack.Protected>
+        <Stack.Protected guard={!inside}>
+          <Stack.Screen name="(auth)" />
+        </Stack.Protected>
       </Stack>
-    </>
+    </AppLock>
   );
 }
 
@@ -49,9 +62,13 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ThemeProvider>
         <StoreProvider>
-          <NotificationsProvider>
-            <RootStack />
-          </NotificationsProvider>
+          <AuthProvider>
+            <CloudSync>
+              <NotificationsProvider>
+                <RootStack />
+              </NotificationsProvider>
+            </CloudSync>
+          </AuthProvider>
         </StoreProvider>
       </ThemeProvider>
     </SafeAreaProvider>

@@ -28,3 +28,13 @@ jest.mock('expo-notifications', () => {
     SchedulableTriggerInputTypes: { DATE: 'date', TIME_INTERVAL: 'timeInterval' },
   };
 });
+
+jest.mock('expo-local-authentication', () => ({
+  hasHardwareAsync: async () => true,
+  isEnrolledAsync: async () => true,
+  authenticateAsync: async () => ({ success: true }),
+}));
+jest.mock('expo-web-browser', () => ({ maybeCompleteAuthSession: () => ({ type: 'failed' }) }));
+jest.mock('expo-auth-session/providers/google', () => ({
+  useIdTokenAuthRequest: () => [null, null, async () => ({ type: 'dismiss' })],
+}));

@@ -94,6 +94,11 @@ export function migrate(raw: unknown): AppState {
     expenses: Array.isArray(s.expenses) ? s.expenses : [],
     cardPayments: Array.isArray(s.cardPayments) ? s.cardPayments : [],
     customCategories: Array.isArray(s.customCategories) ? s.customCategories : [],
-    settings: { defaultReminders: DEFAULT_REMINDERS, ...(s.settings ?? {}) },
+    settings: {
+      defaultReminders: DEFAULT_REMINDERS,
+      // Eski kayıtlarda bayrak yok: verisi olan kullanıcıya kurulumu tekrar gösterme.
+      onboardingDone: (s.cards?.length ?? 0) + (s.bills?.length ?? 0) + (s.expenses?.length ?? 0) > 0,
+      ...(s.settings ?? {}),
+    },
   };
 }

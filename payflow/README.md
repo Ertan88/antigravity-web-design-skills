@@ -30,7 +30,25 @@ npm start         # telefonda Expo Go uygulamasıyla QR kodu okut
 | `src/core/parse.ts` | Türkçe tutar/faiz girişi okuma, tuş takımı |
 | `src/store/` | Durum ağacı + AsyncStorage kalıcılığı, ana sayfa seçicileri, Zaman Nehri projeksiyonu, örnek veri |
 | `src/notifications/` | Bildirim planı (3 gün / 1 gün / son gün + ekstre kesimi), kurulum, izin, Ödedim/Ertele butonları |
+| `src/auth/` | Kimlik doğrulama arayüzü, Firebase uygulaması, bulut yedek senkronu, Google düğmesi, Face ID kilidi |
 | `src/features/` | Harcama ve fatura formları, kategori ızgarası, hatırlatma seçici |
 
 > Faiz hesapları **tahminidir**. Oranlar TCMB'nin aylık duyurusuna göre güncellenmelidir
 > (`src/core/finance/rates.ts`). Kullanıcı kart bazında kendi bankasının oranını girebilir.
+
+## Hesap ve bulut yedek (Firebase) kurulumu
+
+Firebase ayarı girilmeden uygulama **hesapsız modda** çalışır (veriler yalnızca cihazda).
+Hesapları açmak için:
+
+1. [Firebase Console](https://console.firebase.google.com)'da proje oluştur.
+2. **Authentication → Sign-in method**: *E-posta/Şifre* ve *Google* sağlayıcılarını aç.
+3. **Firestore Database** oluştur, **Rules** sekmesine `firestore.rules` içeriğini yapıştır.
+4. **Proje ayarları → Uygulamalarınız → Web uygulaması ekle** → çıkan `firebaseConfig` değerlerini
+   `.env.example` dosyasını `.env` olarak kopyalayıp doldur.
+5. Google ile giriş için Google Cloud Console'da iOS ve Android OAuth istemci kimliklerini oluştur
+   (paket adı `app.payflow.mobile`), `.env`'e ekle. Google ile giriş **Expo Go'da çalışmaz**;
+   geliştirme derlemesi gerekir: `npx eas-cli@latest build --profile development`.
+
+Yedek, `users/{uid}` belgesinde tutulur; kurallar her kullanıcının yalnızca kendi belgesine
+erişmesine izin verir.
