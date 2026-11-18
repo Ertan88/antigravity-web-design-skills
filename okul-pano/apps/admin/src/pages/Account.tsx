@@ -1,5 +1,6 @@
 import { changePasswordSchema, updateProfileSchema } from '@okulpano/shared';
 import { useState } from 'react';
+import { LinkedAccountCard } from '../components/AccountSwitch.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Button, Card, Field, Input, PageHeader, PasswordInput } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
@@ -102,6 +103,7 @@ export function Account() {
       <PageHeader title="Hesabım" description={`${me?.user.fullName} · ${me?.user.email}`} />
       <div className="space-y-6">
         <ProfileCard />
+        <LinkedAccountCard />
         <Card className="max-w-lg p-6">
           <h2 className="mb-4 font-semibold">Şifre değiştir</h2>
           <form onSubmit={submit} className="space-y-4">

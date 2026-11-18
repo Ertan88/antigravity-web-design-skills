@@ -3,6 +3,7 @@ import { reminderSummary, useReminderSettings } from '../../src/reminders.ts';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { AccountsSheet } from '../../src/accountsSheet.tsx';
+import { switchAllowed } from '../../src/accounts.ts';
 import { Platform, Pressable, View } from 'react-native';
 import { Text } from '../../src/text.tsx';
 import { membershipLabel, useAuth, type AppRole } from '../../src/auth.tsx';
@@ -352,7 +353,8 @@ export default function Menu() {
               ]
         }
       />
-      {/* Hızlı hesap geçişi (A): platform ve okul ayrı hesaplar; bu telefonda kayıtlı hesaplar arasında şifresiz geçiş */}
+      {/* Hızlı hesap geçişi (A): yalnızca platform yöneticisine açık; platform ve kendi okul hesabı arasında şifresiz geçiş */}
+      {switchAllowed(accounts, me?.user.isSuperAdmin) && (
       <Card style={{ paddingVertical: 4, gap: 0 }}>
         <ListRow
           tile={{ icon: 'swap-horizontal-outline', tone: 'sky' }}
@@ -362,6 +364,7 @@ export default function Menu() {
           last
         />
       </Card>
+      )}
       <AccountsSheet open={accountsOpen} onClose={() => setAccountsOpen(false)} />
 
       {schoolChoices.length > 1 && (

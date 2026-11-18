@@ -9,6 +9,7 @@ import { openCount, useCoverDay } from '../pages/covers/Covers.tsx';
 import { findNav, NAV, type NavItem } from '../lib/nav.ts';
 import { isPhoneWidth, openAppView, panelChosenOnPhone } from '../lib/appView.ts';
 import { useTheme } from '../lib/theme.ts';
+import { AccountSwitchButton } from './AccountSwitch.tsx';
 import { BrandMark, BrandName } from './Brand.tsx';
 import { EmergencyBanner, EmergencyButton } from './Emergency.tsx';
 import { WelcomeDialog } from './Onboarding.tsx';
@@ -211,6 +212,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         )}
       </nav>
       <div className="relative border-t border-slate-200 p-3">
+        <AccountSwitchButton />
         <div className="flex items-center gap-1">
           <NavLink to="/hesap" onClick={onNavigate} className="flex min-w-0 flex-1 items-center gap-2.5 rounded-2xl px-2 py-2 transition hover:bg-slate-200/60">
             <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-tile-sky text-xs font-extrabold text-tile-sky-ink">

@@ -59,10 +59,29 @@ export const sessions = pgTable(
     tokenHash: text('token_hash').notNull().unique(),
     userAgent: text('user_agent'),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    /** Hesap geçişiyle açılan oturumda geçişi yapan platform hesabı ("Platform hesabına dön" yalnızca bunda görünür) */
+    viaUserId: uuid('via_user_id').references((): AnyPgColumn => users.id, { onDelete: 'cascade' }),
     createdAt: createdAt(),
   },
   (t) => [index('sessions_user_idx').on(t.userId)],
 );
+
+/**
+ * Platform yöneticisinin kendi okul hesabına bağlantısı (web hesap geçişi). Yalnızca platform yöneticisi kurabilir;
+ * okul hesabının şifresiyle doğrulanır, 12 saatten eski doğrulamada geçiş için şifre yeniden sorulur.
+ */
+export const accountLinks = pgTable('account_links', {
+  id: pk(),
+  platformUserId: uuid('platform_user_id')
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  schoolUserId: uuid('school_user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  verifiedAt: timestamp('verified_at', { withTimezone: true }).notNull(),
+  createdAt: createdAt(),
+});
 
 export const schools = pgTable('schools', {
   id: pk(),

@@ -16,6 +16,14 @@ export interface SavedAccount {
   refresh: string | null;
 }
 
+/**
+ * Hesap geçişi yalnızca platform yöneticisine açıktır: açık hesap platform hesabıysa ya da telefonda bir platform hesabı
+ * kayıtlıysa (platform yöneticisinin kendi telefonu). Diğer kullanıcılarda "Hesap değiştir" ve kayıtlı hesap listesi görünmez.
+ */
+export function switchAllowed(list: SavedAccount[], isSuperAdmin: boolean | undefined): boolean {
+  return Boolean(isSuperAdmin) || list.some((a) => a.kind === 'platform');
+}
+
 const KEY = 'okulpano.accounts';
 const MAX = 5;
 

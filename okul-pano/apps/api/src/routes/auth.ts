@@ -1,9 +1,9 @@
-import { branchIsVocational, changePasswordSchema, effectivePermissions, isInternshipSubject, loginSchema, pushTokenSchema, updateProfileSchema } from '@okulpano/shared';
+import { branchIsVocational, changePasswordSchema, effectivePermissions, schoolFullName, isInternshipSubject, loginSchema, pushTokenSchema, updateProfileSchema } from '@okulpano/shared';
 import { and, asc, eq, gt, inArray, isNull, lt, sql } from 'drizzle-orm';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { accessUser } from '../context.ts';
-import { memberships, notifications, pushTokens, schools, sessions, teacherBranches, teachers, teacherTitles, timetableEntries, users } from '../db/schema.ts';
+import { accountLinks, memberships, notifications, pushTokens, schools, sessions, teacherBranches, teachers, teacherTitles, timetableEntries, users } from '../db/schema.ts';
 import { burnPasswordCheck, hashPassword, randomToken, sha256, verifyPassword } from '../lib/crypto.ts';
 import { badRequest, conflict, HttpError, notFound, parse, unauthorized } from '../lib/errors.ts';
 
@@ -56,10 +56,11 @@ export async function authRoutes(app: FastifyInstance) {
     });
   }
 
-  async function issueSession(req: FastifyRequest, userId: string) {
+  async function issueSession(req: FastifyRequest, userId: string, viaUserId: string | null = null) {
     const refreshToken = randomToken('rt');
     await db.insert(sessions).values({
       userId,
+      viaUserId,
       tokenHash: sha256(refreshToken),
       userAgent: req.headers['user-agent']?.slice(0, 200) ?? null,
       expiresAt: new Date(Date.now() + REFRESH_TTL_MS),
@@ -131,7 +132,8 @@ export async function authRoutes(app: FastifyInstance) {
     }
     const [user] = await db.select().from(users).where(eq(users.id, session.userId));
     if (!user) throw unauthorized();
-    const refreshToken = await issueSession(req, user.id);
+    // Hesap geçişiyle açılmış oturum yenilenince de "Platform hesabına dön" bilgisi korunur
+    const refreshToken = await issueSession(req, user.id, session.viaUserId);
     setRefreshCookie(reply, refreshToken);
     return {
       accessToken: accessToken(user),
@@ -193,6 +195,145 @@ export async function authRoutes(app: FastifyInstance) {
         .onConflictDoUpdate({ target: [pushTokens.token, pushTokens.userId], set: { platform: body.platform ?? 'android' } });
     }
     return { ok: true };
+  });
+
+  /*
+   * Platform yöneticisinin web hesap geçişi (yalnızca platform yöneticisi rolü; e-postaya bağlı değildir).
+   * Platform hesabı kendi okul hesabını bir kez o hesabın e-posta ve şifresiyle bağlar; sonra tek dokunuşla geçer.
+   * Geçişle açılan okul oturumunda geçişi yapan platform hesabı işaretlenir; "Platform hesabına dön" yalnızca o
+   * oturumda çalışır. Doğrulama 12 saatten eskiyse geçişte platform hesabının şifresi yeniden sorulur.
+   * Uç noktalar yalnızca panel çereziyle çalışır ve özel başlık ister (başka siteden istek gönderilemez).
+   * Platform ile okul ayrı kalır: okul hesabı ayrı bir kullanıcıdır, platform hesabı okula üye olmaz (KVKK).
+   */
+  const LINK_FRESH_MS = 12 * 3600 * 1000;
+  const linkSchema = z.object({ email: z.string().trim().email().max(200), password: z.string().min(1).max(200) });
+  const switchSchema = z.object({ password: z.string().min(1).max(200).optional() });
+
+  async function cookieSession(req: FastifyRequest) {
+    if (req.headers['x-okul-switch'] !== '1') throw unauthorized();
+    const token = req.cookies[COOKIE];
+    if (!token) throw unauthorized();
+    const [session] = await db
+      .select()
+      .from(sessions)
+      .where(and(eq(sessions.tokenHash, sha256(token)), gt(sessions.expiresAt, new Date())));
+    if (!session) throw unauthorized('Oturumun süresi doldu, lütfen yeniden giriş yapın.');
+    const [user] = await db.select().from(users).where(eq(users.id, session.userId));
+    if (!user) throw unauthorized();
+    return { session, user };
+  }
+
+  /** Okul hesabının ilk okulu (türüyle) ya da hiç üyeliği yoksa null */
+  async function firstSchoolName(userId: string) {
+    const [row] = await db
+      .select({ name: schools.name, settings: schools.settings })
+      .from(memberships)
+      .innerJoin(schools, eq(schools.id, memberships.schoolId))
+      .where(eq(memberships.userId, userId))
+      .orderBy(asc(memberships.createdAt))
+      .limit(1);
+    return row ? schoolFullName(row.name, row.settings?.schoolType) : null;
+  }
+
+  type Ctx = Awaited<ReturnType<typeof cookieSession>>;
+  /** Bu oturum için bağlantı: platform hesabındaysa kendi bağlantısı, okul hesabındaysa geçişle geldiği bağlantı */
+  async function linkFor({ session, user }: Ctx) {
+    if (user.isSuperAdmin) {
+      const [link] = await db.select().from(accountLinks).where(eq(accountLinks.platformUserId, user.id));
+      return link ? { link, side: 'platform' as const } : null;
+    }
+    if (!session.viaUserId) return null;
+    const [link] = await db
+      .select()
+      .from(accountLinks)
+      .where(and(eq(accountLinks.platformUserId, session.viaUserId), eq(accountLinks.schoolUserId, user.id)));
+    return link ? { link, side: 'school' as const } : null;
+  }
+
+  async function linkStatus(ctx: Ctx) {
+    const found = await linkFor(ctx);
+    if (!found) return { side: ctx.user.isSuperAdmin ? ('platform' as const) : ('none' as const), linked: false };
+    const otherId = found.side === 'platform' ? found.link.schoolUserId : found.link.platformUserId;
+    const [other] = await db.select({ fullName: users.fullName }).from(users).where(eq(users.id, otherId));
+    return {
+      side: found.side,
+      linked: true,
+      name: other?.fullName ?? '',
+      schoolName: await firstSchoolName(found.link.schoolUserId),
+      needsPassword: Date.now() - found.link.verifiedAt.getTime() > LINK_FRESH_MS,
+    };
+  }
+
+  app.get('/api/auth/linked-account', { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req) => linkStatus(await cookieSession(req)));
+
+  app.post('/api/auth/linked-account', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req) => {
+    const ctx = await cookieSession(req);
+    if (!ctx.user.isSuperAdmin) throw new HttpError(403, 'Bu işlem yalnızca platform yöneticisine açıktır.', 'forbidden');
+    const body = parse(linkSchema, req.body);
+    const email = body.email.toLowerCase();
+    const wait = lockedFor(email);
+    if (wait > 0) throw new HttpError(429, `Bu hesapla çok sayıda hatalı giriş denendi. ${Math.ceil(wait / 60)} dakika sonra yeniden deneyin.`, 'too_many');
+    const [target] = await db.select().from(users).where(eq(users.email, email));
+    if (!target) {
+      await burnPasswordCheck(body.password);
+      noteFailure(email);
+      throw badRequest('E-posta ya da şifre hatalı.');
+    }
+    if (!(await verifyPassword(body.password, target.passwordHash))) {
+      noteFailure(email);
+      throw badRequest('E-posta ya da şifre hatalı.');
+    }
+    failures.delete(email);
+    if (target.isSuperAdmin) throw badRequest('Platform hesabı bağlanamaz; okul hesabınızı girin.');
+    if (!(await firstSchoolName(target.id))) throw badRequest('Bu hesap hiçbir okula bağlı değil.');
+    const now = new Date();
+    await db
+      .insert(accountLinks)
+      .values({ platformUserId: ctx.user.id, schoolUserId: target.id, verifiedAt: now })
+      .onConflictDoUpdate({ target: accountLinks.platformUserId, set: { schoolUserId: target.id, verifiedAt: now } });
+    return linkStatus(ctx);
+  });
+
+  app.delete('/api/auth/linked-account', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
+    const ctx = await cookieSession(req);
+    if (!ctx.user.isSuperAdmin) throw new HttpError(403, 'Bu işlem yalnızca platform yöneticisine açıktır.', 'forbidden');
+    await db.delete(accountLinks).where(eq(accountLinks.platformUserId, ctx.user.id));
+    // Bu bağlantıyla açılmış okul oturumlarının geri dönüş işareti de geçersizleşir
+    await db.update(sessions).set({ viaUserId: null }).where(eq(sessions.viaUserId, ctx.user.id));
+    return reply.status(204).send();
+  });
+
+  app.post('/api/auth/switch-account', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
+    const ctx = await cookieSession(req);
+    const body = parse(switchSchema, req.body ?? {});
+    const found = await linkFor(ctx);
+    if (!found) throw new HttpError(403, 'Bağlı hesap yok.', 'forbidden');
+    const { link, side } = found;
+    const [platformUser] = await db.select().from(users).where(eq(users.id, link.platformUserId));
+    const [schoolUser] = await db.select().from(users).where(eq(users.id, link.schoolUserId));
+    if (!platformUser?.isSuperAdmin || !schoolUser || schoolUser.isSuperAdmin) throw new HttpError(403, 'Bağlı hesap artık kullanılamıyor.', 'forbidden');
+    if (side === 'platform' && !(await firstSchoolName(schoolUser.id))) throw new HttpError(403, 'Okul hesabınız hiçbir okula bağlı değil.', 'forbidden');
+
+    if (Date.now() - link.verifiedAt.getTime() > LINK_FRESH_MS) {
+      // Kimliği yeniden doğrulayan, platform hesabının şifresidir (iki yönde de)
+      if (!body.password) throw new HttpError(403, 'Güvenlik için platform hesabınızın şifresini girin.', 'reauth');
+      const key = platformUser.email;
+      const wait = lockedFor(key);
+      if (wait > 0) throw new HttpError(429, `Çok sayıda hatalı şifre denendi. ${Math.ceil(wait / 60)} dakika sonra yeniden deneyin.`, 'too_many');
+      if (!(await verifyPassword(body.password, platformUser.passwordHash))) {
+        noteFailure(key);
+        throw new HttpError(403, 'Şifre hatalı.', 'reauth');
+      }
+      failures.delete(key);
+      await db.update(accountLinks).set({ verifiedAt: new Date() }).where(eq(accountLinks.id, link.id));
+    }
+
+    const target = side === 'platform' ? schoolUser : platformUser;
+    await db.delete(sessions).where(eq(sessions.id, ctx.session.id));
+    const refreshToken = await issueSession(req, target.id, side === 'platform' ? platformUser.id : null);
+    setRefreshCookie(reply, refreshToken);
+    await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, target.id));
+    return { accessToken: accessToken(target) };
   });
 
   app.post('/api/auth/logout', async (req, reply) => {

@@ -26,6 +26,13 @@ kalır; burada tekrarlanmaz.
   (`env.ts` denetler). Gizli anahtarlar depoya, koda ya da istemciye yazılmaz.
 - Şifre değişince kullanıcının bütün cihazlardaki oturumları kapanır; çıkışta o cihazın yenileme anahtarı silinir.
   Yönetici bir hesabı kapatınca ya da şifresini sıfırlayınca o hesabın oturumları da silinir.
+- **Hesap geçişi yalnızca platform yöneticisine açıktır** (rol ile, e-postaya bağlı değil). Webde platform hesabı
+  kendi okul hesabını bir kez o hesabın e-posta ve şifresiyle bağlar (`account_links`); sonra kenar menüden tek
+  dokunuşla geçer. Geçişle açılan okul oturumu geçişi yapan platform hesabını taşır (`sessions.via_user_id`),
+  "Platform hesabına dön" yalnızca o oturumda görünür; okul hesabıyla doğrudan girişte görünmez. Doğrulama 12
+  saatten eskiyse geçişte platform hesabının şifresi yeniden sorulur. Uç noktalar yalnızca panel çereziyle ve özel
+  başlıkla (`x-okul-switch`) çalışır, hız sınırlıdır. Mobilde "Hesap değiştir" ve giriş ekranındaki kayıtlı hesaplar
+  yalnızca açık hesap platform hesabıysa ya da telefonda platform hesabı kayıtlıysa görünür (`switchAllowed`).
 
 ### 1.2 Yetkilendirme ve okul ayrımı (çok kiracılı yapı)
 - Her okul verisi `schoolId` ile süzülür. Okula ait her uç nokta `schoolGuard()` ile korunur ve sorgularda
@@ -99,7 +106,7 @@ kalır; burada tekrarlanmaz.
 - Kişisel veri günlüklere (log), hata bildirimlerine, bildirim metinlerine ve URL'lere yazılmaz. Bildirimde yalnızca
   gerekli en kısa bilgi bulunur (ör. "Ayşe Demir 23 Kasım için izin bildirdi").
 - Aydınlatma metni ve gizlilik sayfası yeni veri türü eklenince güncellenir.
-- **Platform ile okul tamamen ayrıdır.** Platform yöneticisi hesabı hiçbir okula üye olamaz (API her üyelik yolunda reddeder); okulda da çalışan kişi okul için ayrı e-postayla hesap kullanır, uygulamada hesaplar arasında hızlı geçiş vardır (Menü › Hesap değiştir). Kuraldan önce kalan üyelik "Platform hesabını ayır" ile ayrılır: mevcut hesap okul hesabı kalır, platform yetkisi yeni hesaba geçer; platform görünümünde
+- **Platform ile okul tamamen ayrıdır.** Platform yöneticisi hesabı hiçbir okula üye olamaz (API her üyelik yolunda reddeder); okulda da çalışan kişi okul için ayrı e-postayla hesap kullanır, platform yöneticisi webde ve uygulamada iki hesabı arasında hızlı geçer (1.1, hesap geçişi). Kuraldan önce kalan üyelik "Platform hesabını ayır" ile ayrılır: mevcut hesap okul hesabı kalır, platform yetkisi yeni hesaba geçer; platform görünümünde
   yalnızca platformu kullananların platformla yazışması (destek talepleri, kayıt başvuruları, abonelikler) görünür.
   Hiçbir okulda (geliştiricinin kendi okulu dahil) yapılan işlem platform yöneticisine görünmez, bildirim olarak
   gitmez. Okul verisine yalnızca müdürün verdiği süreli destek erişimiyle, o süre içinde girilir.

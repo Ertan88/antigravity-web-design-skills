@@ -6,6 +6,7 @@ import { router } from 'expo-router';
 import { DEFAULT_SERVER, normalizeServer, session } from '../src/api.ts';
 import { useAuth } from '../src/auth.tsx';
 import { AccountRow } from '../src/accountsSheet.tsx';
+import { switchAllowed } from '../src/accounts.ts';
 import { Sheet } from '../src/sheet.tsx';
 // Marka kutusu temadan bağımsızdır (koyu turkuaz); üzerindeki etiketler her iki temada açık pastel renklerle
 import { colors, LIGHT_TILES, type TileTone } from '../src/theme.ts';
@@ -151,7 +152,8 @@ export default function Login() {
 
         {/* Kayıtlı hesaplar (B): giriş ekranında açıkta durmaz; düğmeyle alt sayfada açılır, e-posta yarı gizli, okul ve
             görev yazmaz. Dokununca şifresiz geçilir (oturumu kapanmış olanda e-posta doldurulur). */}
-        {accounts.length > 0 && (
+        {/* Yalnızca platform yöneticisinin telefonunda (kayıtlı platform hesabı varsa) görünür */}
+        {accounts.length > 0 && switchAllowed(accounts, false) && (
           <Button variant="secondary" icon="people-outline" onPress={() => setAccountsOpen(true)}>
             {`Kayıtlı hesaplar (${accounts.length})`}
           </Button>
