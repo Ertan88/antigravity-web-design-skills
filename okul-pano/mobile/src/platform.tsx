@@ -1,11 +1,10 @@
-import { academicYearOf } from '@okulpano/shared/academicCalendar';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { View } from 'react-native';
 import { Text } from './text.tsx';
 import { api } from './api.ts';
 import { membershipLabel, useAuth } from './auth.tsx';
-import { useAcademicCalendars, usePlatformSchools, useSignups } from './data.ts';
+import { usePlatformSchools, useSignups } from './data.ts';
 import { fullDate, timeAgo } from './day.ts';
 import { colors } from './theme.ts';
 import { NotificationsButton } from './teacher.tsx';
@@ -21,12 +20,11 @@ export function useOpenSchool() {
   };
 }
 
-/** Platform yöneticisinin ana ekranı: okullar, kayıt onayları, destek erişimleri, MEB takvimi */
+/** Platform yöneticisinin ana ekranı: okullar, kayıt onayları, destek erişimleri (MEB takvimi kendi sekmesinde) */
 export function PlatformHome() {
   const { me } = useAuth();
   const schools = usePlatformSchools();
   const signups = useSignups();
-  const calendars = useAcademicCalendars();
   const openSchool = useOpenSchool();
   const membership = (id: string) => {
     const access = me?.schools.find((s) => s.id === id);
@@ -40,12 +38,9 @@ export function PlatformHome() {
   const trials = list.filter((s) => s.plan === 'trial' && s.isActive);
   const ending = trials.filter((s) => s.trialEndsAt && Date.parse(s.trialEndsAt) - now < 7 * 86400_000);
   const waiting = (signups.data ?? []).filter((s) => !s.expired);
-  const year = academicYearOf(new Date().toISOString().slice(0, 10));
-  const nextCal = calendars.data?.find((c) => c.startYear === year + 1);
-  const review = calendars.data?.filter((c) => c.status === 'review' || c.pending) ?? [];
 
   return (
-    <Screen refreshing={schools.isRefetching} onRefresh={() => void Promise.all([schools.refetch(), signups.refetch(), calendars.refetch()])}>
+    <Screen refreshing={schools.isRefetching} onRefresh={() => void Promise.all([schools.refetch(), signups.refetch()])}>
       <HomeHeader name={me?.user.fullName} role="Platform yöneticisi">
         <NotificationsButton />
       </HomeHeader>
@@ -146,30 +141,6 @@ export function PlatformHome() {
             </>
           )}
 
-          <SectionTitle>MEB çalışma takvimi</SectionTitle>
-          <Card style={{ paddingVertical: 4 }}>
-            <ListRow
-              icon="calendar-outline"
-              iconTone={review.length ? 'warning' : nextCal ? 'primary' : 'muted'}
-              title={
-                review.length
-                  ? `${review.length} takvim onay bekliyor`
-                  : nextCal
-                    ? `${nextCal.label} takvimi sistemde`
-                    : `${year + 1}-${year + 2} takvimi henüz yok`
-              }
-              subtitle={
-                review.length
-                  ? 'Taranan tarihleri kontrol edip onaylayın'
-                  : nextCal
-                    ? 'Tatiller okullara işlendi'
-                    : 'Haziran ortasından itibaren her gün taranır'
-              }
-              onPress={() => router.push('/takvim')}
-              last
-              right={review.length ? <Badge tone="warning">Onay</Badge> : undefined}
-            />
-          </Card>
         </>
       )}
     </Screen>
