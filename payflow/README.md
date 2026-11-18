@@ -24,8 +24,12 @@ npm start         # telefonda Expo Go uygulamasıyla QR kodu okut
 | `src/core/schedule.ts` | Kalan gün, aciliyet seviyesi, Türkçe tarih/selamlama |
 | `src/theme/` | Koyu / açık tema renkleri (tasarımla birebir), sistem/koyu/açık tercih saklama |
 | `src/ui/` | İkon seti, temel bileşenler (metin, kart, kategori rozeti, skor halkası), alt menü |
-| `src/app/` | Expo Router ekranları — `(tabs)/` alt menü sekmeleri, `add` hızlı ekle modalı |
-| `src/data/demo.ts` | Geçici örnek veri (Adım 3'te gerçek veriyle değişecek) |
+| `src/app/` | Expo Router ekranları — `(tabs)/` alt menü sekmeleri; `add` (Kart / Fatura / Günlük), `card-new`, `category-new` modalları |
+| `src/core/model.ts` | Kalıcı veri modeli: kart, fatura, harcama, kart ödemesi, ayarlar |
+| `src/core/ledger.ts` | Kart ekstre defteri (devir zinciri) ve fatura vade hesabı |
+| `src/core/parse.ts` | Türkçe tutar/faiz girişi okuma, tuş takımı |
+| `src/store/` | Durum ağacı + AsyncStorage kalıcılığı, ana sayfa seçicileri, örnek veri |
+| `src/features/` | Harcama ve fatura formları, kategori ızgarası, hatırlatma seçici |
 
 > Faiz hesapları **tahminidir**. Oranlar TCMB'nin aylık duyurusuna göre güncellenmelidir
 > (`src/core/finance/rates.ts`). Kullanıcı kart bazında kendi bankasının oranını girebilir.

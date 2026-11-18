@@ -1,13 +1,16 @@
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Alert, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatTL } from '../../core/money';
-import { daysUntil, dueLabel, formatLongDate, greetingFor, Urgency, urgencyFor } from '../../core/schedule';
-import { buildDemoSummary, UpcomingPayment } from '../../data/demo';
+import { dueLabel, formatLongDate, greetingFor, Urgency, urgencyFor } from '../../core/schedule';
+import { demoState } from '../../store/demoSeed';
+import { DueItem, homeSummary } from '../../store/selectors';
+import { useStore } from '../../store/StoreProvider';
 import { useTheme } from '../../theme/ThemeProvider';
 import { fonts, Palette, radius } from '../../theme/tokens';
-import { AppText, CategoryBadge, Chip, IconButton, ScoreRing, Surface } from '../../ui/primitives';
+import { Icon } from '../../ui/icons';
+import { AppText, CategoryBadge, Chip, IconButton, PrimaryButton, ScoreRing, Surface } from '../../ui/primitives';
 
 const RENT_COLOR = '#FF8FB8';
 
@@ -31,12 +34,38 @@ function splitMoney(text: string) {
 }
 
 export default function HomeScreen() {
-  const { palette } = useTheme();
+  const { palette, mode, setMode } = useTheme();
+  const { state, dispatch } = useStore();
   const insets = useSafeAreaInsets();
   const now = useMemo(() => new Date(), []);
-  const s = useMemo(() => buildDemoSummary(now), [now]);
+  const s = useMemo(() => homeSummary(state, now), [state, now]);
   const [whole, cents] = splitMoney(formatTL(s.monthTotal));
   const g = s.byGroup;
+
+  const openProfile = () =>
+    Alert.alert('Ayarlar', `Tema: ${mode === 'system' ? 'Sistem' : mode === 'dark' ? 'Koyu' : 'Açık'}`, [
+      { text: 'Sistem teması', onPress: () => setMode('system') },
+      { text: 'Koyu tema', onPress: () => setMode('dark') },
+      { text: 'Açık tema', onPress: () => setMode('light') },
+      {
+        text: 'Tüm verileri sil',
+        style: 'destructive',
+        onPress: () =>
+          Alert.alert('Emin misin?', 'Kartlar, faturalar ve harcamalar bu cihazdan silinir.', [
+            { text: 'Vazgeç', style: 'cancel' },
+            { text: 'Sil', style: 'destructive', onPress: () => dispatch({ type: 'reset' }) },
+          ]),
+      },
+      { text: 'Kapat', style: 'cancel' },
+    ]);
+
+  const onItemPress = (item: DueItem) => {
+    if (item.kind === 'card') return router.navigate('/cards');
+    Alert.alert(item.title, `${formatTL(item.amount)} · ${dueLabel(item.daysLeft)}`, [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: 'Ödedim', onPress: () => item.period && dispatch({ type: 'bill/markPaid', id: item.refId, period: item.period }) },
+    ]);
+  };
 
   return (
     <ScrollView
@@ -53,120 +82,168 @@ export default function HomeScreen() {
           </AppText>
         </View>
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          <IconButton icon="bell" label="Bildirimler" badge />
-          <IconButton icon="user" label="Profil" />
+          <IconButton icon="bell" label="Bildirimler" badge={s.overdueCount > 0 || s.upcoming.some((u) => u.daysLeft <= 3)} />
+          <IconButton icon="user" label="Profil ve ayarlar" onPress={openProfile} />
         </View>
       </View>
 
-      <Surface style={{ padding: 18, gap: 12, borderRadius: 24 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <AppText variant="label" muted>
-            Bu ay ödenecek
-          </AppText>
-          <Chip text="≈ faiz dahil tahmini" color={palette.warn} background={palette.warnBg} />
-        </View>
-        <AppText variant="display" accessibilityLabel={`Bu ay ödenecek ${formatTL(s.monthTotal)}`}>
-          {whole}
-          <AppText variant="title" muted>
-            {cents}
-          </AppText>
-        </AppText>
-        <View style={{ flexDirection: 'row', height: 10, borderRadius: 6, overflow: 'hidden', gap: 3 }}>
-          <View style={{ flex: g.cards, backgroundColor: palette.info }} />
-          <View style={{ flex: g.bills, backgroundColor: palette.warn }} />
-          <View style={{ flex: g.rent, backgroundColor: RENT_COLOR }} />
-        </View>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          {[
-            ['Kartlar', g.cards, palette.info],
-            ['Fatura', g.bills, palette.warn],
-            ['Kira', g.rent, RENT_COLOR],
-          ].map(([label, amount, color]) => (
-            <View key={label as string} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: color as string }} />
-              <AppText variant="caption" muted>
-                {label} {formatTL(amount as number).replace(/,\d\d$/, '')}
+      {s.isEmpty ? (
+        <EmptyState onDemo={() => dispatch({ type: 'hydrate', state: demoState(new Date()) })} />
+      ) : (
+        <>
+          <Surface style={{ padding: 18, gap: 12, borderRadius: 24 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <AppText variant="label" muted>
+                Bu ay ödenecek
               </AppText>
+              <Chip text={s.interestThisMonth > 0 ? '≈ faiz dahil tahmini' : '≈ tahmini'} color={palette.warn} background={palette.warnBg} />
             </View>
-          ))}
-        </View>
-      </Surface>
-
-      <View style={{ flexDirection: 'row', gap: 12 }}>
-        <Pressable accessibilityRole="button" onPress={() => router.navigate('/reports')} style={{ flex: 1 }}>
-          <Surface style={{ padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 20 }}>
-            <ScoreRing score={s.healthScore} />
-            <View style={{ flexShrink: 1 }}>
-              <AppText variant="caption" muted>
-                Ödeme sağlığı
+            <AppText variant="display" accessibilityLabel={`Bu ay ödenecek ${formatTL(s.monthTotal)}`}>
+              {whole}
+              <AppText variant="title" muted>
+                {cents}
               </AppText>
-              <AppText variant="bodyStrong" color={palette.accent}>
-                İyi gidiyor
-              </AppText>
+            </AppText>
+            {s.monthTotal > 0 ? (
+              <View style={{ flexDirection: 'row', height: 10, borderRadius: 6, overflow: 'hidden', gap: 3 }}>
+                {g.cards > 0 ? <View style={{ flex: g.cards, backgroundColor: palette.info }} /> : null}
+                {g.bills > 0 ? <View style={{ flex: g.bills, backgroundColor: palette.warn }} /> : null}
+                {g.rent > 0 ? <View style={{ flex: g.rent, backgroundColor: RENT_COLOR }} /> : null}
+              </View>
+            ) : null}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              {(
+                [
+                  ['Kartlar', g.cards, palette.info],
+                  ['Fatura', g.bills, palette.warn],
+                  ['Kira', g.rent, RENT_COLOR],
+                ] as const
+              ).map(([label, amount, color]) => (
+                <View key={label} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: color }} />
+                  <AppText variant="caption" muted>
+                    {label} {formatTL(amount).replace(/,\d\d$/, '')}
+                  </AppText>
+                </View>
+              ))}
             </View>
           </Surface>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.navigate('/cards')}
-          style={{ flex: 1, backgroundColor: palette.dangerBg, borderRadius: 20, padding: 14, borderWidth: 1, borderColor: palette.line }}
-        >
-          <AppText variant="caption" muted>
-            Bu ay faiz (tahmini)
-          </AppText>
-          <AppText variant="title" color={palette.danger} style={{ fontSize: 22 }}>
-            {formatTL(s.interestThisMonth)}
-          </AppText>
-          <AppText variant="caption" muted style={{ fontSize: 11 }}>
-            KKDF + BSMV dahil
-          </AppText>
-        </Pressable>
-      </View>
 
-      <View style={{ gap: 10 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <AppText variant="heading" accessibilityRole="header">
-            Yaklaşan ödemeler
-          </AppText>
-          <Pressable accessibilityRole="link" onPress={() => router.navigate('/timeline')} hitSlop={8}>
-            <AppText variant="label" color={palette.accent}>
-              Akışı gör
-            </AppText>
-          </Pressable>
-        </View>
-        {s.upcoming.map((p) => (
-          <PaymentRow key={p.id} payment={p} now={now} />
-        ))}
-      </View>
-
-      <Surface tone="surface2" style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, paddingHorizontal: 14, borderRadius: 18 }}>
-        <View style={{ flex: 1 }}>
-          <AppText variant="caption" muted>
-            Bugün harcadın
-          </AppText>
-          <AppText variant="money" style={{ fontSize: 18 }}>
-            {formatTL(s.todayTotal)}
-          </AppText>
-        </View>
-        {s.today.map((t) => (
-          <View key={t.category.id} accessible accessibilityLabel={`${t.category.name} ${formatTL(t.amount)}`}>
-            <CategoryBadge category={t.category} size={36} />
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <Pressable accessibilityRole="button" onPress={() => router.navigate('/reports')} style={{ flex: 1 }}>
+              <Surface style={{ padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 20 }}>
+                <ScoreRing score={s.healthScore} />
+                <View style={{ flexShrink: 1 }}>
+                  <AppText variant="caption" muted>
+                    Ödeme sağlığı
+                  </AppText>
+                  <AppText variant="bodyStrong" color={s.overdueCount ? palette.danger : palette.accent}>
+                    {s.overdueCount ? `${s.overdueCount} gecikme` : s.healthScore >= 80 ? 'İyi gidiyor' : 'Dikkat'}
+                  </AppText>
+                </View>
+              </Surface>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.navigate('/cards')}
+              style={{ flex: 1, backgroundColor: s.interestThisMonth ? palette.dangerBg : palette.surface, borderRadius: 20, padding: 14, borderWidth: 1, borderColor: palette.line }}
+            >
+              <AppText variant="caption" muted>
+                Bu ay faiz (tahmini)
+              </AppText>
+              <AppText variant="title" color={s.interestThisMonth ? palette.danger : palette.accent} style={{ fontSize: 22 }}>
+                {formatTL(s.interestThisMonth)}
+              </AppText>
+              <AppText variant="caption" muted style={{ fontSize: 11 }}>
+                KKDF + BSMV dahil
+              </AppText>
+            </Pressable>
           </View>
-        ))}
-      </Surface>
+
+          <View style={{ gap: 10 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <AppText variant="heading" accessibilityRole="header">
+                Yaklaşan ödemeler
+              </AppText>
+              <Pressable accessibilityRole="link" onPress={() => router.navigate('/timeline')} hitSlop={8}>
+                <AppText variant="label" color={palette.accent}>
+                  Akışı gör
+                </AppText>
+              </Pressable>
+            </View>
+            {s.upcoming.length === 0 ? (
+              <AppText variant="body" muted>
+                Yaklaşan ödeme yok.
+              </AppText>
+            ) : (
+              s.upcoming.map((p) => <PaymentRow key={p.key} item={p} onPress={() => onItemPress(p)} />)
+            )}
+          </View>
+
+          <Surface tone="surface2" style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, paddingHorizontal: 14, borderRadius: 18 }}>
+            <View style={{ flex: 1 }}>
+              <AppText variant="caption" muted>
+                Bugün harcadın
+              </AppText>
+              <AppText variant="money" style={{ fontSize: 18 }}>
+                {formatTL(s.todayTotal)}
+              </AppText>
+            </View>
+            {s.today.slice(0, 4).map((t) => (
+              <View key={t.category.id} accessible accessibilityLabel={`${t.category.name} ${formatTL(t.amount)}`}>
+                <CategoryBadge category={t.category} size={36} />
+              </View>
+            ))}
+          </Surface>
+        </>
+      )}
     </ScrollView>
   );
 }
 
-function PaymentRow({ payment, now }: { payment: UpcomingPayment; now: Date }) {
+function EmptyState({ onDemo }: { onDemo: () => void }) {
   const { palette } = useTheme();
-  const days = daysUntil(payment.due, now);
-  const u = urgencyStyle(urgencyFor(days), palette);
+  const actions = [
+    { label: 'İlk faturanı ekle', icon: 'doc' as const, onPress: () => router.push({ pathname: '/add', params: { tab: 'bill' } }) },
+    { label: 'Kredi kartı ekle', icon: 'card' as const, onPress: () => router.push('/card-new') },
+    { label: 'Günlük harcama gir', icon: 'cart' as const, onPress: () => router.push({ pathname: '/add', params: { tab: 'daily' } }) },
+  ];
   return (
-    <View
-      accessible
-      accessibilityLabel={`${payment.title}, ${formatTL(payment.amount)}, ${dueLabel(days)}`}
-      style={{
+    <Surface style={{ padding: 20, gap: 14, borderRadius: 24 }}>
+      <Icon name="logo" size={32} color={palette.accent} strokeWidth={2.2} />
+      <AppText variant="title">Akışını kuralım</AppText>
+      <AppText variant="body" muted>
+        Faturalarını, kartlarını ve harcamalarını ekle. Son ödeme günlerini ve kart faizini PayFlow takip etsin.
+      </AppText>
+      {actions.map((a) => (
+        <Pressable
+          key={a.label}
+          accessibilityRole="button"
+          onPress={a.onPress}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.lg, backgroundColor: palette.surface2 }}
+        >
+          <Icon name={a.icon} size={20} color={palette.accent} />
+          <AppText variant="bodyStrong" style={{ flex: 1 }}>
+            {a.label}
+          </AppText>
+          <Icon name="chevronRight" size={18} color={palette.muted} />
+        </Pressable>
+      ))}
+      <PrimaryButton title="Örnek verilerle dene" onPress={onDemo} />
+    </Surface>
+  );
+}
+
+function PaymentRow({ item, onPress }: { item: DueItem; onPress: () => void }) {
+  const { palette } = useTheme();
+  const u = urgencyStyle(urgencyFor(item.daysLeft), palette);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${item.title}, ${formatTL(item.amount)}, ${dueLabel(item.daysLeft)}`}
+      accessibilityHint={item.kind === 'card' ? 'Kart ayrıntısını açar' : 'Ödendi olarak işaretleyebilirsin'}
+      onPress={onPress}
+      style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
@@ -176,27 +253,27 @@ function PaymentRow({ payment, now }: { payment: UpcomingPayment; now: Date }) {
         borderRadius: radius.lg,
         paddingVertical: 12,
         paddingHorizontal: 14,
-        // "nefes alan" aciliyet parıltısı — Adım 4'te animasyonlu hale gelecek
+        opacity: pressed ? 0.8 : 1,
         shadowColor: u.glow ? u.fg : 'transparent',
         shadowOpacity: u.glow ? 0.35 : 0,
         shadowRadius: 10,
         shadowOffset: { width: 0, height: 0 },
         elevation: u.glow ? 4 : 0,
-      }}
+      })}
     >
-      <CategoryBadge category={payment.category} />
+      <CategoryBadge category={item.category} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <AppText variant="bodyStrong" numberOfLines={1}>
-          {payment.title}
+          {item.title}
         </AppText>
         <AppText variant="caption" muted numberOfLines={1}>
-          {payment.subtitle}
+          {item.subtitle}
         </AppText>
       </View>
       <View style={{ alignItems: 'flex-end', gap: 3 }}>
-        <AppText variant="money">{formatTL(payment.amount)}</AppText>
-        <Chip text={dueLabel(days)} color={u.fg} background={u.bg} />
+        <AppText variant="money">{formatTL(item.amount)}</AppText>
+        <Chip text={dueLabel(item.daysLeft)} color={u.fg} background={u.bg} />
       </View>
-    </View>
+    </Pressable>
   );
 }
