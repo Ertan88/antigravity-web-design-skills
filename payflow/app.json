@@ -33,6 +33,13 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 160
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#3EE6B0",
+          "defaultChannel": "payments"
+        }
       ]
     ]
   }

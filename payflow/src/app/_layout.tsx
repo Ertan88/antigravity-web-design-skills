@@ -5,6 +5,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { NotificationsProvider } from '../notifications/NotificationsProvider';
 import { StoreProvider, useStore } from '../store/StoreProvider';
 import { ThemeProvider, useTheme } from '../theme/ThemeProvider';
 
@@ -32,6 +33,7 @@ function RootStack() {
         <Stack.Screen name="card-pay" options={{ presentation: 'modal' }} />
         <Stack.Screen name="simulator" />
         <Stack.Screen name="flow-settings" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="notifications" />
       </Stack>
     </>
   );
@@ -47,7 +49,9 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ThemeProvider>
         <StoreProvider>
-          <RootStack />
+          <NotificationsProvider>
+            <RootStack />
+          </NotificationsProvider>
         </StoreProvider>
       </ThemeProvider>
     </SafeAreaProvider>

@@ -16,6 +16,8 @@ export interface FlowEvent {
   category: Category;
   kind: 'bill' | 'rent' | 'card' | 'salary';
   refId?: string;
+  /** Fatura için ödendi işaretlenecek dönem. */
+  period?: string;
   projected: boolean;
   /** Kart için: bu ödemenin asgari tutarı (öneri hesabında). */
   minimum?: Kurus;
@@ -37,7 +39,7 @@ export function flowEvents(s: AppState, now: Date, days: number): FlowEvent[] {
     if (!first) continue;
     const cat = findCategory(s, b.typeId);
     const push = (d: Date, period: string) =>
-      out.push({ key: `bill:${b.id}:${period}`, date: d, title: b.title, amount: -b.amount, category: cat, kind: b.typeId === 'rent' ? 'rent' : 'bill', refId: b.id, projected: b.variableAmount });
+      out.push({ key: `bill:${b.id}:${period}`, date: d, title: b.title, amount: -b.amount, category: cat, kind: b.typeId === 'rent' ? 'rent' : 'bill', refId: b.id, period, projected: b.variableAmount });
     if (within(first.due)) push(first.due, first.period);
     if (b.recurrence.type === 'monthly') {
       for (let k = 1; k <= Math.ceil(days / 28) + 1; k++) {

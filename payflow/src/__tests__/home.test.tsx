@@ -8,13 +8,10 @@ import HomeScreen from '../app/(tabs)/index';
 import { AppState } from '../core/model';
 import { demoState } from '../store/demoSeed';
 import { initialState } from '../store/reducer';
+import { NotificationsProvider } from '../notifications/NotificationsProvider';
 import { StoreProvider, useStore } from '../store/StoreProvider';
 import { ThemeProvider } from '../theme/ThemeProvider';
 
-jest.mock('@react-native-async-storage/async-storage', () =>
-  require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
-);
-jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 
 const mockParams: { tab?: string } = {};
 jest.mock('expo-router', () => ({
@@ -32,8 +29,10 @@ async function renderWith(ui: ReactNode, state: AppState = initialState) {
   await render(
     <ThemeProvider>
       <StoreProvider initial={state}>
-        {ui}
-        <Probe />
+        <NotificationsProvider>
+          {ui}
+          <Probe />
+        </NotificationsProvider>
       </StoreProvider>
     </ThemeProvider>,
   );

@@ -29,6 +29,7 @@ npm start         # telefonda Expo Go uygulamasıyla QR kodu okut
 | `src/core/ledger.ts` | Kart ekstre defteri (devir zinciri) ve fatura vade hesabı |
 | `src/core/parse.ts` | Türkçe tutar/faiz girişi okuma, tuş takımı |
 | `src/store/` | Durum ağacı + AsyncStorage kalıcılığı, ana sayfa seçicileri, Zaman Nehri projeksiyonu, örnek veri |
+| `src/notifications/` | Bildirim planı (3 gün / 1 gün / son gün + ekstre kesimi), kurulum, izin, Ödedim/Ertele butonları |
 | `src/features/` | Harcama ve fatura formları, kategori ızgarası, hatırlatma seçici |
 
 > Faiz hesapları **tahminidir**. Oranlar TCMB'nin aylık duyurusuna göre güncellenmelidir

@@ -4,6 +4,7 @@ import { Alert, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatTL } from '../../core/money';
 import { dueLabel, formatLongDate, greetingFor, Urgency, urgencyFor } from '../../core/schedule';
+import { useNotifications } from '../../notifications/NotificationsProvider';
 import { demoState } from '../../store/demoSeed';
 import { DueItem, homeSummary } from '../../store/selectors';
 import { useStore } from '../../store/StoreProvider';
@@ -36,6 +37,7 @@ function splitMoney(text: string) {
 export default function HomeScreen() {
   const { palette, mode, setMode } = useTheme();
   const { state, dispatch } = useStore();
+  const { permission, request } = useNotifications();
   const insets = useSafeAreaInsets();
   const now = useMemo(() => new Date(), []);
   const s = useMemo(() => homeSummary(state, now), [state, now]);
@@ -83,7 +85,7 @@ export default function HomeScreen() {
           </AppText>
         </View>
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          <IconButton icon="bell" label="Bildirimler" badge={s.overdueCount > 0 || s.upcoming.some((u) => u.daysLeft <= 3)} />
+          <IconButton icon="bell" label="Bildirimler" onPress={() => router.push('/notifications')} badge={s.overdueCount > 0 || s.upcoming.some((u) => u.daysLeft <= 3)} />
           <IconButton icon="user" label="Profil ve ayarlar" onPress={openProfile} />
         </View>
       </View>
@@ -92,6 +94,23 @@ export default function HomeScreen() {
         <EmptyState onDemo={() => dispatch({ type: 'hydrate', state: demoState(new Date()) })} />
       ) : (
         <>
+          {permission === 'undetermined' ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => request()}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: palette.warnBg, borderRadius: 18, padding: 14 }}
+            >
+              <Icon name="bell" size={22} color={palette.warn} />
+              <View style={{ flex: 1 }}>
+                <AppText variant="bodyStrong">Hatırlatmaları aç</AppText>
+                <AppText variant="caption" muted>
+                  Son ödeme günlerinde, seçtiğin saatte bildirim gelsin.
+                </AppText>
+              </View>
+              <Icon name="chevronRight" size={18} color={palette.muted} />
+            </Pressable>
+          ) : null}
+
           <Surface style={{ padding: 18, gap: 12, borderRadius: 24 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <AppText variant="label" muted>
