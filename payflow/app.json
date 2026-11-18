@@ -8,11 +8,14 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ertan88.odemeasistani"
+      "bundleIdentifier": "com.ertan88.odemeasistani",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0B1220",
+        "backgroundColor": "#3EE6B0",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -34,14 +37,21 @@
         {
           "backgroundColor": "#0B1220",
           "image": "./assets/splash-icon.png",
-          "imageWidth": 160
+          "imageWidth": 180
         }
       ],
       [
         "expo-notifications",
         {
+          "icon": "./assets/notification-icon.png",
           "color": "#3EE6B0",
           "defaultChannel": "payments"
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "PayFlow verilerini Face ID ile kilitlemek için kullanılır."
         }
       ]
     ]
