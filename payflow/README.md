@@ -73,4 +73,12 @@ kurabilirsin (bilinmeyen kaynaklardan yüklemeye izin vermen gerekebilir).
 - `development` → geliştirme sürümü (Expo Go yerine)
 - `production` → Google Play için AAB
 
-Firebase kullanacaksan derlemeden önce `.env` dosyasını doldur; değerler derlemeye gömülür.
+Firebase kullanacaksan değerleri derlemeye ver: `.env` dosyası git'e eklenmediği için EAS onu
+bulut derlemesine göndermez. Her değişken için bir kez şunu çalıştır (değerler gizli değildir):
+
+```bash
+npx eas-cli@latest env:create --environment preview --visibility plaintext \
+  --name EXPO_PUBLIC_FIREBASE_API_KEY --value "..."
+```
+
+Firebase olmadan derlersen uygulama hesapsız modda çalışır.

@@ -11,19 +11,22 @@
       },
       "env": {
         "EXPO_PUBLIC_APP_ENV": "preview"
-      }
+      },
+      "environment": "preview"
     },
     "development": {
       "developmentClient": true,
       "distribution": "internal",
       "android": {
         "buildType": "apk"
-      }
+      },
+      "environment": "development"
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
-      }
+      },
+      "environment": "production"
     }
   }
 }
