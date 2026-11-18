@@ -80,7 +80,10 @@ jobs:
           path: payflow/${{ steps.apk.outputs.name }}
           retention-days: 30
 
+      # Depo ayarı: Settings › Actions › General › Workflow permissions → "Read and write".
+      # Bu ayar kapalıysa yükleme 403 verir; APK yine yukarıdaki artifact'tan indirilebilir.
       - name: Release'e yükle
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
