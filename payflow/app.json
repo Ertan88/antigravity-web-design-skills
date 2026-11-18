@@ -25,7 +25,10 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "scheme": "payflow",
+    "scheme": [
+      "payflow",
+      "app.payflow.mobile"
+    ],
     "plugins": [
       "expo-router",
       [
