@@ -8,7 +8,7 @@ import { useAuth } from '../../src/auth.tsx';
 import { Text } from '../../src/text.tsx';
 import { colors } from '../../src/theme.ts';
 import { Banner, Button, Card, Field, Loading, Screen, T } from '../../src/ui.tsx';
-import { SECURITY_KEY, useSecurity } from '../../src/security.ts';
+import { useSecurity } from '../../src/security.ts';
 
 /**
  * İki adımlı doğrulama (1C). Kurulum: şifre → anahtarı doğrulayıcı uygulamaya ekle (aynı telefonda QR okutulamaz;
@@ -39,8 +39,9 @@ export default function Dogrulama() {
     }
   };
   const done = async () => {
-    await qc.invalidateQueries({ queryKey: SECURITY_KEY });
     await reloadMe().catch(() => undefined);
+    // Doğrulama açılmadan önce reddedilen (platform) istekler yeni anahtarla yeniden çekilir; eski uyarı ekranda kalmaz
+    await qc.invalidateQueries();
     setCodes([]);
     setStep(null);
     router.back();
