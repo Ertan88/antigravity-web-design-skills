@@ -49,6 +49,7 @@ function RootStack() {
         <Stack.Protected guard={!inside}>
           <Stack.Screen name="(auth)" />
         </Stack.Protected>
+        <Stack.Screen name="legal/[doc]" options={{ presentation: 'modal' }} />
       </Stack>
     </AppLock>
   );

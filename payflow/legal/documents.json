@@ -1,0 +1,251 @@
+{
+  "privacy": {
+    "slug": "gizlilik",
+    "title": "Gizlilik Politikası",
+    "intro": "Bu politika, {{appName}} mobil uygulamasının (\"Uygulama\") hangi kişisel verileri, hangi amaçla ve nasıl işlediğini; verilerinin nerede saklandığını ve haklarını nasıl kullanabileceğini açıklar. Uygulama bir banka veya ödeme kuruluşu uygulaması değildir; ödeme yapmaz, banka hesabına bağlanmaz ve banka şifreni istemez.",
+    "sections": [
+      {
+        "id": "sorumlu",
+        "heading": "1. Veri sorumlusu",
+        "blocks": [
+          { "p": "Veri sorumlusu: {{controllerName}}, {{controllerAddress}}. İletişim: {{contactEmail}}." }
+        ]
+      },
+      {
+        "id": "iki-kullanim",
+        "heading": "2. İki kullanım şekli",
+        "blocks": [
+          { "ul": [
+            "Hesapsız kullanım: Girdiğin tüm bilgiler yalnızca kendi cihazında saklanır. Bu bilgiler bize veya üçüncü kişilere gönderilmez.",
+            "Hesaplı kullanım: E-posta/şifre veya Google ile hesap açarsan, girdiğin bilgiler başka cihazlardan erişebilmen ve kaybolmaması için bulutta yedeklenir (bkz. Bölüm 5)."
+          ] }
+        ]
+      },
+      {
+        "id": "veriler",
+        "heading": "3. İşlenen veriler",
+        "blocks": [
+          { "ul": [
+            "Kimlik ve iletişim: ad soyad, e-posta adresi. Google ile girişte Google hesabındaki ad, e-posta ve hesap kimliği.",
+            "Hesap güvenliği: şifren yalnızca kimlik doğrulama hizmetinde tek yönlü şifrelenmiş (özetlenmiş) olarak tutulur; biz şifreni göremeyiz. Kimlik doğrulama hizmeti güvenlik amacıyla IP adresi ve cihaz/tarayıcı bilgisi işleyebilir.",
+            "Senin girdiğin finansal kayıtlar: kredi kartı adı, isteğe bağlı olarak kartın yalnızca son 4 hanesi, limit, hesap kesim ve son ödeme günleri, faiz oranı; fatura türü, kurum, abone numarası, tutar ve tarihleri; harcama tutarı, kategori, not ve tarihleri; kart ödemeleri; hesap bakiyesi, maaş günü ve tutarı; özel kategoriler.",
+            "Ev bütçesi: eklediğin kişilerin yalnızca adları ve paylaşılan bir faturayı kimin ödediği bilgisi.",
+            "Uygulama ayarları: tema, hatırlatma günleri ve saati, uygulama kilidi tercihi."
+          ] },
+          { "p": "İşlemediğimiz veriler: tam kart numarası, CVV, banka veya internet bankacılığı şifresi, konum, rehber, fotoğraf, mikrofon ve reklam kimliği. Uygulamada reklam, analitik veya üçüncü taraf takip aracı bulunmaz." },
+          { "p": "Face ID / parmak izi kilidi cihazının işletim sistemi tarafından yürütülür; biyometrik verin Uygulamaya ya da bize hiçbir zaman ulaşmaz." },
+          { "p": "Ev bütçesine başka kişilerin adını ekliyorsan, bu kişileri bilgilendirmek senin sorumluluğundadır. Yalnızca ad girmeni öneririz." }
+        ]
+      },
+      {
+        "id": "amaclar",
+        "heading": "4. İşleme amaçları",
+        "blocks": [
+          { "ul": [
+            "Hesabını oluşturmak, giriş yapmanı sağlamak ve şifre sıfırlama e-postası göndermek.",
+            "Girdiğin kayıtlardan son ödeme takvimi, tahmini kart ekstresi ve faiz hesabı, raporlar ve hatırlatmalar üretmek.",
+            "Verilerini bulutta yedeklemek ve cihazlar arasında eşitlemek.",
+            "Hesap ve veri güvenliğini sağlamak, kötüye kullanımı önlemek.",
+            "Talep etmen hâlinde verilerini silmek ve yasal başvurularını yanıtlamak."
+          ] },
+          { "p": "Verilerin profilleme, reklam veya pazarlama amacıyla kullanılmaz ve satılmaz." }
+        ]
+      },
+      {
+        "id": "saklama",
+        "heading": "5. Nerede saklanır, kimlerle paylaşılır",
+        "blocks": [
+          { "ul": [
+            "Cihazın: Tüm kayıtlar cihazındaki uygulama depolama alanında tutulur ve cihazının güvenlik önlemleriyle korunur.",
+            "Hesaplı kullanımda bulut: Kimlik doğrulama için Google Firebase Authentication, yedek için Google Cloud Firestore kullanılır. Google bu hizmetlerde veri işleyen sıfatıyla, yalnızca bizim adımıza hareket eder. Yedek veritabanı Avrupa Birliği'ndeki veri merkezlerinde tutulur; kimlik doğrulama hizmeti verileri Google'ın küresel altyapısında (ABD dâhil) işleyebilir.",
+            "Erişim kuralları: Bulut yedeğine yalnızca kendi hesabınla erişilebilir; başka bir kullanıcı senin verini okuyamaz.",
+            "Paylaşım: Verilerin yukarıdaki hizmet sağlayıcı dışında kimseyle paylaşılmaz. Yalnızca yasal bir zorunluluk olması ve yetkili kamu kurumlarının usulüne uygun talebi hâlinde paylaşılabilir.",
+            "Dışa aktarma: Raporu PDF veya Excel olarak paylaştığında dosya, senin seçtiğin uygulama veya kişiyle senin talimatınla paylaşılır."
+          ] },
+          { "p": "Aktarım sırasında veriler şifreli bağlantı (HTTPS/TLS) ile iletilir." }
+        ]
+      },
+      {
+        "id": "sure",
+        "heading": "6. Saklama süresi",
+        "blocks": [
+          { "p": "Verilerin hesabın açık olduğu sürece saklanır. Bir kaydı sildiğinde o kayıt cihazından ve bir sonraki eşitlemede bulut yedeğinden silinir. Hesabını sildiğinde bulut yedeğin ve hesabın derhâl silinir; hizmet sağlayıcının yedekleme sistemlerinde kalan kopyalar onun silme süreleri içinde kalıcı olarak yok edilir. Hesapsız kullanımda veriler, uygulamayı silene veya Ayarlar › Tüm verileri sil'i kullanana kadar cihazında kalır." }
+        ]
+      },
+      {
+        "id": "hesap-silme",
+        "heading": "7. Hesabını ve verilerini silme",
+        "blocks": [
+          { "p": "{{appName}} hesabını ve ilişkili tüm verilerini dilediğin an silebilirsin:" },
+          { "ul": [
+            "Uygulamadan: Ayarlar › Hesabımı sil. Hesabın, bulut yedeğin ve cihazındaki {{appName}} verileri kalıcı olarak silinir.",
+            "Uygulamaya erişemiyorsan: {{contactEmail}} adresine, hesabının kayıtlı olduğu e-posta adresinden \"{{appName}} hesap silme talebi\" konulu bir e-posta gönder. Kimliğini doğruladıktan sonra hesabın ve tüm verilerin en geç 30 gün içinde silinir ve sana bilgi verilir."
+          ] },
+          { "p": "Silinenler: hesap bilgilerin (ad, e-posta, giriş yöntemi) ve bulutta yedeklenmiş tüm kayıtların (kartlar, faturalar, harcamalar, ödemeler, ayarlar). Saklanan veri yoktur; yasal bir saklama yükümlülüğü doğarsa yalnızca ilgili veri, gereken süre boyunca saklanır." }
+        ]
+      },
+      {
+        "id": "haklar",
+        "heading": "8. Hakların",
+        "blocks": [
+          { "p": "6698 sayılı Kişisel Verilerin Korunması Kanunu'nun 11. maddesi kapsamındaki hakların ve başvuru yöntemi KVKK Aydınlatma Metni'nde açıklanmıştır. Bu haklar için {{contactEmail}} adresine yazabilirsin." }
+        ]
+      },
+      {
+        "id": "cocuklar",
+        "heading": "9. Çocuklar",
+        "blocks": [
+          { "p": "Uygulama 18 yaşından küçüklere yönelik değildir ve bilerek 18 yaş altındaki kişilerin verisini toplamaz." }
+        ]
+      },
+      {
+        "id": "degisiklik",
+        "heading": "10. Değişiklikler",
+        "blocks": [
+          { "p": "Bu politikayı güncellediğimizde yeni sürümü bu sayfada ve uygulamada yayımlarız. Önemli değişiklikleri uygulama içinde ayrıca bildiririz. Yürürlük tarihi: {{effectiveDate}} · Sürüm {{version}}." }
+        ]
+      }
+    ]
+  },
+  "kvkk": {
+    "slug": "kvkk",
+    "title": "KVKK Aydınlatma Metni",
+    "intro": "6698 sayılı Kişisel Verilerin Korunması Kanunu (\"Kanun\") 10. maddesi ve Aydınlatma Yükümlülüğünün Yerine Getirilmesinde Uyulacak Usul ve Esaslar Hakkında Tebliğ uyarınca, {{appName}} uygulamasını kullanan kişileri (\"ilgili kişi\") bilgilendirmek amacıyla hazırlanmıştır. Bu metin bilgilendirme amaçlıdır; senden ayrıca onay istenmez.",
+    "sections": [
+      {
+        "id": "sorumlu",
+        "heading": "1. Veri sorumlusu",
+        "blocks": [
+          { "p": "{{controllerName}} · Adres: {{controllerAddress}} · E-posta: {{contactEmail}}" }
+        ]
+      },
+      {
+        "id": "kategoriler",
+        "heading": "2. İşlenen kişisel veri kategorileri",
+        "blocks": [
+          { "ul": [
+            "Kimlik: ad soyad.",
+            "İletişim: e-posta adresi.",
+            "Müşteri işlem: uygulamaya senin girdiğin kart, fatura, harcama, ödeme, bakiye ve maaş bilgileri ile ev bütçesine eklediğin kişi adları.",
+            "İşlem güvenliği: kimlik doğrulama kayıtları, IP adresi, cihaz/tarayıcı bilgisi (hesaplı kullanımda kimlik doğrulama hizmeti tarafından)."
+          ] },
+          { "p": "Özel nitelikli kişisel veri işlenmez. Face ID / parmak izi doğrulaması cihazının işletim sisteminde gerçekleşir; biyometrik veri tarafımıza ulaşmaz." }
+        ]
+      },
+      {
+        "id": "amac-sebep",
+        "heading": "3. İşleme amaçları ve hukuki sebepler",
+        "blocks": [
+          { "ul": [
+            "Üyelik oluşturma, giriş, şifre sıfırlama; ödeme hatırlatmaları, tahmini ekstre ve faiz hesabı, raporlar, bulut yedekleme ve cihazlar arası eşitleme — Kanun m.5/2-c: bir sözleşmenin kurulması veya ifasıyla doğrudan ilgili olması (uygulama kullanım koşulları).",
+            "Hesap ve bilgi güvenliğinin sağlanması, kötüye kullanımın önlenmesi — Kanun m.5/2-f: temel hak ve özgürlüklerine zarar vermemek kaydıyla veri sorumlusunun meşru menfaati.",
+            "Yetkili kurumların talepleri ve ilgili kişi başvurularının yanıtlanması — Kanun m.5/2-ç: veri sorumlusunun hukuki yükümlülüğünü yerine getirmesi ve m.5/2-e: bir hakkın tesisi, kullanılması veya korunması."
+          ] },
+          { "p": "Verilerin pazarlama, reklam veya profilleme amacıyla işlenmez; bu nedenle açık rıza istenmez." }
+        ]
+      },
+      {
+        "id": "yontem",
+        "heading": "4. Toplama yöntemi",
+        "blocks": [
+          { "p": "Kişisel verilerin, uygulamaya kayıt olurken ve uygulamayı kullanırken senin girdiğin bilgilerden ve Google ile giriş yapman hâlinde Google'ın tarafımıza ilettiği bilgilerden, elektronik ortamda otomatik ve kısmen otomatik yollarla toplanır." }
+        ]
+      },
+      {
+        "id": "aktarim",
+        "heading": "5. Aktarım ve yurt dışına aktarım",
+        "blocks": [
+          { "p": "Hesaplı kullanımda verilerin, kimlik doğrulama (Firebase Authentication) ve bulut yedekleme (Cloud Firestore) hizmetlerini sağlayan Google'a, veri işleyen sıfatıyla aktarılır. Bu hizmetlerin sunucuları yurt dışında (yedek veritabanı Avrupa Birliği'nde, kimlik doğrulama Google'ın küresel altyapısında) bulunduğundan bu aktarım, Kanun'un 9. maddesi kapsamında yurt dışına aktarım niteliğindedir ve Kanun'da öngörülen uygun güvencelerden standart sözleşme çerçevesinde gerçekleştirilir." },
+          { "p": "Bunun dışında verilerin yalnızca kanunen yetkili kamu kurum ve kuruluşlarına, hukuki yükümlülük çerçevesinde aktarılabilir. Hesapsız kullanımda verilerin cihazından çıkmaz ve hiçbir yere aktarılmaz." }
+        ]
+      },
+      {
+        "id": "haklar",
+        "heading": "6. Kanun'un 11. maddesi kapsamındaki hakların",
+        "blocks": [
+          { "ul": [
+            "Kişisel verilerinin işlenip işlenmediğini öğrenme,",
+            "İşlenmişse buna ilişkin bilgi talep etme,",
+            "İşlenme amacını ve bunların amacına uygun kullanılıp kullanılmadığını öğrenme,",
+            "Yurt içinde veya yurt dışında aktarıldığı üçüncü kişileri bilme,",
+            "Eksik veya yanlış işlenmişse düzeltilmesini isteme,",
+            "Kanun'un 7. maddesindeki şartlar çerçevesinde silinmesini veya yok edilmesini isteme,",
+            "Düzeltme, silme ve yok etme işlemlerinin verilerin aktarıldığı üçüncü kişilere bildirilmesini isteme,",
+            "İşlenen verilerin münhasıran otomatik sistemlerle analiz edilmesi suretiyle aleyhine bir sonucun ortaya çıkmasına itiraz etme,",
+            "Kanuna aykırı işleme sebebiyle zarara uğraman hâlinde zararın giderilmesini talep etme."
+          ] }
+        ]
+      },
+      {
+        "id": "basvuru",
+        "heading": "7. Başvuru",
+        "blocks": [
+          { "p": "Bu haklarını kullanmak için talebini, Veri Sorumlusuna Başvuru Usul ve Esasları Hakkında Tebliğ'e uygun olarak, kimliğini doğrulayan bilgilerle birlikte {{controllerAddress}} adresine yazılı olarak, kayıtlı elektronik posta (KEP) adresi, güvenli elektronik imza, mobil imza ile ya da uygulamada kayıtlı e-posta adresinden {{contactEmail}} adresine iletebilirsin. Başvurun en geç 30 gün içinde ücretsiz olarak sonuçlandırılır; işlemin ayrıca bir maliyet gerektirmesi hâlinde Kurulca belirlenen tarifedeki ücret alınabilir." },
+          { "p": "Hesabını ve verilerini silmek için uygulamada Ayarlar › Hesabımı sil adımını da kullanabilirsin." },
+          { "p": "Yürürlük tarihi: {{effectiveDate}} · Sürüm {{version}}" }
+        ]
+      }
+    ]
+  },
+  "terms": {
+    "slug": "kosullar",
+    "title": "Kullanım Koşulları",
+    "intro": "{{appName}} uygulamasını kullanarak bu koşulları kabul etmiş olursun. Lütfen dikkatle oku.",
+    "sections": [
+      {
+        "id": "hizmet",
+        "heading": "1. Hizmet",
+        "blocks": [
+          { "p": "{{appName}}; faturalarını, kredi kartı ekstrelerini ve harcamalarını takip etmen, son ödeme günlerinde hatırlatma alman ve tahmini faiz hesapları görmen için bir kişisel finans takip aracıdır. Uygulama ödeme yapmaz, bankalara bağlanmaz, para transferi veya kredi aracılığı yapmaz." }
+        ]
+      },
+      {
+        "id": "tahmin",
+        "heading": "2. Hesaplamalar tahminidir",
+        "blocks": [
+          { "p": "Faiz, KKDF, BSMV, asgari ödeme ve ekstre tutarları; Türkiye Cumhuriyet Merkez Bankası'nın ilan ettiği azami oranlar veya senin girdiğin oranlar ile senin girdiğin kayıtlar kullanılarak hesaplanan TAHMİNLERDİR. Bankanın uyguladığı gerçek tutarlar farklı olabilir. Ödeme kararlarında her zaman bankanın ekstresini ve resmî bilgilerini esas al. Uygulamadaki bilgiler yatırım, kredi veya finansal danışmanlık niteliği taşımaz." }
+        ]
+      },
+      {
+        "id": "hatirlatma",
+        "heading": "3. Hatırlatmalar",
+        "blocks": [
+          { "p": "Hatırlatmalar cihazının bildirim sistemiyle gönderilir. Bildirim izninin kapatılması, cihazın pil tasarrufu ayarları, uygulamanın uzun süre açılmaması veya işletim sistemi kısıtlamaları nedeniyle bir hatırlatma gecikebilir ya da gelmeyebilir. Ödemelerinin zamanında yapılması senin sorumluluğundadır." }
+        ]
+      },
+      {
+        "id": "hesap",
+        "heading": "4. Hesabın",
+        "blocks": [
+          { "ul": [
+            "Kayıt sırasında doğru bilgi vermekten ve şifreni gizli tutmaktan sen sorumlusun.",
+            "Uygulamayı yasalara aykırı amaçlarla kullanamazsın.",
+            "Hesabını dilediğin an Ayarlar › Hesabımı sil ile kapatabilirsin."
+          ] }
+        ]
+      },
+      {
+        "id": "sorumluluk",
+        "heading": "5. Sorumluluğun sınırı",
+        "blocks": [
+          { "p": "Uygulama \"olduğu gibi\" sunulur. Hesaplamaların ve hatırlatmaların hatasız veya kesintisiz olacağı garanti edilmez. Kanunun izin verdiği ölçüde, uygulamadaki tahminlere dayanılarak verilen kararlardan, gecikmiş veya gelmeyen hatırlatmalardan ya da cihaz kaybı nedeniyle oluşan veri kaybından doğan zararlardan sorumluluk kabul edilmez. Tüketici olarak sahip olduğun yasal haklar saklıdır." }
+        ]
+      },
+      {
+        "id": "gizlilik",
+        "heading": "6. Gizlilik",
+        "blocks": [
+          { "p": "Kişisel verilerin Gizlilik Politikası ve KVKK Aydınlatma Metni'ne uygun olarak işlenir." }
+        ]
+      },
+      {
+        "id": "uygulanacak",
+        "heading": "7. Uygulanacak hukuk ve iletişim",
+        "blocks": [
+          { "p": "Bu koşullara Türkiye Cumhuriyeti hukuku uygulanır. Tüketici uyuşmazlıklarında tüketici hakem heyetleri ve tüketici mahkemeleri yetkilidir. Soruların için: {{contactEmail}}." },
+          { "p": "Koşullar güncellenebilir; yeni sürüm uygulamada ve bu sayfada yayımlanır. Yürürlük tarihi: {{effectiveDate}} · Sürüm {{version}}." }
+        ]
+      }
+    ]
+  }
+}

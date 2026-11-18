@@ -16,7 +16,7 @@ permissions:
 
 concurrency:
   group: payflow-apk-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false # yeni push, süren derlemeyi iptal etmez; sıraya girer
 
 jobs:
   apk:

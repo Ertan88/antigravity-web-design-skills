@@ -5,6 +5,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import { AuthField, AuthScaffold, BrandMark, FormError, OrDivider } from '../../auth/AuthScaffold';
 import { isValidEmail, toAuthError } from '../../auth/errors';
 import { GoogleButton } from '../../auth/GoogleButton';
+import { LegalNotice } from '../../auth/LegalNotice';
 import { useTheme } from '../../theme/ThemeProvider';
 import { fonts } from '../../theme/tokens';
 import { AppText, PrimaryButton, Surface } from '../../ui/primitives';
@@ -66,6 +67,7 @@ export default function LoginScreen() {
           </View>
           <OrDivider />
           <GoogleButton />
+          <LegalNotice withTerms />
         </>
       ) : (
         <Surface style={{ padding: 16, gap: 6 }}>

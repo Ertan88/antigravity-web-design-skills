@@ -5,6 +5,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import { AuthField, AuthScaffold, FormError, OrDivider } from '../../auth/AuthScaffold';
 import { isValidEmail, toAuthError } from '../../auth/errors';
 import { GoogleButton } from '../../auth/GoogleButton';
+import { LegalNotice } from '../../auth/LegalNotice';
 import { passwordStrength } from '../../core/password';
 import { useTheme } from '../../theme/ThemeProvider';
 import { fonts } from '../../theme/tokens';
@@ -17,7 +18,7 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [kvkk, setKvkk] = useState(false);
+  const [terms, setTerms] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -32,7 +33,7 @@ export default function RegisterScreen() {
     if (password.length < 8) e.password = 'Şifre en az 8 karakter olmalı';
     else if (strength.score < 2) e.password = 'Daha güçlü bir şifre seç';
     if (confirm !== password) e.confirm = 'Şifreler eşleşmiyor';
-    if (!kvkk) e.kvkk = 'Devam etmek için KVKK metnini onaylamalısın';
+    if (!terms) e.terms = 'Devam etmek için Kullanım Koşulları\'nı kabul etmelisin';
     setErrors(e);
     setFormError(null);
     if (Object.keys(e).length || !service) return;
@@ -86,19 +87,20 @@ export default function RegisterScreen() {
         <AuthField label="Şifre tekrar" secure autoComplete="new-password" value={confirm} onChangeText={setConfirm} error={errors.confirm} />
 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Switch accessibilityLabel="KVKK Aydınlatma Metni'ni okudum, kabul ediyorum" value={kvkk} onValueChange={setKvkk} trackColor={{ true: palette.button, false: palette.surface2 }} thumbColor="#FFFFFF" />
+          <Switch accessibilityLabel="Kullanım Koşulları'nı kabul ediyorum" value={terms} onValueChange={setTerms} trackColor={{ true: palette.button, false: palette.surface2 }} thumbColor="#FFFFFF" />
           <AppText variant="label" muted style={{ flex: 1, fontFamily: fonts.body }}>
-            <AppText variant="label" color={palette.accent}>
-              KVKK Aydınlatma Metni
+            <AppText variant="label" color={palette.accent} accessibilityRole="link" onPress={() => router.push('/legal/terms')}>
+              Kullanım Koşulları
             </AppText>
-            'ni okudum, kabul ediyorum.
+            'nı kabul ediyorum.
           </AppText>
         </View>
-        {errors.kvkk ? (
+        {errors.terms ? (
           <AppText variant="caption" color={palette.danger}>
-            {errors.kvkk}
+            {errors.terms}
           </AppText>
         ) : null}
+        <LegalNotice />
 
         <FormError message={formError} />
         <PrimaryButton title={busy ? 'Hesap oluşturuluyor…' : 'Hesabı oluştur'} onPress={submit} />

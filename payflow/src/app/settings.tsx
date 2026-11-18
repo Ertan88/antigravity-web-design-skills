@@ -176,6 +176,13 @@ export default function SettingsScreen() {
         </AppText>
       </Surface>
 
+      <SectionLabel>YASAL</SectionLabel>
+      <Surface style={{ overflow: 'hidden' }}>
+        <Row icon="shield" label="Gizlilik Politikası" onPress={() => router.push('/legal/privacy')} />
+        <Row icon="doc" label="KVKK Aydınlatma Metni" onPress={() => router.push('/legal/kvkk')} />
+        <Row icon="book" label="Kullanım Koşulları" onPress={() => router.push('/legal/terms')} last />
+      </Surface>
+
       <SectionLabel>DİĞER</SectionLabel>
       <Surface style={{ overflow: 'hidden' }}>
         <Row icon="bell" label="Bildirimler" value={permission === 'granted' ? 'Açık' : 'Kapalı'} onPress={() => router.push('/notifications')} />

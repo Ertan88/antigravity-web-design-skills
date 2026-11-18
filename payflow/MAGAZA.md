@@ -51,9 +51,9 @@ iOS'ta Google ile giriş için Firebase'e **iOS uygulaması** (bundle kimliği a
 | Gereklilik | Durum |
 |---|---|
 | Uygulama içinden hesap silme | ✅ Ayarlar › Hesabımı sil |
-| Hesap silme için **web bağlantısı** (Play zorunlu) | ⏳ Gizlilik politikası sayfasında "hesap silme talebi" bölümü + e-posta |
-| Gizlilik politikası URL'si | ⏳ Hukuki metin — senin/uzmanın yazması gerekiyor |
-| KVKK aydınlatma metni | ⏳ Kayıt ekranındaki bağlantı bu metne yönlenecek |
+| Hesap silme için **web bağlantısı** (Play zorunlu) | ✅ `docs/payflow/hesap-silme.html` (GitHub Pages açılınca yayında) |
+| Gizlilik politikası URL'si | ✅ taslak hazır (`docs/payflow/gizlilik.html`) — ⏳ `legal/controller.json` doldurulacak, avukat kontrolü önerilir |
+| KVKK aydınlatma metni | ✅ taslak hazır, kayıt/giriş ve Ayarlar › Yasal'da · ⏳ yurt dışı aktarım için standart sözleşme + KVKK bildirimi (bkz. `legal/README.md`) |
 | **Apple ile giriş** (Google girişi sunan iOS uygulamaları için) | ⏳ Apple geliştirici hesabı açılınca eklenecek |
 | Face ID kullanım açıklaması | ✅ |
 | Şifreleme beyanı (ITSAppUsesNonExemptEncryption) | ✅ standart HTTPS, beyan "hayır" |
@@ -62,6 +62,8 @@ iOS'ta Google ile giriş için Firebase'e **iOS uygulaması** (bundle kimliği a
 | Tahmini faiz uyarısı | ✅ ekranlarda "≈ tahmini" ve oran kaynağı |
 
 ## 5. Google Play "Veri güvenliği" formu — taslak
+
+Bağlantılar: Gizlilik Politikası → `https://ertan88.github.io/antigravity-web-design-skills/payflow/gizlilik.html` · Hesap silme → `https://ertan88.github.io/antigravity-web-design-skills/payflow/hesap-silme.html`
 
 | Veri | Toplanıyor mu | Amaç | Paylaşılıyor mu |
 |---|---|---|---|

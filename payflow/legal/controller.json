@@ -1,0 +1,9 @@
+{
+  "_aciklama": "Yasal metinlerdeki veri sorumlusu bilgileri. Mağazaya göndermeden ÖNCE köşeli parantezli alanları doldur, sonra `npm run legal` çalıştır.",
+  "appName": "PayFlow",
+  "controllerName": "[VERİ SORUMLUSU: AD SOYAD veya ŞİRKET UNVANI]",
+  "controllerAddress": "[TEBLİGAT ADRESİ]",
+  "contactEmail": "[İLETİŞİM E-POSTASI]",
+  "effectiveDate": "[YÜRÜRLÜK TARİHİ, örn. 01.12.2026]",
+  "version": "1.0"
+}

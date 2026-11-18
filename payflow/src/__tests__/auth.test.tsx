@@ -144,7 +144,7 @@ describe('Giriş', () => {
 });
 
 describe('Kayıt', () => {
-  it('KVKK ve şifre kuralları; kayıtlı e-posta; başarılı kayıt', async () => {
+  it('koşullar ve şifre kuralları; kayıtlı e-posta; başarılı kayıt', async () => {
     const f = fakeService();
     await renderWith(<RegisterScreen />, f.svc);
     await fireEvent.changeText(screen.getByLabelText('Ad Soyad'), 'Ertan');
@@ -154,10 +154,13 @@ describe('Kayıt', () => {
     await fireEvent.changeText(screen.getByLabelText('Şifre tekrar'), 'Akis-2026?');
     await fireEvent.press(screen.getByText('Hesabı oluştur'));
     expect(screen.getByText('Şifreler eşleşmiyor')).toBeTruthy();
-    expect(screen.getByText(/KVKK metnini onaylamalısın/)).toBeTruthy();
+    expect(screen.getByText(/Kullanım Koşulları'nı kabul etmelisin/)).toBeTruthy();
+    // Aydınlatma metni onaylatılmaz, yalnızca bildirilir (KVKK).
+    expect(screen.queryByLabelText(/Aydınlatma Metni'ni okudum, kabul ediyorum/)).toBeNull();
+    expect(screen.getByText(/KVKK Aydınlatma Metni/)).toBeTruthy();
 
     await fireEvent.changeText(screen.getByLabelText('Şifre tekrar'), 'Akis-2026!');
-    await fireEvent(screen.getByLabelText("KVKK Aydınlatma Metni'ni okudum, kabul ediyorum"), 'valueChange', true);
+    await fireEvent(screen.getByLabelText("Kullanım Koşulları'nı kabul ediyorum"), 'valueChange', true);
     await fireEvent.press(screen.getByText('Hesabı oluştur'));
     expect(await screen.findByText(/zaten bir hesap var/)).toBeTruthy();
 
