@@ -7,7 +7,7 @@ import { centeredText, Text } from "../../src/text.tsx";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth, type AppRole } from "../../src/auth.tsx";
 import { visibleTabs, type TabName } from "../../src/tabs.ts";
-import { useControlCenter, useInbox } from "../../src/data.ts";
+import { useAcademicCalendars, useControlCenter, useInbox } from "../../src/data.ts";
 import { colors, dark } from "../../src/theme.ts";
 import { Animated, Keyboard, Platform, Pressable, useWindowDimensions, View } from "react-native";
 import { useChromeHidden } from "../../src/scrollChrome.ts";
@@ -170,6 +170,9 @@ export default function TabsLayout() {
   const barInset = BAR_HEIGHT + barBottom + 12;
   const center = useControlCenter(isManager && role !== "platform");
   const inbox = useInbox("unread");
+  // Platform: onay bekleyen MEB takvimi sayısı Takvim simgesinde rozet olur (ana ekranda bölüm yok)
+  const calendars = useAcademicCalendars();
+  const calendarReview = role === "platform" ? (calendars.data ?? []).filter((c) => Boolean(c.pending) || c.status === "review").length : 0;
   const pending =
     (center.data?.pending.announcements ?? 0) +
     (center.data?.pending.leaves ?? 0);
@@ -220,6 +223,7 @@ export default function TabsLayout() {
         options={{
           title: "Takvim",
           ...hide("takvim"),
+          tabBarBadge: calendarReview || undefined,
           tabBarIcon: icon("calendar-outline", "calendar"),
         }}
       />

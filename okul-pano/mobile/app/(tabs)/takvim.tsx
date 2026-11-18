@@ -7,7 +7,7 @@ import { api } from '../../src/api.ts';
 import { useAcademicCalendars, type CalendarRow } from '../../src/data.ts';
 import { dateSpan, fullDate, timeAgo } from '../../src/day.ts';
 import { colors } from '../../src/theme.ts';
-import { Badge, Button, Card, Empty, ErrorNote, Loading, Screen, SectionTitle, T } from '../../src/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorNote, Loading, Screen, T } from '../../src/ui.tsx';
 
 const SOURCE = { meb: 'MEB duyurusundan', manual: 'Elle girildi', builtin: 'Kurulum verisi' } as const;
 
@@ -30,67 +30,35 @@ function rowsOf(data: AcademicCalendarData, startYear: number): Row[] {
   ];
 }
 
-const days = (a: string, b: string) => Math.max(1, Math.round((Date.parse(b) - Date.parse(a)) / 86400_000) + 1);
+const DAY = 86400_000;
+const days = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / DAY);
+const today = () => new Date().toISOString().slice(0, 10);
 
-/** Yılın renkli şeridi: birinci dönem, ara tatiller, yarıyıl, ikinci dönem (genişlik gün sayısıyla orantılı) */
-function YearStrip({ data, height = 30, labels = true }: { data: AcademicCalendarData; height?: number; labels?: boolean }) {
+type Now = { title: string; until: string | null; next: { name: string; inDays: number } | null; progress: number };
+
+/** Bugün eğitim yılının neresinde: dönem ya da tatil, bitişi, sonraki tatil ve geçen süre */
+function nowOf(data: AcademicCalendarData, startYear: number, t: string): Now {
   const sem = semesterBreak(data);
-  const segs: { kind: 'l1' | 'l2' | 'b'; n: number; label?: string }[] = [];
-  const term = (from: string, to: string, kind: 'l1' | 'l2', label: string) => {
-    let cur = from;
-    let first = true;
-    for (const b of data.breaks.filter((x) => x.start > from && x.start < to).sort((x, y) => x.start.localeCompare(y.start))) {
-      segs.push({ kind, n: days(cur, b.start) - 1, label: first ? label : undefined });
-      segs.push({ kind: 'b', n: days(b.start, b.end) });
-      cur = b.end;
-      first = false;
-    }
-    segs.push({ kind, n: days(cur, to), label: first ? label : undefined });
-  };
-  term(data.lessonsStart, data.term1End, 'l1', '1. dönem');
-  segs.push({ kind: 'b', n: days(sem.start, sem.end), label: 'Yarıyıl' });
-  term(data.term2Start, data.lessonsEnd, 'l2', '2. dönem');
-  const bg = { l1: '#6366f1', l2: '#818cf8', b: '#16a34a' } as const;
-  return (
-    <View style={{ flexDirection: 'row', height, borderRadius: 10, overflow: 'hidden' }} accessibilityLabel="Eğitim yılı şeridi: dönemler ve tatiller">
-      {segs
-        .filter((x) => x.n > 0)
-        .map((x, i) => (
-          <View key={i} style={{ flex: x.n, backgroundColor: bg[x.kind], alignItems: 'center', justifyContent: 'center' }}>
-            {labels && x.label && x.n > 14 ? (
-              <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#fff' }} numberOfLines={1}>
-                {x.label}
-              </Text>
-            ) : null}
-          </View>
-        ))}
-    </View>
+  const summer = summerBreak(data, startYear);
+  const holidays = [...data.breaks.map((b) => ({ name: b.name, start: b.start, end: b.end })), { name: 'Yarıyıl tatili', ...sem }, { name: 'Yaz tatili', ...summer }].sort((a, b) =>
+    a.start.localeCompare(b.start),
   );
-}
-
-function Legend() {
-  return (
-    <View style={{ flexDirection: 'row', gap: 12 }}>
-      {(
-        [
-          ['Ders', '#6366f1'],
-          ['Tatil', '#16a34a'],
-        ] as const
-      ).map(([t, c]) => (
-        <View key={t} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-          <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: c }} />
-          <T size={11.5} weight="700" color={colors.muted}>
-            {t}
-          </T>
-        </View>
-      ))}
-    </View>
-  );
+  const inHoliday = holidays.find((h) => h.start <= t && t <= h.end);
+  const nextH = holidays.find((h) => h.start > t);
+  const next = nextH ? { name: nextH.name, inDays: days(t, nextH.start) } : null;
+  const total = days(data.lessonsStart, data.lessonsEnd) || 1;
+  const progress = Math.min(1, Math.max(0, days(data.lessonsStart, t) / total));
+  if (t < data.lessonsStart) return { title: 'Ders yılı başlamadı', until: data.lessonsStart, next, progress: 0 };
+  if (inHoliday) return { title: inHoliday.name, until: inHoliday.end, next, progress };
+  if (t <= data.term1End) return { title: '1. dönem', until: data.term1End, next, progress };
+  if (t >= data.term2Start && t <= data.lessonsEnd) return { title: '2. dönem', until: data.lessonsEnd, next, progress };
+  return { title: 'Ders yılı bitti', until: null, next, progress: 1 };
 }
 
 /**
- * MEB çalışma takvimi (platform yöneticisi): her yıl haziran ortasından itibaren MEB'in sitesi taranır, bulunan
- * takvim onaya düşer. Onaylanınca bütün okulların tatil takvimine işlenir.
+ * MEB çalışma takvimi (platform yöneticisi, C): üstte bugünün durumu; MEB'den yeni takvim bulunduysa yalnızca değişen
+ * tarihler eski ve yeni yan yana, onay tek dokunuşla; altta yılların kısa tarih listesi. Her yıl haziran ortasından
+ * itibaren MEB'in sitesi taranır; onaylanan takvim bütün okulların tatil takvimine işlenir.
  */
 export default function Takvim() {
   const calendars = useAcademicCalendars();
@@ -105,14 +73,17 @@ export default function Takvim() {
     },
   });
   const decide = useMutation({
-    mutationFn: ({ year, action }: { year: number; action: 'accept' | 'reject' }) =>
-      api(`/api/platform/academic-calendars/${year}/${action}`, { method: 'POST' }),
+    mutationFn: ({ year, action }: { year: number; action: 'accept' | 'reject' }) => api(`/api/platform/academic-calendars/${year}/${action}`, { method: 'POST' }),
     onSuccess: refresh,
   });
 
-  const current = academicYearOf(new Date().toISOString().slice(0, 10));
-  const rows = (calendars.data ?? []).filter((c) => c.startYear >= current).sort((a, b) => Number(Boolean(b.pending) || b.status === 'review') - Number(Boolean(a.pending) || a.status === 'review') || b.startYear - a.startYear);
-  const missingNext = !rows.some((r) => r.startYear === current + 1);
+  const t = today();
+  const current = academicYearOf(t);
+  const all = (calendars.data ?? []).filter((c) => c.startYear >= current).sort((a, b) => a.startYear - b.startYear);
+  const waiting = all.filter((c) => Boolean(c.pending) || c.status === 'review');
+  const settled = all.filter((c) => !c.pending && c.status !== 'review');
+  const now = all.find((c) => c.startYear === current && c.status !== 'review');
+  const missingNext = !all.some((r) => r.startYear === current + 1);
 
   return (
     <Screen title="MEB takvimi" subtitle="Bütün okullar için ortak" refreshing={calendars.isRefetching} onRefresh={() => void calendars.refetch()}>
@@ -124,122 +95,165 @@ export default function Takvim() {
           </T>
         </Card>
       )}
-      {missingNext && (
-        <Card style={{ gap: 8 }}>
-          <T weight="700">{academicYearLabel(current + 1)} takvimi henüz yok</T>
-          <T size={13} color={colors.muted}>
-            MEB takvimi genellikle haziran ortasından itibaren duyurur; sistem her gün kendiliğinden tarar. İsterseniz şimdi tarayın.
-          </T>
-          <Button
-            size="sm"
-            variant="secondary"
-            icon="refresh"
-            loading={scan.isPending && scan.variables === current + 1}
-            onPress={() => scan.mutate(current + 1)}
-          >
-            Şimdi tara
-          </Button>
-        </Card>
-      )}
       {calendars.isLoading ? (
         <Loading />
-      ) : !rows.length ? (
-        <Card>
-          <Empty icon="calendar-outline" title="Takvim yok" />
-        </Card>
       ) : (
-        rows.map((c) => (
-          <CalendarCard
-            key={c.startYear}
-            c={c}
-            scanning={scan.isPending && scan.variables === c.startYear}
-            onScan={() => scan.mutate(c.startYear)}
-            onDecide={(action) => decide.mutate({ year: c.startYear, action })}
-            deciding={decide.isPending && decide.variables?.year === c.startYear}
-          />
-        ))
+        <>
+          {now && <NowCard data={now.data} startYear={now.startYear} t={t} />}
+          {waiting.map((c) => (
+            <ReviewCard
+              key={c.startYear}
+              c={c}
+              deciding={decide.isPending && decide.variables?.year === c.startYear}
+              onDecide={(action) => decide.mutate({ year: c.startYear, action })}
+            />
+          ))}
+          {missingNext && (
+            <Card style={{ gap: 8 }}>
+              <T weight="800">{academicYearLabel(current + 1).replace('-', '–')} takvimi henüz yok</T>
+              <T size={13} color={colors.muted}>
+                MEB takvimi genellikle haziran ortasından itibaren duyurur; sistem her gün kendiliğinden tarar.
+              </T>
+              <Button size="sm" variant="secondary" icon="refresh" loading={scan.isPending && scan.variables === current + 1} onPress={() => scan.mutate(current + 1)}>
+                Şimdi tara
+              </Button>
+            </Card>
+          )}
+          {settled.map((c) => (
+            <DatesCard key={c.startYear} c={c} scanning={scan.isPending && scan.variables === c.startYear} onScan={() => scan.mutate(c.startYear)} />
+          ))}
+          {!all.length && !missingNext && (
+            <Card>
+              <Empty icon="calendar-outline" title="Takvim yok" />
+            </Card>
+          )}
+        </>
       )}
       <T size={12} color={colors.muted} style={{ textAlign: 'center' }}>
-        Takvimi elle düzeltmek için yönetim panelinde Tatil Takvimi sayfasını kullanın.
+        Takvimi elle düzeltmek için yönetim panelinde MEB Çalışma Takvimi sayfasını kullanın.
       </T>
     </Screen>
   );
 }
 
-function CalendarCard({
-  c,
-  scanning,
-  onScan,
-  onDecide,
-  deciding,
-}: {
-  c: CalendarRow;
-  scanning: boolean;
-  onScan: () => void;
-  onDecide: (a: 'accept' | 'reject') => void;
-  deciding: boolean;
-}) {
-  const waiting = Boolean(c.pending) || c.status === 'review';
-  const [open, setOpen] = useState(waiting);
+/** Şu an: dönem ya da tatil, bitişi, sonraki tatile kalan gün, ders yılının geçen kısmı (marka renginde, iki temada aynı) */
+function NowCard({ data, startYear, t }: { data: AcademicCalendarData; startYear: number; t: string }) {
+  const n = nowOf(data, startYear, t);
+  const pct = Math.round(n.progress * 100);
+  return (
+    <View style={{ backgroundColor: '#115e66', borderRadius: 22, padding: 16, gap: 4 }}>
+      <Text style={{ fontSize: 11.5, fontWeight: '800', color: 'rgba(255,255,255,0.75)', letterSpacing: 0.4 }}>
+        {`ŞU AN · ${academicYearLabel(startYear).replace('-', '–')}`}
+      </Text>
+      <Text style={{ fontSize: 22, fontWeight: '800', color: '#fff' }}>{n.title}</Text>
+      <Text style={{ fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.85)' }}>
+        {[n.until ? `Bitiş: ${fullDate(n.until)}` : null, n.next ? `Sonraki tatil: ${n.next.name}, ${n.next.inDays} gün sonra` : null].filter(Boolean).join(' · ')}
+      </Text>
+      <View style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.2)', overflow: 'hidden', marginTop: 10 }}>
+        <View style={{ width: `${pct}%`, height: '100%', backgroundColor: '#fde68a' }} />
+      </View>
+      <Text style={{ fontSize: 11.5, fontWeight: '600', color: 'rgba(255,255,255,0.8)' }}>{`Ders yılının %${pct}'i geçti`}</Text>
+    </View>
+  );
+}
+
+/** Onay bekleyen takvim: yalnızca değişen tarihler eski / yeni; "Tümünü gör" ile bütün tarihler */
+function ReviewCard({ c, deciding, onDecide }: { c: CalendarRow; deciding: boolean; onDecide: (a: 'accept' | 'reject') => void }) {
+  const [all, setAll] = useState(false);
   const shown = c.pending?.data ?? c.data;
   const before = c.pending ? new Map(rowsOf(c.data, c.startYear).map((r) => [r.key, r.value])) : null;
   const rows = rowsOf(shown, c.startYear);
-  const changed = before ? rows.filter((r) => before.get(r.key) !== r.value).length : 0;
+  const changed = before ? rows.filter((r) => before.get(r.key) !== r.value) : rows;
+  const list = all || !before ? rows : changed;
   return (
-    <View style={{ gap: 8 }}>
-      <SectionTitle right={<Badge tone={waiting ? 'warning' : 'success'}>{waiting ? 'Onay bekliyor' : 'Onaylandı'}</Badge>}>{c.label.replace('-', '–')}</SectionTitle>
-      <Card style={{ gap: 10 }}>
-        <T size={12} color={colors.muted}>
-          {c.pending ? `MEB duyurusundan · ${timeAgo(c.pending.foundAt)} bulundu${changed ? ` · ${changed} tarih farklı` : ''}` : `${SOURCE[c.source]}${c.checkedAt ? ` · son tarama ${timeAgo(c.checkedAt)}` : ''}`}
+    <Card style={{ gap: 8, borderWidth: 1.5, borderColor: colors.warning }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <T weight="800" style={{ flex: 1 }}>
+          {`${c.label.replace('-', '–')} onay bekliyor`}
         </T>
-        <YearStrip data={shown} height={open ? 30 : 20} labels={open} />
-        {open && <Legend />}
-        {open ? (
-          <View>
-            {rows.map((r, i) => {
-              const old = before?.get(r.key);
-              const diff = before && old !== r.value;
-              return (
-                <View key={r.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderTopWidth: i ? 1 : 0, borderTopColor: colors.divider }}>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <T size={12} color={colors.muted}>
-                      {r.label}
-                    </T>
-                    {diff && old ? (
-                      <T size={12.5} color={colors.subtle} style={{ textDecorationLine: 'line-through' }}>
-                        {old}
-                      </T>
-                    ) : null}
-                    <T size={14} weight={diff ? '800' : '600'} color={diff ? colors.warning : colors.ink}>
-                      {r.value}
-                    </T>
-                  </View>
-                  {diff ? <Badge tone="warning">{old ? 'Değişti' : 'Yeni'}</Badge> : null}
-                </View>
-              );
-            })}
-          </View>
-        ) : (
-          <Button size="sm" variant="ghost" icon="chevron-down" onPress={() => setOpen(true)}>
-            Tarihleri göster
+        <Badge tone="warning">{before ? `${changed.length} fark` : 'Yeni'}</Badge>
+      </View>
+      <T size={12} color={colors.muted}>
+        {c.pending ? `MEB duyurusundan · ${timeAgo(c.pending.foundAt)} bulundu` : SOURCE[c.source]}
+      </T>
+      <View>
+        {list.map((r, i) => {
+          const old = before?.get(r.key);
+          const diff = before && old !== r.value;
+          return (
+            <View key={r.key} style={{ paddingVertical: 7, borderTopWidth: i ? 1 : 0, borderTopColor: colors.divider, gap: 1 }}>
+              <T size={12} color={colors.muted}>
+                {r.label}
+              </T>
+              {diff && old ? (
+                <T size={12.5} color={colors.subtle} style={{ textDecorationLine: 'line-through' }}>
+                  {old}
+                </T>
+              ) : null}
+              <T size={13.5} weight={diff ? '800' : '600'} color={diff ? colors.warning : colors.ink}>
+                {r.value}
+              </T>
+            </View>
+          );
+        })}
+      </View>
+      {before && rows.length > changed.length && (
+        <Button size="sm" variant="ghost" icon={all ? 'chevron-up' : 'chevron-down'} onPress={() => setAll((x) => !x)}>
+          {all ? 'Yalnızca farkları göster' : `Diğer ${rows.length - changed.length} tarih aynı · Tümünü gör`}
+        </Button>
+      )}
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        {c.pending && (
+          <Button variant="secondary" disabled={deciding} onPress={() => onDecide('reject')} style={{ flex: 1 }}>
+            Mevcut kalsın
           </Button>
         )}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {waiting && (
-            <Button icon="checkmark" loading={deciding} onPress={() => onDecide('accept')} style={{ flex: 1 }}>
-              Onayla
-            </Button>
-          )}
-          {c.pending && (
-            <Button variant="secondary" disabled={deciding} onPress={() => onDecide('reject')} style={{ flex: 1 }}>
-              Mevcut kalsın
-            </Button>
-          )}
-          <Button size="sm" variant="secondary" icon="refresh" loading={scanning} onPress={onScan} style={waiting ? { flexBasis: '100%' } : { flex: 1 }}>
-            Şimdi tara
-          </Button>
+        <Button icon="checkmark" loading={deciding} onPress={() => onDecide('accept')} style={{ flex: 1 }}>
+          Onayla
+        </Button>
+      </View>
+    </Card>
+  );
+}
+
+/** Onaylı yılın kısa tarih listesi: başlangıç, yarıyıl, bitiş; ara tatiller "Tümü" ile */
+function DatesCard({ c, scanning, onScan }: { c: CalendarRow; scanning: boolean; onScan: () => void }) {
+  const [all, setAll] = useState(false);
+  const rows = rowsOf(c.data, c.startYear);
+  const main = new Set(['start', 'sem', 'end']);
+  const list = all ? rows : rows.filter((r) => main.has(r.key));
+  const hidden = rows.length - list.length;
+  return (
+    <Card style={{ gap: 6 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <T weight="800" style={{ flex: 1 }}>
+          {`${c.label.replace('-', '–')} tarihleri`}
+        </T>
+        <Badge tone="success">Onaylandı</Badge>
+      </View>
+      {list.map((r) => (
+        <View key={r.key} style={{ flexDirection: 'row', gap: 10, paddingVertical: 6, borderTopWidth: 1, borderTopColor: colors.divider }}>
+          <T size={13} color={colors.muted} style={{ flex: 1 }}>
+            {r.label}
+          </T>
+          <T size={13} weight="700" style={{ flex: 1.4, textAlign: 'right' }}>
+            {r.value}
+          </T>
         </View>
-      </Card>
-    </View>
+      ))}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        {(hidden > 0 || all) && (
+          <Button size="sm" variant="ghost" icon={all ? 'chevron-up' : 'chevron-down'} onPress={() => setAll((x) => !x)} style={{ flex: 1 }}>
+            {all ? 'Kısa göster' : 'Bütün tarihler'}
+          </Button>
+        )}
+        <Button size="sm" variant="ghost" icon="refresh" loading={scanning} onPress={onScan} style={{ flex: 1 }}>
+          Şimdi tara
+        </Button>
+      </View>
+      <T size={11.5} color={colors.faint}>
+        {`${SOURCE[c.source]}${c.checkedAt ? ` · son tarama ${timeAgo(c.checkedAt)}` : ''}`}
+      </T>
+    </Card>
   );
 }
