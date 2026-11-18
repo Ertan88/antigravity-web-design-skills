@@ -85,11 +85,18 @@ export default function SettingsScreen() {
                 Bulut yedek · {syncText}
               </AppText>
             </View>
-            <Pressable accessibilityRole="button" onPress={doSignOut} style={{ paddingVertical: 6 }}>
-              <AppText variant="label" color={palette.danger}>
-                Çıkış yap
-              </AppText>
-            </Pressable>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Pressable accessibilityRole="button" onPress={doSignOut} style={{ paddingVertical: 6 }}>
+                <AppText variant="label" color={palette.danger}>
+                  Çıkış yap
+                </AppText>
+              </Pressable>
+              <Pressable accessibilityRole="button" onPress={() => router.push('/delete-account')} style={{ paddingVertical: 6 }}>
+                <AppText variant="label" muted>
+                  Hesabımı sil
+                </AppText>
+              </Pressable>
+            </View>
           </>
         ) : (
           <>

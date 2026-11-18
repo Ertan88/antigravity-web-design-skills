@@ -23,6 +23,11 @@ export interface AuthService {
   resetPassword(email: string): Promise<void>;
   signInWithGoogleIdToken(idToken: string): Promise<void>;
   signOut(): Promise<void>;
+  /**
+   * Hesabı kalıcı olarak siler: önce buluttaki yedek, sonra kimlik.
+   * E-posta hesaplarında güvenlik için şifre yeniden doğrulanır.
+   */
+  deleteAccount(password?: string): Promise<void>;
   loadBackup(uid: string): Promise<CloudBackup | null>;
   saveBackup(uid: string, state: AppState): Promise<number>;
 }

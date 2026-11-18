@@ -2,11 +2,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getApp, getApps, initializeApp } from 'firebase/app';
 import {
   createUserWithEmailAndPassword,
+  deleteUser,
+  EmailAuthProvider,
   getAuth,
   getReactNativePersistence,
   GoogleAuthProvider,
   initializeAuth,
   onAuthStateChanged,
+  reauthenticateWithCredential,
   sendPasswordResetEmail,
   signInWithCredential,
   signInWithEmailAndPassword,
@@ -15,7 +18,7 @@ import {
   type Auth,
   type User,
 } from 'firebase/auth';
-import { doc, getDoc, getFirestore, setDoc } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, getFirestore, setDoc } from 'firebase/firestore';
 import { firebaseConfig } from '../config/env';
 import { migrate } from '../store/reducer';
 import { toAuthError } from './errors';
@@ -68,6 +71,14 @@ export function createFirebaseService(): AuthService {
     resetPassword: (email) => wrap(() => sendPasswordResetEmail(auth, email.trim())),
     signInWithGoogleIdToken: (idToken) => wrap(async () => void (await signInWithCredential(auth, GoogleAuthProvider.credential(idToken)))),
     signOut: () => wrap(() => signOut(auth)),
+    deleteAccount: (password) =>
+      wrap(async () => {
+        const u = auth.currentUser;
+        if (!u) return;
+        if (password && u.email) await reauthenticateWithCredential(u, EmailAuthProvider.credential(u.email, password));
+        await deleteDoc(doc(db, 'users', u.uid));
+        await deleteUser(u);
+      }),
     loadBackup: async (uid) => {
       const snap = await getDoc(doc(db, 'users', uid));
       if (!snap.exists()) return null;

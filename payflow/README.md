@@ -47,7 +47,7 @@ Hesapları açmak için:
 4. **Proje ayarları → Uygulamalarınız → Web uygulaması ekle** → çıkan `firebaseConfig` değerlerini
    `.env.example` dosyasını `.env` olarak kopyalayıp doldur.
 5. Google ile giriş için Google Cloud Console'da iOS ve Android OAuth istemci kimliklerini oluştur
-   (paket adı `app.payflow.mobile`), `.env`'e ekle. Google ile giriş **Expo Go'da çalışmaz**;
+   (paket adı `com.ertan88.odemeasistani`), `.env`'e ekle. Google ile giriş **Expo Go'da çalışmaz**;
    geliştirme derlemesi gerekir: `npx eas-cli@latest build --profile development`.
 
 Yedek, `users/{uid}` belgesinde tutulur; kurallar her kullanıcının yalnızca kendi belgesine

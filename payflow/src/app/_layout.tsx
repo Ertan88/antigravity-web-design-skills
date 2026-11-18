@@ -44,6 +44,7 @@ function RootStack() {
           <Stack.Screen name="notifications" />
           <Stack.Screen name="settings" />
           <Stack.Screen name="expenses" />
+          <Stack.Screen name="delete-account" />
         </Stack.Protected>
         <Stack.Protected guard={!inside}>
           <Stack.Screen name="(auth)" />

@@ -22,6 +22,8 @@ export function toAuthError(e: unknown): AuthError {
       return new AuthError('İnternet bağlantısı yok gibi görünüyor.');
     case 'auth/user-disabled':
       return new AuthError('Bu hesap devre dışı bırakılmış.');
+    case 'auth/requires-recent-login':
+      return new AuthError('Güvenlik için yeniden giriş gerekiyor. Çıkış yapıp tekrar giriş yap, ardından hemen sil.');
     case 'auth/account-exists-with-different-credential':
       return new AuthError('Bu e-posta başka bir giriş yöntemiyle kayıtlı. O yöntemle giriş yap.', 'email');
     default:

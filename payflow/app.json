@@ -8,8 +8,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.payflow.mobile",
-      "buildNumber": "1"
+      "bundleIdentifier": "com.ertan88.odemeasistani"
     },
     "android": {
       "adaptiveIcon": {
@@ -19,15 +18,14 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "app.payflow.mobile",
-      "versionCode": 1
+      "package": "com.ertan88.odemeasistani"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "scheme": [
       "payflow",
-      "app.payflow.mobile"
+      "com.ertan88.odemeasistani"
     ],
     "plugins": [
       "expo-router",

@@ -5,6 +5,7 @@ import { Alert, AlertButton, Text } from 'react-native';
 import ForgotScreen from '../app/(auth)/forgot';
 import LoginScreen from '../app/(auth)/login';
 import RegisterScreen from '../app/(auth)/register';
+import DeleteAccountScreen from '../app/delete-account';
 import SettingsScreen from '../app/settings';
 import { AuthProvider, useAuth } from '../auth/AuthProvider';
 import { CloudSync } from '../auth/CloudSync';
@@ -29,7 +30,7 @@ function fakeService(opts: { backup?: CloudBackup | null } = {}) {
   let current: AuthUser | null = null;
   const listeners = new Set<(u: AuthUser | null) => void>();
   const emit = () => listeners.forEach((l) => l(current));
-  const calls = { register: [] as string[][], reset: [] as string[], saved: [] as AppState[], signOut: 0 };
+  const calls = { register: [] as string[][], reset: [] as string[], saved: [] as AppState[], signOut: 0, deleted: 0 };
   const svc: AuthService = {
     onAuthChange: (cb) => {
       listeners.add(cb);
@@ -51,6 +52,12 @@ function fakeService(opts: { backup?: CloudBackup | null } = {}) {
     signInWithGoogleIdToken: async () => {},
     signOut: async () => {
       calls.signOut++;
+      current = null;
+      emit();
+    },
+    deleteAccount: async (password) => {
+      if (current?.provider === 'password' && password !== 'Dogru-Sifre1') throw toAuthError({ code: 'auth/invalid-credential' });
+      calls.deleted++;
       current = null;
       emit();
     },
@@ -223,3 +230,31 @@ describe('Ayarlar', () => {
   });
 });
 
+
+describe('Hesap silme', () => {
+  it('onay ve şifre ister; yanlış şifrede silmez; doğru şifrede hesabı ve cihaz verisini siler', async () => {
+    const f = fakeService();
+    await renderWith(<DeleteAccountScreen />, f.svc, demoState(new Date()));
+    await act(async () => f.login({ uid: 'u1', email: 'e@o.com', displayName: 'E', provider: 'password' }));
+    await fireEvent.press(screen.getByText('Hesabımı kalıcı olarak sil'));
+    expect(screen.getByText(/onay kutusunu/)).toBeTruthy();
+
+    await fireEvent(screen.getByLabelText('Bunun geri alınamayacağını anlıyorum'), 'valueChange', true);
+    await fireEvent.changeText(screen.getByLabelText('Şifren'), 'yanlis');
+    await fireEvent.press(screen.getByText('Hesabımı kalıcı olarak sil'));
+    expect(await screen.findByText('Şifre hatalı.')).toBeTruthy();
+    expect(f.calls.deleted).toBe(0);
+    expect(store.cards).toHaveLength(1);
+
+    await fireEvent.changeText(screen.getByLabelText('Şifren'), 'Dogru-Sifre1');
+    await fireEvent.press(screen.getByText('Hesabımı kalıcı olarak sil'));
+    await waitFor(() => expect(f.calls.deleted).toBe(1));
+    expect(store.cards).toHaveLength(0);
+    expect(store.bills).toHaveLength(0);
+    expect(auth.status).toBe('signedOut');
+  });
+
+  it('Firebase hata kodu Türkçe', () => {
+    expect(toAuthError({ code: 'auth/requires-recent-login' }).message).toMatch(/yeniden giriş/);
+  });
+});
