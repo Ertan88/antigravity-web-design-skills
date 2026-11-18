@@ -33,6 +33,10 @@ kalır; burada tekrarlanmaz.
   saatten eskiyse geçişte platform hesabının şifresi yeniden sorulur. Uç noktalar yalnızca panel çereziyle ve özel
   başlıkla (`x-okul-switch`) çalışır, hız sınırlıdır. Mobilde "Hesap değiştir" ve giriş ekranındaki kayıtlı hesaplar
   yalnızca açık hesap platform hesabıysa ya da telefonda platform hesabı kayıtlıysa görünür (`switchAllowed`).
+  Okul hesabının şifresi değişince ya da sıfırlanınca bağlantı kalkar (`dropLinksTo`). Platform hesabı olmayan
+  telefonda önceden kaydedilmiş diğer hesaplar açılışta silinir, sunucudaki oturumları kapatılır.
+- Hatalı giriş kilidi (5 hatada 5 dakika) veritabanında tutulur (`login_failures`, e-postanın özetiyle): sunucu yeniden
+  başlayınca sıfırlanmaz.
 
 ### 1.2 Yetkilendirme ve okul ayrımı (çok kiracılı yapı)
 - Her okul verisi `schoolId` ile süzülür. Okula ait her uç nokta `schoolGuard()` ile korunur ve sorgularda

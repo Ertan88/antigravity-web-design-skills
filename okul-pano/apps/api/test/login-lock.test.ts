@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { buildApp } from '../src/app.ts';
+import { loginFailures } from '../src/db/schema.ts';
 import { createTestApp, SUPER, type TestCtx } from './helpers.ts';
 
 /* Giriş güvenliği: hesap başına art arda hatalı giriş kilidi, HTML sayfalarında CSP başlığı */
@@ -21,6 +23,18 @@ describe('giriş güvenliği', () => {
     expect(locked.json().message).toContain('dakika sonra');
     // Aynı ağdan başka hesap girebilir (okuldaki diğer öğretmenler)
     expect((await tryLogin('baska@ornek.test', 'yanlis-sifre')).statusCode).toBe(401);
+  });
+
+  it('kilit sunucu yeniden başlayınca da sürer; veritabanında e-posta değil özeti tutulur', async () => {
+    // Aynı veritabanıyla yeni bir sunucu (yeniden başlama ya da ikinci kopya)
+    const again = await buildApp({ database: t.database, env: { NODE_ENV: 'test', UPLOAD_DIR: t.uploadDir }, logger: false });
+    await again.ready();
+    const res = await again.inject({ method: 'POST', url: '/api/auth/login', payload: { email: SUPER.email, password: SUPER.password } });
+    expect(res.statusCode).toBe(429);
+    await again.close();
+    const rows = await t.database.db.select().from(loginFailures);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((r) => !r.keyHash.includes('@'))).toBe(true);
   });
 
   it('API yanıtlarında CSP başlığı yok (yalnızca HTML sayfalarına eklenir)', async () => {

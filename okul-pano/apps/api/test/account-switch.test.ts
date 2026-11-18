@@ -100,4 +100,5 @@ describe('hesap geçişi', () => {
     expect(await t.database.db.select().from(accountLinks)).toHaveLength(0);
     expect((await call('POST', '/api/auth/switch-account', schoolCookie, {})).statusCode).toBe(403);
   });
+
 });

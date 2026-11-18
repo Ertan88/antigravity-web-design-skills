@@ -5,6 +5,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { audit, schoolGuard, UUID_RE } from '../context.ts';
 import { memberships, sessions, teachers, users } from '../db/schema.ts';
 import { hashPassword, readablePassword } from '../lib/crypto.ts';
+import { dropLinksTo } from '../lib/accountLinks.ts';
 import { trySendMail } from '../lib/mailer.ts';
 import { notifyUsers } from '../lib/push.ts';
 import { addToInbox } from './notifications.ts';
@@ -166,6 +167,7 @@ export async function memberRoutes(app: FastifyInstance) {
         .where(eq(users.id, user!.id))
         .returning();
       await db.delete(sessions).where(eq(sessions.userId, user!.id));
+      await dropLinksTo(db, user!.id);
     }
     if (!user) {
       [user] = await db
@@ -289,6 +291,7 @@ export async function memberRoutes(app: FastifyInstance) {
     const password = body.password ?? readablePassword();
     await db.update(users).set({ passwordHash: await hashPassword(password) }).where(eq(users.id, m.membership.userId));
     await db.delete(sessions).where(eq(sessions.userId, m.membership.userId));
+    await dropLinksTo(db, m.membership.userId);
     await audit(req, 'update', 'Kullanıcı şifresi', m.membership.id, `${m.fullName} şifresi sıfırlandı`);
     let emailed = false;
     if (body.sendEmail) {

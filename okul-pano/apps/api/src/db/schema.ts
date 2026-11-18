@@ -67,6 +67,17 @@ export const sessions = pgTable(
 );
 
 /**
+ * Hesap başına art arda hatalı giriş sayacı (şifre deneme saldırısına karşı kilit). Sunucu yeniden başlasa da korunur.
+ * Anahtar e-postanın kendisi değil özetidir (kişisel veri tutulmaz).
+ */
+export const loginFailures = pgTable('login_failures', {
+  keyHash: text('key_hash').primaryKey(),
+  count: integer('count').notNull().default(0),
+  firstAt: timestamp('first_at', { withTimezone: true }).notNull(),
+  lockedUntil: timestamp('locked_until', { withTimezone: true }),
+});
+
+/**
  * Platform yöneticisinin kendi okul hesabına bağlantısı (web hesap geçişi). Yalnızca platform yöneticisi kurabilir;
  * okul hesabının şifresiyle doğrulanır, 12 saatten eski doğrulamada geçiş için şifre yeniden sorulur.
  */

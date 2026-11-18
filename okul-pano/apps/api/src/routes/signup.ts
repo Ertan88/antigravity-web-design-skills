@@ -5,6 +5,7 @@ import type { AppDeps } from '../context.ts';
 import { accessUser, UUID_RE } from '../context.ts';
 import { memberships, schools, sessions, signups, userInvites, users } from '../db/schema.ts';
 import { hashPassword, randomToken, sha256 } from '../lib/crypto.ts';
+import { dropLinksTo } from '../lib/accountLinks.ts';
 import { trySendMail } from '../lib/mailer.ts';
 import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
 import { addDefaultTeacherOptions } from './teachers.ts';
@@ -230,6 +231,7 @@ export async function signupRoutes(app: FastifyInstance) {
       await tx.update(userInvites).set({ usedAt: new Date() }).where(eq(userInvites.id, row.invite.id));
       await tx.delete(sessions).where(eq(sessions.userId, row.invite.userId));
     });
+    await dropLinksTo(db, row.invite.userId);
     return { email: row.email };
   });
 }

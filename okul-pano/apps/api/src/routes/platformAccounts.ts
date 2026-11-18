@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { accessUser } from '../context.ts';
 import { auditLogs, memberships, schools, sessions, users } from '../db/schema.ts';
 import { hashPassword, readablePassword, verifyPassword } from '../lib/crypto.ts';
+import { dropLinksTo } from '../lib/accountLinks.ts';
 import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
 import { trySendMail } from '../lib/mailer.ts';
 import { INVITE_PENDING } from './members.ts';
@@ -118,6 +119,7 @@ export async function platformAccountsRoutes(app: FastifyInstance) {
     const password = readablePassword();
     await db.update(users).set({ passwordHash: await hashPassword(password) }).where(eq(users.id, a.user.id));
     await db.delete(sessions).where(eq(sessions.userId, a.user.id));
+    await dropLinksTo(db, a.user.id);
     await log(accessUser(req).sub, a.schoolsOf.map((m) => m.schoolId), 'update', `Platform yöneticisi ${a.user.fullName} şifresini yeniledi`);
     const emailed = await trySendMail(env, {
       to: a.user.email,

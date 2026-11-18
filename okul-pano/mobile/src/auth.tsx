@@ -3,7 +3,7 @@ import { appView, type Permission, type Role } from '@okulpano/shared/permission
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { loadAccounts, saveAccounts, upsert, type SavedAccount } from './accounts.ts';
+import { loadAccounts, saveAccounts, switchAllowed, upsert, type SavedAccount } from './accounts.ts';
 import { api, deviceAccount, login, loginOther, logout, session } from './api.ts';
 import { clearSaved, restoreQueries, startSaving } from './persist.ts';
 import { deviceToken, isMuted, registerForPush, setMuted, setPushUser, unregisterPush } from './push.ts';
@@ -117,7 +117,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       startSaving(qc, `${session.server}|${data.user.id}`);
       await Promise.all([session.setSchool(picked), session.setMe(JSON.stringify(data))]);
       // Etkin hesap listede (yenileme anahtarı oturumda durur, listede tutulmaz)
-      await updateAccounts((list) => upsert(list, { ...accountMeta(data), server: session.server, refresh: null }));
+      const list = await updateAccounts((l) => upsert(l, { ...accountMeta(data), server: session.server, refresh: null }));
+      // Hesap geçişi yalnızca platform yöneticisine açık: başka telefonlarda önceden kaydedilmiş diğer hesaplar
+      // kaldırılır, sunucudaki oturumları kapatılır ve bildirimleri bu telefona gelmez olur
+      if (!switchAllowed(list, data.user.isSuperAdmin)) {
+        const others = list.filter((a) => !(a.userId === data.user.id && a.server === session.server));
+        if (others.length) {
+          const token = await deviceToken().catch(() => null);
+          for (const a of others) {
+            if (a.refresh && token) await deviceAccount(a.server, a.refresh, 'unlink', token).catch(() => undefined);
+            if (a.refresh) void fetch(`${a.server}/api/auth/logout`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ refreshToken: a.refresh }) }).catch(() => undefined);
+            await setMuted(a.userId, false).catch(() => undefined);
+          }
+          await updateAccounts((l) => l.filter((a) => a.userId === data.user.id && a.server === session.server));
+        }
+      }
     },
     [applyMe, qc, updateAccounts],
   );
