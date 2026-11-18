@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { CLOUD_ENABLED, isFirebaseConfigured } from '../config/env';
+import { createCloudService } from './cloudService';
 import { AuthService, AuthUser } from './types';
 
 export type AuthStatus = 'loading' | 'signedOut' | 'signedIn' | 'guest';
@@ -22,10 +23,7 @@ const Ctx = createContext<AuthValue | null>(null);
 
 function defaultService(): AuthService | null {
   if (!isFirebaseConfigured()) return null;
-  // Firebase yalnızca yapılandırıldığında yüklenir (testler ve yapılandırmasız kurulum için).
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { createFirebaseService } = require('./firebaseService') as typeof import('./firebaseService');
-  return createFirebaseService();
+  return createCloudService();
 }
 
 export function AuthProvider({ children, service: injected }: { children: ReactNode; service?: AuthService | null }) {

@@ -63,8 +63,10 @@ jobs:
           EXPO_PUBLIC_FIREBASE_APP_ID: ${{ vars.EXPO_PUBLIC_FIREBASE_APP_ID }}
           EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ vars.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
           EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: ${{ vars.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID }}
-        # Yalnızca güncel telefon mimarileri: derleme süresini yarıya indirir.
-        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+        # Test APK'sı yalnızca 64-bit telefonlar için (son yıllardaki neredeyse tüm Android cihazlar):
+        # boyut ~%40 küçülür, derleme hızlanır. Mağaza (AAB) tüm mimarileri içerir; Play her cihaza
+        # yalnızca kendi parçasını gönderir.
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
 
       - name: APK'yı adlandır
         id: apk

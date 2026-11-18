@@ -53,6 +53,15 @@
         {
           "faceIDPermission": "PayFlow verilerini Face ID ile kilitlemek için kullanılır."
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          }
+        }
       ]
     ]
   }
