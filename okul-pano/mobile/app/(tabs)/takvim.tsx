@@ -148,7 +148,7 @@ function NowCard({ data, startYear, t }: { data: AcademicCalendarData; startYear
       </Text>
       <Text style={{ fontSize: 22, fontWeight: '800', color: '#fff' }}>{n.title}</Text>
       <Text style={{ fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.85)' }}>
-        {[n.until ? `Bitiş: ${fullDate(n.until)}` : null, n.next ? `Sonraki tatil: ${n.next.name}, ${n.next.inDays} gün sonra` : null].filter(Boolean).join(' · ')}
+        {n.until ? `Bitiş: ${fullDate(n.until)}` : ''}
       </Text>
       <View style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.2)', overflow: 'hidden', marginTop: 10 }}>
         <View style={{ width: `${pct}%`, height: '100%', backgroundColor: '#fde68a' }} />
@@ -235,11 +235,14 @@ const LEGEND: { kind: LeafKind; label: string }[] = [
 
 /**
  * Takvim yaprakları (C): her olayın solunda gün-ay yaprağı, sağda adı ve süresi; 1. ve 2. dönem ayrı. MEB tarihlerine
- * resmî ve dini tatiller eklenir (bayram tek satır, arife notta). Geçenler soluk, süren olay "Şu an".
+ * resmî ve dini tatiller eklenir (bayram tek satır, arife notta). Geçenler listede kalır, soluk görünür; süren olay "Şu an", sıradaki tatil kaç gün kaldığını rozetle gösterir.
  */
 function DatesCard({ c, scanning, onScan }: { c: CalendarRow; scanning: boolean; onScan: () => void }) {
   const t = today();
   const leaves = calendarLeaves(c.data, c.startYear);
+  // Yalnızca sıradaki tatilde kaç gün kaldığı rozetle yazar (dersler başlar/biter gibi satırlarda yazmaz)
+  const nextHoliday = leaves.find((l) => l.kind !== 'term' && l.start > t);
+  const nextIn = nextHoliday ? Math.round((Date.parse(nextHoliday.start) - Date.parse(t)) / 86400_000) : 0;
   return (
     <View style={{ gap: 10 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -267,16 +270,14 @@ function DatesCard({ c, scanning, onScan }: { c: CalendarRow; scanning: boolean;
               const past = end < t;
               const now = l.start <= t && t <= end;
               const tone = tiles[TONE[l.kind]];
-              const inDays = Math.round((Date.parse(l.start) - Date.parse(t)) / 86400_000);
-              const sub = l.end
-                ? [rangeText(l.start, l.end), l.note].filter(Boolean).join(' · ')
-                : [wd(l.start), l.note, !past && !now && inDays <= 120 ? `${inDays} gün sonra` : null].filter(Boolean).join(' · ');
+              const isNext = l === nextHoliday;
+              const sub = l.end ? [rangeText(l.start, l.end), l.note].filter(Boolean).join(' · ') : [wd(l.start), l.note].filter(Boolean).join(' · ');
               return (
                 <View
                   key={l.key}
                   accessible
-                  accessibilityLabel={`${l.name}, ${l.end ? rangeText(l.start, l.end) : `${dm(l.start)} ${wd(l.start)}`}${l.note ? `, ${l.note}` : ''}${now ? ', şu an' : ''}`}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, borderTopWidth: i ? 1 : 0, borderTopColor: colors.divider, opacity: past ? 0.45 : 1 }}
+                  accessibilityLabel={`${l.name}, ${l.end ? rangeText(l.start, l.end) : `${dm(l.start)} ${wd(l.start)}`}${l.note ? `, ${l.note}` : ''}${now ? ', şu an' : ''}${isNext ? `, sıradaki tatil, ${nextIn} gün sonra` : ''}${past ? ', geçti' : ''}`}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, borderTopWidth: i ? 1 : 0, borderTopColor: colors.divider, opacity: past ? 0.6 : 1 }}
                 >
                   <View style={{ width: 52, borderRadius: 12, paddingVertical: 6, alignItems: 'center', backgroundColor: tone.bg }}>
                     <Text style={{ fontSize: 19, fontWeight: '800', lineHeight: 21, color: tone.fg }}>{Number(l.start.slice(8))}</Text>
@@ -288,6 +289,7 @@ function DatesCard({ c, scanning, onScan }: { c: CalendarRow; scanning: boolean;
                         {l.name}
                       </T>
                       {now && <Badge tone="success">Şu an</Badge>}
+                      {isNext && <Badge tone="primary">{nextIn === 1 ? 'Yarın' : `${nextIn} gün sonra`}</Badge>}
                     </View>
                     <T size={12.5} color={colors.muted}>
                       {sub}
