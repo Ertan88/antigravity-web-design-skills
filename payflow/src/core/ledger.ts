@@ -81,6 +81,8 @@ export function cardLedger(card: CreditCard, expenses: Expense[], payments: Card
           : undefined,
         purchases: [singlePurchases],
         installmentsDue: lines.map((l) => l.amount),
+        // Önceki ekstreden fazla ödenen tutar bu ekstreden düşülür (alacak).
+        refunds: prev ? [Math.max(0, prev.paidAfterCut - prev.result.total)] : [],
         limit: card.limit,
         isFirstYearCard: card.isFirstYear,
         rateOverride: card.rateOverride,
@@ -148,4 +150,44 @@ export function billNextDue(bill: Bill, now: Date): { due: Date; period: string 
     if (!paid(p)) return { due: d, period: p };
   }
   return null;
+}
+
+/** Devreden anaparaya bugün işleyen tahmini günlük faiz (KKDF + BSMV dahil). */
+export function dailyCarryInterest(st: CardStatement): Kurus {
+  const p = st.result.carriedPrincipal;
+  if (p <= 0) return 0;
+  return Math.round(p * (st.result.appliedRates.contractual / 30) * 1.3);
+}
+
+/** Ekstreye bu kesimden sonra düşen tek çekim harcamalar (dökümde listelemek için). */
+export function statementPurchases(card: CreditCard, expenses: Expense[], st: CardStatement): Expense[] {
+  const cycle = cycleOf(card);
+  return expenses
+    .filter((e) => e.source.type === 'card' && e.source.cardId === card.id && e.installments <= 1)
+    .filter((e) => sameDay(statementCutFor(new Date(e.date), cycle), st.cut))
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+/**
+ * Bir ekstreye `paidTotal` kadar ödenirse sonraki ekstreye devredecek tutar ve faizi.
+ * Ödeme ekranındaki "kalan faiziyle devreder" önizlemesi için.
+ */
+export function carryPreview(card: CreditCard, st: CardStatement, paidTotal: Kurus) {
+  const r = computeStatement({
+    previous: { total: st.result.total, minimum: st.result.minimum, paid: paidTotal },
+    purchases: [],
+    installmentsDue: [],
+    limit: card.limit,
+    isFirstYearCard: card.isFirstYear,
+    rateOverride: card.rateOverride,
+  });
+  return { carried: r.carriedTotal, interest: statementInterest(r), belowMinimum: paidTotal < st.result.minimum };
+}
+
+/** Ekstreye sayılan ödemeler: (kesim, sonraki kesim] — defterle aynı aralık. */
+export function statementPayments(card: CreditCard, payments: CardPayment[], st: CardStatement): CardPayment[] {
+  const next = addCycles(st.cut, 1, cycleOf(card));
+  return payments
+    .filter((p) => p.cardId === card.id && inRange(p.date, st.cut, next))
+    .sort((a, b) => b.date.localeCompare(a.date));
 }

@@ -1,5 +1,5 @@
 import { Category } from '../core/categories';
-import { AppState, Bill, CardPayment, CreditCard, Expense } from '../core/model';
+import { AppSettings, AppState, Bill, CardPayment, CreditCard, Expense } from '../core/model';
 import { DEFAULT_REMINDERS } from '../core/reminders';
 
 export const initialState: AppState = {
@@ -16,14 +16,18 @@ export type Action =
   | { type: 'hydrate'; state: AppState }
   | { type: 'reset' }
   | { type: 'card/add'; card: CreditCard }
+  | { type: 'card/update'; card: CreditCard }
   | { type: 'card/remove'; id: string }
   | { type: 'bill/add'; bill: Bill }
+  | { type: 'bill/update'; bill: Bill }
   | { type: 'bill/remove'; id: string }
   | { type: 'bill/markPaid'; id: string; period: string }
   | { type: 'bill/unmarkPaid'; id: string; period: string }
   | { type: 'expense/add'; expense: Expense }
   | { type: 'expense/remove'; id: string }
   | { type: 'cardPayment/add'; payment: CardPayment }
+  | { type: 'cardPayment/remove'; id: string }
+  | { type: 'settings/update'; settings: Partial<AppSettings> }
   | { type: 'category/add'; category: Category };
 
 export function reducer(state: AppState, action: Action): AppState {
@@ -34,6 +38,8 @@ export function reducer(state: AppState, action: Action): AppState {
       return initialState;
     case 'card/add':
       return { ...state, cards: [...state.cards, action.card] };
+    case 'card/update':
+      return { ...state, cards: state.cards.map((c) => (c.id === action.card.id ? action.card : c)) };
     case 'card/remove':
       // Kartın harcama ve ödemeleri de silinir; nakit/banka kartı harcamaları kalır.
       return {
@@ -44,6 +50,8 @@ export function reducer(state: AppState, action: Action): AppState {
       };
     case 'bill/add':
       return { ...state, bills: [...state.bills, action.bill] };
+    case 'bill/update':
+      return { ...state, bills: state.bills.map((b) => (b.id === action.bill.id ? action.bill : b)) };
     case 'bill/remove':
       return { ...state, bills: state.bills.filter((b) => b.id !== action.id) };
     case 'bill/markPaid':
@@ -64,6 +72,10 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, expenses: state.expenses.filter((e) => e.id !== action.id) };
     case 'cardPayment/add':
       return { ...state, cardPayments: [...state.cardPayments, action.payment] };
+    case 'cardPayment/remove':
+      return { ...state, cardPayments: state.cardPayments.filter((p) => p.id !== action.id) };
+    case 'settings/update':
+      return { ...state, settings: { ...state.settings, ...action.settings } };
     case 'category/add':
       return { ...state, customCategories: [...state.customCategories, action.category] };
     default:

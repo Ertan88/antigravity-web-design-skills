@@ -4,6 +4,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BillForm } from '../features/BillForm';
 import { ExpenseForm } from '../features/ExpenseForm';
+import { useStore } from '../store/StoreProvider';
 import { useTheme } from '../theme/ThemeProvider';
 import { Segmented } from '../ui/form';
 import { AppText, IconButton } from '../ui/primitives';
@@ -14,7 +15,9 @@ type Tab = 'card' | 'bill' | 'daily';
 export default function AddScreen() {
   const { palette } = useTheme();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ tab?: Tab }>();
+  const params = useLocalSearchParams<{ tab?: Tab; billId?: string }>();
+  const { state } = useStore();
+  const editingBill = state.bills.find((b) => b.id === params.billId);
   const [tab, setTab] = useState<Tab>(params.tab === 'card' || params.tab === 'bill' ? params.tab : 'daily');
 
   return (
@@ -26,10 +29,11 @@ export default function AddScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <IconButton icon="close" label="Kapat" onPress={() => router.back()} />
           <AppText variant="heading" accessibilityRole="header">
-            Yeni kayıt
+            {editingBill ? 'Faturayı düzenle' : 'Yeni kayıt'}
           </AppText>
           <View style={{ width: 44 }} />
         </View>
+        {editingBill ? null : (
         <Segmented
           label="Kayıt türü"
           value={tab}
@@ -40,7 +44,8 @@ export default function AddScreen() {
             { value: 'daily', label: 'Günlük' },
           ]}
         />
-        {tab === 'bill' ? <BillForm /> : <ExpenseForm key={tab} mode={tab} />}
+        )}
+        {editingBill ? <BillForm initial={editingBill} /> : tab === 'bill' ? <BillForm /> : <ExpenseForm key={tab} mode={tab} />}
       </ScrollView>
     </KeyboardAvoidingView>
   );

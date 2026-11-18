@@ -37,8 +37,17 @@ export function demoState(now: Date): AppState {
     ...extra,
   });
 
+  const endOfToday = day(0);
+  endOfToday.setHours(23, 59, 0, 0);
+
   return {
     ...initialState,
+    settings: {
+      ...initialState.settings,
+      salaryDay: day(27).getDate(),
+      salaryAmount: tl(52_000),
+      balance: { amount: tl(31_480), asOf: endOfToday.toISOString() },
+    },
     cards: [
       {
         id: 'demo-card',

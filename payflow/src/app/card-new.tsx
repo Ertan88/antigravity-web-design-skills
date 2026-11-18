@@ -1,12 +1,12 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toISODate, uid } from '../core/dates';
 import { interestFreeDays } from '../core/finance/billingCycle';
 import { minimumPaymentRate, ratesFor } from '../core/finance/rates';
 import { CARD_COLORS } from '../core/model';
-import { formatTL } from '../core/money';
+import { formatTL, Kurus, toLira } from '../core/money';
 import { parseAmount, parseRate } from '../core/parse';
 import { useStore } from '../store/StoreProvider';
 import { useTheme } from '../theme/ThemeProvider';
@@ -14,23 +14,27 @@ import { fonts } from '../theme/tokens';
 import { SectionLabel, Stepper, TextField, ToggleRow } from '../ui/form';
 import { AppText, IconButton, PrimaryButton } from '../ui/primitives';
 
+const asInput = (k?: Kurus) => (k ? toLira(k).toLocaleString('tr-TR', { maximumFractionDigits: 2 }) : '');
+const rateInput = (r?: number) => (r ? (r * 100).toLocaleString('tr-TR', { maximumFractionDigits: 2 }) : '');
 const pct = (r: number) => `%${(r * 100).toLocaleString('tr-TR', { maximumFractionDigits: 2 })}`;
 
 export default function CardNewScreen() {
   const { palette } = useTheme();
   const insets = useSafeAreaInsets();
   const { state, dispatch } = useStore();
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const editing = state.cards.find((c) => c.id === id);
 
-  const [name, setName] = useState('');
-  const [last4, setLast4] = useState('');
-  const [limitText, setLimitText] = useState('');
-  const [cutDay, setCutDay] = useState(18);
-  const [dueDay, setDueDay] = useState(28);
-  const [color, setColor] = useState(CARD_COLORS[0]);
-  const [openingText, setOpeningText] = useState('');
-  const [openingPaidText, setOpeningPaidText] = useState('');
-  const [firstYear, setFirstYear] = useState(false);
-  const [rateText, setRateText] = useState('');
+  const [name, setName] = useState(editing?.name ?? '');
+  const [last4, setLast4] = useState(editing?.last4 ?? '');
+  const [limitText, setLimitText] = useState(asInput(editing?.limit));
+  const [cutDay, setCutDay] = useState(editing?.cutDay ?? 18);
+  const [dueDay, setDueDay] = useState(editing?.dueDay ?? 28);
+  const [color, setColor] = useState(editing?.color ?? CARD_COLORS[0]);
+  const [openingText, setOpeningText] = useState(asInput(editing?.openingStatementTotal));
+  const [openingPaidText, setOpeningPaidText] = useState(asInput(editing?.openingPaid));
+  const [firstYear, setFirstYear] = useState(editing?.isFirstYear ?? false);
+  const [rateText, setRateText] = useState(rateInput(editing?.rateOverride?.contractual));
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const limit = parseAmount(limitText) ?? 0;
@@ -49,9 +53,9 @@ export default function CardNewScreen() {
     setErrors(e);
     if (Object.keys(e).length) return;
     dispatch({
-      type: 'card/add',
+      type: editing ? 'card/update' : 'card/add',
       card: {
-        id: uid('card'),
+        id: editing?.id ?? uid('card'),
         name: name.trim(),
         last4: last4 || '0000',
         limit,
@@ -62,8 +66,8 @@ export default function CardNewScreen() {
         rateOverride: rate ? { contractual: rate, late: rate + 0.003 } : undefined,
         openingStatementTotal: opening || undefined,
         openingPaid: parseAmount(openingPaidText) || undefined,
-        reminders: state.settings.defaultReminders,
-        createdAt: toISODate(new Date()),
+        reminders: editing?.reminders ?? state.settings.defaultReminders,
+        createdAt: editing?.createdAt ?? toISODate(new Date()),
       },
     });
     router.back();
@@ -75,7 +79,7 @@ export default function CardNewScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <IconButton icon="back" label="Geri" onPress={() => router.back()} />
           <AppText variant="heading" accessibilityRole="header">
-            Kart ekle
+            {editing ? 'Kartı düzenle' : 'Kart ekle'}
           </AppText>
           <View style={{ width: 44 }} />
         </View>
@@ -135,6 +139,29 @@ export default function CardNewScreen() {
         />
 
         <PrimaryButton title="Kartı kaydet" onPress={save} />
+        {editing ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() =>
+              Alert.alert(editing.name, 'Kart ve ona ait tüm harcama ve ödemeler silinsin mi?', [
+                { text: 'Vazgeç', style: 'cancel' },
+                {
+                  text: 'Sil',
+                  style: 'destructive',
+                  onPress: () => {
+                    dispatch({ type: 'card/remove', id: editing.id });
+                    router.dismissAll();
+                  },
+                },
+              ])
+            }
+            style={{ alignSelf: 'center', padding: 10 }}
+          >
+            <AppText variant="label" color={palette.danger}>
+              Kartı sil
+            </AppText>
+          </Pressable>
+        ) : null}
       </ScrollView>
     </KeyboardAvoidingView>
   );

@@ -1,8 +1,10 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
 import { BILL_TYPES } from '../core/categories';
-import { toISODate, uid } from '../core/dates';
+import { fromISODate, toISODate, uid } from '../core/dates';
+import { Bill } from '../core/model';
+import { toLira } from '../core/money';
 import { clampedDate, startOfDay } from '../core/finance/billingCycle';
 import { parseAmount } from '../core/parse';
 import { ReminderSettings } from '../core/reminders';
@@ -21,21 +23,23 @@ export function nextDateForDay(day: number, now: Date): Date {
   return thisMonth.getTime() >= today.getTime() ? thisMonth : clampedDate(today.getFullYear(), today.getMonth() + 1, day);
 }
 
-export function BillForm() {
+export function BillForm({ initial }: { initial?: Bill } = {}) {
   const { palette } = useTheme();
   const { state, dispatch } = useStore();
   const types = useMemo(() => [...BILL_TYPES, ...state.customCategories.filter((c) => c.kind === 'bill')], [state.customCategories]);
 
-  const [typeId, setTypeId] = useState('electricity');
-  const [title, setTitle] = useState('');
-  const [institution, setInstitution] = useState('');
-  const [subscriberNo, setSubscriberNo] = useState('');
-  const [amountText, setAmountText] = useState('');
-  const [variable, setVariable] = useState(false);
-  const [recurrence, setRecurrence] = useState<'monthly' | 'once'>('monthly');
-  const [dueDay, setDueDay] = useState(Math.min(new Date().getDate() + 3, 28));
-  const [reminders, setReminders] = useState<ReminderSettings>(state.settings.defaultReminders);
-  const [shared, setShared] = useState(false);
+  const [typeId, setTypeId] = useState(initial?.typeId ?? 'electricity');
+  const [title, setTitle] = useState(initial?.title ?? '');
+  const [institution, setInstitution] = useState(initial?.institution ?? '');
+  const [subscriberNo, setSubscriberNo] = useState(initial?.subscriberNo ?? '');
+  const [amountText, setAmountText] = useState(initial ? toLira(initial.amount).toLocaleString('tr-TR', { maximumFractionDigits: 2 }) : '');
+  const [variable, setVariable] = useState(initial?.variableAmount ?? false);
+  const [recurrence, setRecurrence] = useState<'monthly' | 'once'>(initial?.recurrence.type ?? 'monthly');
+  const [dueDay, setDueDay] = useState(
+    initial ? (initial.recurrence.type === 'monthly' ? initial.recurrence.dueDay : fromISODate(initial.recurrence.dueDate).getDate()) : Math.min(new Date().getDate() + 3, 28),
+  );
+  const [reminders, setReminders] = useState<ReminderSettings>(initial?.reminders ?? state.settings.defaultReminders);
+  const [shared, setShared] = useState(initial?.shared ?? false);
   const [errors, setErrors] = useState<{ amount?: string }>({});
 
   const type = types.find((t) => t.id === typeId) ?? types[0];
@@ -45,9 +49,9 @@ export function BillForm() {
     const amount = parseAmount(amountText);
     if (amount === null || amount <= 0) return setErrors({ amount: 'Geçerli bir tutar gir (ör. 845,30)' });
     dispatch({
-      type: 'bill/add',
+      type: initial ? 'bill/update' : 'bill/add',
       bill: {
-        id: uid('bill'),
+        id: initial?.id ?? uid('bill'),
         typeId,
         title: title.trim() || type.name,
         institution: institution.trim() || undefined,
@@ -57,8 +61,8 @@ export function BillForm() {
         recurrence: recurrence === 'monthly' ? { type: 'monthly', dueDay } : { type: 'once', dueDate: toISODate(nextDue) },
         reminders,
         shared,
-        paidPeriods: [],
-        createdAt: toISODate(new Date()),
+        paidPeriods: initial?.paidPeriods ?? [],
+        createdAt: initial?.createdAt ?? toISODate(new Date()),
       },
     });
     router.back();
@@ -114,6 +118,29 @@ export function BillForm() {
       />
 
       <PrimaryButton title="Faturayı kaydet" onPress={save} />
+      {initial ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() =>
+            Alert.alert(initial.title, 'Fatura silinsin mi?', [
+              { text: 'Vazgeç', style: 'cancel' },
+              {
+                text: 'Sil',
+                style: 'destructive',
+                onPress: () => {
+                  dispatch({ type: 'bill/remove', id: initial.id });
+                  router.back();
+                },
+              },
+            ])
+          }
+          style={{ alignSelf: 'center', padding: 10 }}
+        >
+          <AppText variant="label" color={palette.danger}>
+            Faturayı sil
+          </AppText>
+        </Pressable>
+      ) : null}
     </View>
   );
 }

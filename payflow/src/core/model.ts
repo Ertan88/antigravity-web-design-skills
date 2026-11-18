@@ -65,6 +65,9 @@ export interface CardPayment {
 
 export interface AppSettings {
   salaryDay?: number;
+  salaryAmount?: Kurus;
+  /** Zaman Nehri bakiye çizgisi için kullanıcının girdiği hesap bakiyesi. */
+  balance?: { amount: Kurus; asOf: string }; // asOf: ISO an
   defaultReminders: ReminderSettings;
 }
 

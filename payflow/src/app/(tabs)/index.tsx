@@ -60,10 +60,11 @@ export default function HomeScreen() {
     ]);
 
   const onItemPress = (item: DueItem) => {
-    if (item.kind === 'card') return router.navigate('/cards');
+    if (item.kind === 'card') return router.push(`/card/${item.refId}`);
     Alert.alert(item.title, `${formatTL(item.amount)} · ${dueLabel(item.daysLeft)}`, [
-      { text: 'Vazgeç', style: 'cancel' },
       { text: 'Ödedim', onPress: () => item.period && dispatch({ type: 'bill/markPaid', id: item.refId, period: item.period }) },
+      { text: 'Düzenle', onPress: () => router.push({ pathname: '/add', params: { billId: item.refId } }) },
+      { text: 'Vazgeç', style: 'cancel' },
     ]);
   };
 
@@ -241,7 +242,7 @@ function PaymentRow({ item, onPress }: { item: DueItem; onPress: () => void }) {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${item.title}, ${formatTL(item.amount)}, ${dueLabel(item.daysLeft)}`}
-      accessibilityHint={item.kind === 'card' ? 'Kart ayrıntısını açar' : 'Ödendi olarak işaretleyebilirsin'}
+      accessibilityHint={item.kind === 'card' ? 'Kart ve ekstre ayrıntısını açar' : 'Ödendi işaretle veya düzenle'}
       onPress={onPress}
       style={({ pressed }) => ({
         flexDirection: 'row',

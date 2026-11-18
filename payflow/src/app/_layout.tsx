@@ -28,6 +28,10 @@ function RootStack() {
         <Stack.Screen name="add" options={{ presentation: 'modal' }} />
         <Stack.Screen name="card-new" options={{ presentation: 'modal' }} />
         <Stack.Screen name="category-new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="card/[id]" />
+        <Stack.Screen name="card-pay" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="simulator" />
+        <Stack.Screen name="flow-settings" options={{ presentation: 'modal' }} />
       </Stack>
     </>
   );
