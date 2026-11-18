@@ -8,7 +8,8 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.payflow.mobile"
+      "bundleIdentifier": "app.payflow.mobile",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +19,8 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "app.payflow.mobile"
+      "package": "app.payflow.mobile",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png"

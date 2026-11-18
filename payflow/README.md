@@ -52,3 +52,25 @@ Hesapları açmak için:
 
 Yedek, `users/{uid}` belgesinde tutulur; kurallar her kullanıcının yalnızca kendi belgesine
 erişmesine izin verir.
+
+## APK oluşturma (Android'e doğrudan kurulum)
+
+Derleme Expo'nun bulut sunucularında yapılır; bilgisayarına Android Studio kurman gerekmez.
+
+```bash
+cd payflow
+npm install
+npx eas-cli@latest login            # ücretsiz Expo hesabınla
+npx eas-cli@latest init             # projeyi Expo hesabına bağlar (ilk sefer)
+npx eas-cli@latest build -p android --profile preview
+```
+
+İlk derlemede imza anahtarı sorulursa "Generate a new keystore" seç. Derleme bitince
+terminalde ve expo.dev'de **APK indirme bağlantısı / QR kodu** çıkar; telefonda açıp
+kurabilirsin (bilinmeyen kaynaklardan yüklemeye izin vermen gerekebilir).
+
+- `preview` → kurulabilir APK (Google ile giriş dahil tüm özellikler)
+- `development` → geliştirme sürümü (Expo Go yerine)
+- `production` → Google Play için AAB
+
+Firebase kullanacaksan derlemeden önce `.env` dosyasını doldur; değerler derlemeye gömülür.
