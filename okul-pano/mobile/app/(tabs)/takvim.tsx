@@ -1,4 +1,5 @@
 import { academicYearLabel, academicYearOf, semesterBreak, summerBreak, type AcademicCalendarData } from '@okulpano/shared/academicCalendar';
+import { breakName, calendarLeaves, type LeafKind } from '@okulpano/shared/calendarLeaves';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { View } from 'react-native';
@@ -6,14 +7,14 @@ import { Text } from '../../src/text.tsx';
 import { api } from '../../src/api.ts';
 import { useAcademicCalendars, type CalendarRow } from '../../src/data.ts';
 import { dateSpan, fullDate, timeAgo } from '../../src/day.ts';
-import { colors } from '../../src/theme.ts';
+import { colors, tiles, type TileTone } from '../../src/theme.ts';
 import { Badge, Button, Card, Empty, ErrorNote, Loading, Screen, T } from '../../src/ui.tsx';
 
 const SOURCE = { meb: 'MEB duyurusundan', manual: 'Elle girildi', builtin: 'Kurulum verisi' } as const;
 
 type Row = { key: string; label: string; value: string };
 
-/** Takvimin satır satır özeti: tarihler kısaltmasız, yıl ve gün adıyla */
+/** Onay kartı için satır satır özet (eski ve yeni tarihler yan yana): tarihler kısaltmasız */
 function rowsOf(data: AcademicCalendarData, startYear: number): Row[] {
   const sem = semesterBreak(data);
   const summer = summerBreak(data, startYear);
@@ -40,7 +41,7 @@ type Now = { title: string; until: string | null; next: { name: string; inDays: 
 function nowOf(data: AcademicCalendarData, startYear: number, t: string): Now {
   const sem = semesterBreak(data);
   const summer = summerBreak(data, startYear);
-  const holidays = [...data.breaks.map((b) => ({ name: b.name, start: b.start, end: b.end })), { name: 'Yarıyıl tatili', ...sem }, { name: 'Yaz tatili', ...summer }].sort((a, b) =>
+  const holidays = [...data.breaks.map((b) => ({ name: breakName(b.name), start: b.start, end: b.end })), { name: 'Yarıyıl tatili', ...sem }, { name: 'Yaz tatili', ...summer }].sort((a, b) =>
     a.start.localeCompare(b.start),
   );
   const inHoliday = holidays.find((h) => h.start <= t && t <= h.end);
@@ -217,43 +218,94 @@ function ReviewCard({ c, deciding, onDecide }: { c: CalendarRow; deciding: boole
 }
 
 /** Onaylı yılın kısa tarih listesi: başlangıç, yarıyıl, bitiş; ara tatiller "Tümü" ile */
+const MONTHS_SHORT = ['', 'OCA', 'ŞUB', 'MAR', 'NİS', 'MAY', 'HAZ', 'TEM', 'AĞU', 'EYL', 'EKİ', 'KAS', 'ARA'];
+const MONTHS = ['', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+const WEEKDAYS = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+const dm = (iso: string) => `${Number(iso.slice(8))} ${MONTHS[Number(iso.slice(5, 7))]}`;
+const wd = (iso: string) => WEEKDAYS[new Date(`${iso}T12:00:00Z`).getUTCDay()]!;
+/** "16–20 Kasım", "25 Ocak – 5 Şubat" */
+const rangeText = (a: string, b: string) => (a.slice(5, 7) === b.slice(5, 7) ? `${Number(a.slice(8))}–${dm(b)}` : `${dm(a)} – ${dm(b)}`);
+const TONE: Record<LeafKind, TileTone> = { term: 'sky', break: 'mint', summer: 'sun', official: 'rose', religious: 'lilac' };
+const LEGEND: { kind: LeafKind; label: string }[] = [
+  { kind: 'term', label: 'Ders' },
+  { kind: 'break', label: 'Okul tatili' },
+  { kind: 'official', label: 'Resmî tatil' },
+  { kind: 'religious', label: 'Dini bayram' },
+];
+
+/**
+ * Takvim yaprakları (C): her olayın solunda gün-ay yaprağı, sağda adı ve süresi; 1. ve 2. dönem ayrı. MEB tarihlerine
+ * resmî ve dini tatiller eklenir (bayram tek satır, arife notta). Geçenler soluk, süren olay "Şu an".
+ */
 function DatesCard({ c, scanning, onScan }: { c: CalendarRow; scanning: boolean; onScan: () => void }) {
-  const [all, setAll] = useState(false);
-  const rows = rowsOf(c.data, c.startYear);
-  const main = new Set(['start', 'sem', 'end']);
-  const list = all ? rows : rows.filter((r) => main.has(r.key));
-  const hidden = rows.length - list.length;
+  const t = today();
+  const leaves = calendarLeaves(c.data, c.startYear);
   return (
-    <Card style={{ gap: 6 }}>
+    <View style={{ gap: 10 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <T weight="800" style={{ flex: 1 }}>
-          {`${c.label.replace('-', '–')} tarihleri`}
+        <T weight="800" size={16} style={{ flex: 1 }}>
+          {`${c.label.replace('-', '–')} takvimi`}
         </T>
         <Badge tone="success">Onaylandı</Badge>
       </View>
-      {list.map((r) => (
-        <View key={r.key} style={{ flexDirection: 'row', gap: 10, paddingVertical: 6, borderTopWidth: 1, borderTopColor: colors.divider }}>
-          <T size={13} color={colors.muted} style={{ flex: 1 }}>
-            {r.label}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+        {LEGEND.map((l) => (
+          <View key={l.kind} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: tiles[TONE[l.kind]].bg, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4 }}>
+            <Text style={{ fontSize: 11.5, fontWeight: '800', color: tiles[TONE[l.kind]].fg }}>{l.label}</Text>
+          </View>
+        ))}
+      </View>
+      {([1, 2] as const).map((g) => (
+        <Card key={g} style={{ paddingVertical: 6, gap: 0 }}>
+          <T size={11.5} weight="800" color={colors.muted} style={{ paddingTop: 6, paddingBottom: 2, letterSpacing: 0.4 }}>
+            {g === 1 ? '1. DÖNEM' : '2. DÖNEM VE YAZ'}
           </T>
-          <T size={13} weight="700" style={{ flex: 1.4, textAlign: 'right' }}>
-            {r.value}
-          </T>
-        </View>
+          {leaves
+            .filter((l) => l.group === g)
+            .map((l, i) => {
+              const end = l.end ?? l.start;
+              const past = end < t;
+              const now = l.start <= t && t <= end;
+              const tone = tiles[TONE[l.kind]];
+              const inDays = Math.round((Date.parse(l.start) - Date.parse(t)) / 86400_000);
+              const sub = l.end
+                ? [rangeText(l.start, l.end), l.note].filter(Boolean).join(' · ')
+                : [wd(l.start), l.note, !past && !now && inDays <= 120 ? `${inDays} gün sonra` : null].filter(Boolean).join(' · ');
+              return (
+                <View
+                  key={l.key}
+                  accessible
+                  accessibilityLabel={`${l.name}, ${l.end ? rangeText(l.start, l.end) : `${dm(l.start)} ${wd(l.start)}`}${l.note ? `, ${l.note}` : ''}${now ? ', şu an' : ''}`}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, borderTopWidth: i ? 1 : 0, borderTopColor: colors.divider, opacity: past ? 0.45 : 1 }}
+                >
+                  <View style={{ width: 52, borderRadius: 12, paddingVertical: 6, alignItems: 'center', backgroundColor: tone.bg }}>
+                    <Text style={{ fontSize: 19, fontWeight: '800', lineHeight: 21, color: tone.fg }}>{Number(l.start.slice(8))}</Text>
+                    <Text style={{ fontSize: 10, fontWeight: '800', color: tone.fg }}>{MONTHS_SHORT[Number(l.start.slice(5, 7))]}</Text>
+                  </View>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <T weight="800" size={14.5}>
+                        {l.name}
+                      </T>
+                      {now && <Badge tone="success">Şu an</Badge>}
+                    </View>
+                    <T size={12.5} color={colors.muted}>
+                      {sub}
+                    </T>
+                  </View>
+                </View>
+              );
+            })}
+        </Card>
       ))}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        {(hidden > 0 || all) && (
-          <Button size="sm" variant="ghost" icon={all ? 'chevron-up' : 'chevron-down'} onPress={() => setAll((x) => !x)} style={{ flex: 1 }}>
-            {all ? 'Kısa göster' : 'Bütün tarihler'}
-          </Button>
-        )}
-        <Button size="sm" variant="ghost" icon="refresh" loading={scanning} onPress={onScan} style={{ flex: 1 }}>
+        <T size={11.5} color={colors.faint} style={{ flex: 1 }}>
+          {`${SOURCE[c.source]}${c.checkedAt ? ` · son tarama ${timeAgo(c.checkedAt)}` : ''}`}
+        </T>
+        <Button size="sm" variant="ghost" icon="refresh" loading={scanning} onPress={onScan}>
           Şimdi tara
         </Button>
       </View>
-      <T size={11.5} color={colors.faint}>
-        {`${SOURCE[c.source]}${c.checkedAt ? ` · son tarama ${timeAgo(c.checkedAt)}` : ''}`}
-      </T>
-    </Card>
+    </View>
   );
 }

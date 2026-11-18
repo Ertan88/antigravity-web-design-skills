@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Share, View } from 'react-native';
+import { AccountCard } from '../../src/accountCard.tsx';
 import { adoptAccessToken, api } from '../../src/api.ts';
 import { useAuth } from '../../src/auth.tsx';
 import { Text } from '../../src/text.tsx';
@@ -117,6 +118,7 @@ export default function Dogrulama() {
           ) : undefined
         }
       >
+        <AccountCard />
         <Banner icon="shield-checkmark-outline" tone="primary" title="Açık" text={`Girişte şifreden sonra doğrulayıcı uygulamadaki kod istenir. ${mfa.recoveryLeft} yedek kodunuz kaldı.`} />
         {action ? (
           <>
@@ -179,6 +181,7 @@ export default function Dogrulama() {
         </>
       }
     >
+      <AccountCard />
       {me?.user.mfaRequired && <Banner icon="shield-checkmark-outline" tone="warning" title="Platform hesabında zorunlu" text="Açana kadar platform ekranları kapalı kalır." />}
       {onKey ? (
         <>
@@ -208,7 +211,7 @@ export default function Dogrulama() {
         </>
       ) : (
         <>
-          <T color={colors.muted}>Girişte şifreden sonra doğrulayıcı uygulamadaki 6 haneli kod istenir. İsterseniz telefonunuz 30 gün hatırlanır. Başlamak için şifrenizi girin.</T>
+          <T color={colors.muted}>Girişte şifreden sonra doğrulayıcı uygulamadaki 6 haneli kod istenir. İsterseniz telefonunuz 30 gün hatırlanır. Başlamak için bu hesabın şifresini girin.</T>
           <Field label="Şifre" value={password} onChangeText={setPassword} secureTextEntry autoComplete="current-password" />
         </>
       )}

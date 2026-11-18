@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
+import { AccountCard } from '../../src/accountCard.tsx';
 import { api } from '../../src/api.ts';
 import { useAuth } from '../../src/auth.tsx';
 import { timeAgo } from '../../src/day.ts';
@@ -36,6 +37,7 @@ export default function Guvenlik() {
 
   return (
     <Screen back title="Güvenlik">
+      <AccountCard />
       {me?.user.mfaRequired && !me.user.mfaEnabled && (
         <Banner icon="shield-checkmark-outline" tone="warning" title="İki adımlı doğrulama zorunlu" text="Platform hesabında açana kadar platform ekranları kapalı kalır." />
       )}
