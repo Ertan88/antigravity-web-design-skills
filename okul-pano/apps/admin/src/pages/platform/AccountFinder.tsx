@@ -14,6 +14,8 @@ interface Account {
   fullName: string;
   isSuperAdmin: boolean;
   invitePending: boolean;
+  /** İki adımlı doğrulama açık */
+  mfaEnabled?: boolean;
   lastLoginAt: string | null;
   createdAt: string;
   /** soleOwner: okulun tek müdürü (silinirse okul müdürsüz kalır) */
@@ -38,7 +40,7 @@ export function AccountFinderDialog({ open, onClose, onChanged }: { open: boolea
   const [email, setEmail] = useState('');
   const [account, setAccount] = useState<Account | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<'find' | 'delete' | 'password' | null>(null);
+  const [busy, setBusy] = useState<'find' | 'delete' | 'password' | 'mfa' | null>(null);
   const [credentials, setCredentials] = useState<Credentials | null>(null);
 
   const close = () => {
@@ -106,6 +108,27 @@ export function AccountFinderDialog({ open, onClose, onChanged }: { open: boolea
     setBusy('password');
     try {
       setCredentials(await api<Credentials>(`/api/platform/accounts/${account.id}/password`, { method: 'POST', body: {} }));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** Telefonunu ve yedek kodlarını kaybeden kişi: iki adımlı doğrulama kapatılır (kişiye e-posta gider) */
+  const resetMfa = async () => {
+    if (!account) return;
+    const ok = await confirm({
+      title: 'İki adımlı doğrulama kapatılsın mı?',
+      message: `${account.fullName} için doğrulama kapanır, bütün oturumları kapanır ve kişiye e-posta gider. Yalnızca kişinin kendisi istediyse ve kimliğinden eminseniz yapın.`,
+      confirmLabel: 'Doğrulamayı kapat',
+    });
+    if (!ok) return;
+    setBusy('mfa');
+    try {
+      await api(`/api/platform/accounts/${account.id}/mfa-reset`, { method: 'POST', body: {} });
+      setAccount({ ...account, mfaEnabled: false });
+      toast.success('İki adımlı doğrulama kapatıldı');
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -199,6 +222,11 @@ export function AccountFinderDialog({ open, onClose, onChanged }: { open: boolea
                 <Button variant="secondary" icon={<KeyRound className="size-4" />} loading={busy === 'password'} onClick={() => void newPassword()}>
                   Yeni şifre ver
                 </Button>
+                {account.mfaEnabled && (
+                  <Button variant="secondary" loading={busy === 'mfa'} onClick={() => void resetMfa()}>
+                    Doğrulamayı kapat
+                  </Button>
+                )}
               </div>
             )}
             <p className="mt-3 text-xs text-slate-500">Yalnızca tam e-posta ile aranır; hesaplar listelenmez (KVKK). Silme ve şifre işlemleri okulun kayıt geçmişine yazılır.</p>

@@ -3,9 +3,10 @@ import { and, asc, eq, gt, inArray, isNull, lt, sql } from 'drizzle-orm';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { accessUser } from '../context.ts';
-import { accountLinks, memberships, notifications, pushTokens, schools, sessions, teacherBranches, teachers, teacherTitles, timetableEntries, users } from '../db/schema.ts';
+import { accountLinks, memberships, trustedDevices, notifications, pushTokens, schools, sessions, teacherBranches, teachers, teacherTitles, timetableEntries, users } from '../db/schema.ts';
 import { burnPasswordCheck, hashPassword, randomToken, sha256, verifyPassword } from '../lib/crypto.ts';
 import { dropLinksTo } from '../lib/accountLinks.ts';
+import { mfaRoutes } from './mfa.ts';
 import { clearFailures, lockedFor, noteFailure } from '../lib/loginLock.ts';
 import { badRequest, conflict, HttpError, notFound, parse, unauthorized } from '../lib/errors.ts';
 
@@ -41,19 +42,21 @@ export async function authRoutes(app: FastifyInstance) {
 
   async function issueSession(req: FastifyRequest, userId: string, viaUserId: string | null = null) {
     const refreshToken = randomToken('rt');
-    await db.insert(sessions).values({
+    const [row] = await db.insert(sessions).values({
       userId,
       viaUserId,
       tokenHash: sha256(refreshToken),
       userAgent: req.headers['user-agent']?.slice(0, 200) ?? null,
       expiresAt: new Date(Date.now() + REFRESH_TTL_MS),
-    });
-    return refreshToken;
+    }).returning({ id: sessions.id });
+    return { token: refreshToken, id: row!.id };
   }
 
-  function accessToken(user: { id: string; isSuperAdmin: boolean }) {
-    return app.jwt.sign({ typ: 'access', sub: user.id, sa: user.isSuperAdmin }, { expiresIn: ACCESS_TTL });
+  function accessToken(user: { id: string; isSuperAdmin: boolean; totpEnabledAt: Date | null }, sid: string) {
+    return app.jwt.sign({ typ: 'access', sub: user.id, sa: user.isSuperAdmin, sid, mfa: Boolean(user.totpEnabledAt) }, { expiresIn: ACCESS_TTL });
   }
+
+  const mfa = await mfaRoutes(app, { issueSession, accessToken, setRefreshCookie });
 
   /*
    * Giriş hız sınırı: okul ağında bütün öğretmenler aynı internet adresinden çıkar. Sınır yalnızca adrese bağlı olsaydı
@@ -88,14 +91,16 @@ export async function authRoutes(app: FastifyInstance) {
       throw unauthorized('E-posta ya da şifre hatalı.');
     }
     await clearFailures(db, email);
+    // İki adımlı doğrulama açıksa (ve bu cihaz hatırlanmıyorsa) oturum açılmaz; kod adımına geçilir
+    if (await mfa.needsCode(req, user, body.trustToken)) return mfa.mfaChallenge(user.id);
 
     await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
     await db.delete(sessions).where(lt(sessions.expiresAt, new Date()));
-    const refreshToken = await issueSession(req, user.id);
-    setRefreshCookie(reply, refreshToken);
+    const s = await issueSession(req, user.id);
+    setRefreshCookie(reply, s.token);
     return {
-      accessToken: accessToken(user),
-      ...(body.client === 'mobile' ? { refreshToken } : {}),
+      accessToken: accessToken(user, s.id),
+      ...(body.client === 'mobile' ? { refreshToken: s.token } : {}),
     };
     },
   );
@@ -116,11 +121,11 @@ export async function authRoutes(app: FastifyInstance) {
     const [user] = await db.select().from(users).where(eq(users.id, session.userId));
     if (!user) throw unauthorized();
     // Hesap geçişiyle açılmış oturum yenilenince de "Platform hesabına dön" bilgisi korunur
-    const refreshToken = await issueSession(req, user.id, session.viaUserId);
-    setRefreshCookie(reply, refreshToken);
+    const s = await issueSession(req, user.id, session.viaUserId);
+    setRefreshCookie(reply, s.token);
     return {
-      accessToken: accessToken(user),
-      ...(typeof fromBody === 'string' ? { refreshToken } : {}),
+      accessToken: accessToken(user, s.id),
+      ...(typeof fromBody === 'string' ? { refreshToken: s.token } : {}),
     };
   });
 
@@ -141,7 +146,7 @@ export async function authRoutes(app: FastifyInstance) {
     if (!session) throw unauthorized('Oturumun süresi doldu, lütfen yeniden giriş yapın.');
     const [user] = await db.select().from(users).where(eq(users.id, session.userId));
     if (!user) throw unauthorized();
-    return { userId: user.id, refreshToken: await issueSession(req, user.id) };
+    return { userId: user.id, refreshToken: (await issueSession(req, user.id)).token };
   });
 
   /**
@@ -189,7 +194,7 @@ export async function authRoutes(app: FastifyInstance) {
    * Platform ile okul ayrı kalır: okul hesabı ayrı bir kullanıcıdır, platform hesabı okula üye olmaz (KVKK).
    */
   const LINK_FRESH_MS = 12 * 3600 * 1000;
-  const linkSchema = z.object({ email: z.string().trim().email().max(200), password: z.string().min(1).max(200) });
+  const linkSchema = z.object({ email: z.string().trim().email().max(200), password: z.string().min(1).max(200), code: z.string().trim().max(12).optional() });
   const switchSchema = z.object({ password: z.string().min(1).max(200).optional() });
 
   async function cookieSession(req: FastifyRequest) {
@@ -268,6 +273,11 @@ export async function authRoutes(app: FastifyInstance) {
     }
     await clearFailures(db, email);
     if (target.isSuperAdmin) throw badRequest('Platform hesabı bağlanamaz; okul hesabınızı girin.');
+    // Okul hesabında iki adımlı doğrulama açıksa bağlarken o hesabın kodu da istenir
+    if (target.totpSecret) {
+      if (!body.code) throw new HttpError(400, 'Okul hesabınızın doğrulama kodunu girin.', 'mfa_code');
+      if (!(await mfa.checkSecondFactor(target, { code: body.code }))) throw new HttpError(400, 'Doğrulama kodu hatalı.', 'mfa_code');
+    }
     if (!(await firstSchoolName(target.id))) throw badRequest('Bu hesap hiçbir okula bağlı değil.');
     const now = new Date();
     await db
@@ -313,10 +323,10 @@ export async function authRoutes(app: FastifyInstance) {
 
     const target = side === 'platform' ? schoolUser : platformUser;
     await db.delete(sessions).where(eq(sessions.id, ctx.session.id));
-    const refreshToken = await issueSession(req, target.id, side === 'platform' ? platformUser.id : null);
-    setRefreshCookie(reply, refreshToken);
+    const s = await issueSession(req, target.id, side === 'platform' ? platformUser.id : null);
+    setRefreshCookie(reply, s.token);
     await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, target.id));
-    return { accessToken: accessToken(target) };
+    return { accessToken: accessToken(target, s.id) };
   });
 
   app.post('/api/auth/logout', async (req, reply) => {
@@ -348,11 +358,13 @@ export async function authRoutes(app: FastifyInstance) {
   app.get('/api/me', { preHandler: app.authenticate }, async (req) => {
     const { sub } = accessUser(req);
     const [user] = await db
-      .select({ id: users.id, email: users.email, fullName: users.fullName, isSuperAdmin: users.isSuperAdmin, lastSchoolId: users.lastSchoolId })
+      .select({ id: users.id, email: users.email, fullName: users.fullName, isSuperAdmin: users.isSuperAdmin, lastSchoolId: users.lastSchoolId, totpEnabledAt: users.totpEnabledAt })
       .from(users)
       .where(eq(users.id, sub));
     if (!user) throw unauthorized();
-    const { lastSchoolId, ...profile } = user;
+    const { lastSchoolId, totpEnabledAt, ...base } = user;
+    // İki adımlı doğrulama: açık mı, bu hesapta zorunlu mu (platform yöneticisi)
+    const profile = { ...base, mfaEnabled: Boolean(totpEnabledAt), mfaRequired: user.isSuperAdmin && env.PLATFORM_MFA === 'required' };
 
     const rows = user.isSuperAdmin
       ? await superAdminSchools(sub)
@@ -464,7 +476,9 @@ export async function authRoutes(app: FastifyInstance) {
     // Diğer cihazlardaki oturumları kapat; eski şifreyle kurulmuş hesap bağlantısı da kalkar
     await db.delete(sessions).where(eq(sessions.userId, sub));
     await dropLinksTo(db, sub);
-    const refreshToken = await issueSession(req, sub);
+    // Hatırlanan cihazlar da unutulur: yeni şifreyle ilk girişte kod sorulur
+    await db.delete(trustedDevices).where(eq(trustedDevices.userId, sub));
+    const { token: refreshToken } = await issueSession(req, sub);
     setRefreshCookie(reply, refreshToken);
     // Mobil uygulama çerez kullanmaz: oturumu sürdürmek için yeni anahtarı yanıttan alır
     const mobile = (req.body as { client?: unknown } | undefined)?.client === 'mobile';

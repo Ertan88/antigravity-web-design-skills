@@ -20,6 +20,16 @@ export interface AccessPayload {
   sub: string;
   /** Platform yöneticisi (SaaS sahibi) */
   sa: boolean;
+  /** Erişim anahtarının bağlı olduğu oturum (Oturumlarım'da "Bu cihaz") */
+  sid?: string;
+  /** Hesapta iki adımlı doğrulama açık mı (platform yöneticisinde zorunlu) */
+  mfa?: boolean;
+}
+
+/** Şifre doğru, iki adımlı doğrulama kodu bekleniyor (5 dakika geçerli) */
+export interface MfaPayload {
+  typ: 'mfa';
+  sub: string;
 }
 
 export interface PreviewPayload {
@@ -54,8 +64,8 @@ declare module 'fastify' {
 
 declare module '@fastify/jwt' {
   interface FastifyJWT {
-    payload: AccessPayload | PreviewPayload;
-    user: AccessPayload | PreviewPayload;
+    payload: AccessPayload | PreviewPayload | MfaPayload;
+    user: AccessPayload | PreviewPayload | MfaPayload;
   }
 }
 

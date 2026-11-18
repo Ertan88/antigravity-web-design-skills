@@ -3,7 +3,7 @@ import { and, asc, count, eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { accessUser } from '../context.ts';
-import { auditLogs, memberships, schools, sessions, users } from '../db/schema.ts';
+import { auditLogs, memberships, mfaRecoveryCodes, schools, sessions, trustedDevices, users } from '../db/schema.ts';
 import { hashPassword, readablePassword, verifyPassword } from '../lib/crypto.ts';
 import { dropLinksTo } from '../lib/accountLinks.ts';
 import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
@@ -56,6 +56,7 @@ export async function platformAccountsRoutes(app: FastifyInstance) {
     fullName: user.fullName,
     isSuperAdmin: user.isSuperAdmin,
     invitePending: user.passwordHash === INVITE_PENDING,
+    mfaEnabled: Boolean(user.totpEnabledAt),
     lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
     createdAt: user.createdAt.toISOString(),
     memberships: schoolsOf,
@@ -127,5 +128,26 @@ export async function platformAccountsRoutes(app: FastifyInstance) {
       text: `Merhaba ${a.user.fullName},\n\nOkulyayın şifreniz yenilendi.\n\nAdres: ${env.PUBLIC_URL.replace(/\/$/, '')}/admin/\nE-posta: ${a.user.email}\nŞifre: ${password}\n\nGiriş yaptıktan sonra Hesabım sayfasından şifrenizi değiştirin.\n`,
     });
     return { password, emailed, email: a.user.email, fullName: a.user.fullName };
+  });
+
+  /**
+   * Telefonunu ve yedek kodlarını kaybeden kişinin iki adımlı doğrulamasını kapatır (yalnızca okul hesapları).
+   * Bütün oturumları kapanır; işlem okulun denetim kaydına yazılır ve kişiye e-posta gider.
+   */
+  app.post('/api/platform/accounts/:id/mfa-reset', platform, async (req) => {
+    const a = await load((req.params as { id: string }).id);
+    if (a.user.isSuperAdmin) throw badRequest('Platform yöneticisinin doğrulaması buradan kapatılamaz.');
+    if (!a.user.totpSecret) throw badRequest('Bu hesapta iki adımlı doğrulama zaten kapalı.');
+    await db.update(users).set({ totpSecret: null, totpPending: null, totpEnabledAt: null, totpLastStep: null }).where(eq(users.id, a.user.id));
+    await db.delete(mfaRecoveryCodes).where(eq(mfaRecoveryCodes.userId, a.user.id));
+    await db.delete(trustedDevices).where(eq(trustedDevices.userId, a.user.id));
+    await db.delete(sessions).where(eq(sessions.userId, a.user.id));
+    await log(accessUser(req).sub, a.schoolsOf.map((m) => m.schoolId), 'update', `Platform yöneticisi ${a.user.fullName} hesabının iki adımlı doğrulamasını kapattı`);
+    const emailed = await trySendMail(env, {
+      to: a.user.email,
+      subject: 'Okulyayın: iki adımlı doğrulama kapatıldı',
+      text: `Merhaba ${a.user.fullName},\n\nİsteğiniz üzerine hesabınızın iki adımlı doğrulaması kapatıldı ve bütün oturumlarınız kapandı.\nGiriş yaptıktan sonra Hesabım › Güvenlik bölümünden yeniden açmanızı öneririz.\n\nBu isteği siz yapmadıysanız hemen şifrenizi değiştirin ve bize yazın.\n`,
+    });
+    return { ok: true, emailed };
   });
 }

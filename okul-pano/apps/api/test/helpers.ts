@@ -24,7 +24,7 @@ export async function createTestApp(env: Record<string, unknown> = {}): Promise<
     passwordHash: await hashPassword(SUPER.password),
   });
   const uploadDir = mkdtempSync(join(tmpdir(), 'okulpano-test-'));
-  const app = await buildApp({ database, env: { NODE_ENV: 'test', UPLOAD_DIR: uploadDir, ...env }, logger: false });
+  const app = await buildApp({ database, env: { NODE_ENV: 'test', UPLOAD_DIR: uploadDir, PLATFORM_MFA: 'optional', ...env }, logger: false });
   await app.ready();
   return { app, database, uploadDir };
 }

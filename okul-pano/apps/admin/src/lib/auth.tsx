@@ -24,7 +24,15 @@ export interface SchoolAccess {
 }
 
 export interface Me {
-  user: { id: string; email: string; fullName: string; isSuperAdmin: boolean };
+  user: {
+    id: string;
+    email: string;
+    fullName: string;
+    isSuperAdmin: boolean;
+    /** İki adımlı doğrulama açık mı; bu hesapta zorunlu mu (platform yöneticisi) */
+    mfaEnabled?: boolean;
+    mfaRequired?: boolean;
+  };
   schools: SchoolAccess[];
   /** En son açılan okul (başka cihazda seçilmiş olabilir) */
   lastSchoolId: string | null;
@@ -37,7 +45,11 @@ interface AuthState {
   schoolId: string;
   setSchoolId: (id: string) => void;
   can: (permission: Permission) => boolean;
-  login: (email: string, password: string) => Promise<void>;
+  /** Kod gerekiyorsa oturum açılmaz, kod adımı için anahtar döner */
+  login: (email: string, password: string) => Promise<{ mfaToken?: string }>;
+  loginWithCode: (mfaToken: string, input: { code?: string; recoveryCode?: string; remember: boolean }) => Promise<void>;
+  /** Yeni erişim anahtarıyla oturumu sürdürür (ör. iki adımlı doğrulama açıldıktan sonra) */
+  adoptAccessToken: (token: string) => Promise<void>;
   logout: () => Promise<void>;
   reloadMe: () => Promise<void>;
 }
@@ -102,14 +114,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
-      const { accessToken } = await api<{ accessToken: string }>('/api/auth/login', {
+      const res = await api<{ accessToken?: string; mfaRequired?: boolean; mfaToken?: string }>('/api/auth/login', {
         method: 'POST',
         body: { email, password },
       });
+      if (res.mfaRequired && res.mfaToken) return { mfaToken: res.mfaToken };
+      setAccessToken(res.accessToken ?? null);
+      await reloadMe();
+      return {};
+    },
+    [reloadMe],
+  );
+
+  const loginWithCode = useCallback(
+    async (mfaToken: string, input: { code?: string; recoveryCode?: string; remember: boolean }) => {
+      const { accessToken } = await api<{ accessToken: string }>('/api/auth/mfa', { method: 'POST', body: { mfaToken, ...input } });
       setAccessToken(accessToken);
       await reloadMe();
     },
     [reloadMe],
+  );
+
+  const adoptAccessToken = useCallback(
+    async (token: string) => {
+      setAccessToken(token);
+      queryClient.removeQueries();
+      await reloadMe();
+    },
+    [reloadMe, queryClient],
   );
 
   const logout = useCallback(async () => {
@@ -129,10 +161,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSchoolId,
       can: (p) => Boolean(school?.permissions.includes(p)),
       login,
+      loginWithCode,
+      adoptAccessToken,
       logout,
       reloadMe,
     };
-  }, [me, loading, schoolId, setSchoolId, login, logout, reloadMe]);
+  }, [me, loading, schoolId, setSchoolId, login, loginWithCode, adoptAccessToken, logout, reloadMe]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

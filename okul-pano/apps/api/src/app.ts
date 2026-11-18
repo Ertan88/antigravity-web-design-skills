@@ -12,7 +12,7 @@ import type { AppDeps } from './context.ts';
 import { openDatabase, type Database } from './db/client.ts';
 import { loadEnv, type Env } from './env.ts';
 import { runMebCalendarJob } from './lib/mebCalendar.ts';
-import { errorHandler, unauthorized } from './lib/errors.ts';
+import { errorHandler, HttpError, unauthorized } from './lib/errors.ts';
 import { DisplayBus } from './lib/events.ts';
 import { DbStorage, LocalStorage, type FileStorage } from './lib/storage.ts';
 import { UUID_RE } from './context.ts';
@@ -149,6 +149,10 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
       throw unauthorized();
     }
     if (req.user.typ !== 'access') throw unauthorized();
+    // Platform yöneticisi iki adımlı doğrulamayı açmadan yalnızca kendi hesap ayarlarına (/api/me) ulaşır
+    if (req.user.sa && !req.user.mfa && env.PLATFORM_MFA === 'required' && !/^\/api\/me(\/|\?|$)/.test(req.url)) {
+      throw new HttpError(403, 'Platform hesabında iki adımlı doğrulamayı açın (Hesabım › Güvenlik).', 'mfa_setup');
+    }
   });
 
   app.get('/api/health', async () => ({ ok: true, driver: database.driver, time: new Date().toISOString() }));

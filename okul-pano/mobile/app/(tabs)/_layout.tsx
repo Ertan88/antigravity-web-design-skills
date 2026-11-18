@@ -1,4 +1,4 @@
-import { Tabs } from "expo-router";
+import { router, Tabs } from "expo-router";
 import { useCallback, useEffect, useRef, useState, type ComponentProps, type ReactElement } from "react";
 import { useTabsBackGuard } from "../../src/exitGuard.ts";
 import { useDutyReminders, useExamReminders } from "../../src/reminders.ts";
@@ -158,7 +158,12 @@ function FloatingTabBar({ state, descriptors, emitter, navigateToTab, bottom }: 
 }
 
 export default function TabsLayout() {
-  const { role, can, isManager, isTeacher } = useAuth();
+  const { role, can, isManager, isTeacher, me } = useAuth();
+  // Platform yöneticisi iki adımlı doğrulamayı açana kadar kurulum ekranına yönlendirilir (sunucu da platform uçlarını kapatır)
+  const mfaPending = Boolean(me?.user.mfaRequired && !me.user.mfaEnabled);
+  useEffect(() => {
+    if (mfaPending) router.push('/hesap/dogrulama');
+  }, [mfaPending]);
   // Nöbet hatırlatmaları: öğretmen kaydı olan herkesin telefonunda kurulur
   useDutyReminders(isTeacher);
   useExamReminders(isTeacher);

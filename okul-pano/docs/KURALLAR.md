@@ -35,6 +35,16 @@ kalır; burada tekrarlanmaz.
   yalnızca açık hesap platform hesabıysa ya da telefonda platform hesabı kayıtlıysa görünür (`switchAllowed`).
   Okul hesabının şifresi değişince ya da sıfırlanınca bağlantı kalkar (`dropLinksTo`). Platform hesabı olmayan
   telefonda önceden kaydedilmiş diğer hesaplar açılışta silinir, sunucudaki oturumları kapatılır.
+- **İki adımlı doğrulama** (doğrulayıcı uygulama, TOTP): platform yöneticisinde zorunlu (`PLATFORM_MFA=required`;
+  açılana kadar yalnızca `/api/me` çalışır), diğer hesaplarda isteğe bağlı (Hesabım › Güvenlik). Şifre doğruysa giriş
+  5 dakikalık kod anahtarı döner, oturum açılmaz. Anahtar `JWT_SECRET`'tan türetilen AES-GCM ile şifreli saklanır
+  (`JWT_SECRET` değişirse doğrulayıcı kodları çalışmaz, yedek kodlar çalışır). Aynı kod iki kez kabul edilmez; kod
+  denemeleri giriş kilidiyle kilitlenir. 10 yedek kod yalnızca özetiyle saklanır. "Bu cihazı 30 gün hatırla" kutusu boş
+  gelir; web'de httpOnly çerez, mobilde şifreli depo. Şifre değişince, "diğer cihazlardan çık"ta ve doğrulama
+  kapatılınca hatırlanan cihazlar unutulur. Kodlarını kaybeden okul kullanıcısının doğrulamasını platform yöneticisi
+  kapatır (denetim kaydı ve kişiye e-posta). Hesap bağlarken okul hesabında doğrulama açıksa o hesabın kodu da istenir.
+- **Oturumlarım:** açık oturumlar cihaz adıyla (tarayıcı bilgisinden) listelenir; konum ve IP tutulmaz. Tek tek ya da
+  "diğer bütün cihazlardan çık" ile kapatılır.
 - Hatalı giriş kilidi (5 hatada 5 dakika) veritabanında tutulur (`login_failures`, e-postanın özetiyle): sunucu yeniden
   başlayınca sıfırlanmaz.
 
@@ -253,7 +263,7 @@ Zayıf TV işlemcilerinde edinilen dersler:
 | 5 | Orta | Play Store'a çıkışta `USE_EXACT_ALARM` reddedilir | Şimdilik APK GitHub'dan dağıtıldığı için sorun yok. Play'e çıkmadan önce kaldırılmalı. |
 | 6 | Düşük–orta | Soluk gri metin kontrastı AA altındaydı | **Düzeltildi.** Mobilde `colors.faint` açık temada `#6f6863` (5.07:1); `colors.subtle` metinlerden çıkarıldı. Panelde `slate-400` açık temada `#77706a` (beyazda 4.87:1), `slate-500` `#635c56` (6.57:1); koyu temada `slate-400` `#9d968e` (yüzeyde 5.08:1). Yer tutucu ve simgelerdeki `slate-300` kullanımları `slate-400`'e alındı. |
 | 7 | İşlevsel | Sunucudan telefona bildirim gelmiyor (Firebase kurulu değil) | **Kapatıldı (17 Kasım 2026).** Bildirimler doğrudan Firebase (FCM v1) ile gidiyor; anahtar Render ortam değişkeninde, `google-services.json` GitHub Secrets'ta. |
-| 8 | Düşük | Yöneticiler için iki adımlı doğrulama yok | Okul müdürü ve platform yöneticisi hesapları için isteğe bağlı iki adımlı doğrulama (TOTP) ileride eklenebilir. |
+| 8 | Düşük | Yöneticiler için iki adımlı doğrulama yok | **Kapatıldı (18 Kasım 2026):** doğrulayıcı uygulama (TOTP), yedek kodlar, 30 gün cihazı hatırla; platform yöneticisinde zorunlu, diğer hesaplarda isteğe bağlı (1.1). |
 | 9 | Orta | TV uygulamasının köprüsü (`OkulYayinTV.setConfig`) sayfadaki gömülü çerçevelere de açıktı: bir YouTube çerçevesi gizli ayarlar şifresini değiştirebilirdi | **Düzeltildi (TV 1.4.2):** köprü yalnızca pano ana sayfasına verilen rastgele anahtarla çağrı kabul eder; WebView'de dosya ve içerik erişimi kapatıldı. |
 | 10 | Orta | TV uygulaması düz http bağlantısına izin veriyordu | **Düzeltildi (TV 1.4.2):** `cleartextTrafficPermitted="false"`; gizli ayarlarda `http://` adresi reddedilir. Sunucular HTTPS kullanır (Render ve kurulum betiğindeki Caddy). |
 | 11 | Yüksek | TV ve telefon APK'ları herkesin bildiği geliştirme anahtarıyla imzalanıyordu | **Kapatıldı (17 Kasım 2026).** Kalıcı anahtar "İmza anahtarı oluştur" iş akışıyla oluşturuldu (RSA 4096, PKCS12); 8 gizli değer GitHub Secrets'ta, yedek kullanıcıda. Telefon ve TV APK'ları bu anahtarla imzalanıyor. Anahtar kaybolursa uygulamalar güncellenemez; iş akışı var olan anahtarın üzerine yazmaz. |

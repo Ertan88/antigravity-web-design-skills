@@ -45,9 +45,47 @@ export const users = pgTable('users', {
   /** En son açılan okul: başka cihazdan girişte de aynı okul açılır (platform yöneticisi bütün okulları görür) */
   lastSchoolId: uuid('last_school_id').references((): AnyPgColumn => schools.id, { onDelete: 'set null' }),
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+  /** İki adımlı doğrulama: doğrulayıcı uygulama anahtarı (AES-GCM ile şifreli); null ise kapalı */
+  totpSecret: text('totp_secret'),
+  /** Kurulum sürerken üretilen anahtar (kod doğrulanınca totpSecret olur) */
+  totpPending: text('totp_pending'),
+  totpEnabledAt: timestamp('totp_enabled_at', { withTimezone: true }),
+  /** Son kabul edilen kodun adımı: aynı kod ikinci kez kullanılamaz */
+  totpLastStep: integer('totp_last_step'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
+
+/** İki adımlı doğrulama yedek kodları (yalnızca özetleri; her biri bir kez kullanılır) */
+export const mfaRecoveryCodes = pgTable(
+  'mfa_recovery_codes',
+  {
+    id: pk(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    codeHash: text('code_hash').notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index('mfa_recovery_user_idx').on(t.userId)],
+);
+
+/** "Bu cihazı 30 gün hatırla": bu cihazda kod sorulmaz (yalnızca anahtarın özeti saklanır) */
+export const trustedDevices = pgTable(
+  'trusted_devices',
+  {
+    id: pk(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull().unique(),
+    userAgent: text('user_agent'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index('trusted_devices_user_idx').on(t.userId)],
+);
 
 export const sessions = pgTable(
   'sessions',

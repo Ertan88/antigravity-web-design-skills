@@ -16,24 +16,48 @@ const FEATURES = [
 ];
 
 export function Login() {
-  const { login } = useAuth();
+  const { login, loginWithCode } = useAuth();
   const signup = useSignupConfig();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // İki adımlı doğrulama (1C): şifreden sonra kod adımı
+  const [mfaToken, setMfaToken] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  const [useRecovery, setUseRecovery] = useState(false);
+  // Ortak okul bilgisayarında hatırlanmasın diye kutu boş gelir
+  const [remember, setRemember] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      await login(email.trim(), password);
+      if (mfaToken) {
+        await loginWithCode(mfaToken, { ...(useRecovery ? { recoveryCode: code.trim() } : { code: code.replace(/\s/g, '') }), remember });
+        return;
+      }
+      const res = await login(email.trim(), password);
+      if (res.mfaToken) {
+        setMfaToken(res.mfaToken);
+        setCode('');
+      }
     } catch (err) {
-      setError(errorText(err, 'Giriş yapılamadı.'));
+      const msg = errorText(err, 'Giriş yapılamadı.');
+      // Kod adımının süresi (5 dk) dolduysa şifre adımına dönülür
+      if (mfaToken && /yeniden giriş/i.test(msg)) setMfaToken(null);
+      setError(msg);
     } finally {
       setBusy(false);
     }
+  };
+
+  const restart = () => {
+    setMfaToken(null);
+    setCode('');
+    setUseRecovery(false);
+    setError(null);
   };
 
   return (
@@ -78,6 +102,50 @@ export function Login() {
               <BrandName className="text-2xl font-extrabold tracking-tight text-ink" />
             </div>
           </div>
+          {mfaToken ? (
+            <>
+              <div>
+                <h1 className="text-[30px] leading-tight font-extrabold tracking-[-0.03em]">{useRecovery ? 'Yedek kod' : 'Doğrulama kodu'}</h1>
+                <p className="mt-1 text-sm text-slate-500">
+                  {useRecovery ? 'Kurulumda aldığınız yedek kodlardan birini girin. Her biri bir kez çalışır.' : 'Doğrulayıcı uygulamadaki 6 haneli kodu girin.'}
+                </p>
+              </div>
+              {error && <Alert tone="red">{error}</Alert>}
+              <Field label={useRecovery ? 'Yedek kod' : 'Kod'}>
+                {(id) => (
+                  <Input
+                    id={id}
+                    autoFocus
+                    required
+                    autoComplete="one-time-code"
+                    inputMode={useRecovery ? 'text' : 'numeric'}
+                    maxLength={useRecovery ? 12 : 7}
+                    value={code}
+                    onChange={(e) => setCode(useRecovery ? e.target.value.toUpperCase() : e.target.value.replace(/[^\d ]/g, ''))}
+                    placeholder={useRecovery ? 'ör. 7KQ2-M9XA' : '123456'}
+                    className={useRecovery ? 'font-mono tracking-wider' : 'text-center font-mono text-2xl tracking-[0.4em]'}
+                  />
+                )}
+              </Field>
+              <label className="flex items-center gap-2 text-sm font-semibold text-ink">
+                <input type="checkbox" className="size-4 accent-brand-600" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+                Bu cihazı 30 gün hatırla
+              </label>
+              <p className="-mt-3 text-xs text-slate-500">Ortak kullanılan bilgisayarda işaretlemeyin.</p>
+              <Button type="submit" loading={busy} className="w-full">
+                Giriş yap
+              </Button>
+              <div className="flex justify-between text-sm">
+                <button type="button" className="font-semibold text-slate-600 underline underline-offset-2 dark:text-slate-300" onClick={() => { setUseRecovery((v) => !v); setCode(''); setError(null); }}>
+                  {useRecovery ? 'Doğrulayıcı kodu kullan' : 'Yedek kod kullan'}
+                </button>
+                <button type="button" className="font-semibold text-slate-600 underline underline-offset-2 dark:text-slate-300" onClick={restart}>
+                  Geri dön
+                </button>
+              </div>
+            </>
+          ) : (
+          <>
           <div>
             <h1 className="text-[30px] leading-tight font-extrabold tracking-[-0.03em]">Yönetim paneline giriş</h1>
             <p className="mt-1 text-sm text-slate-500">Okulunuzun size verdiği hesapla giriş yapın.</p>
@@ -110,7 +178,9 @@ export function Login() {
           <Button type="submit" loading={busy} className="w-full">
             Giriş yap
           </Button>
-          {signup.data && signup.data.mode !== 'closed' && (
+          </>
+          )}
+          {!mfaToken && signup.data && signup.data.mode !== 'closed' && (
             <p className="border-t border-slate-200/70 pt-5 text-center text-sm text-slate-500">
               Okulunuz Okulyayın kullanmıyor mu?{' '}
               <Link to="/kayit" className="font-bold text-ink underline underline-offset-2">

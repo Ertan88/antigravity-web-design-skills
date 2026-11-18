@@ -32,6 +32,8 @@ const schema = z.object({
   CONTACT_EMAIL: z.string().optional().transform((v) => v?.trim() || undefined),
   CONTACT_PHONE: z.string().optional().transform((v) => v?.trim() || undefined),
   /** Okul Yayın Pano TV uygulamasının indirme adresi: TV'de kısa "/tv" adresi buraya yönlendirir */
+  /** Platform yöneticisinde iki adımlı doğrulama: 'required' (üretim) ya da 'optional' (yalnızca test ve geliştirme) */
+  PLATFORM_MFA: z.enum(['required', 'optional']).default('required'),
   TV_APK_URL: z.string().default('https://github.com/Ertan88/antigravity-web-design-skills/releases/download/okul-pano-tv/Okul-Yayin-Pano.apk'),
   /** Okul Yayın telefon uygulamasının (Android) indirme adresi: panelin ve /app'in "İndir" bağlantısı kısa "/indir" adresinden buraya gider */
   APP_APK_URL: z.string().default('https://github.com/Ertan88/antigravity-web-design-skills/releases/download/okul-pano-android/Okul-Yayin.apk'),

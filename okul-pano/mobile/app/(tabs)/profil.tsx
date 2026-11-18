@@ -421,7 +421,7 @@ export default function Menu() {
         <SectionTitle>Uygulama ayarları</SectionTitle>
         <Card style={{ paddingVertical: 4, gap: 0 }}>
           <ListRow tile={{ icon: 'notifications-outline', tone: 'sun' }} title="Bildirimler" onPress={() => router.push('/hatirlatmalar')} />
-          <ListRow tile={{ icon: 'lock-closed-outline', tone: 'lilac' }} title="Şifre değiştir" onPress={() => router.push('/hesap/sifre')} last />
+          <ListRow tile={{ icon: 'shield-checkmark-outline', tone: 'lilac' }} title="Güvenlik" onPress={() => router.push('/hesap/guvenlik')} last />
         </Card>
       </View>
 

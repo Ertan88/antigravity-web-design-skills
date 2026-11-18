@@ -157,12 +157,33 @@ export async function apiFile(path: string): Promise<ArrayBuffer> {
   return res.arrayBuffer();
 }
 
-export async function login(email: string, password: string) {
-  const json = await api<{ accessToken: string; refreshToken: string }>('/api/auth/login', {
+/** "Bu cihazı 30 gün hatırla" anahtarı: hesap başına şifreli depoda (anahtar adında yalnızca izinli karakterler) */
+const trustKey = (email: string) => `okulpano.trust.${email.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '_')}`;
+
+/** İki adımlı doğrulama açıksa (ve bu telefon hatırlanmıyorsa) oturum açılmaz; kod adımı için anahtar döner */
+export async function login(email: string, password: string): Promise<{ mfaToken?: string }> {
+  const trustToken = (await storage.get(trustKey(email))) ?? undefined;
+  const json = await api<{ accessToken?: string; refreshToken?: string; mfaRequired?: boolean; mfaToken?: string }>('/api/auth/login', {
     method: 'POST',
-    body: { email, password, client: 'mobile' },
+    body: { email, password, client: 'mobile', ...(trustToken ? { trustToken } : {}) },
   });
+  if (json.mfaRequired && json.mfaToken) return { mfaToken: json.mfaToken };
+  await session.setTokens(json.accessToken ?? null, json.refreshToken ?? null);
+  return {};
+}
+
+export async function loginMfa(email: string, mfaToken: string, input: { code?: string; recoveryCode?: string; remember: boolean }) {
+  const json = await api<{ accessToken: string; refreshToken: string; trustToken?: string }>('/api/auth/mfa', {
+    method: 'POST',
+    body: { mfaToken, ...input, client: 'mobile' },
+  });
+  if (json.trustToken) await storage.set(trustKey(email), json.trustToken);
   await session.setTokens(json.accessToken, json.refreshToken);
+}
+
+/** İki adımlı doğrulama açılınca sunucu "doğrulama açık" bilgili yeni erişim anahtarı verir */
+export async function adoptAccessToken(access: string) {
+  await session.setTokens(access, session.refresh);
 }
 
 /** Şifre değişince sunucu diğer oturumları kapatır; bu cihazın oturumu yeni anahtarla sürer */
@@ -176,7 +197,8 @@ export async function loginOther(email: string, password: string): Promise<{ ref
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: email.trim().toLowerCase(), password, client: 'mobile' }),
   });
-  const json = (await res.json().catch(() => null)) as { accessToken?: string; refreshToken?: string; message?: string } | null;
+  const json = (await res.json().catch(() => null)) as { accessToken?: string; refreshToken?: string; message?: string; mfaRequired?: boolean } | null;
+  if (json?.mfaRequired) throw new ApiError('Bu hesapta iki adımlı doğrulama açık. Menü › Hesap değiştir › Başka hesap ekle ile giriş ekranından girin.', 400);
   if (!res.ok || !json?.accessToken || !json.refreshToken) throw new ApiError(json?.message ?? 'Giriş yapılamadı', res.status);
   const meRes = await fetch(`${server}/api/me`, { headers: { authorization: `Bearer ${json.accessToken}` } });
   const me = (await meRes.json()) as { user: { id: string; email: string; fullName: string; isSuperAdmin: boolean } };

@@ -166,6 +166,9 @@ function LinkDialog({ open, onClose, onLinked }: { open: boolean; onClose: () =>
   const qc = useQueryClient();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  // Okul hesabında iki adımlı doğrulama açıksa o hesabın kodu da istenir
+  const [needCode, setNeedCode] = useState(false);
+  const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const submit = async (e: React.FormEvent) => {
@@ -173,12 +176,13 @@ function LinkDialog({ open, onClose, onLinked }: { open: boolean; onClose: () =>
     setBusy(true);
     setError('');
     try {
-      const status = await call<LinkStatus>('POST', '/api/auth/linked-account', { email: email.trim(), password });
+      const status = await call<LinkStatus>('POST', '/api/auth/linked-account', { email: email.trim(), password, ...(code ? { code: code.replace(/\s/g, '') } : {}) });
       qc.setQueryData(['linked-account', me?.user.id], status);
       setPassword('');
       onClose();
       onLinked();
     } catch (err) {
+      if (err instanceof SwitchError && err.code === 'mfa_code') setNeedCode(true);
       setError(err instanceof Error ? err.message : 'Hesap bağlanamadı');
     } finally {
       setBusy(false);
@@ -209,6 +213,13 @@ function LinkDialog({ open, onClose, onLinked }: { open: boolean; onClose: () =>
         <Field label="Okul hesabının şifresi">
           {(id) => <PasswordInput id={id} autoComplete="off" value={password} onChange={(e) => setPassword(e.target.value)} />}
         </Field>
+        {needCode && (
+          <Field label="Okul hesabının doğrulama kodu">
+            {(id) => (
+              <Input id={id} autoFocus inputMode="numeric" autoComplete="one-time-code" maxLength={7} value={code} onChange={(e) => setCode(e.target.value.replace(/[^\d ]/g, ''))} className="text-center font-mono text-xl tracking-[0.3em]" />
+            )}
+          </Field>
+        )}
       </form>
     </Modal>
   );

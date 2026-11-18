@@ -10,7 +10,7 @@ import { switchAllowed } from '../src/accounts.ts';
 import { Sheet } from '../src/sheet.tsx';
 // Marka kutusu temadan bağımsızdır (koyu turkuaz); üzerindeki etiketler her iki temada açık pastel renklerle
 import { colors, LIGHT_TILES, type TileTone } from '../src/theme.ts';
-import { Button, Card, Field, Icon, Screen, T, type IconName } from '../src/ui.tsx';
+import { Button, Card, Field, Icon, Screen, T, ToggleRow, type IconName } from '../src/ui.tsx';
 
 const FEATURES: { label: string; icon: IconName; tone: TileTone }[] = [
   { label: 'Duyurular', icon: 'megaphone', tone: 'sun' },
@@ -23,7 +23,12 @@ const FEATURES: { label: string; icon: IconName; tone: TileTone }[] = [
  * açıldığı adrestir. Kendi sunucusunu kuran okullar için "Farklı sunucu" ile değiştirilebilir.
  */
 export default function Login() {
-  const { signIn, server: saved, accounts, switchAccount } = useAuth();
+  const { signIn, signInWithCode, server: saved, accounts, switchAccount } = useAuth();
+  // İki adımlı doğrulama (1C): şifreden sonra kod adımı; telefon kutu işaretlenirse 30 gün hatırlanır
+  const [mfaToken, setMfaToken] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  const [useRecovery, setUseRecovery] = useState(false);
+  const [remember, setRemember] = useState(false);
   const [switching, setSwitching] = useState<string | null>(null);
   const [accountsOpen, setAccountsOpen] = useState(false);
   const [server, setServer] = useState(saved || DEFAULT_SERVER);
@@ -43,9 +48,28 @@ export default function Login() {
     }
     setBusy(true);
     try {
-      await signIn(server, email, password);
+      const res = await signIn(server, email, password);
+      if (res.mfaToken) {
+        setMfaToken(res.mfaToken);
+        setCode('');
+      }
     } catch (err) {
       setError(errorText(err, 'Giriş yapılamadı'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitCode = async () => {
+    if (!mfaToken) return;
+    setError(null);
+    setBusy(true);
+    try {
+      await signInWithCode(email, mfaToken, { ...(useRecovery ? { recoveryCode: code.trim() } : { code: code.replace(/\s/g, '') }), remember });
+    } catch (err) {
+      const msg = errorText(err, 'Giriş yapılamadı');
+      if (/yeniden giriş/i.test(msg)) setMfaToken(null);
+      setError(msg);
     } finally {
       setBusy(false);
     }
@@ -76,6 +100,53 @@ export default function Login() {
           </View>
         </View>
 
+        {mfaToken ? (
+          <Card style={{ gap: 14 }}>
+            <View style={{ gap: 2 }}>
+              <Text style={{ fontSize: 19, fontWeight: '800', color: colors.ink }} accessibilityRole="header">
+                {useRecovery ? 'Yedek kod' : 'Doğrulama kodu'}
+              </Text>
+              <T color={colors.muted} size={13.5}>
+                {useRecovery ? 'Kurulumda aldığınız yedek kodlardan birini girin. Her biri bir kez çalışır.' : 'Doğrulayıcı uygulamadaki 6 haneli kodu girin.'}
+              </T>
+            </View>
+            <Field
+              label={useRecovery ? 'Yedek kod' : 'Kod'}
+              value={code}
+              onChangeText={(v) => setCode(useRecovery ? v.toUpperCase() : v.replace(/[^\d]/g, ''))}
+              keyboardType={useRecovery ? 'default' : 'number-pad'}
+              autoCapitalize="characters"
+              autoComplete="one-time-code"
+              textContentType="oneTimeCode"
+              maxLength={useRecovery ? 12 : 6}
+              autoFocus
+              onSubmitEditing={() => void submitCode()}
+              placeholder={useRecovery ? 'ör. 7KQ2-M9XA' : '123456'}
+              style={useRecovery ? undefined : { fontSize: 24, letterSpacing: 8, textAlign: 'center' }}
+            />
+            <ToggleRow label="Bu telefonu 30 gün hatırla" description="Başkasıyla ortak kullandığınız cihazda açmayın." value={remember} onChange={setRemember} />
+            {error && (
+              <T color={colors.danger} weight="600" size={14}>
+                {error}
+              </T>
+            )}
+            <Button size="lg" loading={busy} disabled={!code.trim()} onPress={() => void submitCode()}>
+              Giriş yap
+            </Button>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Pressable accessibilityRole="button" hitSlop={10} onPress={() => { setUseRecovery((v) => !v); setCode(''); setError(null); }}>
+                <T weight="700" size={14} color={colors.muted} style={{ textDecorationLine: 'underline' }}>
+                  {useRecovery ? 'Doğrulayıcı kodu kullan' : 'Yedek kod kullan'}
+                </T>
+              </Pressable>
+              <Pressable accessibilityRole="button" hitSlop={10} onPress={() => { setMfaToken(null); setCode(''); setUseRecovery(false); setError(null); }}>
+                <T weight="700" size={14} color={colors.muted} style={{ textDecorationLine: 'underline' }}>
+                  Geri dön
+                </T>
+              </Pressable>
+            </View>
+          </Card>
+        ) : (
         <Card style={{ gap: 14 }}>
           <View style={{ gap: 2 }}>
             <Text style={{ fontSize: 19, fontWeight: '800', color: colors.ink }} accessibilityRole="header">
@@ -149,6 +220,7 @@ export default function Login() {
             Giriş kodum var
           </Button>
         </Card>
+        )}
 
         {/* Kayıtlı hesaplar (B): giriş ekranında açıkta durmaz; düğmeyle alt sayfada açılır, e-posta yarı gizli, okul ve
             görev yazmaz. Dokununca şifresiz geçilir (oturumu kapanmış olanda e-posta doldurulur). */}

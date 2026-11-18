@@ -2,7 +2,7 @@ import clsx from 'clsx';
 import { appView, schoolFullName } from '@okulpano/shared';
 import { Building2, CalendarRange, Download, LayoutDashboard, Inbox, Lifebuoy2, ChevronDown, Mail, ChevronRight, ChevronsUpDown, LogOut, Menu, Moon, MonitorSmartphone, School, Sun, X } from './icons.tsx';
 import { Suspense, useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth.tsx';
 import { useInternshipAccess, useSchool } from '../lib/data.ts';
 import { openCount, useCoverDay } from '../pages/covers/Covers.tsx';
@@ -310,6 +310,8 @@ export function Layout() {
       if (!ok) setLeaving(false);
     });
   }, [me, school]);
+  // Platform yöneticisi iki adımlı doğrulamayı açana kadar yalnızca Hesabım › Güvenlik açılır (sunucu da diğer uçları kapatır)
+  if (me?.user.mfaRequired && !me.user.mfaEnabled && location.pathname !== '/hesap') return <Navigate to="/hesap?sekme=guvenlik" replace />;
   if (leaving) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-3 px-6 text-center">

@@ -295,6 +295,8 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Şifre gerekli').max(200),
   /** Mobil istemciler yenileme anahtarını gövdede alır; web çerez kullanır. */
   client: z.enum(['web', 'mobile']).default('web'),
+  /** Mobil: "Bu cihazı hatırla" anahtarı (web'de çerezde) */
+  trustToken: z.string().max(200).optional(),
 });
 
 export const updateProfileSchema = z.object({

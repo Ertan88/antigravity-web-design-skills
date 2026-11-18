@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { loadAccounts, saveAccounts, switchAllowed, upsert, type SavedAccount } from './accounts.ts';
-import { api, deviceAccount, login, loginOther, logout, session } from './api.ts';
+import { api, deviceAccount, login, loginMfa, loginOther, logout, session } from './api.ts';
 import { clearSaved, restoreQueries, startSaving } from './persist.ts';
 import { deviceToken, isMuted, registerForPush, setMuted, setPushUser, unregisterPush } from './push.ts';
 import { storage } from './storage.ts';
@@ -30,7 +30,15 @@ export interface SchoolAccess {
 }
 
 export interface Me {
-  user: { id: string; email: string; fullName: string; isSuperAdmin: boolean };
+  user: {
+    id: string;
+    email: string;
+    fullName: string;
+    isSuperAdmin: boolean;
+    /** İki adımlı doğrulama açık mı; bu hesapta zorunlu mu (platform yöneticisi) */
+    mfaEnabled?: boolean;
+    mfaRequired?: boolean;
+  };
   schools: SchoolAccess[];
   /** En son açılan okul (panelde ya da başka cihazda seçilmiş olabilir) */
   lastSchoolId?: string | null;
@@ -61,7 +69,9 @@ interface AuthValue {
   /** Platform yöneticisi: platform görünümü ile okul görünümü arasında geçiş */
   setPlatformMode: (on: boolean) => Promise<void>;
   reloadMe: () => Promise<void>;
-  signIn: (server: string, email: string, password: string) => Promise<void>;
+  /** Kod gerekiyorsa oturum açılmaz, kod adımı için anahtar döner */
+  signIn: (server: string, email: string, password: string) => Promise<{ mfaToken?: string }>;
+  signInWithCode: (email: string, mfaToken: string, input: { code?: string; recoveryCode?: string; remember: boolean }) => Promise<void>;
   signOut: () => Promise<void>;
   selectSchool: (id: string) => Promise<void>;
   /** Bu telefonda kayıtlı hesaplar (etkin olan dahil) */
@@ -202,7 +212,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn: async (url, email, password) => {
         await session.setServer(url);
         setServer(session.server);
-        await login(email.trim().toLowerCase(), password);
+        const res = await login(email.trim().toLowerCase(), password);
+        if (res.mfaToken) return res;
+        await loadMe(null);
+        return {};
+      },
+      signInWithCode: async (email, mfaToken, input) => {
+        await loginMfa(email.trim().toLowerCase(), mfaToken, input);
         await loadMe(null);
       },
       signOut: async () => {
