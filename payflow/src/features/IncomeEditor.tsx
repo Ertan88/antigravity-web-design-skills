@@ -68,6 +68,16 @@ export function IncomeEditor({ value, onChange }: { value: IncomeDraft[]; onChan
           <ToggleRow title="Her ay değişir" subtitle="Yattığı gün tutarı sorarız; tahmin girdiğin tutarların ortalamasıdır" value={d.variable} onChange={(variable) => update(d.id, { variable })} />
         </Surface>
       ))}
+      {value.length === 0 ? (
+        <View style={{ borderWidth: 1, borderStyle: 'dashed', borderColor: palette.line, borderRadius: 16, padding: 14 }}>
+          <AppText variant="label" muted style={{ fontFamily: fonts.body }}>
+            Henüz gelir eklemedin. Aşağıdan ekle; örneğin öğretmensen ayın 1'i için "Ek ders", 15'i için "Maaş".
+          </AppText>
+        </View>
+      ) : null}
+      <AppText variant="caption" muted style={{ fontFamily: fonts.bodyBold, letterSpacing: 0.4 }}>
+        GELİR EKLE
+      </AppText>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {PRESETS.map((p) => (
           <ChoiceChip key={p.name} label={`+ ${p.name}`} selected={false} onPress={() => add(p)} />

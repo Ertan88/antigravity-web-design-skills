@@ -93,14 +93,12 @@ export function ReminderPicker({ value, onChange }: { value: ReminderSettings; o
           <ChoiceChip key={o.value} label={o.label} tone="warn" selected={value.offsets.includes(o.value)} onPress={() => toggle(o.value)} />
         ))}
       </View>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <View style={{ flex: 1 }}>
-          <Stepper label="Saat" value={value.hour} min={0} max={23} onChange={(hour) => onChange({ ...value, hour })} format={pad} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Stepper label="Dakika" value={value.minute} min={0} max={45} step={15} onChange={(minute) => onChange({ ...value, minute })} format={pad} />
-        </View>
-      </View>
+      {/* Alt alta: büyük yazı boyutunda yan yana sığmıyordu */}
+      <AppText variant="label" muted accessibilityLiveRegion="polite">
+        Bildirim saati: <AppText variant="label" style={{ fontFamily: fonts.bodyBold }}>{pad(value.hour)}:{pad(value.minute)}</AppText>
+      </AppText>
+      <Stepper label="Saat" value={value.hour} min={0} max={23} onChange={(hour) => onChange({ ...value, hour })} format={pad} />
+      <Stepper label="Dakika" value={value.minute} min={0} max={45} step={15} onChange={(minute) => onChange({ ...value, minute })} format={pad} />
       {value.offsets.length === 0 ? (
         <AppText variant="caption" muted>
           Hatırlatma kapalı. Bu ödeme için bildirim gelmez.

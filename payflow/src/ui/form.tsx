@@ -166,10 +166,10 @@ export function Stepper({
       accessible={false}
       style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: palette.surface, borderColor: palette.line, borderWidth: 1, borderRadius: radius.lg, padding: 6, paddingLeft: 14 }}
     >
-      <AppText variant="body" muted style={{ flex: 1 }}>
+      <AppText variant="body" muted numberOfLines={2} style={{ flex: 1, flexShrink: 1, minWidth: 0, paddingRight: 8 }}>
         {label}
       </AppText>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 }}>
         {btn(-1)}
         <AppText variant="money" style={{ minWidth: 58, textAlign: 'center', fontSize: 17 }} accessibilityLabel={`${label}: ${format(value)}`}>
           {format(value)}
