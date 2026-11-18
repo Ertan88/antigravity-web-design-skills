@@ -1,6 +1,8 @@
-import { monthName } from '../core/dates';
-import { clampedDate } from '../core/finance/billingCycle';
+import { fromISODate, monthName, periodKey } from '../core/dates';
+import { clampedDate, startOfDay } from '../core/finance/billingCycle';
+import { incomeDates, incomeSources } from '../core/income';
 import { cardLedger } from '../core/ledger';
+import { billDueForPeriod } from '../store/analytics';
 import { AppState } from '../core/model';
 import { formatTL } from '../core/money';
 import { planReminders, ReminderOffset, ReminderSettings } from '../core/reminders';
@@ -11,7 +13,7 @@ import { flowEvents } from '../store/timeline';
  * işletim sistemine kurma işi NotificationsProvider'da. iOS en fazla 64 bekleyen
  * bildirime izin verir; en yakın `max` tanesini kurarız, uygulama her açıldığında plan yenilenir.
  */
-export type ReminderKind = 'bill' | 'card' | 'statement';
+export type ReminderKind = 'bill' | 'card' | 'statement' | 'income';
 
 export interface PlannedNotification {
   id: string;
@@ -82,8 +84,128 @@ export function buildNotificationPlan(s: AppState, now: Date, opts: { horizonDay
     });
   }
 
+  // Değişken gelirler: yattığı gün "yattı mı?" — tutar girilince tahminler güncellenir.
+  out.push(...incomePrompts(s, now, new Date(now.getTime() + horizonDays * 86_400_000)).filter((p) => !p.logged && p.fireAt.getTime() > now.getTime()));
+
   return out.sort((a, b) => a.fireAt.getTime() - b.fireAt.getTime()).slice(0, max);
 }
+
+function incomePrompts(s: AppState, from: Date, to: Date): (PlannedNotification & { logged: boolean })[] {
+  const { hour, minute } = s.settings.defaultReminders;
+  const out: (PlannedNotification & { logged: boolean })[] = [];
+  for (const src of incomeSources(s.settings)) {
+    if (!src.variable) continue;
+    for (const d of incomeDates(src, from, to)) {
+      const period = periodKey(d);
+      const at = new Date(d);
+      at.setHours(hour, minute, 0, 0);
+      const logged = s.settings.incomeLog?.[src.id]?.[period] !== undefined;
+      out.push({
+        id: `income:${src.id}:${period}`,
+        fireAt: at,
+        title: `${src.name} yattı mı?`,
+        body: 'Bu ay yatan net tutarı gir; akışın ve sonraki ayların tahmini güncellensin.',
+        category: 'info',
+        data: { kind: 'income', refId: src.id, period },
+        logged,
+      });
+    }
+  }
+  return out;
+}
+
+const OFFSET_DAYS: Record<ReminderOffset, number> = { 'D-3': 3, 'D-1': 1, D0: 0 };
+const fireTime = (due: Date, offset: ReminderOffset, r: ReminderSettings) => {
+  const d = new Date(due.getFullYear(), due.getMonth(), due.getDate() - OFFSET_DAYS[offset]);
+  d.setHours(r.hour, r.minute, 0, 0);
+  return d;
+};
+
+export type InboxStatus = 'paid' | 'pending' | 'overdue' | 'logged';
+export interface InboxItem extends PlannedNotification {
+  status: InboxStatus;
+}
+
+/**
+ * Bildirim kutusu: son `days` gün içinde ZAMANI GELMİŞ hatırlatmalar (gönderilmiş olanlar),
+ * en yeni en üstte, ilgili ödemenin güncel durumuyla. Gelecekteki hatırlatmalar burada görünmez.
+ */
+export function buildInbox(s: AppState, now: Date, days = 30): InboxItem[] {
+  const from = new Date(now.getTime() - days * 86_400_000);
+  const inWindow = (d: Date) => d.getTime() >= from.getTime() && d.getTime() <= now.getTime();
+  const today = startOfDay(now);
+  const out: InboxItem[] = [];
+
+  for (const b of s.bills) {
+    const created = fromISODate(b.createdAt);
+    const periods =
+      b.recurrence.type === 'once'
+        ? ['once']
+        : Array.from({ length: 3 }, (_, i) => periodKey(new Date(now.getFullYear(), now.getMonth() - 1 + i, 1)));
+    for (const p of periods) {
+      const due = billDueForPeriod(b, p);
+      if (due < startOfDay(created)) continue;
+      const paid = b.paidPeriods.includes(p);
+      for (const o of b.reminders.offsets) {
+        const at = fireTime(due, o, b.reminders);
+        if (!inWindow(at) || at < created) continue;
+        out.push({
+          id: `bill:${b.id}:${p}:${o}`,
+          fireAt: at,
+          title: titleFor(b.title, o),
+          body: `${b.variableAmount ? '≈ ' : ''}${formatTL(b.amount)} · son ödeme ${dayLabel(due)}`,
+          category: 'bill-reminder',
+          data: { kind: 'bill', refId: b.id, period: p },
+          status: paid ? 'paid' : due < today ? 'overdue' : 'pending',
+        });
+      }
+    }
+  }
+
+  for (const c of s.cards) {
+    for (const st of cardLedger(c, s.expenses, s.cardPayments, now)) {
+      if (st.isOpening || st.result.total <= 0) continue;
+      const status: InboxStatus = st.remaining <= 0 ? 'paid' : st.due < today ? 'overdue' : 'pending';
+      for (const o of c.reminders.offsets) {
+        const at = fireTime(st.due, o, c.reminders);
+        if (!inWindow(at)) continue;
+        out.push({
+          id: `card:${c.id}:${st.cut.getTime()}:${o}`,
+          fireAt: at,
+          title: titleFor(`${c.name} ekstresi`, o),
+          body: `Toplam ${formatTL(st.result.total)} · asgari ${formatTL(st.result.minimum)} · son ödeme ${dayLabel(st.due)}`,
+          category: 'card-reminder',
+          data: { kind: 'card', refId: c.id },
+          status,
+        });
+      }
+      if (c.reminders.offsets.length) {
+        const cutAt = new Date(st.cut);
+        cutAt.setHours(c.reminders.hour, c.reminders.minute, 0, 0);
+        if (inWindow(cutAt))
+          out.push({
+            id: `statement:${c.id}:${st.cut.getTime()}`,
+            fireAt: cutAt,
+            title: `${c.name}: ${monthName(st.cut)} ekstren kesildi`,
+            body: `${formatTL(st.result.total)} · son ödeme ${dayLabel(st.due)}`,
+            category: 'info',
+            data: { kind: 'statement', refId: c.id },
+            status,
+          });
+      }
+    }
+  }
+
+  for (const p of incomePrompts(s, from, now)) {
+    if (inWindow(p.fireAt)) out.push({ ...p, status: p.logged ? 'logged' : 'pending' });
+  }
+
+  return out.sort((a, b) => b.fireAt.getTime() - a.fireAt.getTime());
+}
+
+/** Kutuda, en son açılıştan sonra gelmiş bildirim sayısı. */
+export const unreadCount = (items: InboxItem[], seenAt?: string) =>
+  items.filter((i) => !seenAt || i.fireAt.getTime() > new Date(seenAt).getTime()).length;
 
 /** Plan değişmediyse işletim sistemindeki bildirimleri yeniden kurmamak için imza. */
 export const planSignature = (plan: PlannedNotification[]) =>

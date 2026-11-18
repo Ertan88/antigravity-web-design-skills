@@ -67,8 +67,27 @@ export interface CardPayment {
   date: string; // ISO an
 }
 
+/**
+ * Gelir kaynağı (maaş, ek ders, kira geliri…). Değişken gelirlerde her ay yatan net tutar
+ * `incomeLog`'a girilir; tahmin, son girilen tutarların ortalamasıdır.
+ */
+export interface IncomeSource {
+  id: string;
+  name: string;
+  day: number; // ayın kaçında yatar
+  amount: Kurus; // beklenen net tutar (değişkense ilk tahmin)
+  variable: boolean;
+}
+
 export interface AppSettings {
+  incomes?: IncomeSource[];
+  /** Gelir id → dönem ('YYYY-MM') → o ay gerçekten yatan net tutar. */
+  incomeLog?: Record<string, Record<string, Kurus>>;
+  /** Bildirim kutusunun en son açıldığı an (okunmamış rozeti için). */
+  inboxSeenAt?: string;
+  /** @deprecated incomes'a taşındı (eski kayıtlar için okunur). */
   salaryDay?: number;
+  /** @deprecated incomes'a taşındı. */
   salaryAmount?: Kurus;
   /** Zaman Nehri bakiye çizgisi için kullanıcının girdiği hesap bakiyesi. */
   balance?: { amount: Kurus; asOf: string }; // asOf: ISO an

@@ -223,7 +223,7 @@ export default function SettingsScreen() {
       <SectionLabel>DİĞER</SectionLabel>
       <Surface style={{ overflow: 'hidden' }}>
         <Row icon="bell" label="Bildirimler" value={permission === 'granted' ? 'Açık' : 'Kapalı'} onPress={() => router.push('/notifications')} />
-        <Row icon="wallet" label="Bakiye ve maaş" onPress={() => router.push('/flow-settings')} />
+        <Row icon="wallet" label="Bakiye ve gelirler" onPress={() => router.push('/flow-settings')} />
         <Row icon="doc" label="Kurulumu tekrar göster" onPress={() => router.push('/onboarding')} last />
       </Surface>
 

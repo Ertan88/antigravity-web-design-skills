@@ -18,18 +18,21 @@ describe('Zaman Nehri', () => {
       '22 Su',
       '28 Maaş Kartım (dönem içi)',
       '29 Kira',
+      '30 Ek ders',
       '1 İnternet',
       '14 Maaş',
     ]);
-    expect(events.find((e) => e.kind === 'salary')!.amount).toBe(tl(52_000));
+    const maas = events.find((e) => e.title === 'Maaş')!;
+    expect(maas).toMatchObject({ kind: 'salary', amount: tl(46_000), projected: true });
   });
 
   it('bakiye zinciri ve eksiye düşüş + faiz maliyetli öneri', () => {
     expect(events[2].balanceAfter).toBe(tl(31_480 - 845.3 - 312.4 - 23_383.8));
     const sf = findShortfall(s, events)!;
     expect(sf.date).toEqual(new Date(2026, 10, 29));
-    expect(sf.lowest).toBe(tl(-1_011.4));
-    expect(sf.suggestion).toEqual({ cardTitle: 'Maaş Kartım (dönem içi)', defer: tl(1_011.4), cost: tl(42.73) });
+    // Kira sonrası −561,50; ertesi gün ek ders yatıyor
+    expect(sf.lowest).toBe(tl(-561.5));
+    expect(sf.suggestion).toEqual({ cardTitle: 'Maaş Kartım (dönem içi)', defer: tl(561.5), cost: tl(23.72) });
   });
 
   it('girilen bakiyeden sonraki nakit harcama ve kart ödemesi düşülür', () => {

@@ -1,22 +1,67 @@
 import { router } from 'expo-router';
+import { useEffect, useMemo, useRef } from 'react';
 import { Linking, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNotifications } from '../notifications/NotificationsProvider';
+import { sameDay } from '../core/dates';
+import { openTarget, useNotifications } from '../notifications/NotificationsProvider';
+import { buildInbox, InboxItem, InboxStatus } from '../notifications/plan';
+import { useStore } from '../store/StoreProvider';
 import { useTheme } from '../theme/ThemeProvider';
-import { fonts } from '../theme/tokens';
+import { fonts, Palette } from '../theme/tokens';
 import { Icon } from '../ui/icons';
-import { AppText, IconButton, PrimaryButton, Surface } from '../ui/primitives';
+import { AppText, Chip, IconButton, PrimaryButton, Surface } from '../ui/primitives';
 
-const timeFmt = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short', weekday: 'short', hour: '2-digit', minute: '2-digit' });
+const timeFmt = new Intl.DateTimeFormat('tr-TR', { hour: '2-digit', minute: '2-digit' });
+const dayFmt = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' });
 
-/** Bildirimler: izin durumu ve kurulmuş hatırlatmaların listesi. */
+function groupLabel(d: Date, now: Date) {
+  if (sameDay(d, now)) return 'Bugün';
+  const y = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  if (sameDay(d, y)) return 'Dün';
+  return dayFmt.format(d);
+}
+
+function statusChip(s: InboxStatus, p: Palette) {
+  switch (s) {
+    case 'paid':
+      return { text: 'Ödendi', fg: p.accent, bg: p.glow };
+    case 'logged':
+      return { text: 'Girildi', fg: p.accent, bg: p.glow };
+    case 'overdue':
+      return { text: 'Gecikti', fg: p.danger, bg: p.dangerBg };
+    default:
+      return { text: 'Bekliyor', fg: p.warn, bg: p.warnBg };
+  }
+}
+
+/**
+ * Bildirim kutusu: yalnızca zamanı gelmiş (gönderilmiş) hatırlatmalar, en yenisi üstte.
+ * Dokununca ilgili ödemeye / karta / gelir girişine gider.
+ */
 export default function NotificationsScreen() {
   const { palette } = useTheme();
   const insets = useSafeAreaInsets();
-  const { permission, request, plan, sendTest } = useNotifications();
+  const { state, dispatch } = useStore();
+  const { permission, request } = useNotifications();
+  const now = useMemo(() => new Date(), []);
+  const items = useMemo(() => buildInbox(state, now), [state, now]);
+  const seenAt = useRef(state.settings.inboxSeenAt);
+
+  // Kutu açıldı: okunmamış rozetini sıfırla (bu oturumda yeni olanlar yine vurgulu kalır).
+  useEffect(() => {
+    dispatch({ type: 'settings/update', settings: { inboxSeenAt: new Date().toISOString() } });
+  }, [dispatch]);
+
+  const groups: { label: string; items: InboxItem[] }[] = [];
+  for (const it of items) {
+    const label = groupLabel(it.fireAt, now);
+    const g = groups[groups.length - 1];
+    if (g && g.label === label) g.items.push(it);
+    else groups.push({ label, items: [it] });
+  }
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: palette.bg }} contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: 20, paddingBottom: insets.bottom + 32, gap: 14 }}>
+    <ScrollView style={{ flex: 1, backgroundColor: palette.bg }} contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: 20, paddingBottom: insets.bottom + 32, gap: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <IconButton icon="back" label="Geri" onPress={() => router.back()} />
         <AppText variant="heading" accessibilityRole="header">
@@ -25,71 +70,77 @@ export default function NotificationsScreen() {
         <View style={{ width: 44 }} />
       </View>
 
-      {permission === 'granted' ? (
-        <Surface style={{ padding: 16, gap: 10 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <Icon name="check" size={20} color={palette.accent} strokeWidth={2.4} />
-            <AppText variant="bodyStrong">Hatırlatmalar açık</AppText>
-          </View>
+      {permission !== 'granted' && permission !== 'unsupported' ? (
+        <Surface style={{ padding: 14, gap: 8 }}>
+          <AppText variant="bodyStrong">Hatırlatmalar kapalı</AppText>
           <AppText variant="label" muted style={{ fontFamily: fonts.body }}>
-            Her ödeme için seçtiğin günlerde ve saatte bildirim gelir. Faturalarda "Ödedim" ve "2 saat ertele" butonları bulunur.
-          </AppText>
-          <Pressable accessibilityRole="button" onPress={() => sendTest()} style={{ alignSelf: 'flex-start', paddingVertical: 6 }}>
-            <AppText variant="label" color={palette.accent}>
-              5 saniye içinde test bildirimi gönder
-            </AppText>
-          </Pressable>
-        </Surface>
-      ) : permission === 'unsupported' ? (
-        <Surface style={{ padding: 16 }}>
-          <AppText variant="body" muted>
-            Bildirimler bu platformda desteklenmiyor. Telefonda dene.
-          </AppText>
-        </Surface>
-      ) : (
-        <Surface style={{ padding: 16, gap: 10 }}>
-          <AppText variant="bodyStrong">Son ödeme günlerini kaçırma</AppText>
-          <AppText variant="label" muted style={{ fontFamily: fonts.body }}>
-            {permission === 'denied'
-              ? 'Bildirim izni kapalı. Telefonun ayarlarından PayFlow için bildirimlere izin ver.'
-              : 'Faturaların ve kart ekstrelerin için son ödeme gününden önce, seçtiğin saatte hatırlatalım.'}
+            {permission === 'denied' ? 'Telefonun ayarlarından PayFlow için bildirimlere izin ver.' : 'Son ödeme günlerinde, seçtiğin saatte telefonuna bildirim gelsin.'}
           </AppText>
           <PrimaryButton title={permission === 'denied' ? 'Ayarları aç' : 'Bildirimlere izin ver'} onPress={() => (permission === 'denied' ? Linking.openSettings() : request())} />
         </Surface>
-      )}
+      ) : null}
 
-      <AppText variant="heading" accessibilityRole="header">
-        Yaklaşan hatırlatmalar
-      </AppText>
-      {plan.length === 0 ? (
-        <AppText variant="body" muted>
-          Önümüzdeki 45 günde kurulacak hatırlatma yok.
-        </AppText>
+      {items.length === 0 ? (
+        <View style={{ alignItems: 'center', gap: 10, paddingVertical: 48 }}>
+          <Icon name="bell" size={32} color={palette.muted} />
+          <AppText variant="bodyStrong">Henüz bildirim yok</AppText>
+          <AppText variant="label" muted style={{ textAlign: 'center', fontFamily: fonts.body }}>
+            Zamanı gelen hatırlatmalar burada birikir. Dokununca ilgili ödemeye gidersin.
+          </AppText>
+        </View>
       ) : (
-        plan.slice(0, 20).map((p) => (
-          <View key={p.id} accessible accessibilityLabel={`${timeFmt.format(p.fireAt)}, ${p.title}, ${p.body}`} style={{ flexDirection: 'row', gap: 12, backgroundColor: palette.surface, borderRadius: 16, padding: 12 }}>
-            <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: p.title.includes('bugün') ? palette.warnBg : palette.surface2, alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name={p.category === 'info' ? 'doc' : 'bell'} size={18} color={p.title.includes('bugün') ? palette.warn : palette.muted} />
-            </View>
-            <View style={{ flex: 1, gap: 2 }}>
-              <AppText variant="caption" muted>
-                {timeFmt.format(p.fireAt)}
-              </AppText>
-              <AppText variant="bodyStrong" style={{ fontSize: 14 }}>
-                {p.title}
-              </AppText>
-              <AppText variant="caption" muted>
-                {p.body}
-              </AppText>
-            </View>
+        groups.map((g) => (
+          <View key={g.label} style={{ gap: 8 }}>
+            <AppText variant="label" muted style={{ marginTop: 6 }}>
+              {g.label}
+            </AppText>
+            {g.items.map((it) => {
+              const chip = statusChip(it.status, palette);
+              const unread = !seenAt.current || it.fireAt.getTime() > new Date(seenAt.current).getTime();
+              const icon = it.data.kind === 'card' || it.data.kind === 'statement' ? 'card' : it.data.kind === 'income' ? 'wallet' : 'doc';
+              return (
+                <Pressable
+                  key={it.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${it.title}. ${it.body}. ${chip.text}`}
+                  accessibilityHint="İlgili ödemeyi açar"
+                  onPress={() => openTarget(it.data)}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    gap: 12,
+                    backgroundColor: palette.surface,
+                    borderRadius: 16,
+                    padding: 12,
+                    borderWidth: 1,
+                    borderColor: unread ? palette.accent : palette.line,
+                    opacity: pressed ? 0.8 : 1,
+                  })}
+                >
+                  <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: chip.bg, alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name={icon} size={19} color={chip.fg} />
+                  </View>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+                      <AppText variant="bodyStrong" style={{ flex: 1, fontSize: 14 }}>
+                        {it.title}
+                      </AppText>
+                      <AppText variant="caption" muted>
+                        {timeFmt.format(it.fireAt)}
+                      </AppText>
+                    </View>
+                    <AppText variant="caption" muted>
+                      {it.body}
+                    </AppText>
+                    <View style={{ marginTop: 4 }}>
+                      <Chip text={chip.text} color={chip.fg} background={chip.bg} />
+                    </View>
+                  </View>
+                </Pressable>
+              );
+            })}
           </View>
         ))
       )}
-      {plan.length > 20 ? (
-        <AppText variant="caption" muted>
-          + {plan.length - 20} hatırlatma daha
-        </AppText>
-      ) : null}
     </ScrollView>
   );
 }

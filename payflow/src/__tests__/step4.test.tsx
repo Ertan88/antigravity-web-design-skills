@@ -108,18 +108,30 @@ describe('Zaman Nehri', () => {
     await renderWith(<TimelineScreen />, demoState(new Date()));
     expect(screen.getByText(/bakiye eksiye düşüyor/)).toBeTruthy();
     expect(screen.getByText(/maaştan sonraya bırakmak ≈ ₺\d+,\d\d faiz/)).toBeTruthy();
-    expect(screen.getByLabelText(/Maaş, ₺52\.000,00/)).toBeTruthy();
+    expect(screen.getByLabelText(/Maaş, ₺46\.000,00/)).toBeTruthy();
+    expect(screen.getByLabelText(/Ek ders, ₺6\.000,00/)).toBeTruthy();
   });
 
-  it('bakiye ve maaş ayarı kaydedilir', async () => {
+  it('bakiye ve gelir kaynakları kaydedilir (maaş + değişken ek ders)', async () => {
     await renderWith(<FlowSettingsScreen />, initialState);
     await fireEvent.changeText(screen.getByLabelText('Şu anki hesap bakiyen (₺)'), '10.000');
-    await fireEvent(screen.getByLabelText('Düzenli maaşım var'), 'valueChange', true);
-    await fireEvent.changeText(screen.getByLabelText('Net maaş (₺)'), '40.000');
+    await fireEvent.press(screen.getByText('+ Maaş'));
+    await fireEvent.changeText(screen.getByLabelText('Net tutar (₺)'), '40.000');
+    await fireEvent.press(screen.getByText('+ Ek ders'));
     await fireEvent.press(screen.getByText('Kaydet'));
     expect(latest.settings.balance?.amount).toBe(1_000_000);
-    expect(latest.settings.salaryAmount).toBe(4_000_000);
-    expect(latest.settings.salaryDay).toBe(15);
+    expect(latest.settings.incomes?.map((i) => [i.name, i.day, i.amount, i.variable])).toEqual([
+      ['Maaş', 15, 4_000_000, false],
+      ['Ek ders', 1, 0, true],
+    ]);
+  });
+
+  it('sabit gelirde tutar zorunlu', async () => {
+    await renderWith(<FlowSettingsScreen />, initialState);
+    await fireEvent.press(screen.getByText('+ Maaş'));
+    await fireEvent.press(screen.getByText('Kaydet'));
+    expect(screen.getByText('Maaş: tutarı gir')).toBeTruthy();
+    expect(latest.settings.incomes).toBeUndefined();
   });
 });
 

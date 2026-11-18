@@ -2,28 +2,31 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { parseAmount } from '../core/parse';
+import { uid } from '../core/dates';
 import { ReminderSettings } from '../core/reminders';
+import { fromDrafts, IncomeDraft, IncomeEditor, toDrafts } from '../features/IncomeEditor';
 import { ReminderPicker } from '../features/shared';
 import { useStore } from '../store/StoreProvider';
 import { useTheme } from '../theme/ThemeProvider';
 import { fonts } from '../theme/tokens';
-import { Stepper, TextField, ToggleRow } from '../ui/form';
+import { ToggleRow } from '../ui/form';
 import { AppText, PrimaryButton } from '../ui/primitives';
 
-/** İlk kurulum: maaş günü/tutarı ve varsayılan hatırlatma; ardından istersen ilk kart. */
+/** İlk kurulum: gelir kaynakları (maaş, ek ders…) ve varsayılan hatırlatma; ardından istersen ilk kart. */
 export default function OnboardingScreen() {
   const { palette } = useTheme();
   const insets = useSafeAreaInsets();
   const { state, dispatch } = useStore();
-  const [hasSalary, setHasSalary] = useState(true);
-  const [salaryDay, setSalaryDay] = useState(state.settings.salaryDay ?? 15);
-  const [salaryText, setSalaryText] = useState('');
+  const [incomes, setIncomes] = useState<IncomeDraft[]>(
+    state.settings.incomes?.length ? toDrafts(state.settings.incomes) : [{ id: uid('inc'), name: 'Maaş', day: 15, amountText: '', variable: false }],
+  );
+  const [error, setError] = useState<string | null>(null);
   const [reminders, setReminders] = useState<ReminderSettings>(state.settings.defaultReminders);
   const [addCard, setAddCard] = useState(true);
 
   const finish = (skip = false) => {
-    const salary = parseAmount(salaryText);
+    const parsed = fromDrafts(incomes);
+    if (!skip && parsed.error) return setError(parsed.error);
     dispatch({
       type: 'settings/update',
       settings: skip
@@ -31,8 +34,7 @@ export default function OnboardingScreen() {
         : {
             onboardingDone: true,
             defaultReminders: reminders,
-            salaryDay: hasSalary ? salaryDay : undefined,
-            salaryAmount: hasSalary && salary ? salary : undefined,
+            incomes: parsed.incomes,
           },
     });
     router.replace('/');
@@ -66,12 +68,17 @@ export default function OnboardingScreen() {
         </AppText>
       </View>
 
-      <ToggleRow title="Düzenli maaş alıyorum" subtitle="Zaman Nehri'nde maaş gününü ve bakiyeni gösterir" value={hasSalary} onChange={setHasSalary} />
-      {hasSalary ? (
-        <>
-          <Stepper label="Maaş günün" value={salaryDay} min={1} max={31} onChange={setSalaryDay} />
-          <TextField label="Net maaş (₺) — isteğe bağlı" placeholder="52.000" value={salaryText} onChangeText={setSalaryText} keyboardType="decimal-pad" />
-        </>
+      <View style={{ gap: 6 }}>
+        <AppText variant="heading">Gelirlerin</AppText>
+        <AppText variant="caption" muted>
+          Ayın hangi günü ne yattığını bilirsek, bakiyenin eksiye düşeceği günü önceden gösteririz.
+        </AppText>
+      </View>
+      <IncomeEditor value={incomes} onChange={(v) => { setIncomes(v); setError(null); }} />
+      {error ? (
+        <AppText variant="caption" color={palette.danger}>
+          {error}
+        </AppText>
       ) : null}
 
       <View style={{ gap: 6 }}>

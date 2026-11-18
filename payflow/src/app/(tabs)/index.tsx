@@ -6,6 +6,7 @@ import { formatTL } from '../../core/money';
 import { dueLabel, formatLongDate, greetingFor, Urgency, urgencyFor } from '../../core/schedule';
 import { useNotifications } from '../../notifications/NotificationsProvider';
 import { markBillPaid } from '../../features/markPaid';
+import { buildInbox, unreadCount } from '../../notifications/plan';
 import { healthReport } from '../../store/analytics';
 import { demoState } from '../../store/demoSeed';
 import { DueItem, homeSummary } from '../../store/selectors';
@@ -44,6 +45,7 @@ export default function HomeScreen() {
   const now = useMemo(() => new Date(), []);
   const s = useMemo(() => homeSummary(state, now), [state, now]);
   const health = useMemo(() => healthReport(state, now), [state, now]);
+  const unread = useMemo(() => unreadCount(buildInbox(state, now), state.settings.inboxSeenAt), [state, now]);
   const [whole, cents] = splitMoney(formatTL(s.monthTotal));
   const g = s.byGroup;
 
@@ -73,7 +75,7 @@ export default function HomeScreen() {
           </AppText>
         </View>
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          <IconButton icon="bell" label="Bildirimler" onPress={() => router.push('/notifications')} badge={s.overdueCount > 0 || s.upcoming.some((u) => u.daysLeft <= 3)} />
+          <IconButton icon="bell" label={unread ? `Bildirimler, ${unread} yeni` : 'Bildirimler'} onPress={() => router.push('/notifications')} badge={unread > 0} />
           <IconButton icon="user" label="Profil ve ayarlar" onPress={openProfile} />
         </View>
       </View>

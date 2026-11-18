@@ -3,6 +3,7 @@ import { periodKey } from '../core/dates';
 import { clampedDate, startOfDay } from '../core/finance/billingCycle';
 import { ratesFor } from '../core/finance/rates';
 import { billNextDue, cardLedger } from '../core/ledger';
+import { expectedIncome, incomeDates, incomeSince, incomeSources } from '../core/income';
 import { AppState } from '../core/model';
 import { Kurus } from '../core/money';
 import { CARD_CATEGORY, findCategory } from './selectors';
@@ -66,12 +67,12 @@ export function flowEvents(s: AppState, now: Date, days: number): FlowEvent[] {
     }
   }
 
-  const { salaryDay, salaryAmount } = s.settings;
-  if (salaryDay && salaryAmount) {
-    for (let k = 0; k <= Math.ceil(days / 28) + 1; k++) {
-      const d = clampedDate(today.getFullYear(), today.getMonth() + k, salaryDay);
-      if (d.getTime() < today.getTime() || !within(d)) continue;
-      out.push({ key: `salary:${periodKey(d)}`, date: d, title: 'Maaş', amount: salaryAmount, category: SALARY_CATEGORY, kind: 'salary', projected: false });
+  for (const src of incomeSources(s.settings)) {
+    for (const d of incomeDates(src, today, horizon)) {
+      const period = periodKey(d);
+      const exp = expectedIncome(src, s.settings, period);
+      if (exp.amount <= 0) continue;
+      out.push({ key: `income:${src.id}:${period}`, date: d, title: src.name, amount: exp.amount, category: SALARY_CATEGORY, kind: 'salary', refId: src.id, period, projected: exp.estimated });
     }
   }
 
@@ -89,7 +90,7 @@ export function currentBalance(s: AppState): Kurus | null {
   const since = new Date(b.asOf).getTime();
   const spent = s.expenses.filter((e) => e.source.type !== 'card' && new Date(e.date).getTime() > since).reduce((a, e) => a + e.amount, 0);
   const paid = s.cardPayments.filter((p) => new Date(p.date).getTime() > since).reduce((a, p) => a + p.amount, 0);
-  return b.amount - spent - paid;
+  return b.amount - spent - paid + incomeSince(s.settings, new Date(b.asOf), new Date());
 }
 
 export function withBalances(events: FlowEvent[], start: Kurus): FlowEvent[] {

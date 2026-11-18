@@ -121,7 +121,13 @@ export default function TimelineScreen() {
 function EventRow({ e, first, palette }: { e: FlowEvent; first: boolean; palette: Palette }) {
   const neg = (e.balanceAfter ?? 0) < 0;
   const income = e.amount > 0;
-  const onPress = e.kind === 'card' && e.refId ? () => router.push(`/card/${e.refId}`) : undefined;
+  const onPress = !e.refId
+    ? undefined
+    : e.kind === 'card'
+      ? () => router.push(`/card/${e.refId}`)
+      : e.kind === 'salary'
+        ? () => router.push({ pathname: '/income-log', params: { id: e.refId!, period: e.period! } })
+        : () => router.push(`/bill/${e.refId}`);
   return (
     <Pressable
       accessibilityRole={onPress ? 'button' : undefined}
@@ -153,7 +159,7 @@ function EventRow({ e, first, palette }: { e: FlowEvent; first: boolean; palette
           </AppText>
           {e.projected ? (
             <AppText variant="caption" muted style={{ fontSize: 11 }}>
-              tahmini
+              {income ? 'tahmini · yatınca tutarı gir' : 'tahmini'}
             </AppText>
           ) : null}
         </View>

@@ -49,6 +49,16 @@ async function setupChannelsAndCategories() {
 const toState = (s: { granted: boolean; canAskAgain?: boolean; status?: string }): PermissionState =>
   s.granted ? 'granted' : s.status === 'undetermined' || s.canAskAgain ? 'undetermined' : 'denied';
 
+/** Bildirimin ilgili ekranı: fatura → fatura ayrıntısı, kart → kart/ödeme, gelir → tutar girişi. */
+export function openTarget(data: { kind?: string; refId?: string; period?: string }, pay = false) {
+  if (!data.refId) return;
+  if (data.kind === 'bill') router.push(`/bill/${data.refId}`);
+  else if (data.kind === 'card' || data.kind === 'statement') {
+    if (pay) router.push({ pathname: '/card-pay', params: { id: data.refId } });
+    else router.push(`/card/${data.refId}`);
+  } else if (data.kind === 'income') router.push({ pathname: '/income-log', params: { id: data.refId, period: data.period ?? '' } });
+}
+
 export function NotificationsProvider({ children }: { children: ReactNode }) {
   const { state, dispatch, ready } = useStore();
   const supported = Platform.OS === 'ios' || Platform.OS === 'android';
@@ -123,10 +133,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'bill/markPaid', id: data.refId, period: data.period });
         return;
       }
-      if ((data.kind === 'card' || data.kind === 'statement') && data.refId) {
-        if (response.actionIdentifier === ACTION_PAY) router.push({ pathname: '/card-pay', params: { id: data.refId } });
-        else router.push(`/card/${data.refId}`);
-      }
+      openTarget(data, response.actionIdentifier === ACTION_PAY);
     },
     [dispatch],
   );

@@ -4,15 +4,16 @@ import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatTL, toLira } from '../core/money';
 import { parseAmount } from '../core/parse';
+import { fromDrafts, IncomeDraft, IncomeEditor, toDrafts } from '../features/IncomeEditor';
 import { useStore } from '../store/StoreProvider';
 import { currentBalance } from '../store/timeline';
 import { useTheme } from '../theme/ThemeProvider';
-import { Stepper, TextField, ToggleRow } from '../ui/form';
+import { SectionLabel, TextField } from '../ui/form';
 import { AppText, IconButton, PrimaryButton } from '../ui/primitives';
 
 const asInput = (k?: number | null) => (k ? toLira(k).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
 
-/** Zaman Nehri ayarları: güncel hesap bakiyesi, maaş günü ve tutarı. */
+/** Zaman Nehri ayarları: güncel hesap bakiyesi ve gelir kaynakları. */
 export default function FlowSettingsScreen() {
   const { palette } = useTheme();
   const insets = useSafeAreaInsets();
@@ -20,26 +21,23 @@ export default function FlowSettingsScreen() {
   const s = state.settings;
 
   const [balanceText, setBalanceText] = useState(asInput(currentBalance(state)));
-  const [hasSalary, setHasSalary] = useState(!!s.salaryDay);
-  const [salaryDay, setSalaryDay] = useState(s.salaryDay ?? 15);
-  const [salaryText, setSalaryText] = useState(asInput(s.salaryAmount));
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [incomes, setIncomes] = useState<IncomeDraft[]>(toDrafts(s.incomes ?? []));
+  const [errors, setErrors] = useState<{ balance?: string; incomes?: string }>({});
 
   const save = () => {
-    const e: Record<string, string> = {};
     const negative = balanceText.trim().startsWith('-');
     const bal = parseAmount(balanceText.replace(/^-/, ''));
-    if (balanceText && bal === null) e.balance = 'Geçerli bir tutar gir';
-    const salary = parseAmount(salaryText);
-    if (hasSalary && (salary === null || salary <= 0)) e.salary = 'Maaş tutarını gir';
+    const parsed = fromDrafts(incomes);
+    const e = { balance: balanceText && bal === null ? 'Geçerli bir tutar gir' : undefined, incomes: parsed.error ?? undefined };
     setErrors(e);
-    if (Object.keys(e).length) return;
+    if (e.balance || e.incomes) return;
     dispatch({
       type: 'settings/update',
       settings: {
         balance: bal === null ? undefined : { amount: negative ? -bal : bal, asOf: new Date().toISOString() },
-        salaryDay: hasSalary ? salaryDay : undefined,
-        salaryAmount: hasSalary ? salary ?? undefined : undefined,
+        incomes: parsed.incomes,
+        salaryDay: undefined,
+        salaryAmount: undefined,
       },
     });
     router.back();
@@ -51,7 +49,7 @@ export default function FlowSettingsScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <IconButton icon="close" label="Kapat" onPress={() => router.back()} />
           <AppText variant="heading" accessibilityRole="header">
-            Bakiye ve maaş
+            Bakiye ve gelirler
           </AppText>
           <View style={{ width: 44 }} />
         </View>
@@ -62,18 +60,18 @@ export default function FlowSettingsScreen() {
           onChangeText={setBalanceText}
           keyboardType="numbers-and-punctuation"
           error={errors.balance}
-          hint="Bundan sonra girdiğin nakit/banka kartı harcamaları ve kart ödemeleri otomatik düşülür."
+          hint="Bundan sonra girdiğin nakit/banka kartı harcamaları, kart ödemeleri ve yatan gelirler otomatik hesaba katılır."
         />
-        <ToggleRow title="Düzenli maaşım var" value={hasSalary} onChange={setHasSalary} />
-        {hasSalary ? (
-          <>
-            <Stepper label="Maaş günü" value={salaryDay} min={1} max={31} onChange={setSalaryDay} />
-            <TextField label="Net maaş (₺)" placeholder="52.000" value={salaryText} onChangeText={setSalaryText} keyboardType="decimal-pad" error={errors.salary} />
-          </>
-        ) : null}
         {s.balance ? (
           <AppText variant="caption" muted>
             Son girilen: {formatTL(s.balance.amount)} · {new Date(s.balance.asOf).toLocaleDateString('tr-TR')}
+          </AppText>
+        ) : null}
+        <SectionLabel>GELİRLER</SectionLabel>
+        <IncomeEditor value={incomes} onChange={(v) => { setIncomes(v); setErrors((x) => ({ ...x, incomes: undefined })); }} />
+        {errors.incomes ? (
+          <AppText variant="caption" color={palette.danger}>
+            {errors.incomes}
           </AppText>
         ) : null}
         <PrimaryButton title="Kaydet" onPress={save} />

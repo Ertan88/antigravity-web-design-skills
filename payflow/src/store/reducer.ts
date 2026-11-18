@@ -1,5 +1,6 @@
 import { Category } from '../core/categories';
 import { AppSettings, AppState, Bill, CardPayment, CreditCard, Expense } from '../core/model';
+import { Kurus } from '../core/money';
 import { DEFAULT_REMINDERS } from '../core/reminders';
 
 export const initialState: AppState = {
@@ -28,6 +29,7 @@ export type Action =
   | { type: 'cardPayment/add'; payment: CardPayment }
   | { type: 'cardPayment/remove'; id: string }
   | { type: 'settings/update'; settings: Partial<AppSettings> }
+  | { type: 'income/log'; id: string; period: string; amount: Kurus | null }
   | { type: 'category/add'; category: Category };
 
 export function reducer(state: AppState, action: Action): AppState {
@@ -88,6 +90,14 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, cardPayments: state.cardPayments.filter((p) => p.id !== action.id) };
     case 'settings/update':
       return { ...state, settings: { ...state.settings, ...action.settings } };
+    case 'income/log': {
+      const log = { ...(state.settings.incomeLog ?? {}) };
+      const entries = { ...(log[action.id] ?? {}) };
+      if (action.amount === null) delete entries[action.period];
+      else entries[action.period] = action.amount;
+      log[action.id] = entries;
+      return { ...state, settings: { ...state.settings, incomeLog: log } };
+    }
     case 'category/add':
       return { ...state, customCategories: [...state.customCategories, action.category] };
     default:
@@ -111,6 +121,12 @@ export function migrate(raw: unknown): AppState {
       // Eski kayıtlarda bayrak yok: verisi olan kullanıcıya kurulumu tekrar gösterme.
       onboardingDone: (s.cards?.length ?? 0) + (s.bills?.length ?? 0) + (s.expenses?.length ?? 0) > 0,
       ...(s.settings ?? {}),
+      // Eski tek maaş alanlarını gelir kaynağına taşı
+      incomes:
+        s.settings?.incomes ??
+        (s.settings?.salaryDay && s.settings?.salaryAmount
+          ? [{ id: 'salary', name: 'Maaş', day: s.settings.salaryDay, amount: s.settings.salaryAmount, variable: false }]
+          : undefined),
     },
   };
 }

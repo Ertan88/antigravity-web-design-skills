@@ -44,8 +44,10 @@ export function demoState(now: Date): AppState {
     ...initialState,
     settings: {
       ...initialState.settings,
-      salaryDay: day(27).getDate(),
-      salaryAmount: tl(52_000),
+      incomes: [
+        { id: 'demo-salary', name: 'Maaş', day: day(27).getDate(), amount: tl(46_000), variable: true },
+        { id: 'demo-extra', name: 'Ek ders', day: day(13).getDate(), amount: tl(6_000), variable: true },
+      ],
       onboardingDone: true,
       balance: { amount: tl(31_480), asOf: endOfToday.toISOString() },
     },

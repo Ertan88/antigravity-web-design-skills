@@ -46,7 +46,7 @@ describe('bildirim katmanı', () => {
   it('izin yokken kurmaz; izin verilince planın tamamını tarihli tetikleyiciyle kurar', async () => {
     const s = demoState(new Date());
     await renderApp(s);
-    expect(screen.getByText('Bildirimlere izin ver')).toBeTruthy();
+    expect(screen.getByText('Hatırlatmalar kapalı')).toBeTruthy();
     expect(N.scheduleNotificationAsync).not.toHaveBeenCalled();
 
     await fireEvent.press(screen.getByText('Bildirimlere izin ver'));
@@ -56,7 +56,7 @@ describe('bildirim katmanı', () => {
     const first = N.scheduleNotificationAsync.mock.calls[0][0] as { identifier: string; content: { title: string; categoryIdentifier?: string }; trigger: { type: string; date: Date } };
     expect(first.identifier).toBe(plan[0].id);
     expect(first.trigger).toMatchObject({ type: 'date', date: plan[0].fireAt });
-    expect(screen.getByText('Hatırlatmalar açık')).toBeTruthy();
+    await waitFor(() => expect(screen.queryByText('Hatırlatmalar kapalı')).toBeNull());
   });
 
   it('"Ödedim" butonu faturayı işaretler; "Ertele" 2 saat sonraya yeniden kurar', async () => {
@@ -76,9 +76,26 @@ describe('bildirim katmanı', () => {
     expect(latest.bills.find((b) => b.id === 'demo-ele')!.paidPeriods).toEqual(['2026-11']);
   });
 
-  it('yaklaşan hatırlatmaları listeler', async () => {
-    await renderApp(demoState(new Date()));
-    expect(screen.getByText('Yaklaşan hatırlatmalar')).toBeTruthy();
-    expect(screen.getAllByText(/Elektrik: (yarın|bugün) son gün|Elektrik: 3 gün kaldı/).length).toBeGreaterThan(0);
+  it('kutuda yalnızca zamanı gelmiş bildirimler; dokununca ilgili faturaya gider', async () => {
+    const now = new Date();
+    const s = demoState(now);
+    const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    // Su faturası dün son gündü ve ödenmedi → 3 hatırlatması geçmişte gönderildi
+    s.bills = s.bills.map((b) =>
+      b.id === 'demo-water' ? { ...b, recurrence: { type: 'monthly' as const, dueDay: yesterday.getDate() }, createdAt: '2026-01-01' } : b,
+    );
+    await renderApp(s);
+    expect(screen.getByText('Su: bugün son gün')).toBeTruthy();
+    expect(screen.getAllByText('Gecikti').length).toBeGreaterThan(0);
+    // Elektriğin son günü yarından sonra: henüz gönderilmemiş bildirim kutuda yok
+    expect(screen.queryByText('Elektrik: bugün son gün')).toBeNull();
+    const router = (jest.requireMock('expo-router') as { router: { push: jest.Mock } }).router;
+    await fireEvent.press(screen.getByLabelText(/^Su: bugün son gün/));
+    expect(router.push).toHaveBeenCalledWith('/bill/demo-water');
+  });
+
+  it('boş kutu mesajı', async () => {
+    await renderApp(initialState);
+    expect(screen.getByText('Henüz bildirim yok')).toBeTruthy();
   });
 });

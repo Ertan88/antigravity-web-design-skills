@@ -1,7 +1,8 @@
 import { describe, expect, it } from '@jest/globals';
 import { demoState } from '../../store/demoSeed';
 import { reducer } from '../../store/reducer';
-import { buildNotificationPlan, planSignature } from '../plan';
+import { tl } from '../../core/money';
+import { buildInbox, buildNotificationPlan, planSignature, unreadCount } from '../plan';
 
 const now = new Date(2026, 10, 17, 15);
 
@@ -47,5 +48,30 @@ describe('bildirim planı', () => {
   it('iOS sınırı için en yakın N tanesi', () => {
     expect(buildNotificationPlan(s, now, { max: 3 })).toHaveLength(3);
     expect(planSignature(buildNotificationPlan(s, now))).toBe(planSignature(plan));
+  });
+});
+
+describe('bildirim kutusu ve gelir hatırlatmaları', () => {
+  it('yalnızca geçmiş hatırlatmalar, en yeni üstte, durumla', () => {
+    const s = demoState(now);
+    s.bills = s.bills.map((b) => (b.id === 'demo-water' ? { ...b, recurrence: { type: 'monthly' as const, dueDay: 15 }, createdAt: '2026-10-01' } : b));
+    s.bills = s.bills.map((b) => (b.id === 'demo-water' ? { ...b, paidPeriods: ['2026-11'], paidLog: { '2026-11': '2026-11-14T10:00:00Z' } } : b));
+    const inbox = buildInbox(s, now);
+    expect(inbox.every((i) => i.fireAt.getTime() <= now.getTime())).toBe(true);
+    const water = inbox.filter((i) => i.data.refId === 'demo-water' && i.data.period === '2026-11');
+    expect(water.map((w) => w.title)).toEqual(['Su: bugün son gün', 'Su: yarın son gün', 'Su: 3 gün kaldı']);
+    expect(water.every((w) => w.status === 'paid')).toBe(true);
+    const oct = inbox.filter((i) => i.data.refId === 'demo-water' && i.data.period === '2026-10');
+    expect(oct.every((w) => w.status === 'overdue')).toBe(true);
+    expect(unreadCount(inbox, now.toISOString())).toBe(0);
+    expect(unreadCount(inbox)).toBe(inbox.length);
+  });
+
+  it('değişken gelir: yattığı gün "yattı mı?"; tutar girilince planlanmaz', () => {
+    const s = demoState(now);
+    const extra = buildNotificationPlan(s, now).filter((p) => p.data.kind === 'income');
+    expect(extra[0]).toMatchObject({ title: 'Ek ders yattı mı?', data: { refId: 'demo-extra', period: '2026-11' } });
+    const logged = reducer(s, { type: 'income/log', id: 'demo-extra', period: '2026-11', amount: tl(6_400) });
+    expect(buildNotificationPlan(logged, now).some((p) => p.id === 'income:demo-extra:2026-11')).toBe(false);
   });
 });

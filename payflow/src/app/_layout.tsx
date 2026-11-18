@@ -45,6 +45,8 @@ function RootStack() {
           <Stack.Screen name="settings" />
           <Stack.Screen name="expenses" />
           <Stack.Screen name="delete-account" />
+          <Stack.Screen name="bill/[id]" />
+          <Stack.Screen name="income-log" options={{ presentation: 'modal' }} />
         </Stack.Protected>
         <Stack.Protected guard={!inside}>
           <Stack.Screen name="(auth)" />
