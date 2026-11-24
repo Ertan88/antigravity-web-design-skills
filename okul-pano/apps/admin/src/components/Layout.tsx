@@ -135,14 +135,8 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <SchoolSwitcher />
       </div>
       <nav className="relative flex-1 space-y-3 overflow-y-auto px-3 pb-4 [scrollbar-width:thin]">
-        {/* Telefonda açılan menü: uygulama şeridi ve en sık kullanılan sayfaların kısayolları, altında tam liste */}
-        {onNavigate && (
-          <PhoneShortcuts
-            items={nav.flatMap((g) => g.items).filter((i) => (!i.permission || can(i.permission)) && (!i.when || i.when(settings, who)))}
-            badges={badges}
-            onNavigate={onNavigate}
-          />
-        )}
+        {/* Telefonda açılan menü: uygulamayı indirme şeridi, altında tam liste */}
+        {onNavigate && <PhoneShortcuts />}
         {nav.map((group) => {
           const items = group.items.filter((i) => (!i.permission || can(i.permission)) && (!i.when || i.when(settings, who)));
           if (!items.length) return null;
@@ -361,67 +355,19 @@ export function Layout() {
   );
 }
 
-/** Telefondaki menünün başı: önce uygulama şeridi, sonra en çok dört kısayol (kişinin görebildiği sayfalardan) */
-const SHORTCUT_ORDER = ['/duyurular', '/gorevlendirme', '/nobet', '/izinler', '/ekranlar', '/sinav-takvimi', '/sorunlar'];
-
-function PhoneShortcuts({ items, badges, onNavigate }: { items: NavItem[]; badges: Record<'coverOpen', number>; onNavigate: () => void }) {
-  const { me, school } = useAuth();
-  const [opening, setOpening] = useState(false);
-  const shortcuts = SHORTCUT_ORDER.map((to) => items.find((i) => i.to === to)).filter((i): i is NavItem => Boolean(i)).slice(0, 4);
+/**
+ * Telefondaki menünün başı: uygulamayı indirme şeridi. (Uygulamanın tarayıcı sürümünü açan düğme ve kısayol kartları
+ * kaldırıldı: panelde menünün tamamı zaten altta; tarayıcı sürümü geniş ekranda ortalanmış telefon görünümü veriyordu.)
+ */
+function PhoneShortcuts() {
   return (
-    <div className="space-y-3">
-      <div className="space-y-2.5 rounded-2xl bg-[#0E5E66] p-3 text-white">
-        <div className="flex items-center gap-2">
-          <MonitorSmartphone className="size-5 shrink-0" />
-          <span className="text-sm font-extrabold">Telefonda uygulamada daha kolay</span>
-        </div>
-        <div className="flex gap-2">
-          <a href="/indir" className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-white px-3 py-2 text-xs font-extrabold text-[#0E5E66]">
-            <Download className="size-3.5" />
-            İndir
-          </a>
-          <button
-            type="button"
-            disabled={opening || !me}
-            onClick={() => {
-              if (!me) return;
-              setOpening(true);
-              void openAppView(me.user.id, school?.id ?? null).then((ok) => !ok && setOpening(false));
-            }}
-            className="flex-1 rounded-xl bg-white/15 px-3 py-2 text-xs font-extrabold text-white ring-1 ring-white/30 disabled:opacity-60"
-          >
-            {opening ? 'Açılıyor…' : 'Tarayıcıda aç'}
-          </button>
-        </div>
-      </div>
-      {shortcuts.length > 1 && (
-        <div>
-          <div className="px-3.5 pb-1.5 text-xs font-bold text-slate-400">Kısayollar</div>
-          <div className="grid grid-cols-2 gap-2">
-            {shortcuts.map((item) => {
-              const badge = item.badge ? badges[item.badge] : 0;
-              return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.to === '/'}
-                  onClick={onNavigate}
-                  className={({ isActive }) =>
-                    clsx(
-                      'relative flex flex-col gap-1.5 rounded-2xl p-2.5 text-[13px] font-bold ring-1 transition',
-                      isActive ? 'bg-ink text-white ring-ink dark:text-[#1c1917]' : 'bg-surface text-ink ring-slate-200 hover:ring-slate-300',
-                    )
-                  }
-                >
-                  <item.icon className="size-5" />
-                  <span className="truncate">{item.label}</span>
-                  {badge > 0 && <span className="absolute top-2 right-2 rounded-full bg-rose-600 px-1.5 text-[10.5px] font-extrabold text-white tabular-nums">{badge}</span>}
-                </NavLink>
-              );
-            })}
-          </div>
-        </div>
-      )}
+    <div className="flex items-center gap-2 rounded-2xl bg-[#0E5E66] p-3 text-white">
+      <MonitorSmartphone className="size-5 shrink-0" />
+      <span className="flex-1 text-sm font-extrabold">Telefonda uygulamada daha kolay</span>
+      <a href="/indir" className="flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-xs font-extrabold text-[#0E5E66]">
+        <Download className="size-3.5" />
+        İndir
+      </a>
     </div>
   );
 }

@@ -29,7 +29,8 @@ export function switchAllowed(list: SavedAccount[], isSuperAdmin: boolean | unde
 }
 
 const KEY = 'okulpano.accounts';
-const MAX = 5;
+/** Telefonda en çok bu kadar hesap saklanır (platform yöneticisinin hesapları; şifreli depo boyutu sınırlı) */
+const MAX = 10;
 
 export async function loadAccounts(): Promise<SavedAccount[]> {
   try {
