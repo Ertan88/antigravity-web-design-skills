@@ -42,7 +42,7 @@ export function AccountRow({
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ selected: active, busy }}
-        accessibilityLabel={`${a.fullName}, ${a.kind === 'platform' ? 'platform hesabı' : 'okul hesabı'}${compact ? '' : `, ${a.email}${a.school ? `, ${a.school}` : ''}${a.role ? `, ${a.role}` : ''}`}${active ? ', etkin hesap' : ''}`}
+        accessibilityLabel={`${a.fullName}, ${a.kind === 'platform' ? 'platform hesabı' : 'okul hesabı'}${compact ? '' : `, ${a.email}`}${active ? ', etkin hesap' : ''}`}
         onPress={onPress}
         disabled={active || busy}
         style={({ pressed }) => ({
@@ -69,18 +69,7 @@ export function AccountRow({
           <T size={12.5} color={colors.muted} lines={1}>
             {compact ? maskEmail(a.email) : a.email}
           </T>
-          {!compact && a.kind === 'school' && a.school ? (
-            <View style={{ marginTop: 3, gap: 1 }}>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.ink }} numberOfLines={2}>
-                {a.school}
-              </Text>
-              {a.role ? (
-                <T size={12.5} color={colors.muted} lines={1}>
-                  {a.role}
-                </T>
-              ) : null}
-            </View>
-          ) : !compact && a.kind === 'school' && a.detail ? (
+          {!compact && a.kind === 'school' && a.detail ? (
             <T size={12.5} color={colors.faint} lines={2}>
               {a.detail}
             </T>
@@ -203,8 +192,18 @@ export function SwitchingOverlay() {
         <T color={colors.muted} style={{ textAlign: 'center' }}>
           {switching.kind === 'platform' ? 'Platform hesabına geçiliyor…' : 'Okul hesabına geçiliyor…'}
         </T>
-        {switching.kind === 'school' && switching.detail ? (
-          <T size={13} color={colors.faint} style={{ textAlign: 'center' }}>
+        {/* Okul hesabı: okul adı (türüyle) belirgin, altında ünvan ve branş */}
+        {switching.kind === 'school' && switching.school ? (
+          <View style={{ alignItems: 'center', gap: 4, marginTop: 4 }}>
+            <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink, textAlign: 'center' }}>{switching.school}</Text>
+            {switching.role ? (
+              <T size={15} weight="600" color={colors.muted} style={{ textAlign: 'center' }}>
+                {switching.role}
+              </T>
+            ) : null}
+          </View>
+        ) : switching.kind === 'school' && switching.detail ? (
+          <T size={15} weight="600" color={colors.muted} style={{ textAlign: 'center' }}>
             {switching.detail}
           </T>
         ) : null}
