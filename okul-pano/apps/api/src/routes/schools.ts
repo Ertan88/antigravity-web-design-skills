@@ -13,6 +13,7 @@ import { geocode } from '../lib/weather.ts';
 import { SAMPLE_TABLES, seedSchoolContent, type SampleData } from '../seed-data.ts';
 import { addDefaultTeacherOptions } from './teachers.ts';
 import { PLATFORM_MEMBER_ERROR } from '../lib/platformAccount.ts';
+import { duplicateInstitutionCodes, warnDuplicateInstitution } from '../lib/institutionCode.ts';
 
 /**
  * Okulun panelde görünen bilgileri. TV uygulamasının çıkış şifresi yalnızca ayar yetkisi olana gider (öğretmen
@@ -27,6 +28,7 @@ export function publicSchool(s: typeof schools.$inferSelect, withSecrets = false
     logoUrl: s.logoUrl,
     timezone: s.timezone,
     city: s.city,
+    institutionCode: s.institutionCode,
     latitude: s.latitude,
     longitude: s.longitude,
     settings: withSecrets ? settings : { ...settings, tvExitPin: null },
@@ -81,6 +83,7 @@ export async function schoolRoutes(app: FastifyInstance) {
       .where(eq(schools.id, req.ctx.schoolId))
       .returning();
     await audit(req, 'update', 'Okul ayarları', req.ctx.schoolId, updated!.name);
+    if (updated!.institutionCode && updated!.institutionCode !== req.ctx.school.institutionCode) await warnDuplicateInstitution(app.deps, updated!).catch(() => false);
     bus.contentChanged(req.ctx.schoolId);
     return publicSchool(updated!, secrets(req));
   });
@@ -296,6 +299,7 @@ export async function schoolRoutes(app: FastifyInstance) {
     // Panelde açılabilen okullar: üyesi olunan ya da destek erişimi süren (KVKK)
     const own = new Set((await db.select({ id: memberships.schoolId }).from(memberships).where(eq(memberships.userId, accessUser(req).sub))).map((m) => m.id));
     const owners = await schoolOwners(app.deps);
+    const dupCodes = await duplicateInstitutionCodes(app.deps);
     const now = Date.now();
     // Çevrimiçi pano sayısı (cihaz bağlantısı; okulun içeriği değil)
     const screenRows = await db.select({ id: screens.id, schoolId: screens.schoolId }).from(screens);
@@ -309,6 +313,8 @@ export async function schoolRoutes(app: FastifyInstance) {
       screensOnline: online.get(r.school.id) ?? 0,
       contactPhone: r.school.contactPhone,
       createdAt: r.school.createdAt,
+      /** Aynı kurum kodu başka bir okulda da kayıtlı */
+      codeShared: Boolean(r.school.institutionCode && dupCodes.has(r.school.institutionCode)),
       member: own.has(r.school.id),
       canOpen: own.has(r.school.id) || (r.school.supportAccessUntil?.getTime() ?? 0) > now,
     }));

@@ -4,6 +4,7 @@ import { ArrowRight, CheckCircle2, MailCheck } from '../components/icons.tsx';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { BrandMark, BrandName } from '../components/Brand.tsx';
+import { PlaceSelect } from '../components/PlaceSelect.tsx';
 import { Alert, Button, Field, Input, PasswordInput, Select, Spinner } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
@@ -79,7 +80,7 @@ function Done({ icon, title, children }: { icon: ReactNode; title: string; child
  */
 export function Signup() {
   const config = useSignupConfig();
-  const [form, setForm] = useState({ schoolName: '', schoolType: '', city: '', district: '', ownerName: '', email: '', phone: '', password: '' });
+  const [form, setForm] = useState({ institutionCode: '', schoolName: '', schoolType: '', city: '', district: '', ownerName: '', email: '', phone: '', password: '' });
   const [kvkk, setKvkk] = useState(false);
   const [marketing, setMarketing] = useState(false);
   const [website, setWebsite] = useState('');
@@ -93,7 +94,7 @@ export function Signup() {
     setBusy(true);
     setError(null);
     try {
-      setSent(await api<{ emailed: boolean }>('/api/signup', { method: 'POST', body: { ...form, district: form.district || null, kvkk, marketing, website } }));
+      setSent(await api<{ emailed: boolean }>('/api/signup', { method: 'POST', body: { ...form, kvkk, marketing, website } }));
     } catch (err) {
       setError(errorText(err, 'Kayıt yapılamadı.'));
     } finally {
@@ -149,6 +150,20 @@ export function Signup() {
         {error && <Alert tone="red">{error}</Alert>}
 
         <Step n={1} title="Okul">
+          <Field label="Kurum kodu" help="MEBBİS'teki 6 haneli kurum kodunuz.">
+            {(id) => (
+              <Input
+                id={id}
+                required
+                inputMode="numeric"
+                pattern="\d{6}"
+                maxLength={6}
+                value={form.institutionCode}
+                onChange={(e) => setForm((f) => ({ ...f, institutionCode: e.target.value.replace(/\D/g, '') }))}
+                autoComplete="off"
+              />
+            )}
+          </Field>
           <Field label="Okulun tam adı" help="Panolarda bu ad görünür; sonra değiştirebilirsiniz.">
             {(id) => <Input id={id} required minLength={3} maxLength={120} value={form.schoolName} onChange={set('schoolName')} autoComplete="organization" />}
           </Field>
@@ -167,10 +182,7 @@ export function Signup() {
               </Select>
             )}
           </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="İl">{(id) => <Input id={id} required minLength={2} maxLength={40} value={form.city} onChange={set('city')} autoComplete="address-level1" />}</Field>
-            <Field label="İlçe">{(id) => <Input id={id} maxLength={60} value={form.district} onChange={set('district')} autoComplete="address-level2" />}</Field>
-          </div>
+          <PlaceSelect required province={form.city} district={form.district} onChange={(city, district) => setForm((f) => ({ ...f, city, district }))} />
         </Step>
 
         <Step n={2} title="Yetkili · okul müdürü hesabı">

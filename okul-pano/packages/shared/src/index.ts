@@ -37,3 +37,4 @@ export * from './people.ts';
 export * from './coverText.ts';
 export * from './slideDuration.ts';
 export * from './announcementPlan.ts';
+export * from './turkeyPlaces.ts';

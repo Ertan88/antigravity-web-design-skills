@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { schools, signups } from '../src/db/schema.ts';
+import { notifications, schools, signups } from '../src/db/schema.ts';
 import { sha256 } from '../src/lib/crypto.ts';
 import { runTrialReminders } from '../src/routes/signup.ts';
 import { client, createTestApp, expectStatus, login, SUPER, type TestCtx } from './helpers.ts';
@@ -8,7 +8,10 @@ import { client, createTestApp, expectStatus, login, SUPER, type TestCtx } from 
 let t: TestCtx;
 let root: ReturnType<typeof client>;
 
+// Her başvuru ayrı kurum koduyla (aynı kod uyarısı yalnızca kendi testinde oluşsun); ilk başvuru 900001
+let nextCode = 900001;
 const form = (over: Record<string, unknown> = {}) => ({
+  institutionCode: String(nextCode++),
   schoolName: 'Yıldız Ortaokulu',
   city: 'Kayseri',
   district: 'Melikgazi',
@@ -67,7 +70,9 @@ describe('web kaydı', () => {
     expect(me.schools).toHaveLength(1);
     expect(me.schools[0]).toMatchObject({ role: 'owner', name: 'Yıldız Ortaokulu' });
     const school = (await owner.get(`/api/schools/${me.schools[0].id}`)).json();
-    expect(school).toMatchObject({ plan: 'trial', maxScreens: 2, city: 'Kayseri', slug: 'yildiz-ortaokulu' });
+    expect(school).toMatchObject({ plan: 'trial', maxScreens: 2, city: 'Kayseri', slug: 'yildiz-ortaokulu', institutionCode: '900001' });
+    // Kayıttaki il ve ilçe resmî belgelerdeki yer olarak ayarlara geçer
+    expect(school.settings).toMatchObject({ province: 'Kayseri', district: 'Melikgazi', schoolType: 'Ortaokulu' });
     expect(Date.parse(school.trialEndsAt) - Date.now()).toBeGreaterThan(29 * 86400_000);
   });
 
@@ -261,5 +266,33 @@ describe('kayıt kapalı', () => {
     t = prev;
     await approval.app.close();
     await approval.database.close();
+  });
+});
+
+describe('kurum kodu, il ve ilçe', () => {
+  it('kurum kodu 6 hane olmalı; il ve ilçe listeden seçilmeli', async () => {
+    let ip = 0;
+    for (const bad of [{ institutionCode: '12345' }, { institutionCode: '12a456' }, { institutionCode: '' }, { city: 'Kayseri İli' }, { district: 'Çankaya' }, { district: '' }]) {
+      const res = await t.app.inject({ method: 'POST', url: '/api/signup', remoteAddress: `10.9.1.${++ip}`, payload: form({ email: 'kod@x.test', ...bad }) });
+      expect(res.statusCode, JSON.stringify(bad)).toBe(400);
+    }
+  });
+
+  it('aynı kurum koduyla ikinci kayıt engellenmez; platform yöneticisi uyarılır', async () => {
+    const res = await t.app.inject({ method: 'POST', url: '/api/signup', remoteAddress: '10.9.0.2', payload: form({ email: 'ikinci@x.test', schoolName: 'Deneme Ortaokulu', institutionCode: '900001' }) });
+    expectStatus(res, 202);
+    // Onay beklerken başvuru listesinde kodun kayıtlı olduğu görünür
+    const pending = (await root.get('/api/platform/signups')).json() as { email: string; codeTaken: boolean }[];
+    expect(pending.find((x) => x.email === 'ikinci@x.test')?.codeTaken).toBe(true);
+
+    const token = await knownToken('ikinci@x.test');
+    expectStatus(await t.app.inject({ method: 'POST', url: '/api/signup/verify', payload: { token } }), 200);
+    const list = (await root.get('/api/platform/schools')).json() as { institutionCode: string | null; codeShared: boolean }[];
+    const same = list.filter((s) => s.institutionCode === '900001');
+    expect(same).toHaveLength(2);
+    expect(same.every((s) => s.codeShared)).toBe(true);
+    const notes = await t.database.db.select().from(notifications).where(eq(notifications.kind, 'institution-code'));
+    expect(notes.length).toBeGreaterThan(0);
+    expect(notes[0]!.body).toContain('900001');
   });
 });

@@ -1,4 +1,5 @@
 import { BOARD_MODULES } from './layout.ts';
+import { isDistrictOf, isProvince } from './turkeyPlaces.ts';
 import { LABEL_KEYS, type LabelKey as LabelKeyT } from './labels.ts';
 import { DESIGN_PALETTE_IDS, DESIGN_TEMPLATE_IDS } from './designs.ts';
 import { EMERGENCY_TYPES } from './emergency.ts';
@@ -248,6 +249,12 @@ export const labelsSchema = z.object({
   labels: z.partialRecord(z.enum(LABEL_KEYS as [LabelKeyT, ...LabelKeyT[]]), z.string().trim().max(60, 'Başlık en çok 60 karakter olabilir')),
 });
 
+/** MEB kurum kodu: 6 haneli; okulu tanımak içindir, giriş ya da yetki için kullanılmaz (herkese açık bir bilgidir) */
+export const institutionCode = z
+  .string()
+  .trim()
+  .regex(/^\d{6}$/, 'Kurum kodu 6 haneli olmalı');
+
 export const updateSchoolSchema = z.object({
   name: required('Okul adı', 120, 2).optional(),
   logoUrl: optionalText(500),
@@ -255,6 +262,8 @@ export const updateSchoolSchema = z.object({
   city: optionalText(80),
   latitude: z.number().min(-90).max(90).nullable().optional(),
   longitude: z.number().min(-180).max(180).nullable().optional(),
+  /** Boş bırakılırsa silinir */
+  institutionCode: z.union([institutionCode, z.literal('').transform(() => null), z.null()]).optional(),
   settings: schoolSettingsSchema.partial().optional(),
 });
 export type UpdateSchoolInput = z.infer<typeof updateSchoolSchema>;
@@ -331,24 +340,27 @@ export const createMemberSchema = z.object({
 const newPassword = z.string().min(8, 'Şifre en az 8 karakter olmalı').max(200);
 
 /** Okul için deneme kaydı (yalnızca web) */
-export const signupSchema = z.object({
-  schoolName: required('Okul adı', 120, 3),
-  city: required('İl', 40, 2),
-  district: optionalText(60),
-  schoolType: required('Okul türü', 80, 2),
-  ownerName: required('Ad soyad', 80, 3),
-  email: z.email('Geçerli bir e-posta girin'),
-  phone: z
-    .string()
-    .trim()
-    .transform((v) => v.replace(/[^\d+]/g, ''))
-    .pipe(z.string().regex(/^\+?\d{10,13}$/, 'Geçerli bir telefon numarası girin')),
-  password: newPassword,
-  kvkk: z.literal(true, { error: 'Aydınlatma metnini onaylayın' }),
-  marketing: z.boolean().default(false),
-  /** Bot tuzağı: insanlar bu alanı görmez, doluysa kayıt sessizce yok sayılır */
-  website: z.string().max(200).optional(),
-});
+export const signupSchema = z
+  .object({
+    institutionCode,
+    schoolName: required('Okul adı', 120, 3),
+    city: required('İl', 40, 2).refine(isProvince, 'İli listeden seçin'),
+    district: required('İlçe', 60, 2),
+    schoolType: required('Okul türü', 80, 2),
+    ownerName: required('Ad soyad', 80, 3),
+    email: z.email('Geçerli bir e-posta girin'),
+    phone: z
+      .string()
+      .trim()
+      .transform((v) => v.replace(/[^\d+]/g, ''))
+      .pipe(z.string().regex(/^\+?\d{10,13}$/, 'Geçerli bir telefon numarası girin')),
+    password: newPassword,
+    kvkk: z.literal(true, { error: 'Aydınlatma metnini onaylayın' }),
+    marketing: z.boolean().default(false),
+    /** Bot tuzağı: insanlar bu alanı görmez, doluysa kayıt sessizce yok sayılır */
+    website: z.string().max(200).optional(),
+  })
+  .refine((v) => isDistrictOf(v.city, v.district), { message: 'İlçeyi listeden seçin', path: ['district'] });
 export type SignupInput = z.infer<typeof signupSchema>;
 
 export const tokenSchema = z.object({ token: z.string().min(20).max(200) });

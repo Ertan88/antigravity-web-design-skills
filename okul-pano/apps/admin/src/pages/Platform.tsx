@@ -22,6 +22,8 @@ type Row = School & {
   createdAt: string;
   /** Platform yöneticisi bu okulun üyesi (kendi okulu) */
   member: boolean;
+  /** Aynı kurum kodu başka bir okulda da kayıtlı */
+  codeShared?: boolean;
   /** Okul verileri panelde açılabilir: üyelik ya da süreli destek erişimi (KVKK) */
   canOpen: boolean;
   /** Okulun müdürü (ad ve e-posta; üye listesi platforma açık değil) */
@@ -30,6 +32,9 @@ type Row = School & {
 
 interface Signup {
   id: string;
+  institutionCode: string | null;
+  /** Kurum kodu açık bir okulda zaten kayıtlı */
+  codeTaken?: boolean;
   schoolName: string;
   schoolType: string;
   city: string;
@@ -152,8 +157,14 @@ export function Platform() {
                 <Td>
                   <div className="font-semibold">{x.schoolName}</div>
                   <div className="text-xs text-slate-500">
+                    {x.institutionCode && `Kurum kodu ${x.institutionCode} · `}
                     {x.schoolType} · {[x.district, x.city].filter(Boolean).join(', ')}
                   </div>
+                  {x.codeTaken && (
+                    <div className="mt-1">
+                      <Badge tone="amber">Bu kurum kodu başka bir okulda kayıtlı</Badge>
+                    </div>
+                  )}
                 </Td>
                 <Td>{x.ownerName}</Td>
                 <Td>
@@ -205,9 +216,15 @@ export function Platform() {
                     )}
                   </div>
                   <div className="text-xs text-slate-500">
+                    {s.institutionCode && `Kurum kodu ${s.institutionCode} · `}
                     {s.slug}
                     {s.contactPhone && ` · ${s.contactPhone}`}
                   </div>
+                  {s.codeShared && (
+                    <div className="mt-1">
+                      <Badge tone="amber">Aynı kurum kodu başka bir okulda da var</Badge>
+                    </div>
+                  )}
                   <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs">
                     <span className="text-slate-600">
                       Müdür: {s.owner ? <span className="font-medium text-ink">{s.owner.fullName}</span> : <span className="text-amber-700">atanmamış</span>}

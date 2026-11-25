@@ -1,3 +1,4 @@
+import { PlaceSelect } from '../components/PlaceSelect.tsx';
 import { RESPONSIBILITY_AREAS, SCHOOL_TYPE_OPTIONS, shortTitle, SPECIAL_DAYS, type Member, type ResponsibilityArea, specialDayFor, splitSchoolName, updateSchoolSchema, type SchoolSettings, errorText } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Download, ExternalLink, FileText, MapPin, Search } from '../components/icons.tsx';
@@ -28,6 +29,7 @@ interface GeoResult {
 type Form = {
   name: string;
   logoUrl: string | null;
+  institutionCode: string;
   city: string;
   latitude: string;
   longitude: string;
@@ -35,11 +37,12 @@ type Form = {
   settings: SchoolSettings;
 };
 
-const EMPTY: Form = { name: '', logoUrl: null, city: '', latitude: '', longitude: '', timezone: 'Europe/Istanbul', settings: {} as SchoolSettings };
+const EMPTY: Form = { name: '', logoUrl: null, institutionCode: '', city: '', latitude: '', longitude: '', timezone: 'Europe/Istanbul', settings: {} as SchoolSettings };
 
 const toForm = (s: School): Form => ({
   name: s.name,
   logoUrl: s.logoUrl,
+  institutionCode: s.institutionCode ?? '',
   city: s.city ?? '',
   latitude: s.latitude?.toString() ?? '',
   longitude: s.longitude?.toString() ?? '',
@@ -338,6 +341,7 @@ export function Settings() {
     const payload = form.validate(updateSchoolSchema, {
       name: v.name,
       logoUrl: v.logoUrl,
+      institutionCode: v.institutionCode || null,
       city: v.city || null,
       latitude: v.latitude ? Number(v.latitude) : null,
       longitude: v.longitude ? Number(v.longitude) : null,
@@ -378,14 +382,25 @@ export function Settings() {
           >
             {(id) => <SchoolTypeField id={id} value={v.settings.schoolType ?? ''} derived={splitSchoolName(v.name).type} onChange={(t) => setting('schoolType', t)} />}
           </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="İl" help="Resmî belgelerde (ör. aylık rehberlik raporu) kullanılır.">
-              {(id) => <Input id={id} value={v.settings.province ?? ''} maxLength={40} onChange={(e) => setting('province', e.target.value)} placeholder="ör. Ankara" />}
-            </Field>
-            <Field label="İlçe" help="Panodaki hava durumu yerinden ayrıdır.">
-              {(id) => <Input id={id} value={v.settings.district ?? ''} maxLength={60} onChange={(e) => setting('district', e.target.value)} placeholder="ör. Çankaya" />}
-            </Field>
-          </div>
+          <Field label="Kurum kodu" help="MEBBİS'teki 6 haneli kurum kodu." error={form.errors.institutionCode}>
+            {(id) => (
+              <Input
+                id={id}
+                inputMode="numeric"
+                maxLength={6}
+                className="max-w-40"
+                value={v.institutionCode}
+                onChange={(e) => set('institutionCode', e.target.value.replace(/\D/g, ''))}
+              />
+            )}
+          </Field>
+          <PlaceSelect
+            province={v.settings.province ?? ''}
+            district={v.settings.district ?? ''}
+            onChange={(province, district) => set('settings', { ...v.settings, province, district })}
+            provinceHelp="Resmî belgelerde (ör. aylık rehberlik raporu) kullanılır."
+            districtHelp="Panodaki hava durumu yerinden ayrıdır."
+          />
           <Field label="Logo" help="Şeffaf arka planlı PNG önerilir.">
             {() => (
               <div className="max-w-xs">

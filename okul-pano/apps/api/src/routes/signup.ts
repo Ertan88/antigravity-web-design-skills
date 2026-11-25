@@ -9,6 +9,7 @@ import { dropLinksTo } from '../lib/accountLinks.ts';
 import { trySendMail } from '../lib/mailer.ts';
 import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
 import { addDefaultTeacherOptions } from './teachers.ts';
+import { warnDuplicateInstitution } from '../lib/institutionCode.ts';
 
 const SIGNUP_TTL_MS = 48 * 3600_000;
 export const INVITE_TTL_MS = 7 * 86400_000;
@@ -72,7 +73,7 @@ export async function createInvite(
 /** Kayıt başvurusundan okulu açar: okul deneme paketiyle, başvuran okul müdürü olarak */
 async function openSchool(deps: AppDeps, signup: typeof signups.$inferSelect, active: boolean) {
   const { db, env } = deps;
-  return db.transaction(async (tx) => {
+  const opened = await db.transaction(async (tx) => {
     const [taken] = await tx.select({ id: users.id }).from(users).where(eq(users.email, signup.email));
     if (taken) throw conflict('Bu e-posta ile zaten bir hesap var. Giriş yapın.');
     const base = slugify(signup.schoolName) || 'okul';
@@ -87,13 +88,15 @@ async function openSchool(deps: AppDeps, signup: typeof signups.$inferSelect, ac
       .values({
         name: signup.schoolName,
         slug,
+        institutionCode: signup.institutionCode,
         city: signup.city,
         plan: 'trial',
         maxScreens: env.TRIAL_SCREENS,
         trialEndsAt: new Date(Date.now() + env.TRIAL_DAYS * 86400_000),
         isActive: active,
         contactPhone: signup.phone,
-        settings: { schoolType: signup.schoolType },
+        // Kayıttaki il ve ilçe resmî belgelerdeki yer olarak ayarlara geçer (hava durumu yeri ayrıdır)
+        settings: { schoolType: signup.schoolType, province: signup.city, district: signup.district ?? '' },
         onboarding: 'pending',
       })
       .returning();
@@ -106,6 +109,9 @@ async function openSchool(deps: AppDeps, signup: typeof signups.$inferSelect, ac
     await tx.update(signups).set({ verifiedAt: new Date(), schoolId: school!.id }).where(eq(signups.id, signup.id));
     return school!;
   });
+  // Aynı kurum kodu başka okulda varsa kayıt engellenmez; platform yöneticisi uyarılır
+  await warnDuplicateInstitution(deps, opened).catch(() => false);
+  return opened;
 }
 
 /**
@@ -132,9 +138,10 @@ export async function signupRoutes(app: FastifyInstance) {
     await db.delete(signups).where(and(eq(signups.email, email), isNull(signups.verifiedAt)));
     const token = randomToken('sgn');
     await db.insert(signups).values({
+      institutionCode: body.institutionCode,
       schoolName: body.schoolName,
       city: body.city,
-      district: body.district ?? null,
+      district: body.district,
       schoolType: body.schoolType,
       ownerName: body.ownerName,
       email,
@@ -179,7 +186,13 @@ export async function signupRoutes(app: FastifyInstance) {
   app.get('/api/platform/signups', platform, async () => {
     await db.delete(signups).where(and(isNull(signups.verifiedAt), lt(signups.createdAt, new Date(Date.now() - 30 * 86400_000))));
     const rows = await db.select().from(signups).where(isNull(signups.verifiedAt)).orderBy(desc(signups.createdAt));
-    return rows.map(({ passwordHash: _p, tokenHash: _t, ...r }) => ({ ...r, expired: r.expiresAt < new Date() }));
+    // Başvurunun kurum kodu açık bir okulda zaten kayıtlıysa onaylamadan önce görülsün
+    const codes = rows.length ? new Set((await db.select({ code: schools.institutionCode }).from(schools)).map((s) => s.code).filter(Boolean)) : new Set();
+    return rows.map(({ passwordHash: _p, tokenHash: _t, ...r }) => ({
+      ...r,
+      expired: r.expiresAt < new Date(),
+      codeTaken: Boolean(r.institutionCode && codes.has(r.institutionCode)),
+    }));
   });
 
   /** E-posta ulaşmadıysa (ör. SMTP kurulmadı) başvuruyu elle onaylar: okul açılır, başvuran kendi şifresiyle girer */

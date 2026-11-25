@@ -139,6 +139,8 @@ export const schools = pgTable('schools', {
   logoUrl: text('logo_url'),
   timezone: text('timezone').notNull().default('Europe/Istanbul'),
   city: text('city'),
+  /** MEB kurum kodu (6 hane). Benzersiz değildir: aynı kodla ikinci kayıt engellenmez, platform listesinde uyarılır */
+  institutionCode: text('institution_code'),
   latitude: doublePrecision('latitude'),
   longitude: doublePrecision('longitude'),
   settings: jsonb('settings').$type<Partial<SchoolSettings>>().notNull().default({}),
@@ -1055,6 +1057,7 @@ export const signups = pgTable(
   'signups',
   {
     id: pk(),
+    institutionCode: text('institution_code'),
     schoolName: text('school_name').notNull(),
     city: text('city').notNull(),
     district: text('district'),

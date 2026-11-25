@@ -154,6 +154,8 @@ export interface School {
   logoUrl: string | null;
   timezone: string;
   city: string | null;
+  /** MEB kurum kodu (6 hane) */
+  institutionCode?: string | null;
   latitude: number | null;
   longitude: number | null;
   settings: SchoolSettings;
