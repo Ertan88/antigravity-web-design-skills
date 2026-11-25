@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { notifications, schools, signups } from '../src/db/schema.ts';
+import { notifications, schools, signups, trialMarks } from '../src/db/schema.ts';
+import { runTrialMarkRetention } from '../src/lib/trialGuard.ts';
 import { sha256 } from '../src/lib/crypto.ts';
 import { runTrialReminders } from '../src/routes/signup.ts';
 import { client, createTestApp, expectStatus, login, SUPER, type TestCtx } from './helpers.ts';
@@ -10,6 +11,8 @@ let root: ReturnType<typeof client>;
 
 // Her başvuru ayrı kurum koduyla (aynı kod uyarısı yalnızca kendi testinde oluşsun); ilk başvuru 900001
 let nextCode = 900001;
+// Her başvuru ayrı telefonla (aynı telefon deneme işaretidir)
+let nextPhone = 100000;
 const form = (over: Record<string, unknown> = {}) => ({
   institutionCode: String(nextCode++),
   schoolName: 'Yıldız Ortaokulu',
@@ -18,7 +21,7 @@ const form = (over: Record<string, unknown> = {}) => ({
   schoolType: 'Ortaokulu',
   ownerName: 'Aylin Kara',
   email: 'aylin@yildiz.test',
-  phone: '0532 111 22 33',
+  phone: `05321${nextPhone++}`,
   password: 'GuvenliSifre9',
   kvkk: true,
   ...over,
@@ -87,7 +90,7 @@ describe('web kaydı', () => {
   });
 
   it('e-posta ulaşmazsa platform yöneticisi başvuruyu onaylar', async () => {
-    expectStatus(await t.app.inject({ method: 'POST', url: '/api/signup', payload: form({ email: 'mehmet@gunes.test', schoolName: 'Güneş İlkokulu', ownerName: 'Mehmet Er' }) }), 202);
+    expectStatus(await t.app.inject({ method: 'POST', url: '/api/signup', payload: form({ email: 'mehmet@gunes.test', schoolName: 'Güneş İlkokulu', ownerName: 'Mehmet Er', phone: '0532 111 22 33' }) }), 202);
     const list = (await root.get('/api/platform/signups')).json() as { id: string; email: string; phone: string }[];
     const item = list.find((x) => x.email === 'mehmet@gunes.test')!;
     expect(item.phone).toBe('05321112233');
@@ -278,21 +281,86 @@ describe('kurum kodu, il ve ilçe', () => {
     }
   });
 
-  it('aynı kurum koduyla ikinci kayıt engellenmez; platform yöneticisi uyarılır', async () => {
+  it('aynı kurum koduyla ikinci kayıt engellenmez ama onaya düşer; platform yöneticisi onaylayınca açılır', async () => {
     const res = await t.app.inject({ method: 'POST', url: '/api/signup', remoteAddress: '10.9.0.2', payload: form({ email: 'ikinci@x.test', schoolName: 'Deneme Ortaokulu', institutionCode: '900001' }) });
     expectStatus(res, 202);
-    // Onay beklerken başvuru listesinde kodun kayıtlı olduğu görünür
-    const pending = (await root.get('/api/platform/signups')).json() as { email: string; codeTaken: boolean }[];
-    expect(pending.find((x) => x.email === 'ikinci@x.test')?.codeTaken).toBe(true);
+    // Doğrulanmamış başvuru listesinde işaret görünür
+    const pending = (await root.get('/api/platform/signups')).json() as { email: string; codeTaken: boolean; flags: string[] }[];
+    expect(pending.find((x) => x.email === 'ikinci@x.test')).toMatchObject({ codeTaken: true, flags: ['code'] });
 
     const token = await knownToken('ikinci@x.test');
-    expectStatus(await t.app.inject({ method: 'POST', url: '/api/signup/verify', payload: { token } }), 200);
-    const list = (await root.get('/api/platform/schools')).json() as { institutionCode: string | null; codeShared: boolean }[];
+    const verified = await t.app.inject({ method: 'POST', url: '/api/signup/verify', payload: { token } });
+    expect(verified.json()).toMatchObject({ pendingApproval: true });
+    type Row = { id: string; name: string; institutionCode: string | null; codeShared: boolean; isActive: boolean; trialFlags: string[] };
+    const list = (await root.get('/api/platform/schools')).json() as Row[];
     const same = list.filter((s) => s.institutionCode === '900001');
     expect(same).toHaveLength(2);
     expect(same.every((s) => s.codeShared)).toBe(true);
-    const notes = await t.database.db.select().from(notifications).where(eq(notifications.kind, 'institution-code'));
+    const second = same.find((s) => s.name === 'Deneme Ortaokulu')!;
+    expect(second).toMatchObject({ isActive: false, trialFlags: ['code'] });
+    const notes = await t.database.db.select().from(notifications).where(eq(notifications.kind, 'trial-review'));
     expect(notes.length).toBeGreaterThan(0);
-    expect(notes[0]!.body).toContain('900001');
+    expect(notes[0]!.body).toContain('kurum kodu daha önce deneme kullanmış');
+
+    expectStatus(await root.patch(`/api/platform/schools/${second.id}`, { approveTrial: true }), 200);
+    const after = ((await root.get('/api/platform/schools')).json() as Row[]).find((s) => s.id === second.id)!;
+    expect(after).toMatchObject({ isActive: true, trialFlags: [] });
+  });
+});
+
+describe('deneme kötüye kullanımı', () => {
+  type Row = { id: string; name: string; slug: string; isActive: boolean; trialFlags: string[] };
+  const schoolsList = async () => (await root.get('/api/platform/schools')).json() as Row[];
+  let ip = 0;
+  async function signupAndVerify(over: Record<string, unknown>) {
+    expectStatus(await t.app.inject({ method: 'POST', url: '/api/signup', remoteAddress: `10.9.2.${++ip}`, payload: form(over) }), 202);
+    const token = await knownToken(over.email as string);
+    return (await t.app.inject({ method: 'POST', url: '/api/signup/verify', payload: { token } })).json() as { pendingApproval: boolean };
+  }
+
+  it('aynı telefon (farklı yazımla) yeni e-postayla kaydolursa onaya düşer', async () => {
+    expect((await signupAndVerify({ email: 'tel1@x.test', schoolName: 'Telefon Bir Okulu', phone: '0544 777 66 55' })).pendingApproval).toBe(false);
+    expect((await signupAndVerify({ email: 'tel2@x.test', schoolName: 'Telefon İki Okulu', phone: '+90 544 777 66 55' })).pendingApproval).toBe(true);
+    expect((await schoolsList()).find((s) => s.name === 'Telefon İki Okulu')).toMatchObject({ isActive: false, trialFlags: ['phone'] });
+    // Telefon numarası açık hâlde saklanmaz
+    const marks = await t.database.db.select().from(trialMarks);
+    expect(marks.every((m) => !m.valueHash.includes('5447776655'))).toBe(true);
+  });
+
+  it('okul silinse de kurum kodu deneme kullanmış sayılır', async () => {
+    await signupAndVerify({ email: 'silinen@x.test', schoolName: 'Silinen Okul', institutionCode: '955555' });
+    const gone = (await schoolsList()).find((s) => s.name === 'Silinen Okul')!;
+    expectStatus(await root.del(`/api/platform/schools/${gone.id}`, { confirmSlug: gone.slug }), 200);
+    expect((await signupAndVerify({ email: 'geri@x.test', schoolName: 'Geri Dönen Okul', institutionCode: '955555' })).pendingApproval).toBe(true);
+  });
+
+  it('başka okulun denemesinde kullanılan TV eşleşmez; onaylanınca eşleşir', async () => {
+    await signupAndVerify({ email: 'tvbir@x.test', schoolName: 'TV Bir Okulu' });
+    await signupAndVerify({ email: 'tviki@x.test', schoolName: 'TV İki Okulu' });
+    const one = await as('tvbir@x.test');
+    const two = await as('tviki@x.test');
+    const idOf = async (c: typeof one) => (await c.get('/api/me')).json().schools[0].id as string;
+    const pairingCode = async () => (await t.app.inject({ method: 'POST', url: '/api/display/pairings', payload: { deviceId: 'tv-cihaz-0001' } })).json().code as string;
+
+    expectStatus(await one.post(`/api/schools/${await idOf(one)}/screens/pair`, { code: await pairingCode(), name: 'Giriş' }), 201);
+    const blocked = await two.post(`/api/schools/${await idOf(two)}/screens/pair`, { code: await pairingCode(), name: 'Giriş' });
+    expect(blocked.statusCode).toBe(403);
+    expect(blocked.json().message).toContain('başka bir okulun deneme sürümünde');
+    // Aynı okul TV'sini yeniden eşleştirebilir; cihaz kimliği göndermeyen (tarayıcı) pano denetlenmez
+    expectStatus(await one.post(`/api/schools/${await idOf(one)}/screens/pair`, { code: await pairingCode(), name: 'Giriş 2' }), 201);
+    const browser = (await t.app.inject({ method: 'POST', url: '/api/display/pairings' })).json().code as string;
+    expectStatus(await two.post(`/api/schools/${await idOf(two)}/screens/pair`, { code: browser, name: 'Tarayıcı' }), 201);
+
+    const row = (await schoolsList()).find((s) => s.name === 'TV İki Okulu')!;
+    expect(row.trialFlags).toEqual(['device']);
+    expectStatus(await root.patch(`/api/platform/schools/${row.id}`, { approveTrial: true }), 200);
+    expectStatus(await two.post(`/api/schools/${await idOf(two)}/screens/pair`, { code: await pairingCode(), name: 'Giriş' }), 201);
+  });
+
+  it('işaret kayıtları 2 yıl sonra silinir', async () => {
+    const before = (await t.database.db.select().from(trialMarks)).length;
+    await t.database.db.insert(trialMarks).values({ kind: 'phone', valueHash: 'eski', createdAt: new Date(Date.now() - 3 * 365 * 86400_000) });
+    await runTrialMarkRetention(t.app.deps);
+    expect((await t.database.db.select().from(trialMarks)).length).toBe(before);
   });
 });

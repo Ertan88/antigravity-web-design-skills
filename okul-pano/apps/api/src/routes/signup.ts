@@ -10,6 +10,7 @@ import { trySendMail } from '../lib/mailer.ts';
 import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
 import { addDefaultTeacherOptions } from './teachers.ts';
 import { warnDuplicateInstitution } from '../lib/institutionCode.ts';
+import { recordSignupMarks, signupFlags, tellPlatformReview } from '../lib/trialGuard.ts';
 
 const SIGNUP_TTL_MS = 48 * 3600_000;
 export const INVITE_TTL_MS = 7 * 86400_000;
@@ -70,8 +71,12 @@ export async function createInvite(
   return { inviteUrl, emailed };
 }
 
-/** Kayıt başvurusundan okulu açar: okul deneme paketiyle, başvuran okul müdürü olarak */
-async function openSchool(deps: AppDeps, signup: typeof signups.$inferSelect, active: boolean) {
+/**
+ * Kayıt başvurusundan okulu açar: okul deneme paketiyle, başvuran okul müdürü olarak. Başvuruda deneme kötüye
+ * kullanımı işareti varsa okul etkin açılmaz (platform yöneticisi onaylar); platform yöneticisi başvuruyu kendisi
+ * onaylıyorsa (approvedByPlatform) işaretler görülmüş sayılır.
+ */
+async function openSchool(deps: AppDeps, signup: typeof signups.$inferSelect, active: boolean, approvedByPlatform = false) {
   const { db, env } = deps;
   const opened = await db.transaction(async (tx) => {
     const [taken] = await tx.select({ id: users.id }).from(users).where(eq(users.email, signup.email));
@@ -89,6 +94,8 @@ async function openSchool(deps: AppDeps, signup: typeof signups.$inferSelect, ac
         name: signup.schoolName,
         slug,
         institutionCode: signup.institutionCode,
+        trialFlags: signup.flags,
+        trialApprovedAt: approvedByPlatform && signup.flags.length ? new Date() : null,
         city: signup.city,
         plan: 'trial',
         maxScreens: env.TRIAL_SCREENS,
@@ -109,8 +116,11 @@ async function openSchool(deps: AppDeps, signup: typeof signups.$inferSelect, ac
     await tx.update(signups).set({ verifiedAt: new Date(), schoolId: school!.id }).where(eq(signups.id, signup.id));
     return school!;
   });
+  // Kurum kodu ve telefon denemeyi kullanmış sayılır (okul silinse de kalır)
+  await recordSignupMarks(deps, opened.id, { institutionCode: signup.institutionCode, phone: signup.phone });
+  if (signup.flags.length && !approvedByPlatform) await tellPlatformReview(deps, opened, signup.flags).catch(() => {});
   // Aynı kurum kodu başka okulda varsa kayıt engellenmez; platform yöneticisi uyarılır
-  await warnDuplicateInstitution(deps, opened).catch(() => false);
+  else await warnDuplicateInstitution(deps, opened).catch(() => false);
   return opened;
 }
 
@@ -137,8 +147,11 @@ export async function signupRoutes(app: FastifyInstance) {
     // Aynı e-postanın doğrulanmamış eski başvurusu yenisiyle değişir
     await db.delete(signups).where(and(eq(signups.email, email), isNull(signups.verifiedAt)));
     const token = randomToken('sgn');
+    // Deneme kötüye kullanımı: kurum kodu ya da telefon daha önce denemede kullanıldıysa okul onaya düşer
+    const flags = await signupFlags(deps, { institutionCode: body.institutionCode, phone: body.phone });
     await db.insert(signups).values({
       institutionCode: body.institutionCode,
+      flags,
       schoolName: body.schoolName,
       city: body.city,
       district: body.district,
@@ -167,7 +180,7 @@ export async function signupRoutes(app: FastifyInstance) {
     if (!signup) throw notFound('Bağlantı geçersiz. Kaydı yeniden yapın.');
     if (signup.verifiedAt) return { schoolName: signup.schoolName, email: signup.email, pendingApproval: false, alreadyVerified: true };
     if (signup.expiresAt < new Date()) throw badRequest('Bağlantının süresi dolmuş. Kaydı yeniden yapın.');
-    const pendingApproval = env.SIGNUP_MODE === 'approval';
+    const pendingApproval = env.SIGNUP_MODE === 'approval' || signup.flags.length > 0;
     await openSchool(deps, signup, !pendingApproval);
     return { schoolName: signup.schoolName, email: signup.email, pendingApproval, alreadyVerified: false };
   });
@@ -201,7 +214,7 @@ export async function signupRoutes(app: FastifyInstance) {
     if (!UUID_RE.test(id)) throw notFound();
     const [signup] = await db.select().from(signups).where(and(eq(signups.id, id), isNull(signups.verifiedAt)));
     if (!signup) throw notFound('Başvuru bulunamadı.');
-    const school = await openSchool(deps, signup, true);
+    const school = await openSchool(deps, signup, true, true);
     await trySendMail(env, {
       to: signup.email,
       subject: 'Okulyayın · okulunuz hazır',

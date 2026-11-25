@@ -295,6 +295,8 @@ export const adminUpdateSchoolSchema = z.object({
   isActive: z.boolean().optional(),
   /** Deneme süresini bugünden (ya da bitiş henüz gelmediyse bitişten) itibaren uzatır */
   extendTrialDays: z.number().int().min(1).max(365).optional(),
+  /** Deneme kötüye kullanımı işareti olan okulu onaylar: okul açılır, TV eşleştirmesi denetlenmez */
+  approveTrial: z.literal(true).optional(),
 });
 
 /* ---------- Kimlik ve kullanıcılar ---------- */

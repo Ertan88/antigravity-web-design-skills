@@ -46,6 +46,7 @@ import { DEVICE_TOKEN_PREFIX } from './screens.ts';
 import { noteScreenSeen, noticeScreenPaired, revokedReason } from '../lib/screenSecurity.ts';
 import { listExams } from '../lib/examSchedule.ts';
 import { isQuietHour, QUIET_TOUCH_MS } from '../lib/quietHours.ts';
+import { deviceHashOf } from '../lib/trialGuard.ts';
 import { noteScreenAlive, touchScreen } from '../lib/screenOffline.ts';
 
 const PAIRING_TTL_MS = 10 * 60 * 1000;
@@ -351,15 +352,17 @@ export async function displayRoutes(app: FastifyInstance) {
   const { db, bus } = app.deps;
 
   /** 1) Ekran açılır, kod ister ve kodu büyük puntoyla gösterir. */
-  app.post('/api/display/pairings', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (_req, reply) => {
+  app.post('/api/display/pairings', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
     await db.delete(displayPairings).where(lte(displayPairings.expiresAt, new Date()));
     const pollSecret = randomToken('ps', 24);
+    // TV uygulaması cihaz kimliğini gönderir (deneme kötüye kullanımı denetimi); tarayıcıda yoktur
+    const deviceHash = deviceHashOf(app.deps, (req.body as { deviceId?: unknown } | undefined)?.deviceId);
     for (let attempt = 0; attempt < 5; attempt++) {
       const code = pairingCode();
       const expiresAt = new Date(Date.now() + PAIRING_TTL_MS);
       const inserted = await db
         .insert(displayPairings)
-        .values({ code, pollSecretHash: sha256(pollSecret), expiresAt })
+        .values({ code, pollSecretHash: sha256(pollSecret), expiresAt, deviceHash })
         .onConflictDoNothing()
         .returning({ id: displayPairings.id });
       if (inserted[0]) return reply.status(201).send({ id: inserted[0].id, code, pollSecret, expiresAt: expiresAt.toISOString() });

@@ -57,6 +57,25 @@ export const users = pgTable('users', {
 });
 
 /** İki adımlı doğrulama yedek kodları (yalnızca özetleri; her biri bir kez kullanılır) */
+export type TrialFlag = 'code' | 'phone' | 'device';
+
+/**
+ * Deneme kullanmış kurum kodu, telefon ve TV kayıtları: okul silinse de kalır, böylece silip yeniden kaydolmak yeni
+ * deneme açmaz. Değerin kendisi değil, gizli anahtarla alınmış özeti (HMAC) tutulur; telefon numarası geri
+ * çıkarılamaz (KVKK). 2 yıl sonra kendiliğinden silinir (runTrialMarkRetention).
+ */
+export const trialMarks = pgTable(
+  'trial_marks',
+  {
+    id: pk(),
+    kind: text('kind').$type<TrialFlag>().notNull(),
+    valueHash: text('value_hash').notNull(),
+    schoolId: uuid('school_id').references(() => schools.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+  },
+  (t) => [index('trial_marks_value_idx').on(t.kind, t.valueHash)],
+);
+
 export const mfaRecoveryCodes = pgTable(
   'mfa_recovery_codes',
   {
@@ -141,6 +160,12 @@ export const schools = pgTable('schools', {
   city: text('city'),
   /** MEB kurum kodu (6 hane). Benzersiz değildir: aynı kodla ikinci kayıt engellenmez, platform listesinde uyarılır */
   institutionCode: text('institution_code'),
+  /**
+   * Deneme kötüye kullanımı işaretleri ('code' | 'phone' | 'device'): kurum kodu, telefon ya da TV daha önce başka bir
+   * denemede kullanılmış. Doluysa ve platform yöneticisi onaylamadıysa okul onay bekler, TV eşleştirmesi durur.
+   */
+  trialFlags: jsonb('trial_flags').$type<TrialFlag[]>().notNull().default([]),
+  trialApprovedAt: timestamp('trial_approved_at', { withTimezone: true }),
   latitude: doublePrecision('latitude'),
   longitude: doublePrecision('longitude'),
   settings: jsonb('settings').$type<Partial<SchoolSettings>>().notNull().default({}),
@@ -1029,6 +1054,8 @@ export const displayPairings = pgTable('display_pairings', {
   id: pk(),
   code: text('code').notNull().unique(),
   pollSecretHash: text('poll_secret_hash').notNull(),
+  /** TV uygulamasının cihaz kimliğinin özeti (HMAC); tarayıcıdan açılan panoda yok */
+  deviceHash: text('device_hash'),
   screenId: uuid('screen_id').references(() => screens.id, { onDelete: 'cascade' }),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt: createdAt(),
@@ -1058,6 +1085,8 @@ export const signups = pgTable(
   {
     id: pk(),
     institutionCode: text('institution_code'),
+    /** Kayıt sırasında bulunan deneme kötüye kullanımı işaretleri; doluysa okul onaya düşer */
+    flags: jsonb('flags').$type<TrialFlag[]>().notNull().default([]),
     schoolName: text('school_name').notNull(),
     city: text('city').notNull(),
     district: text('district'),

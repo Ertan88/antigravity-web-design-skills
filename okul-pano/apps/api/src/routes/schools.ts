@@ -14,6 +14,7 @@ import { SAMPLE_TABLES, seedSchoolContent, type SampleData } from '../seed-data.
 import { addDefaultTeacherOptions } from './teachers.ts';
 import { PLATFORM_MEMBER_ERROR } from '../lib/platformAccount.ts';
 import { duplicateInstitutionCodes, warnDuplicateInstitution } from '../lib/institutionCode.ts';
+import { trySendMail } from '../lib/mailer.ts';
 
 /**
  * Okulun panelde görünen bilgileri. TV uygulamasının çıkış şifresi yalnızca ayar yetkisi olana gider (öğretmen
@@ -315,6 +316,8 @@ export async function schoolRoutes(app: FastifyInstance) {
       createdAt: r.school.createdAt,
       /** Aynı kurum kodu başka bir okulda da kayıtlı */
       codeShared: Boolean(r.school.institutionCode && dupCodes.has(r.school.institutionCode)),
+      /** Onay bekleyen deneme kötüye kullanımı işaretleri (onaylanınca boş döner) */
+      trialFlags: r.school.trialApprovedAt ? [] : r.school.trialFlags,
       member: own.has(r.school.id),
       canOpen: own.has(r.school.id) || (r.school.supportAccessUntil?.getTime() ?? 0) > now,
     }));
@@ -367,7 +370,7 @@ export async function schoolRoutes(app: FastifyInstance) {
   app.patch('/api/platform/schools/:id', platform, async (req) => {
     const { id } = req.params as { id: string };
     if (!UUID_RE.test(id)) throw notFound();
-    const { extendTrialDays, ...body } = parse(adminUpdateSchoolSchema, req.body);
+    const { extendTrialDays, approveTrial, ...body } = parse(adminUpdateSchoolSchema, req.body);
     const [current] = await db.select().from(schools).where(eq(schools.id, id));
     if (!current) throw notFound();
     const plan = body.plan ?? current.plan;
@@ -383,8 +386,22 @@ export async function schoolRoutes(app: FastifyInstance) {
           : current.plan !== 'trial'
             ? { trialEndsAt: new Date(Date.now() + 30 * 86400_000), trialNotice: null }
             : {};
-    const [updated] = await db.update(schools).set({ ...body, ...trial }).where(eq(schools.id, id)).returning();
+    // Onay bekleyen (deneme kötüye kullanımı işaretli) okulu açmak onay sayılır; müdüre "okulunuz hazır" e-postası gider
+    const flagged = current.trialFlags.length > 0 && !current.trialApprovedAt;
+    const approving = flagged && (approveTrial || (body.isActive === true && !current.isActive));
+    const review: Partial<typeof schools.$inferInsert> = approving ? { trialApprovedAt: new Date(), isActive: true } : {};
+    const [updated] = await db.update(schools).set({ ...body, ...trial, ...review }).where(eq(schools.id, id)).returning();
     if (!updated) throw notFound();
+    if (approving && !current.isActive) {
+      const owner = (await schoolOwners(app.deps)).get(id);
+      if (owner) {
+        await trySendMail(app.deps.env, {
+          to: owner.email,
+          subject: 'Okulyayın · okulunuz hazır',
+          text: `Merhaba ${owner.fullName},\n\n${schoolFullName(updated.name, updated.settings?.schoolType)} için Okulyayın hesabınız açıldı. Kayıtta belirlediğiniz şifreyle giriş yapabilirsiniz:\n${app.deps.env.PUBLIC_URL.replace(/\/$/, '')}/admin/\n`,
+        });
+      }
+    }
     bus.contentChanged(id);
     return publicSchool(updated);
   });

@@ -38,6 +38,7 @@ import { runContactRetention, siteRoutes } from './routes/site.ts';
 import { runExamReminders } from './lib/examReminders.ts';
 import { runScreenOfflineAlerts } from './lib/screenOffline.ts';
 import { isQuietHour, QUIET_INTERVAL_MS } from './lib/quietHours.ts';
+import { runTrialMarkRetention } from './lib/trialGuard.ts';
 import { controlRoutes } from './routes/control.ts';
 import { draftRoutes } from './routes/drafts.ts';
 import { coverRoutes } from './routes/covers.ts';
@@ -226,6 +227,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
       // Uzun süre bağlanmayan panoların anahtarı iptal edilir
       void runScreenKeyExpiry(deps).catch((err) => app.log.error(err, 'pano anahtarı süresi'));
       void runContactRetention(deps).catch((err) => app.log.error(err, 'iletişim talebi saklama süresi'));
+      void runTrialMarkRetention(deps).catch((err) => app.log.error(err, 'deneme işareti saklama süresi'));
       void runIssuePhotoRetention(deps).catch((err) => app.log.error(err, 'sorun fotoğrafı saklama süresi'));
       // MEB çalışma takvimi: haziran ortasından itibaren yayımlanır; her yıl için günde bir deneme
       if (deps.env.MEB_INDEX_URLS) void runMebCalendarJob(deps).catch((err) => app.log.error(err, 'MEB çalışma takvimi'));

@@ -6,6 +6,7 @@ import { audit, schoolGuard, UUID_RE } from '../context.ts';
 import { displayPairings, screens } from '../db/schema.ts';
 import { randomToken, sha256 } from '../lib/crypto.ts';
 import { rememberRevoked } from '../lib/screenSecurity.ts';
+import { checkTrialDevice } from '../lib/trialGuard.ts';
 import { badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 
 export const DEVICE_TOKEN_PREFIX = 'opd';
@@ -72,6 +73,10 @@ export async function screenRoutes(app: FastifyInstance) {
       .from(displayPairings)
       .where(and(eq(displayPairings.code, body.code), isNull(displayPairings.screenId), gt(displayPairings.expiresAt, new Date())));
     if (!pairing) throw badRequest('Kod bulunamadı ya da süresi doldu. Ekrandaki güncel kodu girin.');
+    // Deneme paketinde: TV başka bir okulun denemesinde kullanıldıysa eşleştirme platform onayına kadar durur
+    if (!(await checkTrialDevice(app.deps, req.ctx.school, pairing.deviceHash))) {
+      throw forbidden('Bu TV daha önce başka bir okulun deneme sürümünde kullanılmış. Okulunuz onaylanınca eşleştirebilirsiniz; bunun için bizimle iletişime geçin.');
+    }
 
     const [screen] = await db
       .insert(screens)

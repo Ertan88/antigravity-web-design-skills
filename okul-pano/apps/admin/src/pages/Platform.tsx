@@ -24,14 +24,24 @@ type Row = School & {
   member: boolean;
   /** Aynı kurum kodu başka bir okulda da kayıtlı */
   codeShared?: boolean;
+  /** Onay bekleyen deneme kötüye kullanımı işaretleri */
+  trialFlags?: TrialFlag[];
   /** Okul verileri panelde açılabilir: üyelik ya da süreli destek erişimi (KVKK) */
   canOpen: boolean;
   /** Okulun müdürü (ad ve e-posta; üye listesi platforma açık değil) */
   owner: { fullName: string; email: string } | null;
 };
 
+type TrialFlag = 'code' | 'phone' | 'device';
+const TRIAL_FLAG_TEXT: Record<TrialFlag, string> = {
+  code: 'Kurum kodu daha önce deneme kullanmış',
+  phone: 'Telefon numarası daha önce deneme kullanmış',
+  device: 'TV daha önce başka bir okulun denemesinde kullanılmış',
+};
+
 interface Signup {
   id: string;
+  flags?: TrialFlag[];
   institutionCode: string | null;
   /** Kurum kodu açık bir okulda zaten kayıtlı */
   codeTaken?: boolean;
@@ -67,7 +77,7 @@ export function Platform() {
 
   const create = useMutation({ mutationFn: (body: unknown) => api('/api/platform/schools', { method: 'POST', body }) });
   const patch = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: Partial<Pick<School, 'plan' | 'maxScreens' | 'isActive'>> & { extendTrialDays?: number } }) =>
+    mutationFn: ({ id, body }: { id: string; body: Partial<Pick<School, 'plan' | 'maxScreens' | 'isActive'>> & { extendTrialDays?: number; approveTrial?: true } }) =>
       api(`/api/platform/schools/${id}`, { method: 'PATCH', body }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['platform', 'schools'] }),
     onError: (e) => toast.error(e.message),
@@ -160,9 +170,14 @@ export function Platform() {
                     {x.institutionCode && `Kurum kodu ${x.institutionCode} · `}
                     {x.schoolType} · {[x.district, x.city].filter(Boolean).join(', ')}
                   </div>
-                  {x.codeTaken && (
-                    <div className="mt-1">
-                      <Badge tone="amber">Bu kurum kodu başka bir okulda kayıtlı</Badge>
+                  {(x.codeTaken || !!x.flags?.length) && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {x.codeTaken && !x.flags?.includes('code') && <Badge tone="amber">Bu kurum kodu başka bir okulda kayıtlı</Badge>}
+                      {x.flags?.map((f) => (
+                        <Badge key={f} tone="amber">
+                          {TRIAL_FLAG_TEXT[f]}
+                        </Badge>
+                      ))}
                     </div>
                   )}
                 </Td>
@@ -220,9 +235,22 @@ export function Platform() {
                     {s.slug}
                     {s.contactPhone && ` · ${s.contactPhone}`}
                   </div>
-                  {s.codeShared && (
+                  {s.codeShared && !s.trialFlags?.length && (
                     <div className="mt-1">
                       <Badge tone="amber">Aynı kurum kodu başka bir okulda da var</Badge>
+                    </div>
+                  )}
+                  {!!s.trialFlags?.length && (
+                    <div className="mt-2 rounded-xl bg-tile-sun p-2.5 text-xs text-tile-sun-ink">
+                      <div className="font-semibold">Onay bekliyor</div>
+                      <ul className="mt-0.5 list-disc pl-4">
+                        {s.trialFlags.map((f) => (
+                          <li key={f}>{TRIAL_FLAG_TEXT[f]}</li>
+                        ))}
+                      </ul>
+                      <Button size="sm" className="mt-2" icon={<Check className="size-4" />} loading={patch.isPending && patch.variables?.id === s.id} onClick={() => patch.mutate({ id: s.id, body: { approveTrial: true } })}>
+                        Onayla
+                      </Button>
                     </div>
                   )}
                   <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs">

@@ -180,8 +180,28 @@ export interface PairingStart {
   expiresAt: string;
 }
 
+/**
+ * TV uygulamasının cihaz kimliği (deneme kötüye kullanımı denetimi için). Uygulama köprü anahtarını sayfa yüklenince
+ * verir; en çok 3 saniye beklenir. Tarayıcıda ve eski uygulama sürümlerinde yoktur.
+ */
+async function tvDeviceId(): Promise<string | null> {
+  const w = window as { OkulYayinTV?: { deviceId?(key: string): string }; __okulYayinTvKey?: string };
+  if (!w.OkulYayinTV?.deviceId) return null;
+  for (let i = 0; i < 6 && !w.__okulYayinTvKey; i++) await new Promise((r) => setTimeout(r, 500));
+  if (!w.__okulYayinTvKey) return null;
+  try {
+    return w.OkulYayinTV.deviceId(w.__okulYayinTvKey) || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function startPairing(): Promise<PairingStart> {
-  const res = await fetch('/api/display/pairings', { method: 'POST' });
+  const deviceId = await tvDeviceId();
+  const res = await fetch('/api/display/pairings', {
+    method: 'POST',
+    ...(deviceId ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify({ deviceId }) } : {}),
+  });
   if (!res.ok) throw new Error('Eşleştirme kodu alınamadı');
   return res.json();
 }

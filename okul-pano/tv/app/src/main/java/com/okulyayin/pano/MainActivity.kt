@@ -335,6 +335,16 @@ class MainActivity : Activity() {
 
         @JavascriptInterface
         fun version(): String = BuildConfig.VERSION_NAME
+
+        /**
+         * Cihaz kimliği (ANDROID_ID): sunucu, aynı TV'nin başka okulların deneme sürümünde kullanılıp kullanılmadığına
+         * bakar. Yalnızca anahtarı bilen pano ana sayfasına verilir; gömülü çerçeveler alamaz. Sunucu kimliği özetleyerek
+         * saklar. Uygulama kaldırılıp kurulsa da değişmez; TV fabrika ayarlarına dönerse değişir.
+         */
+        @SuppressLint("HardwareIds")
+        @JavascriptInterface
+        fun deviceId(key: String): String =
+            if (key != bridgeKey) "" else Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID) ?: ""
     }
 
     /* ---------------- Kumanda ---------------- */

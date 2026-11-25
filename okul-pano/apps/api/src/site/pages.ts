@@ -351,6 +351,7 @@ export const legalPages: Record<string, (i: SiteInfo) => string> = {
 <li>İletişim formu: ad soyad, görev, okul ya da kurum adı, il ve ilçe, e-posta, isteğe bağlı telefon, uygun zaman ve mesaj</li>
 <li>Kayıt ve abonelik: okul bilgileri, yetkili kişinin adı, e-posta adresi, telefon numarası, fatura bilgileri</li>
 <li>Güvenlik kayıtları: giriş denemeleri ve IP adresi (kötüye kullanımı önlemek için)</li>
+<li>Deneme süresi kaydı: kurum kodu, yetkili telefon numarası ve pano TV’sinin cihaz kimliği. Bunların kendisi değil, geri çevrilemeyen özetleri saklanır; özetten numara ya da kimlik elde edilemez.</li>
 </ul>
 <h2>Amaçlar ve hukuki sebepler</h2>
 <ul>
@@ -358,12 +359,14 @@ export const legalPages: Record<string, (i: SiteInfo) => string> = {
 <li>Hesabın açılması, deneme süresi ve aboneliğin yürütülmesi: sözleşmenin ifası (m. 5/2-c)</li>
 <li>Fatura ve muhasebe kayıtları: hukuki yükümlülük (m. 5/2-ç)</li>
 <li>Bilgi güvenliği: meşru menfaat (m. 5/2-f)</li>
+<li>Ücretsiz deneme süresinin kötüye kullanımını önlemek (aynı okulun, kişinin ya da TV’nin tekrar tekrar deneme açmasının fark edilmesi): meşru menfaat (m. 5/2-f). Bu durumda kayıt engellenmez, onaya alınır.</li>
 <li>Kampanya ve yenilik e-postaları: yalnızca açık rızanız varsa (m. 5/1); rızanızı her e-postadaki bağlantıyla geri alabilirsiniz</li>
 </ul>
 <h2>Saklama süreleri</h2>
 <ul>
 <li>İletişim talepleri: yanıtlananlar 1 yıl, yanıtlanmayanlar 2 yıl sonra kendiliğinden silinir</li>
 <li>Doğrulanmamış kayıt başvuruları: 48 saatlik süre dolunca geçersiz olur</li>
+<li>Deneme süresi kaydı (özetler): okul hesabı silinse de 2 yıl saklanır, sonra kendiliğinden silinir</li>
 <li>Fatura kayıtları: vergi mevzuatının öngördüğü süre boyunca</li>
 </ul>
 <h2>Aktarım</h2>
