@@ -61,7 +61,13 @@ bilgisayarınıza indirin (`scp root@SUNUCU_IP_ADRESI:/opt/okul-pano/yedekler/*.
 
 ## Notlar
 
-- Telefon bildirimleri için Expo erişim anahtarı varsa `/opt/okul-pano/.env` dosyasına `PUSH_ACCESS_TOKEN=...`
-  ekleyip `sudo docker compose up -d` çalıştırın.
+- **Telefon bildirimleri (Firebase):** Firebase hizmet hesabı JSON'unu tek satır hâlinde, tek tırnak içinde
+  `/opt/okul-pano/.env` dosyasına ekleyin: `FIREBASE_SERVICE_ACCOUNT='{"type":"service_account",...}'`. Sonra
+  `cd /opt/okul-pano && sudo docker compose up -d`. Değeri kimseyle paylaşmayın; sohbete ya da e-postaya yazmayın.
+- **E-posta:** Platform hesabıyla Panel › E-posta ayarları sayfasından girilir (ya da `.env`'de `SMTP_*`).
+- **Telefon ve TV uygulamaları:** GitHub deposunda Settings › Secrets and variables › Actions › **Variables**
+  sekmesinde `PANOKUL_API_URL` değişkenini yeni adres yapın (ör. `https://pano.alanadiniz.com.tr`); sonraki
+  derlemede uygulamalar bu adresle çıkar. Telefonda eski Render adresi kayıtlıysa uygulama açılışta yeni adrese
+  kendiliğinden geçer (kişi bir kez yeniden giriş yapar).
 - Kod ana dala (`main`) alınınca kurulum komutundaki dal adını `main` yapın; mevcut kurulumda
   `/opt/okul-pano/.env` içindeki `OKULPANO_BRANCH` satırı yalnızca kaynaktan derleme yapılan kurulumlarda kullanılır.

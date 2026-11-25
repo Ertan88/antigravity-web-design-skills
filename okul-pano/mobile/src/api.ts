@@ -25,14 +25,21 @@ let server = '';
 let accessToken: string | null = null;
 let refreshToken: string | null = null;
 let refreshing: Promise<boolean> | null = null;
+/** Önceden kullanılan sunucu adresleri: telefonda bunlardan biri kayıtlıysa açılışta derlemedeki adrese geçilir */
+const LEGACY_SERVERS = ['https://okul-pano.onrender.com'];
+
 let onSignedOut: (() => void) | null = null;
 
 export const session = {
   async load() {
     // Şifreli depodan okumalar birlikte yapılır (her biri telefonda ayrı bir şifre çözme)
     const [savedServer, savedRefresh, schoolId, me] = await Promise.all([storage.get(KEYS.server), storage.get(KEYS.refresh), storage.get(KEYS.school), storage.get(KEYS.me)]);
-    server = savedServer ?? DEFAULT_SERVER;
-    refreshToken = savedRefresh;
+    // Sunucu taşındıysa (eski ücretsiz barındırma → yeni adres) telefonda kayıtlı eski adres yenisine çevrilir. Eski
+    // sunucunun oturumu yeni sunucuda geçmez: kişi bir kez yeniden giriş yapar.
+    const moved = Boolean(DEFAULT_SERVER && savedServer && LEGACY_SERVERS.includes(savedServer) && !LEGACY_SERVERS.includes(DEFAULT_SERVER));
+    if (moved) await Promise.all([storage.set(KEYS.server, DEFAULT_SERVER), storage.set(KEYS.refresh, null), storage.set(KEYS.me, null)]).catch(() => undefined);
+    server = moved ? DEFAULT_SERVER : (savedServer ?? DEFAULT_SERVER);
+    refreshToken = moved ? null : savedRefresh;
     return { server, hasSession: Boolean(refreshToken), schoolId, me };
   },
   /** Son bilinen kullanıcı bilgisi: açılışta ağı beklemeden ekran çizilir, arkada tazelenir */
