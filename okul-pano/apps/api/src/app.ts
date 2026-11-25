@@ -37,6 +37,7 @@ import { platformAccountsRoutes } from './routes/platformAccounts.ts';
 import { runContactRetention, siteRoutes } from './routes/site.ts';
 import { runExamReminders } from './lib/examReminders.ts';
 import { runScreenOfflineAlerts } from './lib/screenOffline.ts';
+import { isQuietHour, QUIET_INTERVAL_MS } from './lib/quietHours.ts';
 import { controlRoutes } from './routes/control.ts';
 import { draftRoutes } from './routes/drafts.ts';
 import { coverRoutes } from './routes/covers.ts';
@@ -44,13 +45,16 @@ import { meRoutes } from './routes/me.ts';
 import { bellOverrideRoutes } from './routes/bellOverrides.ts';
 import { privacyRoutes } from './routes/privacy.ts';
 import { runTrialReminders, signupRoutes } from './routes/signup.ts';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { schoolRoutes } from './routes/schools.ts';
 import { screenRoutes } from './routes/screens.ts';
 import { studentRoutes } from './routes/students.ts';
 import { teacherRoutes } from './routes/teachers.ts';
 import { timetableRoutes } from './routes/timetable.ts';
 import { timetableImportRoutes } from './routes/timetableImport.ts';
+
+/** Sağlık denetiminde veritabanının yanıt vermesi için beklenen en uzun süre */
+const HEALTH_DB_TIMEOUT_MS = 3000;
 
 /** Hesap ile öğretmen kaydı eşleşmesini etkileyen yazma istekleri (kadro, ders programı, nöbet, taşımalı, hesaplar) */
 const TEACHER_LINK_PATHS = /^\/api\/schools\/[^/]+\/(teacher|timetable|duties|transport|members|enrollments)/;
@@ -155,7 +159,25 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     }
   });
 
-  app.get('/api/health', async () => ({ ok: true, driver: database.driver, time: new Date().toISOString() }));
+  // Sağlık denetimi veritabanını da sınar: veritabanı yanıt vermezse 503 döner (uyanık tutma işi ve Render kırmızı görür)
+  app.get('/api/health', async (_req, reply) => {
+    const time = new Date().toISOString();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        database.db.execute(sql`select 1`),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error('zaman aşımı')), HEALTH_DB_TIMEOUT_MS);
+        }),
+      ]);
+      return { ok: true, db: true, driver: database.driver, time };
+    } catch (err) {
+      app.log.error(err, 'sağlık denetimi: veritabanı yanıt vermiyor');
+      return reply.code(503).send({ ok: false, db: false, driver: database.driver, time });
+    } finally {
+      clearTimeout(timer);
+    }
+  });
   // TV'de kumandayla yazması kolay kısa adres: Okul Yayın Pano uygulamasını indirir ("Downloader" uygulamasıyla)
   app.get('/tv', (_req, reply) => reply.redirect(env.TV_APK_URL));
   // Telefon uygulamasını indirme bağlantısı (panelde ve uygulamanın web sürümünde "İndir")
@@ -210,8 +232,13 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     };
     const first = setTimeout(run, 60_000);
     const hourly = setInterval(run, 3600_000);
-    // Sınav hatırlatmaları dakika hassasiyetinde (teneffüs başı)
+    // Sınav hatırlatmaları dakika hassasiyetinde (teneffüs başı). Gece sessiz saatlerde 15 dakikada bir çalışır:
+    // ders yoktur, veritabanı boşta kalır.
+    let lastMinutely = 0;
     const minutely = setInterval(() => {
+      const now = Date.now();
+      if (isQuietHour(new Date(now)) && now - lastMinutely < QUIET_INTERVAL_MS) return;
+      lastMinutely = now;
       void runExamReminders(deps).catch((err) => app.log.error(err, 'sınav hatırlatması'));
       // Ders saatlerinde bağlantısı kopan pano: ekranları yönetenlere bildirim
       void runScreenOfflineAlerts(deps).catch((err) => app.log.error(err, 'pano kopma bildirimi'));

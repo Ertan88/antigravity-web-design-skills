@@ -231,6 +231,10 @@ Zayıf TV işlemcilerinde edinilen dersler:
 - `backdrop-filter`, kayan maske (`mask-image`) ve büyük alanlı bulanıklık kullanılmaz.
 - TV'de kart sayfaları efektsiz değişir; "Hafif" modda süs animasyonları kapanır.
 - Saniyede bir yenilenen öğe (saat) yalnızca kendini yeniden çizdirir; her saniye ölçüm (layout okuma) yapılmaz.
+- Veritabanı gece boşta kalır: 23.00–05.00 arasında dakikalık işler 15 dakikada bir çalışır, açık pano bağlantısı
+  son görülmeyi 10 dakikada bir yazar (`lib/quietHours.ts`). Yeni bir dakikalık iş eklenirse aynı kural uygulanır.
+- `/api/health` veritabanını da sınar (`select 1`, 3 sn); veritabanı yanıt vermezse 503 döner. Uyanık tutma işi ve
+  barındırma sağlık denetimi böylece veritabanı sorununu da görür.
 
 ---
 

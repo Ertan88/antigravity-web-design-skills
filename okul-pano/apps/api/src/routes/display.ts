@@ -45,6 +45,7 @@ import { addDays, holidaysAndHalfDays } from '../lib/dayinfo.ts';
 import { DEVICE_TOKEN_PREFIX } from './screens.ts';
 import { noteScreenSeen, noticeScreenPaired, revokedReason } from '../lib/screenSecurity.ts';
 import { listExams } from '../lib/examSchedule.ts';
+import { isQuietHour, QUIET_TOUCH_MS } from '../lib/quietHours.ts';
 import { noteScreenAlive, touchScreen } from '../lib/screenOffline.ts';
 
 const PAIRING_TTL_MS = 10 * 60 * 1000;
@@ -452,13 +453,14 @@ export async function displayRoutes(app: FastifyInstance) {
       send(e.type, e);
     });
     const offline = screenId ? bus.screenConnected(screenId) : () => {};
-    // Bağlantı açık kaldıkça son görülme dakikada bir yazılır (kopma bildirimi veritabanındaki bu zamana bakar)
+    // Bağlantı açık kaldıkça son görülme dakikada bir yazılır (kopma bildirimi veritabanındaki bu zamana bakar).
+    // Gece sessiz saatlerde 10 dakikada bir: ders olmadığından bildirim gitmez, veritabanı boşta kalır.
     let touched = Date.now();
     // Sinyal adlı olay olarak gider: pano bağlantının yaşadığını görür (yorum satırını tarayıcı panoya iletmez).
     // 20 saniye: okul ağlarındaki filtreler sessiz bağlantıları çoğunlukla 30–60 saniyede keser.
     const ping = setInterval(() => {
       raw.write(`event: ping\ndata: ${Date.now()}\n\n`);
-      if (screenId && Date.now() - touched >= 60_000) {
+      if (screenId && Date.now() - touched >= (isQuietHour(new Date()) ? QUIET_TOUCH_MS : 60_000)) {
         touched = Date.now();
         void touchScreen(app.deps, screenId).catch(() => {});
       }
