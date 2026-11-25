@@ -43,7 +43,32 @@ interface Options {
   form?: FormData;
 }
 
-export async function api<T = unknown>(path: string, { method = 'GET', body, form }: Options = {}): Promise<T> {
+/**
+ * Formdaki dosyalar gönderilmeden önce belleğe okunur. Android'de Google Drive gibi bulut klasöründen seçilen dosya
+ * telefonda hazır durmaz; tarayıcı gönderirken okumaya çalışır, bu sırada dosya bilgisi değiştiği için istek
+ * yarıda kesilir ve "sunucuya ulaşılamıyor" gibi görünür. Önceden okumak dosyayı indirir ve sabitler; okunamazsa
+ * kişiye ne yapacağı söylenir.
+ */
+async function readFormFiles(form: FormData): Promise<FormData> {
+  const out = new FormData();
+  for (const [key, value] of form.entries()) {
+    if (typeof value === 'string') {
+      out.append(key, value);
+      continue;
+    }
+    let bytes: ArrayBuffer;
+    try {
+      bytes = await value.arrayBuffer();
+    } catch {
+      throw new ApiError(0, 'Dosya okunamadı. Google Drive gibi bir bulut klasöründeki dosyayı önce telefona indirin, sonra İndirilenler klasöründen seçin.');
+    }
+    out.append(key, new File([bytes], value.name, { type: value.type, lastModified: value.lastModified }));
+  }
+  return out;
+}
+
+export async function api<T = unknown>(path: string, { method = 'GET', body, form: rawForm }: Options = {}): Promise<T> {
+  const form = rawForm ? await readFormFiles(rawForm) : undefined;
   const send = () =>
     fetch(path, {
       method,

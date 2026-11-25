@@ -287,9 +287,16 @@ async function upload<T>(path: string, form: FormData): Promise<T> {
 export async function uploadImage(schoolId: string, asset: { uri: string; mimeType?: string | null; fileName?: string | null; file?: File; width?: number; height?: number }, endpoint = 'uploads') {
   const path = `/api/schools/${schoolId}/${endpoint}`;
   const form = new FormData();
-  // Web: tarayıcının dosyası tarayıcının fetch'iyle gider
+  // Web: tarayıcının dosyası tarayıcının fetch'iyle gider. Önce belleğe okunur: Android'de Google Drive'dan seçilen
+  // dosya gönderilirken okunursa istek yarıda kesilir ("sunucuya ulaşılamıyor" gibi görünür)
   if (asset.file) {
-    form.append('file', asset.file);
+    let bytes: ArrayBuffer;
+    try {
+      bytes = await asset.file.arrayBuffer();
+    } catch {
+      throw new ApiError('Fotoğraf okunamadı. Google Drive gibi bir bulut klasöründeki dosyayı önce telefona indirip oradan seçin.', 0);
+    }
+    form.append('file', new File([bytes], asset.file.name, { type: asset.file.type, lastModified: asset.file.lastModified }));
     return api<{ url: string }>(path, { method: 'POST', form });
   }
   // Kamera fotoğrafları büyük olur: küçültülüp JPEG olarak sıkıştırılır (yükleme hızlı, sunucu sınırına takılmaz)
