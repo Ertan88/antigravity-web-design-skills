@@ -518,7 +518,7 @@ export function ConductStudents() {
                   size="sm"
                   icon={<Users className="size-4" />}
                   onClick={() => {
-                    setSelected(s.students.map((x) => x.id));
+                    setSelected(activeStudents.map((x) => x.id));
                     setBulk(true);
                   }}
                 >
