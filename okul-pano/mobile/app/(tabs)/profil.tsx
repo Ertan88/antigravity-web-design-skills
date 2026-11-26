@@ -280,7 +280,7 @@ export default function Menu() {
       add('Mesleki eğitim', [
         { title: 'İşletmeler', subtitle: 'İşletme bilgileri, ekle, düzenle', icon: 'business-outline', to: '/isletme' },
         { title: 'Öğrenciler', subtitle: 'İşletmedeki öğrenciler, öğrenci ekle', icon: 'people-outline', to: '/isletme?sekme=ogrenciler' },
-        { title: 'İşletmede devam', subtitle: 'Aylık çizelge: X, D, İ, R, H, K, T · özürlü / özürsüz', icon: 'grid-outline', to: '/isletme-devam' },
+        { title: 'İşletmede devam', subtitle: 'Gün gün işaretleme ve aylık çizelge', icon: 'grid-outline', to: '/isletme-devam' },
         { title: 'Formlar', subtitle: 'Günlük rehberlik formu, devam çizelgesi, aylık rehberlik raporu', icon: 'print-outline', to: '/isletme?formlar=1' },
       ]);
     }

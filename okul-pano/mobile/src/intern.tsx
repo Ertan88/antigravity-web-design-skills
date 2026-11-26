@@ -473,3 +473,62 @@ export function FillSheet({
     </Sheet>
   );
 }
+
+/* ---------- İşletmede devam: gün ekranı ve aylık çizelge ortak verisi ---------- */
+
+export interface SheetStudent {
+  id: string;
+  fullName: string;
+  schoolNo: string;
+  classId: string | null;
+  className: string | null;
+  businessId: string;
+  businessName: string;
+  editable: boolean;
+  /** Kişinin kendi işletmesindeki öğrenci */
+  mine?: boolean;
+  cells: [Cell, Cell][];
+  unsent?: string[];
+  totals: { excused: number; unexcused: number; unchecked?: number };
+}
+export interface SheetDay {
+  date: string;
+  weekday: number;
+  holiday: string | null;
+  halfDay: string | null;
+}
+export interface SheetData {
+  month: string;
+  today: string;
+  days: SheetDay[];
+  classes: { id: string; name: string }[];
+  businesses: { id: string; name: string }[];
+  managerAssigned: boolean;
+  students: SheetStudent[];
+}
+
+export const MONTH_NAMES = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+export const monthName = (m: string) => `${MONTH_NAMES[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
+export const shiftMonth = (m: string, n: number) => new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1 + n, 1)).toISOString().slice(0, 7);
+/** Haftanın günü: 1 Pazartesi … 7 Pazar */
+export const isoWeekday = (iso: string) => ((new Date(`${iso}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
+export const fmtDays = days;
+
+/**
+ * İşletmeler ekranıyla aynı kural: alan şefi ve koordinatörlüğü olan yönetici önce kendi işletmelerindeki öğrencileri
+ * görür; "Alanımın / Bütünü" seçilince ötekiler de gelir.
+ */
+export function useScopeView(d: SheetData | undefined, access: { manage?: boolean; areaHead?: boolean } | undefined) {
+  const [view, setView] = useState<'mine' | 'all' | null>(null);
+  const scoped = Boolean(access?.manage || access?.areaHead);
+  const mineCount = (d?.students ?? []).filter((x) => x.mine).length;
+  const value: 'mine' | 'all' = scoped && mineCount ? (view ?? 'mine') : 'all';
+  const options =
+    scoped && mineCount && d
+      ? [
+          { value: 'mine' as const, label: `Benim öğrencilerim · ${mineCount}` },
+          { value: 'all' as const, label: `${access?.manage ? 'Bütünü' : 'Alanımın'} · ${d.students.length}` },
+        ]
+      : null;
+  return { value, setView, options, visible: (s: SheetStudent) => value === 'all' || Boolean(s.mine) };
+}
