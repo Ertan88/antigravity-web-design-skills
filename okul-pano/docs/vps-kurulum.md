@@ -59,6 +59,34 @@ Yedekler sunucunun kendi diskindedir. Sunucu tamamen kaybolursa yedekler de gide
 bilgisayarınıza indirin (`scp root@SUNUCU_IP_ADRESI:/opt/okul-pano/yedekler/*.dump .`) ya da sağlayıcının
 "otomatik yedek / snapshot" hizmetini açın. Yedekleri Türkiye dışındaki bir servise koymayın (KVKK).
 
+## Sunucu taşırken
+
+Veritabanını yeni sunucuya taşımak yetmez; eski sunucunun **oturum anahtarı** (`JWT_SECRET`) da taşınmalıdır.
+Panelden girilen e-posta (Brevo) anahtarı ve iki adımlı doğrulama bilgileri bu anahtarla şifreli saklanır.
+Kurulum betiği yeni sunucuda yeni bir anahtar üretir; eskisi taşınmazsa:
+
+- Panele girilmiş e-posta anahtarı çözülemez, e-posta gönderilmez (Platform › E-posta ayarları sayfası
+  "Kayıtlı anahtar çözülemedi" der).
+- İki adımlı doğrulamayı açmış kişilerin uygulamadaki kodları kabul edilmez; ancak kurtarma koduyla girebilirler.
+- Herkesin oturumu kapanır, yeniden giriş yapılır.
+
+Sıra:
+
+1. Eski sunucuda son bir yedek alın (`sudo /opt/okul-pano/yedekle.sh`) ve yedek dosyasını yeni sunucuya kopyalayın.
+2. Eski sunucudaki `/opt/okul-pano/.env` dosyasından `JWT_SECRET` satırını not edin. Değeri kimseyle paylaşmayın;
+   sohbete ya da e-postaya yazmayın.
+3. Yeni sunucuda kurulum komutunu çalıştırın, sonra `/opt/okul-pano/.env` içindeki `JWT_SECRET` değerini eskisiyle
+   değiştirin. `.env`'de `BREVO_API_KEY`, `SMTP_*` ya da `FIREBASE_SERVICE_ACCOUNT` kullandıysanız onları da taşıyın.
+4. Yedeği geri yükleyin (`sudo /opt/okul-pano/geri-yukle.sh <dosya>.dump`) ve
+   `cd /opt/okul-pano && sudo docker compose up -d` ile yeniden başlatın.
+5. Brevo'da IP kısıtlaması açıksa Security › Authorised IPs sayfasında yeni sunucunun IP adresini onaylayın,
+   eskisini kaldırın.
+6. Platform › E-posta ayarları sayfasından **Deneme gönder** ile e-postayı deneyin.
+7. Alan adının DNS kaydını yeni sunucunun IP adresine çevirin.
+
+Eski `JWT_SECRET` kaybolduysa: Brevo'da yeni bir API anahtarı oluşturup Platform › E-posta ayarları sayfasına
+girin; iki adımlı doğrulama kullananlar kurtarma koduyla girip doğrulamayı yeniden kurar.
+
 ## Notlar
 
 - **Telefon bildirimleri (Firebase):** Firebase hizmet hesabı JSON'unu tek satır hâlinde, tek tırnak içinde
