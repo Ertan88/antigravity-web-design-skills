@@ -1155,9 +1155,8 @@ export function ConductReport() {
   const school = useSchool();
   const toast = useToast();
   const [term, setTerm] = useState<ConductTerm | null>(null);
-  // İlk açılış "Yalnızca benim"; kişinin bu dönem kendi kaydı yoksa "Tüm öğretmenler"e geçer (seçim yapılana kadar)
-  const [chosenMine, setMine] = useState<boolean | null>(null);
-  const mine = chosenMine ?? true;
+  // Sayfa her zaman "Yalnızca benim" ile açılır; kişinin kaydı yoksa uyarı çıkar
+  const [mine, setMine] = useState(true);
   const [downloading, setDownloading] = useState<'class' | 'all' | null>(null);
   const classes = useQuery({
     queryKey: [schoolId, 'conduct', 'classes'],
@@ -1176,9 +1175,6 @@ export function ConductReport() {
     enabled: Boolean(active),
   });
   const r = report.data;
-  useEffect(() => {
-    if (chosenMine === null && r && r.mine && r.hasOwn === false) setMine(false);
-  }, [chosenMine, r]);
   const shownTerm = term ?? r?.term ?? 1;
   const download = async (all: boolean) => {
     setDownloading(all ? 'all' : 'class');
@@ -1234,6 +1230,9 @@ export function ConductReport() {
             </div>
           </div>
           <ClassPicker classes={classes.data} active={active} onPick={setClassId} />
+          {r && r.mine && r.hasOwn === false && (
+            <Alert tone="blue">Bu dönem gözlem kaydınız yok. Bütün öğretmenlerin kayıtlarını görmek için "Tüm öğretmenler"i seçin.</Alert>
+          )}
           {!r ? (
             <Spinner />
           ) : (

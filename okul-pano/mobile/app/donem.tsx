@@ -1,6 +1,6 @@
 import { CONDUCT_BANDS, CONDUCT_HIGH_SHARE, CONDUCT_MIN_TEACHERS } from '@okulpano/shared/conduct';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useConductClasses, useConductReport, type ConductBand } from '../src/data.ts';
 import { Text } from '../src/text.tsx';
@@ -41,15 +41,11 @@ export default function Donem() {
   const classes = useConductClasses();
   const [classId, setClassId] = useState<string | null>(null);
   const [term, setTerm] = useState<1 | 2 | null>(null);
-  // İlk açılış "Yalnızca benim"; kişinin bu dönem kendi kaydı yoksa "Tüm öğretmenler"e geçer (seçim yapılana kadar)
-  const [chosenMine, setMine] = useState<boolean | null>(null);
-  const mine = chosenMine ?? true;
+  // Sayfa her zaman "Yalnızca benim" ile açılır; kişinin kaydı yoksa uyarı çıkar
+  const [mine, setMine] = useState(true);
   const active = classId ?? classes.data?.find((c) => c.students > 0)?.id ?? null;
   const report = useConductReport(active, term, mine);
   const r = report.data;
-  useEffect(() => {
-    if (chosenMine === null && r && r.mine && r.hasOwn === false) setMine(false);
-  }, [chosenMine, r]);
   const shownTerm = term ?? r?.term ?? 1;
 
   return (
@@ -77,6 +73,11 @@ export default function Donem() {
           { value: 'all', label: 'Tüm öğretmenler' },
         ]}
       />
+      {r && r.mine && r.hasOwn === false && (
+        <T size={13} color={colors.muted}>
+          Bu dönem gözlem kaydınız yok. Bütün öğretmenlerin kayıtlarını görmek için "Tüm öğretmenler"i seçin.
+        </T>
+      )}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
         {(classes.data ?? []).map((c) => {
           const on = c.id === active;

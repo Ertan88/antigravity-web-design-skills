@@ -246,12 +246,22 @@ const UPLOAD_MAX_SIDE = 1920;
  * Telefonda dosya gönderme: Expo'nun fetch'i telefondaki dosyayı ({ uri, name, type }) FormData'da desteklemez
  * ("Unsupported FormDataPart"); React Native'in XMLHttpRequest'i destekler. Oturum yenileme api() ile aynıdır.
  */
-function sendForm(path: string, form: FormData): Promise<{ status: number; json: { message?: string } | null }> {
+/** Yükleme aşaması: dosya gönderiliyor (gerçek yüzde) ya da gönderildi, sunucu kaydediyor (süre bilinmez) */
+export type UploadProgress = { phase: 'upload'; percent: number } | { phase: 'reading' };
+
+function sendForm(path: string, form: FormData, onProgress?: (p: UploadProgress) => void): Promise<{ status: number; json: { message?: string } | null }> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${server}${path}`);
     if (accessToken) xhr.setRequestHeader('authorization', `Bearer ${accessToken}`);
     xhr.timeout = 90_000;
+    if (onProgress) {
+      onProgress({ phase: 'upload', percent: 0 });
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && e.total > 0) onProgress({ phase: 'upload', percent: Math.min(100, Math.round((e.loaded / e.total) * 100)) });
+      };
+      xhr.upload.onload = () => onProgress({ phase: 'reading' });
+    }
     xhr.onload = () => {
       let json: { message?: string } | null = null;
       try {
@@ -267,12 +277,12 @@ function sendForm(path: string, form: FormData): Promise<{ status: number; json:
   });
 }
 
-async function upload<T>(path: string, form: FormData): Promise<T> {
+async function upload<T>(path: string, form: FormData, onProgress?: (p: UploadProgress) => void): Promise<T> {
   let res: { status: number; json: { message?: string } | null };
   try {
     if (!accessToken && refreshToken) await refresh();
-    res = await sendForm(path, form);
-    if (res.status === 401 && refreshToken && (await refresh())) res = await sendForm(path, form);
+    res = await sendForm(path, form, onProgress);
+    if (res.status === 401 && refreshToken && (await refresh())) res = await sendForm(path, form, onProgress);
   } catch {
     throw new ApiError('Fotoğraf gönderilemedi. İnternet bağlantınızı kontrol edip yeniden deneyin.', 0);
   }
@@ -284,7 +294,12 @@ async function upload<T>(path: string, form: FormData): Promise<T> {
   return res.json as T;
 }
 
-export async function uploadImage(schoolId: string, asset: { uri: string; mimeType?: string | null; fileName?: string | null; file?: File; width?: number; height?: number }, endpoint = 'uploads') {
+export async function uploadImage(
+  schoolId: string,
+  asset: { uri: string; mimeType?: string | null; fileName?: string | null; file?: File; width?: number; height?: number },
+  endpoint = 'uploads',
+  onProgress?: (p: UploadProgress) => void,
+) {
   const path = `/api/schools/${schoolId}/${endpoint}`;
   const form = new FormData();
   // Web: tarayıcının dosyası tarayıcının fetch'iyle gider. Önce belleğe okunur: Android'de Google Drive'dan seçilen
@@ -297,7 +312,7 @@ export async function uploadImage(schoolId: string, asset: { uri: string; mimeTy
       throw new ApiError('Fotoğraf okunamadı. Google Drive gibi bir bulut klasöründeki dosyayı önce telefona indirip oradan seçin.', 0);
     }
     form.append('file', new File([bytes], asset.file.name, { type: asset.file.type, lastModified: asset.file.lastModified }));
-    return api<{ url: string }>(path, { method: 'POST', form });
+    return upload<{ url: string }>(path, form, onProgress);
   }
   // Kamera fotoğrafları büyük olur: küçültülüp JPEG olarak sıkıştırılır (yükleme hızlı, sunucu sınırına takılmaz)
   let uri = asset.uri;
@@ -318,5 +333,5 @@ export async function uploadImage(schoolId: string, asset: { uri: string; mimeTy
   }
   form.append('file', { uri, name, type } as unknown as Blob);
   if (Platform.OS === 'web') return api<{ url: string }>(path, { method: 'POST', form });
-  return upload<{ url: string }>(path, form);
+  return upload<{ url: string }>(path, form, onProgress);
 }

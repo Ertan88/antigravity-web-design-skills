@@ -22,7 +22,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { AppState, BackHandler, Platform, Pressable, ScrollView, View } from 'react-native';
-import { api, uploadImage } from '../src/api.ts';
+import { api, uploadImage, type UploadProgress } from '../src/api.ts';
 import { useAuth, useSchoolPath } from '../src/auth.tsx';
 import { useAnnouncementDrafts, useAnnouncements, useScreens, useSchoolInfo, type Announcement, type AnnouncementDraft } from '../src/data.ts';
 import { AnnouncementPreview } from '../src/preview.tsx';
@@ -30,7 +30,7 @@ import { Text } from '../src/text.tsx';
 import { colors } from '../src/theme.ts';
 import { DatePickSheet } from '../src/datePick.tsx';
 import { openChoice } from '../src/confirm.tsx';
-import { Button, Card, Chip, Field, Icon, Screen, SectionTitle, T, type IconName } from '../src/ui.tsx';
+import { Button, Card, Chip, Field, Icon, Screen, SectionTitle, T, UploadBar, type IconName } from '../src/ui.tsx';
 
 type Kind = 'design' | 'image' | 'text' | 'video';
 const EMPTY_SCHEDULE: PlanSchedule = { days: [], from: null, to: null, phase: 'any' };
@@ -120,6 +120,7 @@ export default function DuyuruYeni() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [screenIds, setScreenIds] = useState<string[]>([]);
   // Ne zamana kadar: varsayılan 1 hafta (web paneliyle aynı)
   const [until, setUntil] = useState<UntilChoice>(DEFAULT_UNTIL);
@@ -420,8 +421,9 @@ export default function DuyuruYeni() {
     const asset = res.assets?.[0];
     if (res.canceled || !asset || !school) return;
     setUploading(true);
+    setProgress(null);
     try {
-      const { url } = await uploadImage(school.id, asset as never);
+      const { url } = await uploadImage(school.id, asset as never, 'uploads', setProgress);
       setImageUrl(url);
     } catch (err) {
       setError(errorText(err, 'Fotoğraf yüklenemedi'));
@@ -599,14 +601,15 @@ export default function DuyuruYeni() {
               ))
           ) : (
             <>
-              {kind === 'image' && (
+              {kind === 'image' && uploading && <UploadBar progress={progress} />}
+              {kind === 'image' && !uploading && (
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                   {Platform.OS !== 'web' && (
-                    <Button variant="secondary" icon="camera-outline" style={{ flex: 1 }} loading={uploading} onPress={() => void pick(true)}>
+                    <Button variant="secondary" icon="camera-outline" style={{ flex: 1 }} onPress={() => void pick(true)}>
                       Fotoğraf çek
                     </Button>
                   )}
-                  <Button variant="secondary" icon="image-outline" style={{ flex: 1 }} loading={uploading} onPress={() => void pick(false)}>
+                  <Button variant="secondary" icon="image-outline" style={{ flex: 1 }} onPress={() => void pick(false)}>
                     Galeriden seç
                   </Button>
                 </View>

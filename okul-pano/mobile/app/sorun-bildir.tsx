@@ -6,12 +6,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Image, Platform, Pressable, View } from 'react-native';
-import { api, uploadImage } from '../src/api.ts';
+import { api, uploadImage, type UploadProgress } from '../src/api.ts';
 import { useAuth, useSchoolPath } from '../src/auth.tsx';
 import { CATEGORY_LOOK } from '../src/issues.tsx';
 import { Text } from '../src/text.tsx';
 import { colors, tiles } from '../src/theme.ts';
-import { Button, Field, Icon, Screen, T } from '../src/ui.tsx';
+import { Button, Field, Icon, Screen, T, UploadBar } from '../src/ui.tsx';
 
 /** Sorun bildir: kategori, yer, açıklama, isteğe bağlı fotoğraf ve "Acil"; kategori sorumlusuna (yoksa bütün idareye) gider */
 export default function SorunBildir() {
@@ -25,6 +25,7 @@ export default function SorunBildir() {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,8 +38,9 @@ export default function SorunBildir() {
     const asset = res.assets?.[0];
     if (res.canceled || !asset || !school) return;
     setUploading(true);
+    setProgress(null);
     try {
-      const { url } = await uploadImage(school.id, asset as never, 'issues/photo');
+      const { url } = await uploadImage(school.id, asset as never, 'issues/photo', setProgress);
       setPhotoUrl(url);
       setPreview(asset.uri);
     } catch (err) {
@@ -108,11 +110,12 @@ export default function SorunBildir() {
       </View>
       <Field label="Nerede?" value={location} onChangeText={setLocation} maxLength={80} placeholder="ör. 2. kat koridor, 10-B sınıfı, bahçe" />
       <Field label="Açıklama" value={description} onChangeText={setDescription} maxLength={1000} multiline placeholder="Sorunu kısaca anlatın" style={{ minHeight: 90, textAlignVertical: 'top' }} />
+      {uploading && <UploadBar progress={progress} />}
       <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-        <Button variant="secondary" size="sm" icon="camera-outline" loading={uploading} onPress={() => void pick(true)}>
+        <Button variant="secondary" size="sm" icon="camera-outline" disabled={uploading} onPress={() => void pick(true)}>
           Fotoğraf çek
         </Button>
-        <Button variant="secondary" size="sm" icon="image-outline" onPress={() => void pick(false)}>
+        <Button variant="secondary" size="sm" icon="image-outline" disabled={uploading} onPress={() => void pick(false)}>
           Galeriden
         </Button>
         <Pressable

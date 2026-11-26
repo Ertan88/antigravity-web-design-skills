@@ -8,12 +8,12 @@ import { useState } from 'react';
 import { Image, Platform, Pressable, View } from 'react-native';
 import { Sheet, SheetScroll } from '../../src/sheet.tsx';
 import { Text } from '../../src/text.tsx';
-import { absoluteUrl, api, uploadImage } from '../../src/api.ts';
+import { absoluteUrl, api, uploadImage, type UploadProgress } from '../../src/api.ts';
 import { useAuth, useSchoolPath } from '../../src/auth.tsx';
 import { useSchoolQuery } from '../../src/data.ts';
 import { clock, fullDate, localIso } from '../../src/day.ts';
 import { colors } from '../../src/theme.ts';
-import { AddFab, Badge, Button, Card, Choice, confirm, Empty, ErrorNote, Field, Loading, Screen, T, ToggleRow, type IconName } from '../../src/ui.tsx';
+import { AddFab, Badge, Button, Card, Choice, confirm, Empty, ErrorNote, Field, Loading, Screen, T, ToggleRow, UploadBar, type IconName } from '../../src/ui.tsx';
 
 type Row = Record<string, unknown> & { id: string; isActive?: boolean };
 type FieldDef =
@@ -304,6 +304,7 @@ function Editor({ kind, row, path, onDone }: { kind: Kind; row: Row | null; path
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
   const set = (k: string, v: string) => setValues((x) => ({ ...x, [k]: v }));
 
   const pick = async (key: string, aspect: [number, number], camera: boolean) => {
@@ -315,8 +316,9 @@ function Editor({ kind, row, path, onDone }: { kind: Kind; row: Row | null; path
     const asset = res.assets?.[0];
     if (res.canceled || !asset || !school) return;
     setUploading(key);
+    setProgress(null);
     try {
-      const { url } = await uploadImage(school.id, asset as never);
+      const { url } = await uploadImage(school.id, asset as never, 'uploads', setProgress);
       set(key, url);
     } catch (err) {
       setError(errorText(err, 'Fotoğraf yüklenemedi'));
@@ -393,8 +395,9 @@ function Editor({ kind, row, path, onDone }: { kind: Kind; row: Row | null; path
               ) : (
                 <T color={colors.muted}>{f.label} (isteğe bağlı)</T>
               )}
+              {uploading === f.key && <UploadBar progress={progress} />}
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                <Button size="sm" icon="camera-outline" loading={uploading === f.key} onPress={() => void pick(f.key, f.aspect, true)}>
+                <Button size="sm" icon="camera-outline" disabled={Boolean(uploading)} onPress={() => void pick(f.key, f.aspect, true)}>
                   Kamerayla çek
                 </Button>
                 <Button size="sm" variant="secondary" icon="images-outline" disabled={Boolean(uploading)} onPress={() => void pick(f.key, f.aspect, false)}>

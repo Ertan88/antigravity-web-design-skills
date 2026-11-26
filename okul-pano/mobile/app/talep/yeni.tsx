@@ -6,12 +6,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Image, Platform, Pressable, View } from 'react-native';
-import { api, uploadImage } from '../../src/api.ts';
+import { api, uploadImage, type UploadProgress } from '../../src/api.ts';
 import { useAuth, useSchoolPath } from '../../src/auth.tsx';
 import { KIND_LOOK } from '../../src/support.tsx';
 import { Text } from '../../src/text.tsx';
 import { colors, tiles } from '../../src/theme.ts';
-import { Button, Chip, Field, Icon, Screen, T } from '../../src/ui.tsx';
+import { Button, Chip, Field, Icon, Screen, T, UploadBar } from '../../src/ui.tsx';
 
 /** Yeni destek talebi: tür, konu, açıklama, ilgili bölüm ve isteğe bağlı ekran görüntüsü */
 export default function YeniTalep() {
@@ -25,6 +25,7 @@ export default function YeniTalep() {
   const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,8 +37,9 @@ export default function YeniTalep() {
     const asset = res.assets?.[0];
     if (res.canceled || !asset || !school) return;
     setUploading(true);
+    setProgress(null);
     try {
-      const { url } = await uploadImage(school.id, asset as never, 'uploads');
+      const { url } = await uploadImage(school.id, asset as never, 'uploads', setProgress);
       setAttachmentUrl(url);
       setPreview(asset.uri);
     } catch (err) {
@@ -110,8 +112,10 @@ export default function YeniTalep() {
             <Icon name="close" size={16} color="#fff" />
           </Pressable>
         </View>
+      ) : uploading ? (
+        <UploadBar progress={progress} />
       ) : (
-        <Button variant="secondary" size="sm" icon="paperclip" loading={uploading} onPress={() => void attach()} style={{ alignSelf: 'flex-start' }}>
+        <Button variant="secondary" size="sm" icon="paperclip" onPress={() => void attach()} style={{ alignSelf: 'flex-start' }}>
           Ekran görüntüsü ekle
         </Button>
       )}

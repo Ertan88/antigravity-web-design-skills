@@ -12,6 +12,7 @@ import { scrollMemory, scrollRestore } from './scroll.ts';
 import { colors, dark, radius, space, tiles, type TileTone } from './theme.ts';
 import { shortSchoolName } from '@okulpano/shared/schoolName';
 import { dayTitle, greeting, localIso } from './day.ts';
+import type { UploadProgress } from './api.ts';
 import { useEmergencyInHeader } from './tabs.ts';
 
 export type { IconName } from './icons.tsx';
@@ -1168,5 +1169,46 @@ export function AddFab({ label = 'Ekle', onPress }: { label?: string; onPress: (
       <Icon name="add" size={small ? 26 : 20} color={colors.onPrimary} />
       {!small && <Text style={{ fontSize: 15, fontWeight: '800', color: colors.onPrimary }}>{label}</Text>}
     </Pressable>
+  );
+}
+
+/**
+ * Dosya yükleme göstergesi (web paneliyle aynı): önce gerçek gönderim yüzdesi, gönderim bitince "kaydediliyor"
+ * aşamasında kayan şerit (sunucunun süresi önceden bilinemez, yüzde uydurulmaz).
+ */
+export function UploadBar({ progress, reading = 'Kaydediliyor…' }: { progress: UploadProgress | null; reading?: string }) {
+  const uploading = !progress || progress.phase === 'upload';
+  const percent = progress?.phase === 'upload' ? progress.percent : 100;
+  const x = useRef(new Animated.Value(0)).current;
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    if (uploading) return;
+    x.setValue(0);
+    const loop = Animated.loop(Animated.timing(x, { toValue: 1, duration: 1200, easing: Easing.inOut(Easing.quad), useNativeDriver: true }));
+    loop.start();
+    return () => loop.stop();
+  }, [uploading, x]);
+  return (
+    <View style={{ gap: 6, alignSelf: 'stretch' }} accessibilityRole="progressbar" accessibilityLabel={uploading ? `Fotoğraf gönderiliyor yüzde ${percent}` : reading}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+        <Text style={{ fontSize: 13, fontWeight: '600', color: colors.muted }}>{uploading ? 'Fotoğraf gönderiliyor' : reading}</Text>
+        {uploading && <Text style={{ fontSize: 13, fontWeight: '700', color: colors.muted }}>%{percent}</Text>}
+      </View>
+      <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ height: 8, borderRadius: 4, backgroundColor: colors.border, overflow: 'hidden' }}>
+        {uploading ? (
+          <View style={{ height: 8, borderRadius: 4, width: `${percent}%`, backgroundColor: colors.primary }} />
+        ) : (
+          <Animated.View
+            style={{
+              height: 8,
+              borderRadius: 4,
+              width: width * 0.4,
+              backgroundColor: colors.primary,
+              transform: [{ translateX: x.interpolate({ inputRange: [0, 1], outputRange: [-width * 0.4, width] }) }],
+            }}
+          />
+        )}
+      </View>
+    </View>
   );
 }
