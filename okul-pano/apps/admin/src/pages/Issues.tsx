@@ -88,7 +88,8 @@ export function Issues() {
   const path = useSchoolPath('issues');
   const [params, setParams] = useSearchParams();
   const [cat, setCat] = useState<IssueCategory | ''>('');
-  const [creating, setCreating] = useState(false);
+  // Genel Bakış'taki "Sorun bildir" düğmesi ?yeni=1 ile gelir; form doğrudan açılır
+  const [creating, setCreating] = useState(() => params.get('yeni') === '1');
   const [owners, setOwners] = useState(false);
   const openId = params.get('id');
   const qc = useQueryClient();
@@ -182,7 +183,18 @@ export function Issues() {
       ) : (
         <EmptyState icon={<AlertTriangle className="size-6" />} title="Bildiriminiz yok" description="Okulda bir sorun görürseniz “Sorun bildir” ile idareye iletin." />
       )}
-      {creating && <IssueForm onClose={() => setCreating(false)} />}
+      {creating && (
+        <IssueForm
+          onClose={() => {
+            setCreating(false);
+            if (params.has('yeni')) {
+              const next = new URLSearchParams(params);
+              next.delete('yeni');
+              setParams(next, { replace: true });
+            }
+          }}
+        />
+      )}
       {owners && <OwnersDialog onClose={() => setOwners(false)} />}
       {openId && <IssueDetail id={openId} manager={manager} onClose={() => setParams({})} />}
     </div>

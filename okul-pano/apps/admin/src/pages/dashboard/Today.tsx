@@ -43,7 +43,7 @@ function useBoardState() {
   });
 }
 
-function useNow(ms: number) {
+export function useNow(ms: number) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), ms);

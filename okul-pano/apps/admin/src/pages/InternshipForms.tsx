@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, FileDown } from "../components/icons.tsx";
 import { useToast } from "../components/Toast.tsx";
 import { Link, useNavigate } from "react-router-dom";
 import { choose } from "../components/confirm.tsx";
-import { Alert, Button, Modal, MonthPicker, Spinner } from "../components/ui.tsx";
+import { Alert, Button, MonthPicker, PageHeader, Spinner } from "../components/ui.tsx";
 import { api, fetchBlob, saveBlob } from "../lib/api.ts";
 import { useAuth } from "../lib/auth.tsx";
 import { useSchoolPath } from "../lib/data.ts";
@@ -107,7 +107,12 @@ const weekText = (mon: string, fri: string) =>
     ? `${Number(mon.slice(8, 10))}–${dayMonth(fri)} ${fri.slice(0, 4)}`
     : `${dayMonth(mon)} – ${dayMonth(fri)} ${fri.slice(0, 4)}`;
 
-export function FormsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+/**
+ * Formlar sayfası (3A): Mesleki Eğitim menüsünde İşletmede Devam'ın altında. Solda form türü, dönem ve işletmeler;
+ * sağda geniş PDF önizlemesi.
+ */
+export function InternshipForms() {
+  const open = true;
   const { schoolId } = useAuth();
   const path = useSchoolPath("internship");
   const toast = useToast();
@@ -206,7 +211,6 @@ export function FormsDialog({ open, onClose }: { open: boolean; onClose: () => v
           ],
         });
         if (c === "go") {
-          onClose();
           navigate(`/isletme-devam?ay=${month}`);
           return;
         }
@@ -225,33 +229,26 @@ export function FormsDialog({ open, onClose }: { open: boolean; onClose: () => v
   };
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      size="2xl"
-      title="Form yazdır"
-      description="Her form A5 boyutundadır; iki form bir A4 kâğıda sığar. Yazdırırken ölçeği “Gerçek boyut” (%100) seçin."
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Vazgeç
-          </Button>
+    <div>
+      <PageHeader
+        title="Formlar"
+        description="Günlük rehberlik formu, aylık devam çizelgesi ve aylık rehberlik raporu. Her form A5 boyutundadır; iki form bir A4 kâğıda sığar. Yazdırırken ölçeği “Gerçek boyut” (%100) seçin."
+        actions={
           <Button icon={<FileDown className="size-4" />} loading={busy} disabled={!formCount} onClick={() => void download()}>
             İndir{formCount ? ` · ${formCount} form, ${Math.ceil(formCount / 2)} sayfa` : ""}
           </Button>
-        </>
-      }
-    >
+        }
+      />
       <div className="grid gap-5 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
       <div className="min-w-0 space-y-4">
-        <div className="flex flex-wrap gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-white/5">
+        <div className="grid grid-cols-3 gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-white/5">
           {TYPES.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => setType(t.id)}
               className={clsx(
-                "flex-1 rounded-xl px-3 py-2 text-sm font-bold whitespace-nowrap transition-colors",
+                "rounded-xl px-2 py-2 text-sm leading-tight font-bold transition-colors",
                 type === t.id ? "bg-ink text-surface" : "text-slate-600 hover:text-ink",
               )}
             >
@@ -350,14 +347,14 @@ export function FormsDialog({ open, onClose }: { open: boolean; onClose: () => v
       </div>
       <FormPreview url={current?.url ?? preview?.url ?? null} loading={previewing || (Boolean(formCount) && !current && !previewError)} error={previewError} empty={!formCount} />
       </div>
-    </Modal>
+    </div>
   );
 }
 
 /** Önizleme alanı: tarayıcının PDF görüntüleyicisi; seçim değişirken eski önizleme soluk kalır */
 function FormPreview({ url, loading, error, empty }: { url: string | null; loading: boolean; error: string | null; empty: boolean }) {
   return (
-    <div className="relative hidden min-h-[60vh] overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200 lg:block dark:bg-white/5 dark:ring-white/10">
+    <div className="relative hidden min-h-[75vh] overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200 lg:block dark:bg-white/5 dark:ring-white/10">
       {empty ? (
         <p className="absolute inset-0 grid place-items-center p-6 text-center text-sm font-semibold text-slate-500">Önizleme için listeden işletme seçin.</p>
       ) : error ? (

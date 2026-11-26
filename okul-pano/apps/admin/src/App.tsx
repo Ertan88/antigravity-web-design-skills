@@ -51,6 +51,7 @@ const ConductReport = page(() => import('./pages/Conduct.tsx'), 'ConductReport')
 const ConductAlerts = page(() => import('./pages/Conduct.tsx'), 'ConductAlerts');
 const InternshipSheet = page(() => import('./pages/Internship.tsx'), 'InternshipSheet');
 const Businesses = page(() => import('./pages/Internship.tsx'), 'Businesses');
+const InternshipForms = page(() => import('./pages/InternshipForms.tsx'), 'InternshipForms');
 
 function Guard({ permission, children }: { permission: Permission | Permission[]; children: ReactNode }) {
   const { can } = useAuth();
@@ -143,6 +144,7 @@ export function App() {
         <Route path="rehberlik" element={needsSchool(<Guard permission="conduct.counsel"><ConductAlerts /></Guard>)} />
         <Route path="isletme-devam" element={needsSchool(<InternshipSheet />)} />
         <Route path="isletmeler" element={needsSchool(<Businesses />)} />
+        <Route path="isletme-formlari" element={needsSchool(<InternshipForms />)} />
         <Route path="gozlem-kriterleri" element={needsSchool(<Guard permission="conduct.manage"><ConductCriteria /></Guard>)} />
         <Route path="zil-saatleri" element={needsSchool(<Guard permission="schedule.manage"><BellSchedules /></Guard>)} />
         <Route path="ders-programi" element={needsSchool(<Guard permission="schedule.manage"><Timetable /></Guard>)} />

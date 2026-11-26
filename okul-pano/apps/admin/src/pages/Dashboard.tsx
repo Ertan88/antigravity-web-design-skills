@@ -12,6 +12,7 @@ import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useList, useSchoolPath, type Announcement, type Screen } from '../lib/data.ts';
 import { timeAgo } from '../lib/format.ts';
+import { MyDay } from './dashboard/MyDay.tsx';
 import { TodaySummary } from './dashboard/Today.tsx';
 import { CoverBand, MyAssignmentsCard } from './covers/Covers.tsx';
 
@@ -106,8 +107,10 @@ function PendingApprovals() {
 
 export function Dashboard() {
   const { me, school, schoolId, can } = useAuth();
+  // Müdür ve müdür yardımcısı okul geneli sayıları görür; öğretmen (4A) kendi gününü ("Bugünüm") görür
+  const manager = school?.role === 'owner' || school?.role === 'admin';
   const base = useSchoolPath();
-  const stats = useQuery({ queryKey: [schoolId, 'stats'], queryFn: () => api<Stats>(`${base}/stats`), refetchInterval: 30_000 });
+  const stats = useQuery({ queryKey: [schoolId, 'stats'], queryFn: () => api<Stats>(`${base}/stats`), refetchInterval: 30_000, enabled: manager });
   const audit = useQuery({
     queryKey: [schoolId, 'audit-recent'],
     queryFn: () => api<AuditRow[]>(`${base}/audit`),
@@ -143,8 +146,11 @@ export function Dashboard() {
       {/* İzinli öğretmenin boş kalan dersleri ve nöbet yeri: tek satır uyarı, atama Görevlendirme sayfasında */}
       <CoverBand />
       {/* Öğretmenin izinli yerine görevi (ders ya da nöbet yeri); gün bitince sonraki okul günü */}
-      <MyAssignmentsCard />
+      {manager && <MyAssignmentsCard />}
 
+      {!manager && <MyDay />}
+
+      {manager && (
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat
           tone="dark"
@@ -167,6 +173,7 @@ export function Dashboard() {
         <Stat tone="sky" icon={<Users className="size-4" />} label="Öğretmen" value={s?.teachers ?? '—'} hint="kadroda" to="/ogretmenler" />
         <Stat tone="lilac" icon={<Cake className="size-4" />} label="Öğrenci" value={s?.students ?? '—'} hint="kayıtlı" to="/ogrenciler" />
       </div>
+      )}
 
       <PendingApprovals />
 

@@ -9,12 +9,9 @@ import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useSchoolPath } from '../lib/data.ts';
 import { formatDate, todayIso } from '../lib/format.ts';
+import { dayLessons, type MeToday } from '../lib/teacherDay.ts';
+import { useSearchParams } from 'react-router-dom';
 
-interface MeToday {
-  teacher: { id: string; fullName: string } | null;
-  today: string;
-  lessons: { weekday: number; periodNo: number; className: string; subject: string }[];
-}
 interface MyDuties {
   showing: string;
   teacherName: string | null;
@@ -39,17 +36,8 @@ const KINDS = ['Mazeret izni', 'Görevlendirme', 'Rapor', 'Refakat izni', 'Doğu
 const DAYS = [1, 2, 3, 4, 5] as const;
 type Tab = 'program' | 'duties' | 'leaves';
 
-/** Bu haftanın Pazartesi–Pazar aralığı (ISO tarih) */
-function weekRange(today: string): [string, string] {
-  const d = new Date(`${today}T12:00:00Z`);
-  const wd = (d.getUTCDay() + 6) % 7;
-  const mon = new Date(d.getTime() - wd * 86_400_000);
-  const sun = new Date(mon.getTime() + 6 * 86_400_000);
-  return [mon.toISOString().slice(0, 10), sun.toISOString().slice(0, 10)];
-}
-
 /**
- * Benim (2B): müdür, müdür yardımcısı ve görevi olan öğretmenin kendi bilgileri tek sayfada. Üstte bu haftanın
+ * Benim (2B): müdür, müdür yardımcısı ve görevi olan öğretmenin kendi bilgileri tek sayfada. Üstte bugünden başlayan
  * özeti; altında Ders programım, Nöbetlerim ve İzinlerim sekmeleri. Bilgiler kadrodaki öğretmen kaydından gelir
  * (kendiliğinden bağlanır); nöbetçi müdür yardımcısı günleri kadro kaydı olmasa da ada göre bulunur.
  */
@@ -61,15 +49,12 @@ export function Me() {
   const today = useQuery({ queryKey: [schoolId, 'me/today'], queryFn: () => api<MeToday>(todayPath), enabled: Boolean(schoolId) });
   const duties = useQuery({ queryKey: [schoolId, 'me/duties'], queryFn: () => api<MyDuties>(dutiesPath), enabled: Boolean(schoolId) });
   const leaves = useQuery({ queryKey: [schoolId, 'me/leaves'], queryFn: () => api<MyLeave[]>(leavesPath), enabled: Boolean(schoolId) });
-  const [tab, setTab] = useState<Tab>('program');
+  // Genel Bakış kartları ?sekme=nobet / ?sekme=izin ile ilgili sekmeyi açar
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState<Tab>(() => (params.get('sekme') === 'nobet' ? 'duties' : params.get('sekme') === 'izin' ? 'leaves' : 'program'));
   const [asking, setAsking] = useState(false);
 
-  const lessons = today.data?.lessons ?? [];
-  const [mon, sun] = weekRange(today.data?.today ?? todayIso());
   const dutyDays = (duties.data?.days ?? []).filter((d) => !d.holiday && (d.duties.length > 0 || d.transport));
-  const thisWeek = dutyDays.filter((d) => d.date >= mon && d.date <= sun);
-  const supervising = thisWeek.find((d) => d.duties.some((x) => x.dutyId.startsWith('supervisor:')));
-  const pending = (leaves.data ?? []).filter((l) => l.approvalStatus === 'pending').length;
   const teacher = today.data?.teacher;
 
   const loading = today.isLoading || duties.isLoading || leaves.isLoading;
@@ -97,12 +82,7 @@ export function Me() {
               Kadroda öğretmen kaydınız bulunamadı. Dersiniz varsa Kişiler ve Yetkiler'de kişi kartınızdan kadrodaki kaydınızı seçin. Nöbetçi müdür yardımcısı günleriniz yine de görünür.
             </Alert>
           )}
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Kpi tone="bg-tile-sky text-tile-sky-ink" value={String(lessons.length)} label="ders saati / hafta" />
-            <Kpi tone="bg-tile-peach text-tile-peach-ink" value={String(thisWeek.filter((d) => d.duties.some((x) => !x.dutyId.startsWith('supervisor:')) || d.transport).length)} label="nöbet bu hafta" />
-            <Kpi tone="bg-tile-lilac text-tile-lilac-ink" value={supervising ? WEEKDAY_NAMES[supervising.weekday]!.slice(0, 3) : '—'} label="nöbetçi md. yrd. (bu hafta)" />
-            <Kpi tone="bg-tile-mint text-tile-mint-ink" value={String(pending)} label="onay bekleyen izin" />
-          </div>
+          {today.data && <WeekStrip d={today.data} leaves={leaves.data ?? []} />}
 
           <Segmented<Tab>
             value={tab}
@@ -114,7 +94,7 @@ export function Me() {
             ]}
           />
 
-          {tab === 'program' && <Program lessons={lessons} />}
+          {tab === 'program' && <Program lessons={today.data?.lessons ?? []} />}
           {tab === 'duties' && <Duties days={dutyDays} />}
           {tab === 'leaves' && <Leaves rows={leaves.data ?? []} onAsk={() => setAsking(true)} />}
         </div>
@@ -124,11 +104,104 @@ export function Me() {
   );
 }
 
-function Kpi({ tone, value, label }: { tone: string; value: string; label: string }) {
+const shortDay = (iso: string) => new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));
+const hm = (t: string) => t.replace(':', '.');
+
+/**
+ * Haftalık şerit (5A): bugünden başlayarak okul günleri; her günde ders sayısı, nöbet, nöbetçi müdür yardımcılığı ve
+ * izin. Güne basınca o günün dersleri saatleriyle, nöbetleri ve izni altta açılır.
+ */
+function WeekStrip({ d, leaves }: { d: MeToday; leaves: MyLeave[] }) {
+  const days = d.week
+    .filter((w) => w.weekday <= 5)
+    .slice(0, 5)
+    .map((w) => {
+      const { holiday, lessons } = dayLessons(d, w.date);
+      const own = w.duties.filter((x) => !x.dutyId.startsWith('supervisor:'));
+      const supervisor = w.duties.some((x) => x.dutyId.startsWith('supervisor:'));
+      const leave = leaves.find((l) => l.approvalStatus !== 'rejected' && l.startDate <= w.date && l.endDate >= w.date) ?? null;
+      return { ...w, holiday: holiday ?? w.holiday, lessons, own, supervisor, leave };
+    });
+  const [picked, setPicked] = useState(() => days.find((x) => x.date === d.today)?.date ?? days[0]?.date ?? '');
+  const sel = days.find((x) => x.date === picked) ?? days[0];
+  if (!sel) return null;
   return (
-    <div className={clsx('rounded-3xl p-4', tone)}>
-      <div className="text-3xl font-extrabold tracking-tight">{value}</div>
-      <div className="mt-1 text-xs font-semibold opacity-80">{label}</div>
+    <div className="grid gap-3">
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {days.map((x) => {
+          const on = x.date === sel.date;
+          return (
+            <button
+              key={x.date}
+              type="button"
+              onClick={() => setPicked(x.date)}
+              aria-pressed={on}
+              className={clsx(
+                'grid min-w-36 flex-1 gap-1 rounded-2xl px-3.5 py-3 text-left ring-1 transition-colors',
+                on ? 'bg-ink text-surface ring-ink' : 'bg-surface text-ink ring-slate-200 hover:ring-slate-400 dark:ring-white/10 dark:hover:ring-white/30',
+              )}
+            >
+              <span className="text-xs font-bold opacity-70">
+                {x.date === d.today ? 'Bugün' : WEEKDAY_NAMES[x.weekday]} · {shortDay(x.date)}
+              </span>
+              <span className="text-base font-extrabold tracking-tight">{x.holiday ? 'Tatil' : x.lessons.length ? `${x.lessons.length} ders` : 'Ders yok'}</span>
+              <span className="flex flex-wrap gap-1">
+                {x.own.length > 0 && <span className="rounded-md bg-tile-peach px-1.5 py-px text-[11px] font-bold text-tile-peach-ink">Nöbet</span>}
+                {x.supervisor && <span className="rounded-md bg-tile-lilac px-1.5 py-px text-[11px] font-bold text-tile-lilac-ink">Nöbetçi Md. Yrd.</span>}
+                {x.leave && (
+                  <span className="rounded-md bg-tile-mint px-1.5 py-px text-[11px] font-bold text-tile-mint-ink">
+                    {x.leave.approvalStatus === 'pending' ? 'İzin (bekliyor)' : 'İzinli'}
+                  </span>
+                )}
+                {x.lessons.some((l) => l.coverFor) && <span className="rounded-md bg-amber-400 px-1.5 py-px text-[11px] font-bold text-slate-900">Görev</span>}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <Card className="grid gap-2 p-4">
+        <div className="text-sm font-extrabold text-ink">
+          {WEEKDAY_NAMES[sel.weekday]}, {formatDate(sel.date)}
+        </div>
+        {sel.holiday ? (
+          <p className="text-sm text-slate-500">Tatil: {sel.holiday}</p>
+        ) : (
+          <>
+            {sel.leave && (
+              <p className="text-sm font-semibold text-tile-mint-ink">
+                {sel.leave.approvalStatus === 'pending' ? 'İzin bildiriminiz onay bekliyor.' : 'Bu gün izinlisiniz.'}
+              </p>
+            )}
+            {sel.lessons.length ? (
+              <ul className="grid gap-1 text-sm">
+                {sel.lessons.map((l) => (
+                  <li key={`${l.period.no}-${l.className}`} className="flex flex-wrap gap-x-2">
+                    <span className="w-28 shrink-0 font-bold text-slate-500 tabular-nums">
+                      {l.period.no}. ders · {hm(l.period.start)}
+                    </span>
+                    <span className="font-semibold text-ink">
+                      {l.className} {l.subject}
+                    </span>
+                    {l.coverFor && <span className="text-amber-700 dark:text-amber-300">· {l.coverFor} yerine</span>}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-slate-500">Bu gün dersiniz yok.</p>
+            )}
+            {sel.own.map((x) => (
+              <p key={x.dutyId} className="flex flex-wrap gap-x-2 text-sm">
+                <span className="w-28 shrink-0 font-bold text-slate-500">Nöbet</span>
+                <span className="font-semibold text-ink">{x.area}</span>
+                {x.partners.length > 0 && <span className="text-slate-500"> · birlikte: {x.partners.join(', ')}</span>}
+                {x.substituteFor && <span className="text-slate-500"> · {x.substituteFor} yerine</span>}
+                {x.coveredBy && <span className="text-slate-500"> · yerinize {x.coveredBy}</span>}
+              </p>
+            ))}
+            {sel.supervisor && <p className="text-sm font-bold text-tile-lilac-ink">Nöbetçi müdür yardımcısısınız.</p>}
+          </>
+        )}
+      </Card>
     </div>
   );
 }
@@ -244,7 +317,7 @@ function Leaves({ rows, onAsk }: { rows: MyLeave[]; onAsk: () => void }) {
   );
 }
 
-function LeaveDialog({ open, onClose, path }: { open: boolean; onClose: () => void; path: string }) {
+export function LeaveDialog({ open, onClose, path }: { open: boolean; onClose: () => void; path: string }) {
   const { schoolId } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();

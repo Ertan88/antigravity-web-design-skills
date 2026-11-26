@@ -31,7 +31,7 @@ import {
   X,
 } from '../components/icons.tsx';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "../components/Toast.tsx";
 import {
   ACTION_SHAPE,
@@ -48,6 +48,7 @@ import {
   Modal,
   MonthPicker,
   PageHeader,
+  Segmented,
   Select,
   Spinner,
   Table,
@@ -57,7 +58,7 @@ import {
 import { api } from "../lib/api.ts";
 import { useAuth } from "../lib/auth.tsx";
 import { useInternshipAccess, useList, useSchoolPath, type Teacher } from "../lib/data.ts";
-import { FormsDialog, VISIT_DAYS, VisitDayPicker } from "./InternshipForms.tsx";
+import { VISIT_DAYS, VisitDayPicker } from "./InternshipForms.tsx";
 import { InternshipSettingsDialog } from "./InternshipSettings.tsx";
 
 /*
@@ -1114,64 +1115,148 @@ function useAreas() {
  * Koordinatör öğretmenler (yönetim işaretler): yalnızca meslek alanı branşlı öğretmenler. İşaretlenen öğretmen
  * mesleki eğitimi görür, kendi işletmelerini ve öğrencilerini girer; işletmeye yalnızca işaretliler atanır.
  */
-function CoordinatorsCard() {
+/**
+ * Koordinatör öğretmenler (1A): sayfada tek satırlık özet; "Değiştir" aramalı, alana göre gruplu pencereyi açar ve
+ * seçim pencerede birlikte kaydedilir. Kültür dersi öğretmenleri listede yer almaz.
+ */
+function CoordinatorsCard({ businessCounts }: { businessCounts: Map<string, number> }) {
   const { schoolId } = useAuth();
   const path = useSchoolPath("internship/coordinators");
-  const qc = useQueryClient();
-  const toast = useToast();
   const q = useQuery({
     queryKey: [schoolId, "internship", "coordinators"],
-    queryFn: () => api<{ teachers: { id: string; fullName: string; branchName: string | null; designated: boolean }[] }>(path),
+    queryFn: () => api<{ teachers: CoordinatorTeacher[] }>(path),
   });
+  const [open, setOpen] = useState(false);
+  const list = q.data?.teachers ?? [];
+  const on = list.filter((t) => t.designated).sort((a, b) => trCompare(a.fullName, b.fullName));
+  return (
+    <Card className="mb-4 flex flex-wrap items-center gap-3 px-5 py-4">
+      <div className="min-w-0 flex-1">
+        <div className="font-bold text-ink">Koordinatör öğretmenler{q.data ? ` · ${on.length}` : ""}</div>
+        <div className="truncate text-sm text-slate-500">
+          {!q.data
+            ? "Yükleniyor…"
+            : !list.length
+              ? "Meslek alanı branşlı öğretmen yok."
+              : on.length
+                ? on.map((t) => t.fullName).join(", ")
+                : "Henüz seçilmedi. Yalnızca seçilen meslek öğretmenleri mesleki eğitimi görür."}
+        </div>
+      </div>
+      <Button size="sm" variant="secondary" icon={<Pencil className="size-4" />} disabled={!list.length} onClick={() => setOpen(true)}>
+        Değiştir
+      </Button>
+      <CoordinatorsDialog open={open} onClose={() => setOpen(false)} teachers={list} businessCounts={businessCounts} path={path} />
+    </Card>
+  );
+}
+
+type CoordinatorTeacher = { id: string; fullName: string; branchName: string | null; designated: boolean };
+
+function CoordinatorsDialog({
+  open,
+  onClose,
+  teachers: list,
+  businessCounts,
+  path,
+}: {
+  open: boolean;
+  onClose: () => void;
+  teachers: CoordinatorTeacher[];
+  businessCounts: Map<string, number>;
+  path: string;
+}) {
+  const { schoolId } = useAuth();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [q, setQ] = useState("");
+  useEffect(() => {
+    if (open) {
+      setPicked(new Set(list.filter((t) => t.designated).map((t) => t.id)));
+      setQ("");
+    }
+  }, [open, list]);
   const save = useMutation({
-    mutationFn: (teacherIds: string[]) => api(path, { method: "PUT", body: { teacherIds } }),
+    mutationFn: () => api(path, { method: "PUT", body: { teacherIds: [...picked] } }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: [schoolId, "internship"] });
+      toast.success("Koordinatör öğretmenler kaydedildi");
+      onClose();
     },
     onError: (err) => toast.error(errorText(err, "Kaydedilemedi")),
   });
-  const list = q.data?.teachers ?? [];
-  const on = list.filter((t) => t.designated);
-  const groups = [...list.reduce((m, t) => m.set(t.branchName || "Alan girilmemiş", [...(m.get(t.branchName || "Alan girilmemiş") ?? []), t]), new Map<string, typeof list>())].sort((a, b) =>
-    a[0].localeCompare(b[0], "tr"),
-  );
-  const set = (ids: string[]) => save.mutate(ids);
+  const needle = q.trim().toLocaleLowerCase("tr-TR");
+  const groups = [
+    ...list.reduce((m, t) => {
+      const area = t.branchName || "Alan girilmemiş";
+      return m.set(area, [...(m.get(area) ?? []), t]);
+    }, new Map<string, CoordinatorTeacher[]>()),
+  ]
+    .map(([area, ts]) => [area, ts.sort((a, b) => trCompare(a.fullName, b.fullName))] as const)
+    .sort((a, b) => trCompare(a[0], b[0]));
+  const shown = groups
+    .map(([area, ts]) => [area, ts, needle ? ts.filter((t) => t.fullName.toLocaleLowerCase("tr-TR").includes(needle) || area.toLocaleLowerCase("tr-TR").includes(needle)) : ts] as const)
+    .filter(([, , vis]) => vis.length);
+  const toggle = (id: string) =>
+    setPicked((p) => {
+      const n = new Set(p);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
   return (
-    <Card className="mb-4 p-5">
-      <div className="mb-1 font-bold text-ink">Koordinatör öğretmenler</div>
-      <p className="mb-3 text-sm text-slate-500">
-        Yalnızca işaretlenen meslek öğretmenleri mesleki eğitimi görür; kendi işletmelerini ve öğrencilerini girebilir, işletmelere
-        koordinatör olarak atanabilir. Kültür dersi öğretmenleri listede yer almaz.
-      </p>
-      {/* Alana göre gruplu işaret listesi: işaretlenen öğretmen yerinde kalır, liste kaymaz */}
-      {!list.length ? (
-        <span className="text-sm text-slate-500">Meslek alanı branşlı öğretmen yok.</span>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {groups.map(([area, ts]) => (
-            <div key={area}>
-              <div className="mb-1.5 text-xs font-bold tracking-wide text-slate-500">
-                {area.toLocaleUpperCase("tr-TR")} · {ts.filter((t) => t.designated).length}/{ts.length}
-              </div>
-              <div className="grid gap-0.5">
-                {ts.map((t) => (
-                  <label key={t.id} className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-slate-50">
-                    <input
-                      type="checkbox"
-                      className="size-4 accent-brand-600"
-                      checked={t.designated}
-                      disabled={save.isPending}
-                      onChange={() => set(t.designated ? on.filter((x) => x.id !== t.id).map((x) => x.id) : [...on.map((x) => x.id), t.id])}
-                    />
-                    <span className="text-sm font-semibold text-ink">{t.fullName}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          ))}
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Koordinatör öğretmenler"
+      description="Yalnızca seçilen meslek öğretmenleri mesleki eğitimi görür; kendi işletmelerini ve öğrencilerini girebilir, işletmelere koordinatör olarak atanabilir."
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Vazgeç
+          </Button>
+          <Button loading={save.isPending} onClick={() => save.mutate()}>
+            Kaydet
+          </Button>
+        </>
+      }
+    >
+      <div className="grid gap-4">
+        <div className="relative">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Öğretmen ya da alan ara" aria-label="Öğretmen ara" className="pl-9" />
         </div>
-      )}
-    </Card>
+        {!shown.length ? (
+          <p className="text-sm text-slate-500">Aramaya uyan öğretmen yok.</p>
+        ) : (
+          <div className="grid max-h-[50vh] gap-4 overflow-y-auto pr-1">
+            {shown.map(([area, ts, vis]) => (
+              <div key={area}>
+                <div className="mb-1 text-xs font-bold tracking-wide text-slate-500">
+                  {area.toLocaleUpperCase("tr-TR")} · {ts.filter((t) => picked.has(t.id)).length}/{ts.length}
+                </div>
+                <div className="grid gap-0.5">
+                  {vis.map((t) => {
+                    const n = businessCounts.get(t.id) ?? 0;
+                    return (
+                      <label key={t.id} className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-white/5">
+                        <input type="checkbox" className="size-4 accent-brand-600" checked={picked.has(t.id)} onChange={() => toggle(t.id)} />
+                        <span className="text-sm font-semibold text-ink">{t.fullName}</span>
+                        {n > 0 && <Badge tone="blue">{n} işletme</Badge>}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {list.some((t) => t.designated && !picked.has(t.id) && (businessCounts.get(t.id) ?? 0) > 0) && (
+          <Alert>Çıkardığınız öğretmenin işletmeleri ona atanmış olarak kalır; işletmelerin koordinatörünü İşletmeler tablosundan değiştirebilirsiniz.</Alert>
+        )}
+      </div>
+    </Modal>
   );
 }
 
@@ -1180,6 +1265,9 @@ export function Businesses() {
   const access = useInternshipAccess();
   const manager = Boolean(access.data?.manage);
   const designated = Boolean(access.data?.teacher);
+  // Alan şefi (2A): önce kendi işletmeleri (koordinatörü olduğu ya da eklediği), isterse alanının bütün işletmeleri
+  const areaHead = !manager && Boolean(access.data?.areaHead);
+  const [view, setView] = useState<"mine" | "area" | null>(null);
   const path = useSchoolPath("internship/businesses");
   const list = useQuery({
     queryKey: [schoolId, "internship", "businesses"],
@@ -1190,7 +1278,7 @@ export function Businesses() {
   const [assigning, setAssigning] = useState<Business | null>(null);
   const [viewing, setViewing] = useState<Business | null>(null);
   const [areasOpen, setAreasOpen] = useState(false);
-  const [formsOpen, setFormsOpen] = useState(false);
+  const navigate = useNavigate();
   // Genel Ayarlar'daki "Staj ayarlarını aç" bu sayfaya ?ayarlar=1 ile gelir; pencere doğrudan açılır
   const [settingsParams, setSettingsParams] = useSearchParams();
   const [settingsOpen, setSettingsOpen] = useState(settingsParams.get("ayarlar") === "1");
@@ -1228,7 +1316,14 @@ export function Businesses() {
     onError: (e) => toast.error(e.message),
   });
 
-  const all = list.data ?? [];
+  const everything = list.data ?? [];
+  const mineCount = everything.filter((b) => b.canEdit).length;
+  const scopeView = areaHead ? (view ?? (mineCount ? "mine" : "area")) : "area";
+  const all = scopeView === "mine" ? everything.filter((b) => b.canEdit) : everything;
+  const businessCounts = everything.reduce(
+    (m, b) => (b.coordinatorTeacherId ? m.set(b.coordinatorTeacherId, (m.get(b.coordinatorTeacherId) ?? 0) + 1) : m),
+    new Map<string, number>(),
+  );
   const coordinators = [
     ...new Map(
       all
@@ -1263,7 +1358,9 @@ export function Businesses() {
         description={
           manager
             ? "Öğrencilerin mesleki eğitim gördüğü işletmeler; okulun meslek alanlarına göre. Koordinatör öğretmen kendi işletmelerindeki öğrencilerin devamını işaretler."
-            : designated
+            : areaHead
+              ? "Kendi işletmeleriniz ve alanınızdaki işletmeler. Alanınızdaki diğer işletmeleri yalnızca görüntülersiniz."
+              : designated
               ? "Koordinatörü olduğunuz işletmeler. Eklediğiniz işletmenin alanı branşınızdan gelir, koordinatörü siz olursunuz."
               : "Alanınızdaki işletmeler (alan şefi olarak yalnızca görüntülersiniz)."
         }
@@ -1286,9 +1383,9 @@ export function Businesses() {
             <Button
               variant="secondary"
               icon={<Printer className="size-4" />}
-              onClick={() => setFormsOpen(true)}
+              onClick={() => navigate("/isletme-formlari")}
             >
-              Form yazdır
+              Formlar
             </Button>
             {(manager || designated) && (
               <Button
@@ -1301,7 +1398,7 @@ export function Businesses() {
           </div>
         }
       />
-      {manager && <CoordinatorsCard />}
+      {manager && <CoordinatorsCard businessCounts={businessCounts} />}
       {manager && areas.data && !areas.data.areas.length && (
         <div className="mb-4">
           <Alert>
@@ -1309,6 +1406,22 @@ export function Businesses() {
             olabilir. "Alanlar ve meslek öğretmenleri" penceresinden meslek
             öğretmenlerinin branşını girin.
           </Alert>
+        </div>
+      )}
+      {areaHead && mineCount > 0 && (
+        <div className="mb-3">
+          <Segmented<"mine" | "area">
+            value={scopeView}
+            onChange={(v) => {
+              setView(v);
+              setArea("");
+              setCoordinator("");
+            }}
+            options={[
+              { value: "mine", label: `Benim işletmelerim · ${mineCount}` },
+              { value: "area", label: `Alanımın işletmeleri · ${everything.length}` },
+            ]}
+          />
         </div>
       )}
       {(areaChips.length > 0 || noArea > 0) && (
@@ -1469,7 +1582,6 @@ export function Businesses() {
       {manager && (
         <AreasDialog open={areasOpen} onClose={() => setAreasOpen(false)} />
       )}
-      <FormsDialog open={formsOpen} onClose={() => setFormsOpen(false)} />
       <InternshipSettingsDialog open={settingsOpen && manager} onClose={closeSettings} />
     </div>
   );
