@@ -430,6 +430,8 @@ export interface ConductReport {
   startYear: number;
   term: 1 | 2;
   range: { from: string; to: string };
+  /** Kişinin bu dönem okulda kendi gözlem kaydı var mı */
+  hasOwn?: boolean;
   mine: boolean;
   class: {
     id: string;

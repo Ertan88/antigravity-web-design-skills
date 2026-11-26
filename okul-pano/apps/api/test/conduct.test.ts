@@ -72,7 +72,7 @@ describe('gözlem', () => {
 
   it('sınıfın düzeyi adından anlaşılır; hızlı giriş ekranı okul numarası sırasıyla gelir', async () => {
     const classes = (await teachers[0]!.get(`${base}/conduct/classes`)).json();
-    expect(classes).toEqual([{ id: classId, name: '9-A', level: 'high', levelSet: false, students: 3 }]);
+    expect(classes).toEqual([{ id: classId, name: '9-A', level: 'high', levelSet: false, nameLevel: true, students: 3 }]);
     const screen = (await teachers[0]!.get(`${base}/conduct/classes/${classId}/students`)).json();
     expect(screen.class.level).toBe('high');
     expect(screen.students.map((s: { schoolNo: string }) => s.schoolNo)).toEqual(['2', '10', '33']);

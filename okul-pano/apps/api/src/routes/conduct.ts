@@ -95,7 +95,7 @@ async function schoolClasses(deps: AppDeps, schoolId: string) {
     if (known) counts.set(known, (counts.get(known) ?? 0) + 1);
   }
   const fallback = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'high';
-  return rows.map((r) => ({ ...r, resolvedLevel: classLevel(r, fallback), levelSet: Boolean(r.level) }));
+  return rows.map((r) => ({ ...r, resolvedLevel: classLevel(r, fallback), levelSet: Boolean(r.level), nameLevel: levelFromClassName(r.name) !== null }));
 }
 
 /** Kaydı kimin girdiğini, rehberlik uyarılarını ve görüşme notlarını görebilir mi: idare ve rehber öğretmen */
@@ -157,14 +157,10 @@ export async function checkConductAlerts(deps: AppDeps, school: { id: string; se
 }
 
 /** Okulun ikinci dönem başlangıcı: ayar > MEB takvimi (okul takibi açıksa) > 1 Şubat */
-async function term2StartFor(deps: AppDeps, settings: unknown, startYear: number) {
-  const s = schoolSettingsSchema.parse(settings ?? {});
-  let meb: string | null = null;
-  if (!s.conductTerm2Start && s.followMebCalendar) {
-    const [cal] = await deps.db.select({ data: academicCalendars.data }).from(academicCalendars).where(eq(academicCalendars.startYear, startYear));
-    meb = cal?.data.term2Start ?? null;
-  }
-  return resolveTerm2Start(startYear, s.conductTerm2Start, meb);
+/** İkinci dönemin ilk günü her zaman Çalışma Takvimi'nden (MEB); takvim girilmemişse kuraldan. Okul ayrıca girmez. */
+async function term2StartFor(deps: AppDeps, _settings: unknown, startYear: number) {
+  const [cal] = await deps.db.select({ data: academicCalendars.data }).from(academicCalendars).where(eq(academicCalendars.startYear, startYear));
+  return resolveTerm2Start(startYear, null, cal?.data.term2Start ?? null);
 }
 
 async function userName(deps: AppDeps, userId: string) {
@@ -268,7 +264,7 @@ export async function conductRoutes(app: FastifyInstance) {
         .groupBy(students.classGroupId),
     ]);
     const byClass = new Map(counts.map((c) => [c.classGroupId, c.n]));
-    return classes.map((c) => ({ id: c.id, name: c.name, level: c.resolvedLevel, levelSet: c.levelSet, students: byClass.get(c.id) ?? 0 }));
+    return classes.map((c) => ({ id: c.id, name: c.name, level: c.resolvedLevel, levelSet: c.levelSet, nameLevel: c.nameLevel, students: byClass.get(c.id) ?? 0 }));
   });
 
   /** Sınıfın düzeyini elle seç (null: sınıf adından anlaşılsın) */
@@ -543,7 +539,21 @@ export async function conductRoutes(app: FastifyInstance) {
     if (!classId || !UUID_RE.test(classId)) throw badRequest('Sınıf seçin.');
     const r = await termReport(req, [classId]);
     const { classes, ...rest } = r;
-    return { ...rest, class: classes[0]! };
+    // Kişinin bu dönem okulda kendi gözlem kaydı var mı: yoksa sayfa "Tüm öğretmenler" ile açılır (boş kalmasın)
+    const tz = req.ctx.school.timezone;
+    const [own] = await db
+      .select({ id: conductEntries.id })
+      .from(conductEntries)
+      .where(
+        and(
+          eq(conductEntries.schoolId, req.ctx.schoolId),
+          eq(conductEntries.userId, req.ctx.userId),
+          gte(conductEntries.createdAt, sql`(${r.range.from}::timestamp AT TIME ZONE ${tz})`),
+          lt(conductEntries.createdAt, sql`(${r.range.to}::timestamp AT TIME ZONE ${tz})`),
+        ),
+      )
+      .limit(1);
+    return { ...rest, hasOwn: Boolean(own), class: classes[0]! };
   });
 
   /** Excel: seçilen sınıf ya da bütün sınıflar (her sınıf ayrı sayfa) */

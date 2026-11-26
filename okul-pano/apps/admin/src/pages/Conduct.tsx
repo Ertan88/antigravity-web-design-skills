@@ -15,8 +15,8 @@ import {
 } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { ArrowUpRight, Check, ClipboardCheck, Download, FileSpreadsheet, Gauge, HeartHandshake, Pencil, Plus, Star, Undo2, Users } from '../components/icons.tsx';
-import { useEffect, useState } from 'react';
+import { ArrowUpRight, Check, ChevronDown, ClipboardCheck, Download, FileSpreadsheet, Gauge, HeartHandshake, Pencil, Plus, Star, Undo2, Users } from '../components/icons.tsx';
+import { useEffect, useRef, useState } from 'react';
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Badge, Button, Card, DeleteButton, EmptyState, Field, IconButton, Input, Modal, MonthPicker, PageHeader, Segmented, Select, Spinner, Table, Td, Textarea, Toggle } from '../components/ui.tsx';
 import { api, downloadFile, excelFileName } from '../lib/api.ts';
@@ -44,6 +44,8 @@ interface ConductClass {
   name: string;
   level: SchoolLevel;
   levelSet: boolean;
+  /** Düzey sınıf adından anlaşılıyor (9-A → Lise) */
+  nameLevel?: boolean;
   students: number;
 }
 interface ClassScreen {
@@ -803,6 +805,7 @@ export function ConductCriteria() {
     },
     onError: (e) => setError(e.message),
   });
+  const levelAttention = (classes.data ?? []).filter((c) => c.levelSet || c.nameLevel === false);
   const setClassLevel = useMutation({
     mutationFn: ({ id, level }: { id: string; level: SchoolLevel | null }) => api(`${path}/classes/${id}`, { method: 'PATCH', body: { level } }),
     onSuccess: refresh,
@@ -887,30 +890,37 @@ export function ConductCriteria() {
         </Card>
 
         <div className="grid gap-5 lg:grid-cols-2">
-          <Card className="p-5">
-            <div className="text-lg font-extrabold tracking-tight">Sınıf düzeyleri</div>
-            <p className="mt-1 mb-3 text-sm text-slate-500">Düzey sınıf adından anlaşılır (9-A → Lise). Anlaşılamayan ya da farklı olan sınıflar için elle seçin.</p>
-            <div className="max-h-80 divide-y divide-slate-100 overflow-y-auto">
-              {(classes.data ?? []).map((c) => (
-                <div key={c.id} className="flex items-center gap-3 py-2">
-                  <span className="w-24 font-bold">{c.name}</span>
-                  <Select
-                    value={c.levelSet ? c.level : ''}
-                    onChange={(e) => setClassLevel.mutate({ id: c.id, level: (e.target.value || null) as SchoolLevel | null })}
-                    className="w-56"
-                    aria-label={`${c.name} düzeyi`}
-                  >
-                    <option value="">Otomatik ({SCHOOL_LEVELS[c.level]})</option>
-                    {LEVEL_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              ))}
-            </div>
-          </Card>
+          {/* Düzey sınıf adından anlaşılır (9-A → Lise); kart yalnızca anlaşılamayan ya da elle değiştirilmiş sınıf varsa görünür */}
+          {levelAttention.length > 0 && (
+            <Card className="p-5">
+              <div className="text-lg font-extrabold tracking-tight">Sınıf düzeyleri</div>
+              <p className="mt-1 mb-3 text-sm text-slate-500">
+                {levelAttention.some((c) => !c.nameLevel)
+                  ? `${levelAttention.filter((c) => !c.nameLevel).length} sınıfın düzeyi adından anlaşılamadı (ör. Anasınıfı, Özel Eğitim). Bu sınıfların düzeyini seçin.`
+                  : 'Bu sınıfların düzeyi elle değiştirildi. "Otomatik" seçilirse addan anlaşılan düzey kullanılır.'}
+              </p>
+              <div className="max-h-80 divide-y divide-slate-100 overflow-y-auto">
+                {levelAttention.map((c) => (
+                  <div key={c.id} className="flex items-center gap-3 py-2">
+                    <span className="w-24 font-bold">{c.name}</span>
+                    <Select
+                      value={c.levelSet ? c.level : ''}
+                      onChange={(e) => setClassLevel.mutate({ id: c.id, level: (e.target.value || null) as SchoolLevel | null })}
+                      className="w-56"
+                      aria-label={`${c.name} düzeyi`}
+                    >
+                      <option value="">Otomatik ({SCHOOL_LEVELS[c.level]})</option>
+                      {LEVEL_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
           <Card className="p-5">
             <div className="text-lg font-extrabold tracking-tight">Saklama süresi (KVKK)</div>
             <p className="mt-1 mb-4 text-sm text-slate-500">
@@ -990,6 +1000,8 @@ interface TermReport {
   term2Start: string;
   range: { from: string; to: string };
   mine: boolean;
+  /** Kişinin bu dönem okulda kendi gözlem kaydı var mı */
+  hasOwn?: boolean;
   class: {
     id: string;
     name: string;
@@ -1020,13 +1032,51 @@ function BandPill({ band }: { band: ConductBand }) {
   return <span className={clsx('inline-flex rounded-full px-3 py-1 text-xs font-extrabold whitespace-nowrap', BAND_STYLE[band])}>{CONDUCT_BANDS[band]}</span>;
 }
 
-const dayLabel = (iso: string) =>
-  new Intl.DateTimeFormat('tr-TR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date(`${iso}T12:00:00`));
-const dayBefore = (iso: string) => new Date(Date.parse(`${iso}T12:00:00Z`) - 86400_000).toISOString().slice(0, 10);
+
+/** "Excel indir ▾": hangi listenin indirileceği açılır menüden seçilir */
+function DownloadMenu({ busy, items }: { busy: boolean; items: { label: string; disabled?: boolean; onClick: () => void }[] }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [open]);
+  return (
+    <div ref={box} className="relative">
+      <Button icon={<FileSpreadsheet className="size-4" />} loading={busy} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        Excel indir
+        <ChevronDown className={clsx('ml-0.5 size-4 transition-transform', open && 'rotate-180')} />
+      </Button>
+      {open && (
+        <div role="menu" className="absolute right-0 z-30 mt-1.5 min-w-52 rounded-2xl border border-slate-200 bg-elevated p-1.5 shadow-[0_18px_40px_-16px_rgb(0_0_0/0.35)] dark:border-white/15">
+          {items.map((it) => (
+            <button
+              key={it.label}
+              type="button"
+              role="menuitem"
+              disabled={it.disabled}
+              onClick={() => {
+                setOpen(false);
+                it.onClick();
+              }}
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-ink hover:bg-slate-100 disabled:opacity-40 dark:hover:bg-white/8"
+            >
+              <Download className="size-4 text-slate-500" />
+              {it.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function ConductReport() {
   const { schoolId } = useAuth();
@@ -1034,7 +1084,9 @@ export function ConductReport() {
   const school = useSchool();
   const toast = useToast();
   const [term, setTerm] = useState<ConductTerm | null>(null);
-  const [mine, setMine] = useState(false);
+  // İlk açılış "Yalnızca benim"; kişinin bu dönem kendi kaydı yoksa "Tüm öğretmenler"e geçer (seçim yapılana kadar)
+  const [chosenMine, setMine] = useState<boolean | null>(null);
+  const mine = chosenMine ?? true;
   const [downloading, setDownloading] = useState<'class' | 'all' | null>(null);
   const classes = useQuery({
     queryKey: [schoolId, 'conduct', 'classes'],
@@ -1053,6 +1105,9 @@ export function ConductReport() {
     enabled: Boolean(active),
   });
   const r = report.data;
+  useEffect(() => {
+    if (chosenMine === null && r && r.mine && r.hasOwn === false) setMine(false);
+  }, [chosenMine, r]);
   const shownTerm = term ?? r?.term ?? 1;
   const download = async (all: boolean) => {
     setDownloading(all ? 'all' : 'class');
@@ -1093,22 +1148,18 @@ export function ConductReport() {
               value={mine ? 'mine' : 'all'}
               onChange={(v) => setMine(v === 'mine')}
               options={[
-                { value: 'all', label: 'Tüm öğretmenler' },
                 { value: 'mine', label: 'Yalnızca benim' },
+                { value: 'all', label: 'Tüm öğretmenler' },
               ]}
             />
-            {r && (
-              <span className="text-sm font-semibold text-slate-500">
-                {dayLabel(r.range.from)} – {dayLabel(dayBefore(r.range.to))}
-              </span>
-            )}
-            <div className="ml-auto flex gap-2">
-              <Button variant="secondary" icon={<FileSpreadsheet className="size-4" />} loading={downloading === 'all'} onClick={() => void download(true)}>
-                Tüm sınıflar
-              </Button>
-              <Button icon={<FileSpreadsheet className="size-4" />} loading={downloading === 'class'} disabled={!active} onClick={() => void download(false)}>
-                Excel
-              </Button>
+            <div className="ml-auto">
+              <DownloadMenu
+                busy={downloading !== null}
+                items={[
+                  { label: r ? `Bu sınıf (${r.class.name})` : 'Bu sınıf', disabled: !active, onClick: () => void download(false) },
+                  { label: 'Tüm sınıflar', onClick: () => void download(true) },
+                ]}
+              />
             </div>
           </div>
           <ClassPicker classes={classes.data} active={active} onPick={setClassId} />
@@ -1325,7 +1376,6 @@ function ConductSettingsCards({ settings, onSave }: { settings: SchoolSettings |
   const rule = settings?.conductAlert ?? { enabled: true, days: 7, minus: 3 };
   const [days, setDays] = useState(String(rule.days));
   const [minus, setMinus] = useState(String(rule.minus));
-  const [term2, setTerm2] = useState(settings?.conductTerm2Start ?? '');
   const num = (v: string, min: number, max: number, fallback: number) => {
     const n = Math.round(Number(v));
     return Number.isFinite(n) && n >= min && n <= max ? n : fallback;
@@ -1365,22 +1415,6 @@ function ConductSettingsCards({ settings, onSave }: { settings: SchoolSettings |
           />
           eksi alırsa haber ver.
         </div>
-      </Card>
-      <Card className="p-5">
-        <div className="text-lg font-extrabold tracking-tight">Dönemler</div>
-        <p className="mt-1 mb-4 text-sm text-slate-500">
-          Dönem göstergesi için. Birinci dönem 1 Eylül'de başlar. İkinci dönemin başlangıcı boş bırakılırsa MEB çalışma takviminden, o da yoksa 1 Şubat'tan alınır.
-        </p>
-        <Field label="İkinci dönemin ilk günü (AA-GG)">
-          {(id) => (
-            <div className="flex gap-2">
-              <Input id={id} value={term2} onChange={(e) => setTerm2(e.target.value)} placeholder="Ör. 02-09 · boş: otomatik" className="w-48" maxLength={5} />
-              <Button variant="secondary" onClick={() => onSave({ conductTerm2Start: term2.trim() || null })}>
-                Kaydet
-              </Button>
-            </div>
-          )}
-        </Field>
       </Card>
     </>
   );

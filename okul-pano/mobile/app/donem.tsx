@@ -1,14 +1,11 @@
 import { CONDUCT_BANDS, CONDUCT_HIGH_SHARE, CONDUCT_MIN_TEACHERS } from '@okulpano/shared/conduct';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useConductClasses, useConductReport, type ConductBand } from '../src/data.ts';
 import { Text } from '../src/text.tsx';
 import { colors, radius, tiles } from '../src/theme.ts';
 import { Avatar, BentoRow, Card, Empty, ErrorNote, Loading, Screen, Segmented, T, Tile } from '../src/ui.tsx';
-
-const dayLabel = (iso: string) => new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long' }).format(new Date(`${iso}T12:00:00`));
-const dayBefore = (iso: string) => new Date(Date.parse(`${iso}T12:00:00Z`) - 86400_000).toISOString().slice(0, 10);
 
 function BandPill({ band }: { band: ConductBand }) {
   const t = band === 'high' ? tiles.mint : band === 'low' ? tiles.peach : null;
@@ -44,16 +41,21 @@ export default function Donem() {
   const classes = useConductClasses();
   const [classId, setClassId] = useState<string | null>(null);
   const [term, setTerm] = useState<1 | 2 | null>(null);
-  const [mine, setMine] = useState(false);
+  // İlk açılış "Yalnızca benim"; kişinin bu dönem kendi kaydı yoksa "Tüm öğretmenler"e geçer (seçim yapılana kadar)
+  const [chosenMine, setMine] = useState<boolean | null>(null);
+  const mine = chosenMine ?? true;
   const active = classId ?? classes.data?.find((c) => c.students > 0)?.id ?? null;
   const report = useConductReport(active, term, mine);
   const r = report.data;
+  useEffect(() => {
+    if (chosenMine === null && r && r.mine && r.hasOwn === false) setMine(false);
+  }, [chosenMine, r]);
   const shownTerm = term ?? r?.term ?? 1;
 
   return (
     <Screen
       title="Dönem Göstergesi"
-      subtitle={r ? `${r.class.name} · ${dayLabel(r.range.from)} – ${dayLabel(dayBefore(r.range.to))}` : undefined}
+      subtitle={r ? r.class.name : undefined}
       back
       refreshing={report.isRefetching}
       onRefresh={() => void report.refetch()}
@@ -71,8 +73,8 @@ export default function Donem() {
         value={mine ? 'mine' : 'all'}
         onChange={(v) => setMine(v === 'mine')}
         options={[
-          { value: 'all', label: 'Tüm öğretmenler' },
           { value: 'mine', label: 'Yalnızca benim' },
+          { value: 'all', label: 'Tüm öğretmenler' },
         ]}
       />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
