@@ -82,11 +82,12 @@ export function TeacherHome() {
   const linked = Boolean(today.data?.teacher);
   // Kadroda olmayan kişide (ör. memur) gözlem ve izin bildirme yok; rehber öğretmen gözlemi yine görür
   const quick: { label: string; icon: IconName; tone: TileTone; to: string }[] = [
-    ...(linked || can('conduct.counsel') ? [{ label: 'Gözlem', icon: 'clipboard-text' as IconName, tone: 'mint' as TileTone, to: '/gozlem' }] : []),
     ...(linked ? [{ label: 'İzin bildir', icon: 'calendar-plus' as IconName, tone: 'peach' as TileTone, to: '/izin' }] : []),
     // Duyurular: yetkisi olan yönetir, olmayan yayındakileri görür
     { label: 'Duyurular', icon: 'megaphone-outline', tone: 'sky', to: '/duyurular' },
     ...(linked ? [{ label: 'Hatırlatma', icon: 'alarm' as IconName, tone: 'sun' as TileTone, to: '/hatirlatmalar' }] : []),
+    // Gözlem alt menüde; yerine sorun bildirme (12)
+    { label: 'Sorun bildir', icon: 'alert-triangle', tone: 'mint', to: '/sorun-bildir' },
   ];
   return (
     <Screen refreshing={today.isRefetching} onRefresh={() => void today.refetch()}>

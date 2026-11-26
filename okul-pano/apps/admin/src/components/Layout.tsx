@@ -1,7 +1,7 @@
 import clsx from 'clsx';
 import { appView, schoolFullName } from '@okulpano/shared';
 import { Building2, CalendarRange, Download, LayoutDashboard, Inbox, Lifebuoy2, ChevronDown, Mail, ChevronRight, ChevronsUpDown, LogOut, Menu, Moon, MonitorSmartphone, School, Sun, X } from './icons.tsx';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth.tsx';
 import { useInternshipAccess, useSchool } from '../lib/data.ts';
@@ -82,6 +82,7 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 
 /** Kenar menüde katlanan grupların adları (tarayıcıda saklanır) */
 const COLLAPSE_KEY = 'okulpano.navCollapsed';
+const SCROLL_KEY = 'okulpano.navScroll';
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { me, can, logout, school: access } = useAuth();
@@ -121,6 +122,43 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       }
       return next;
     });
+  // Menünün kaydırma yeri (9): sayfa yenilenince menü en başa dönmez, kaldığı yerden açılır. Menü öğeleri yetki ve
+  // modül bilgisi geldikçe uzar; kaydedilen yer, menü o yüksekliğe ulaşınca (en geç birkaç saniye içinde) geri konur.
+  const navRef = useRef<HTMLElement>(null);
+  const restored = useRef(false);
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el || restored.current) return;
+    let saved = 0;
+    try {
+      saved = Number(sessionStorage.getItem(SCROLL_KEY)) || 0;
+    } catch {
+      /* tarayıcı depolaması kapalı */
+    }
+    if (!saved) {
+      restored.current = true;
+      return;
+    }
+    el.scrollTop = saved;
+    if (Math.abs(el.scrollTop - saved) < 2) restored.current = true;
+  });
+  useEffect(() => {
+    const t = setTimeout(() => (restored.current = true), 4000);
+    return () => clearTimeout(t);
+  }, []);
+  // Açık sayfa menüde görünmüyorsa görünür yere kaydırılır (ör. başka sekmeden bağlantıyla gelince)
+  useEffect(() => {
+    if (!restored.current) return;
+    navRef.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest' });
+  }, [current]);
+  const saveScroll = (e: React.UIEvent<HTMLElement>) => {
+    if (!restored.current) return;
+    try {
+      sessionStorage.setItem(SCROLL_KEY, String(Math.round(e.currentTarget.scrollTop)));
+    } catch {
+      /* tarayıcı depolaması kapalı */
+    }
+  };
   return (
     <div className="relative flex h-full flex-col overflow-hidden border-r border-slate-200 bg-slate-50 text-slate-600 dark:bg-[#161412]">
 
@@ -134,7 +172,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       <div className="relative px-3 pb-4">
         <SchoolSwitcher />
       </div>
-      <nav className="relative flex-1 space-y-3 overflow-y-auto px-3 pb-4 [scrollbar-width:thin]">
+      <nav ref={navRef} onScroll={saveScroll} className="relative flex-1 space-y-3 overflow-y-auto px-3 pb-4 [scrollbar-width:thin]">
         {/* Telefonda açılan menü: uygulamayı indirme şeridi, altında tam liste */}
         {onNavigate && <PhoneShortcuts />}
         {nav.map((group) => {

@@ -198,7 +198,7 @@ export default function Gozlem() {
                   </Text>
                 </View>
                 <Text style={{ fontSize: 11, fontWeight: '600', color: colors.faint }} numberOfLines={1}>
-                  {st.status === 'absent' ? 'Sürekli devamsız' : st.hidden ? 'Listemde değil' : `No ${st.schoolNo}`}
+                  {st.status === 'absent' ? 'Sürekli devamsız (idare)' : st.hidden ? 'Listemde değil' : `No ${st.schoolNo}`}
                 </Text>
               </Pressable>
             );

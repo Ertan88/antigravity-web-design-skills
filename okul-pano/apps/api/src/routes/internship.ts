@@ -101,13 +101,13 @@ async function areaHeadBranch(deps: AppDeps, req: FastifyRequest): Promise<strin
   return t?.branchId && t.title && /alan\s*şef/.test(t.title.toLocaleLowerCase('tr-TR')) ? t.branchId : null;
 }
 
-/** Bir alanın işletmeleri: alanı o branş olanlar ve koordinatörü o branştan olanlar */
+/** Bir alanın işletmeleri: alanı o branş olanlar; alanı seçilmemişse koordinatörü o branştan olanlar (başka alanın işletmesi girmez) */
 async function areaBusinessIds(deps: AppDeps, schoolId: string, branchId: string): Promise<Set<string>> {
   const rows = await deps.db
     .select({ id: businesses.id })
     .from(businesses)
     .leftJoin(teachers, eq(teachers.id, businesses.coordinatorTeacherId))
-    .where(and(eq(businesses.schoolId, schoolId), or(eq(businesses.areaId, branchId), eq(teachers.branchId, branchId))));
+    .where(and(eq(businesses.schoolId, schoolId), or(eq(businesses.areaId, branchId), and(isNull(businesses.areaId), eq(teachers.branchId, branchId)))));
   return new Set(rows.map((r) => r.id));
 }
 
@@ -136,9 +136,10 @@ async function ownBusinessIds(deps: AppDeps, req: FastifyRequest): Promise<Set<s
 async function roleOf(deps: AppDeps, req: FastifyRequest) {
   const all = isManager(req);
   const designated = !all && req.ctx.teacherId ? (await designatedCoordinators(deps, req)).has(req.ctx.teacherId) : false;
-  // İşaretlenmemiş öğretmen kendi eklediği ya da koordinatörü olduğu işletmeyi de görmez
-  const own = designated ? await ownBusinessIds(deps, req) : new Set<string>();
+  // İşaretlenmemiş öğretmen kendi eklediği ya da koordinatörü olduğu işletmeyi de görmez; alan şefi ise kendisine atanan
+  // işletmeleri (koordinatörü olduğu) her zaman kendi işletmesi olarak görür ve işaretler
   const head = all ? null : await areaHeadBranch(deps, req);
+  const own = designated || head ? await ownBusinessIds(deps, req) : new Set<string>();
   const area = head ? await areaBusinessIds(deps, req.ctx.schoolId, head) : new Set<string>();
   return { all, designated, own, head, area };
 }

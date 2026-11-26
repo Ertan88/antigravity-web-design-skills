@@ -11,9 +11,9 @@ import { schoolFullName, shortTitle } from '@okulpano/shared';
 import { useInternshipAccess, useMyLeaves } from '../../src/data.ts';
 import { useOpenSchool } from '../../src/platform.tsx';
 import { colors, radius, tiles, type TileTone } from '../../src/theme.ts';
-import { Avatar, Badge, BentoRow, Card, Chip, Icon, ListRow, Screen, SectionTitle, Segmented, T, type IconName } from '../../src/ui.tsx';
+import { Avatar, Badge, Card, Chip, Icon, ListRow, Screen, SectionTitle, Segmented, T, type IconName } from '../../src/ui.tsx';
 import { useThemeMode } from '../../src/themeMode.tsx';
-import { useTabBack, useVisibleTabs } from '../../src/tabs.ts';
+import { useTabBack } from '../../src/tabs.ts';
 
 interface Item {
   title: string;
@@ -49,7 +49,6 @@ const CONTENT: { tur: string; title: string; subtitle: string; icon: IconName; p
   { tur: 'books', title: 'Haftanın kitabı', subtitle: 'Kapağı kamerayla çek', icon: 'book-outline', permission: 'highlights.manage' },
 ];
 
-const TILE_CYCLE: TileTone[] = ['sky', 'peach', 'mint', 'lilac', 'sun', 'rose'];
 
 type Tile = { icon: IconName; tone: TileTone };
 /** Menü simgeleri renkli kutuda: önce başlığa, yoksa simge adına göre (her rolün menüsü kendi maddelerini gösterir) */
@@ -65,7 +64,7 @@ const TILE_BY_TITLE: Record<string, Tile> = {
   İşletmeler: { icon: 'factory', tone: 'peach' },
   Öğrenciler: { icon: 'school-outline', tone: 'mint' },
   'Etkinlik geçmişi': { icon: 'history', tone: 'paper' },
-  'Tatil takvimi': { icon: 'beach', tone: 'sun' },
+  'Çalışma takvimi': { icon: 'calendar-week', tone: 'sun' },
   'MEB çalışma takvimi': { icon: 'calendar-number-outline', tone: 'sky' },
   'Destek erişimi': { icon: 'lock-access', tone: 'sun' },
   'Destek erişimi olan okullar': { icon: 'key-outline', tone: 'sun' },
@@ -140,29 +139,6 @@ function ProfileTile({ name, email, school, badges }: { name: string; email: str
 }
 
 /** Menünün öne çıkan bölümündeki renkli kutu: simge, başlık ve kısa açıklama */
-/** Satırda tek başına kalan kutu (wide) yatay dizilir: yazı simgenin yanında */
-function MenuTile({ item, tone, wide }: { item: Item; tone: TileTone; wide?: boolean }) {
-  const t = tiles[tone];
-  const onPress = item.onPress ?? (item.to ? () => router.push(item.to as never) : undefined);
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={[item.title, item.subtitle].filter(Boolean).join(', ')}
-      onPress={onPress}
-      style={({ pressed }) => ({ flex: 1, backgroundColor: t.bg, borderRadius: radius.lg, padding: 14, minHeight: wide ? 64 : 96, gap: 12, flexDirection: wide ? 'row' : 'column', alignItems: wide ? 'center' : 'stretch', opacity: pressed ? 0.88 : 1, transform: [{ scale: pressed ? 0.985 : 1 }] })}
-    >
-      <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: t.chip, alignItems: 'center', justifyContent: 'center' }}>
-        <Icon name={tileFor(item)?.icon ?? item.icon} size={21} color={t.fg} />
-      </View>
-      <View style={{ gap: 3, flex: wide ? 1 : undefined }}>
-        <Text style={{ fontSize: 15, lineHeight: 19, fontWeight: '800', letterSpacing: -0.3, color: t.fg }} numberOfLines={2}>
-          {item.title}
-        </Text>
-      </View>
-    </Pressable>
-  );
-}
-
 /**
  * Menü: role göre bölümler (okul yönetimi, içerik, öğretmen araçları, okul) ve herkes için Hesabım
  * (profil, şifre, bildirimler, çıkış). Alt menüye sığmayan her şey buradadır.
@@ -171,9 +147,7 @@ export default function Menu() {
   const { me, school, role, can, isTeacher, selectSchool, setPlatformMode, signOut, accounts } = useAuth();
   const [accountsOpen, setAccountsOpen] = useState(false);
   const back = useTabBack('profil');
-  // Menü alt menüde olmayan ekranları listeler (alt menüdekiler burada tekrar edilmez)
-  const tabs = useVisibleTabs();
-  const notTab = (t: Parameters<typeof tabs.includes>[0]) => !tabs.includes(t);
+  // Menü bütün ekranları listeler; alt menüde ya da ana sayfanın hızlı işlemlerinde olanlar da burada bulunur (12)
   const openSchool = useOpenSchool();
   const theme = useThemeMode();
   const leaves = useMyLeaves();
@@ -262,13 +236,15 @@ export default function Menu() {
         { title: 'Nöbetlerim', subtitle: 'Bu hafta ve yerine görevlendirmeler', icon: 'shield-checkmark-outline', to: '/nobet' },
       ]);
     add('Pano', [
-      (can('announcements.approve') || can('leaves.manage')) && notTab('onaylar') && { title: 'Onaylar', subtitle: 'Onay bekleyen duyurular ve izinler', icon: 'checkmark-done-outline', to: '/onaylar' },
-      (can('board.control') || can('screens.manage')) && notTab('panolar') && { title: 'Panolar', subtitle: 'Açık / kapalı panolar, uzaktan komut', icon: 'tv-outline', to: '/panolar' },
-      can('announcements.manage') && notTab('duyurular') && { title: 'Duyurular', subtitle: 'Yayındakiler, onay bekleyenler, taslaklar', icon: 'megaphone-outline', to: '/duyurular' },
+      (can('announcements.approve') || can('leaves.manage')) && { title: 'Onaylar', subtitle: 'Onay bekleyen duyurular ve izinler', icon: 'checkmark-done-outline', to: '/onaylar' },
+      (can('board.control') || can('screens.manage')) && { title: 'Panolar', subtitle: 'Açık / kapalı panolar, uzaktan komut', icon: 'tv-outline', to: '/panolar' },
+      can('announcements.manage')
+        ? { title: 'Duyurular', subtitle: 'Yayındakiler, onay bekleyenler, taslaklar', icon: 'megaphone-outline', to: '/duyurular' }
+        : { title: 'Duyurular', subtitle: 'Panoda yayındaki duyurular', icon: 'megaphone-outline', to: '/duyurular' },
       ...content,
     ]);
     add('Takvim ve Ders', [
-      isTeacher && !mine && notTab('program') && { title: 'Ders programım', subtitle: 'Haftalık ders programı', icon: 'time-outline', to: '/programim' },
+      isTeacher && !mine && { title: 'Ders programım', subtitle: 'Haftalık ders programı', icon: 'time-outline', to: '/programim' },
       (managerial || isTeacher) && {
         title: 'Sınav takvimi',
         subtitle: isTeacher && !managerial ? 'Gözetmen olduğunuz ve dersinizin sınavları' : 'Sınıfların yazılı ve ortak sınavları',
@@ -277,15 +253,14 @@ export default function Menu() {
       },
       can('schedule.manage') && { title: 'Zil saatleri', subtitle: 'Eğitim düzeni, günün zili, zil düzenleri', icon: 'notifications-outline', to: '/zil-saatleri' },
       !managerial && { title: 'Sınavlar ve etkinlikler', subtitle: 'Yaklaşan sınav ve etkinlikler', icon: 'school-outline', to: '/yaklasanlar' },
-      { title: 'Tatil takvimi', subtitle: 'MEB takvimi, ara tatil, bayramlar', icon: 'sunny-outline', to: '/tatiller' },
+      { title: 'Çalışma takvimi', subtitle: 'Ders günleri, ara tatiller, bayramlar', icon: 'calendar-week', to: '/tatiller' },
       isTeacher && { title: 'Telefon takvimine ekle', subtitle: 'Nöbetler ve sınavlar takviminize', icon: 'calendar-outline', to: '/takvime-ekle' },
     ]);
     add('Personel', [
-      notTab('nobet') &&
-        (isTeacher && !mine
-          ? { title: 'Nöbetlerim', subtitle: 'Bu hafta ve yerine görevlendirmeler', icon: 'shield-checkmark-outline', to: '/nobet' }
-          : can('duties.manage') && { title: 'Nöbet çizelgesi', subtitle: 'Bugünkü nöbetçiler ve haftalık çizelge', icon: 'shield-checkmark-outline', to: '/nobet?g=cizelge' }),
-      can('duties.manage') && notTab('gorevlendirme') && { title: 'Ders görevlendirme', subtitle: 'İzinli öğretmenin dersleri ve nöbet yeri', icon: 'people-outline', to: '/gorevlendirme' },
+      isTeacher && !mine
+        ? { title: 'Nöbetlerim', subtitle: 'Bu hafta ve yerine görevlendirmeler', icon: 'shield-checkmark-outline', to: '/nobet' }
+        : can('duties.manage') && { title: 'Nöbet çizelgesi', subtitle: 'Bugünkü nöbetçiler ve haftalık çizelge', icon: 'shield-checkmark-outline', to: '/nobet?g=cizelge' },
+      can('duties.manage') && { title: 'Ders görevlendirme', subtitle: 'İzinli öğretmenin dersleri ve nöbet yeri', icon: 'people-outline', to: '/gorevlendirme' },
       can('directory.manage') && { title: 'Öğretmen kadrosu', subtitle: 'Ad, branş, görev, iletişim · ekle, düzenle', icon: 'school-outline', to: '/kadro' },
       isTeacher && {
         title: role === 'teacher' ? 'İzinlerim' : 'İzin bildir',
@@ -295,7 +270,7 @@ export default function Menu() {
       },
     ]);
     add('Öğrenci takibi', [
-      (managerial || isTeacher || counsel) && notTab('gozlem') && { title: 'Gözlem', subtitle: 'Öğrencilere artı / eksi, öğrenci kartları', icon: 'clipboard-outline', to: '/gozlem' },
+      (managerial || isTeacher || counsel) && { title: 'Gözlem', subtitle: 'Öğrencilere artı / eksi, öğrenci kartları', icon: 'clipboard-outline', to: '/gozlem' },
       (managerial || counsel) && { title: 'Rehberlik uyarıları', subtitle: 'Kısa sürede çok eksi alan öğrenciler', icon: 'heart-outline', to: '/rehberlik' },
       { title: 'Doğum günleri', subtitle: 'Bugün doğum günü olan öğrenciler', icon: 'gift-outline', to: '/dogum-gunleri' },
     ]);
@@ -333,8 +308,7 @@ export default function Menu() {
 
   const schoolChoices = role === 'platform' ? [] : (me?.schools ?? []);
 
-  // Rolün ilk bölümü renkli kutular hâlinde (en sık kullanılanlar; tek kalan kutu tam genişlikte), geri kalanı liste
-  const [featured, ...rest] = sections;
+  // Bütün bölümler aynı liste düzeninde (12): ilk bölüm de kutu kutu değil
 
   return (
     <Screen title="Menü" back={back}>
@@ -378,20 +352,7 @@ export default function Menu() {
         </>
       )}
 
-      {featured && featured !== sections[sections.length - 1] && (
-        <View style={{ gap: 10 }}>
-          <SectionTitle>{featured.title}</SectionTitle>
-          {Array.from({ length: Math.ceil(featured.items.length / 2) }, (_, r) => featured.items.slice(r * 2, r * 2 + 2)).map((row, r) => (
-            <BentoRow key={r}>
-              {row.map((it, j) => (
-                <MenuTile key={it.title} item={it} tone={TILE_CYCLE[(r * 2 + j) % TILE_CYCLE.length]} wide={row.length === 1} />
-              ))}
-            </BentoRow>
-          ))}
-        </View>
-      )}
-
-      {(featured === sections[sections.length - 1] ? sections : rest).map((s) => (
+      {sections.map((s) => (
         <View key={s.title} style={{ gap: 6 }}>
           <SectionTitle>{s.title}</SectionTitle>
           <Card style={{ paddingVertical: 4, gap: 0 }}>

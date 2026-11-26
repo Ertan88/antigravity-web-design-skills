@@ -120,16 +120,25 @@ export default function StudentCard() {
             <Text style={{ fontSize: 14, fontWeight: '800', color: colors.ink }}>Öğrencinin durumu</Text>
             <T size={13} color={colors.muted}>
               {d.student.status === 'absent'
-                ? 'Sürekli devamsız: bütün kullanıcılarda soluk, artı ve eksi verilemez.'
+                ? 'İdare "Sürekli devamsız" olarak işaretledi: bütün kullanıcılarda soluk, artı ve eksi verilemez.'
                 : d.student.status === 'left'
-                  ? 'Okuldan ayrıldı: listelerde görünmez.'
+                  ? 'İdare "Okuldan ayrıldı" olarak işaretledi: listelerde görünmez.'
                   : d.student.hidden
                     ? 'Listenizden çıkardınız: yalnızca sizde soluk, artı ve eksi veremezsiniz.'
                     : 'Etkin'}
             </T>
-            <Button variant="secondary" icon={d.student.hidden ? 'eye-outline' : 'eye-off-outline'} loading={busy} onPress={() => void toggleHidden()}>
-              {d.student.hidden ? 'Listeme geri al' : 'Listemden çıkar'}
-            </Button>
+            {/* İdarenin işaretlediği öğrencide "Listeme geri al" olmaz (11): durumu yalnızca idare değiştirir */}
+            {(d.student.status ?? 'active') === 'active' ? (
+              <Button variant="secondary" icon={d.student.hidden ? 'eye-outline' : 'eye-off-outline'} loading={busy} onPress={() => void toggleHidden()}>
+                {d.student.hidden ? 'Listeme geri al' : 'Listemden çıkar'}
+              </Button>
+            ) : (
+              !d.canSetStatus && (
+                <T size={12} color={colors.faint}>
+                  Durumu yalnızca idare değiştirebilir.
+                </T>
+              )
+            )}
             {d.canSetStatus && (
               <>
                 <T size={12} color={colors.faint}>

@@ -41,9 +41,9 @@ import {
   Card,
   DELETE_TONE,
   DeleteButton,
+  EditButton,
   EmptyState,
   Field,
-  IconButton,
   Input,
   Modal,
   MonthPicker,
@@ -1541,18 +1541,11 @@ export function Businesses() {
                   </Button>
                 </Td>
                 <Td className="text-right whitespace-nowrap">
-                  {/* Düzenle ve sil yan yana (projenin satır işlemleri düzeni); adına tıklayınca bilgi penceresi açılır */}
-                  {b.canEdit && (
-                    <IconButton tone="edit" label="Düzenle" onClick={() => setEditing(b)}>
-                      <Pencil className="size-4" />
-                    </IconButton>
-                  )}
-                  {b.canManage && (
-                    <DeleteButton
-                      onConfirm={() => remove.mutate(b.id)}
-                      what={`${b.name} işletmesi`}
-                    />
-                  )}
+                  {/* Düzenle ve sil yan yana, ortak satır düzeninde (CrudPage gibi aralıklı); adına tıklayınca bilgi penceresi açılır */}
+                  <div className="flex items-center justify-end gap-1.5">
+                    {b.canEdit && <EditButton onClick={() => setEditing(b)} />}
+                    {b.canManage && <DeleteButton onConfirm={() => remove.mutate(b.id)} what={`${b.name} işletmesi`} />}
+                  </div>
                 </Td>
               </tr>
             ))}

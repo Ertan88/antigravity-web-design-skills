@@ -2,11 +2,11 @@ import { mondayOf, trDate } from "@okulpano/shared";
 import { useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, FileDown } from "../components/icons.tsx";
+import { ChevronLeft, ChevronRight, FileDown, Printer } from "../components/icons.tsx";
 import { useToast } from "../components/Toast.tsx";
 import { Link, useNavigate } from "react-router-dom";
 import { choose } from "../components/confirm.tsx";
-import { Alert, Button, MonthPicker, PageHeader, Spinner } from "../components/ui.tsx";
+import { Alert, Button, MonthPicker, PageHeader, Select, Spinner } from "../components/ui.tsx";
 import { api, fetchBlob, saveBlob } from "../lib/api.ts";
 import { useAuth } from "../lib/auth.tsx";
 import { useSchoolPath } from "../lib/data.ts";
@@ -15,6 +15,33 @@ import { useSchoolPath } from "../lib/data.ts";
  * İşletmelerde mesleki eğitim formları: günlük rehberlik formu (hafta), aylık devam-devamsızlık çizelgesi ve aylık
  * rehberlik raporu (ay). Görev tarihleri işletmenin görev gününden gelir; PDF'te her form A5, ikisi bir A4'te.
  */
+
+const NO_COORD = "__none__";
+
+/**
+ * PDF'yi yazdırma penceresiyle açar: görünmez bir çerçevede yüklenir, tarayıcının yazdır penceresi açılır. Tarayıcı
+ * çerçeveden yazdırmaya izin vermezse PDF yeni sekmede açılır (oradan yazdırılır).
+ */
+function printBlob(blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const frame = document.createElement("iframe");
+  frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+  frame.src = url;
+  frame.onload = () => {
+    try {
+      frame.contentWindow?.focus();
+      frame.contentWindow?.print();
+    } catch {
+      window.open(url, "_blank", "noopener");
+    }
+    // Yazdır penceresi kapanınca çerçeve ve bellek bırakılır
+    setTimeout(() => {
+      frame.remove();
+      URL.revokeObjectURL(url);
+    }, 60_000);
+  };
+  document.body.appendChild(frame);
+}
 
 export const VISIT_DAYS = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
 const VISIT_SHORT = ["Pt", "Sa", "Ça", "Pe", "Cu"];
@@ -136,12 +163,17 @@ export function InternshipForms() {
     setPicked(new Set(items.filter((b) => usable(b) && !b.holiday).map((b) => b.id)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
-  const shown = items.filter(usable).sort((a, b) => (daily ? (a.date ?? '').localeCompare(b.date ?? '') : 0));
+  // Koordinatör öğretmene göre süzme (1): seçilen öğretmenin işletmeleri önizlenir ve yazdırılır
+  const [coord, setCoord] = useState("");
+  const coordNames = [...new Set(items.filter(usable).map((b) => b.coordinatorName ?? ""))].sort((a, b) => a.localeCompare(b, "tr"));
+  // Form türü ya da dönem değişince seçili öğretmenin işletmesi kalmadıysa hepsi gösterilir
+  const coordOn = coord && coordNames.includes(coord === NO_COORD ? "" : coord) ? coord : "";
+  const shown = items.filter((b) => usable(b) && (!coordOn || (b.coordinatorName ?? "") === (coordOn === NO_COORD ? "" : coordOn))).sort((a, b) => (daily ? (a.date ?? '').localeCompare(b.date ?? '') : 0));
   const noDay = attendance ? 0 : items.filter((b) => !b.visitWeekday).length;
   const chosen = shown.filter((b) => picked.has(b.id));
   const formCount =
     type === "attendance" ? chosen.reduce((n, b) => n + Math.max(1, Math.ceil(b.students / 5)), 0) : chosen.length;
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"download" | "print" | null>(null);
   const period = daily ? `week=${week}` : `month=${month}`;
   const pdfPath = `${path}/forms.pdf?type=${type}&${period}&ids=${chosen.map((b) => b.id).join(",")}`;
   const label = daily
@@ -190,7 +222,7 @@ export function InternshipForms() {
   }, [open]);
   const current = preview && preview.key === pdfPath && formCount ? preview : null;
 
-  const download = async () => {
+  const output = async (mode: "download" | "print") => {
     // Devam çizelgesinde boş kalacak günler: kontrol edilmemişler ve ay bitmediyse bugünden sonrası
     if (attendance) {
       const halves = chosen.reduce((n, b) => n + (b.unchecked?.halves ?? 0), 0);
@@ -217,14 +249,16 @@ export function InternshipForms() {
         if (c !== "print") return;
       }
     }
-    setBusy(true);
+    setBusy(mode);
     try {
       // Önizlemedeki dosya güncelse yeniden üretilmez
-      saveBlob(current ? current.blob : await fetchBlob(pdfPath), `${label}.pdf`);
+      const blob = current ? current.blob : await fetchBlob(pdfPath);
+      if (mode === "download") saveBlob(blob, `${label}.pdf`);
+      else printBlob(blob);
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
@@ -234,9 +268,14 @@ export function InternshipForms() {
         title="Formlar"
         description="Günlük rehberlik formu, aylık devam çizelgesi ve aylık rehberlik raporu. Her form A5 boyutundadır; iki form bir A4 kâğıda sığar. Yazdırırken ölçeği “Gerçek boyut” (%100) seçin."
         actions={
-          <Button icon={<FileDown className="size-4" />} loading={busy} disabled={!formCount} onClick={() => void download()}>
-            İndir{formCount ? ` · ${formCount} form, ${Math.ceil(formCount / 2)} sayfa` : ""}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" icon={<Printer className="size-4" />} loading={busy === "print"} disabled={!formCount || Boolean(busy)} onClick={() => void output("print")}>
+              Yazdır
+            </Button>
+            <Button icon={<FileDown className="size-4" />} loading={busy === "download"} disabled={!formCount || Boolean(busy)} onClick={() => void output("download")}>
+              İndir{formCount ? ` · ${formCount} form, ${Math.ceil(formCount / 2)} sayfa` : ""}
+            </Button>
+          </div>
         }
       />
       <div className="grid gap-5 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
@@ -266,6 +305,19 @@ export function InternshipForms() {
         ) : (
           <div className="w-60">
             <MonthPicker value={month} onChange={setMonth} />
+          </div>
+        )}
+
+        {coordNames.length > 1 && (
+          <div className="w-72 max-w-full">
+            <Select value={coordOn} onChange={(e) => setCoord(e.target.value)} aria-label="Koordinatör öğretmen">
+              <option value="">Bütün koordinatörler</option>
+              {coordNames.map((n) => (
+                <option key={n || NO_COORD} value={n || NO_COORD}>
+                  {n || "Koordinatörü seçilmemiş"}
+                </option>
+              ))}
+            </Select>
           </div>
         )}
 

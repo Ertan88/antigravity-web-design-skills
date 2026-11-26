@@ -304,15 +304,21 @@ function StudentCard({ studentId, month, criteria, onClose, readOnly }: { studen
                 <div className="font-extrabold">Öğrencinin durumu</div>
                 <div className="text-slate-500">
                   {d.student.status === 'absent'
-                    ? 'Sürekli devamsız: bütün kullanıcılarda soluk, gözlem girilmez.'
-                    : d.student.hidden
-                      ? 'Listenizden çıkardınız: yalnızca sizde soluk, gözlem girilmez.'
-                      : 'Etkin'}
+                    ? 'İdare "Sürekli devamsız" olarak işaretledi: bütün kullanıcılarda soluk, gözlem girilmez.'
+                    : d.student.status === 'left'
+                      ? 'İdare "Okuldan ayrıldı" olarak işaretledi: listelerde görünmez.'
+                      : d.student.hidden
+                        ? 'Listenizden çıkardınız: yalnızca sizde soluk, gözlem girilmez.'
+                        : 'Etkin'}
+                  {(d.student.status ?? 'active') !== 'active' && !d.canSetStatus && ' Durumu yalnızca idare değiştirebilir.'}
                 </div>
               </div>
-              <Button variant="secondary" size="sm" loading={hide.isPending} onClick={() => hide.mutate(!d.student.hidden)}>
-                {d.student.hidden ? 'Listeme geri al' : 'Listemden çıkar'}
-              </Button>
+              {/* İdarenin işaretlediği öğrencide "Listeme geri al" olmaz: durumu yalnızca idare değiştirir */}
+              {(d.student.status ?? 'active') === 'active' && (
+                <Button variant="secondary" size="sm" loading={hide.isPending} onClick={() => hide.mutate(!d.student.hidden)}>
+                  {d.student.hidden ? 'Listeme geri al' : 'Listemden çıkar'}
+                </Button>
+              )}
               {d.canSetStatus && (
                 <Select
                   value={d.student.status ?? 'active'}

@@ -1,6 +1,7 @@
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Platform } from 'react-native';
 import { storage } from './storage.ts';
+import { pacedUpload } from '@okulpano/shared/uploadPace';
 
 /**
  * Sunucu adresi kuruluma göre değişir (SaaS): girişte yazılır ve saklanır. Varsayılan, derleme sırasında
@@ -255,12 +256,13 @@ function sendForm(path: string, form: FormData, onProgress?: (p: UploadProgress)
     xhr.open('POST', `${server}${path}`);
     if (accessToken) xhr.setRequestHeader('authorization', `Bearer ${accessToken}`);
     xhr.timeout = 90_000;
-    if (onProgress) {
-      onProgress({ phase: 'upload', percent: 0 });
+    // Yüzde ekranda okunabilsin diye en az ~1,2 sn gösterilir (bkz. pacedUpload)
+    const pace = onProgress ? pacedUpload(onProgress) : null;
+    if (pace) {
       xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable && e.total > 0) onProgress({ phase: 'upload', percent: Math.min(100, Math.round((e.loaded / e.total) * 100)) });
+        if (e.lengthComputable && e.total > 0) pace.progress(Math.round((e.loaded / e.total) * 100));
       };
-      xhr.upload.onload = () => onProgress({ phase: 'reading' });
+      xhr.upload.onload = () => pace.sent();
     }
     xhr.onload = () => {
       let json: { message?: string } | null = null;
@@ -269,10 +271,18 @@ function sendForm(path: string, form: FormData, onProgress?: (p: UploadProgress)
       } catch {
         json = null;
       }
-      resolve({ status: xhr.status, json });
+      if (!pace) return resolve({ status: xhr.status, json });
+      pace.sent();
+      void pace.ready().then(() => resolve({ status: xhr.status, json }));
     };
-    xhr.onerror = () => reject(new Error('network'));
-    xhr.ontimeout = () => reject(new Error('timeout'));
+    xhr.onerror = () => {
+      pace?.stop();
+      reject(new Error('network'));
+    };
+    xhr.ontimeout = () => {
+      pace?.stop();
+      reject(new Error('timeout'));
+    };
     xhr.send(form);
   });
 }

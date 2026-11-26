@@ -87,6 +87,18 @@ export function Timetable() {
     return m;
   }, [entries.data, mode, activeClass, activeTeacher]);
 
+  // Günün son dersi (7): 10 ve 11 derslik günler bir arada olunca 10 derslik günde 11. saat ders yeri sayılmaz. Sınıfta
+  // sınıfın o günkü son dersi; sınıfın o gün dersi yoksa ya da öğretmen görünümünde okulun o günkü son dersi
+  const dayEnd = useMemo(() => {
+    const school = new Map<number, number>();
+    const own = new Map<number, number>();
+    for (const e of entries.data ?? []) {
+      school.set(e.weekday, Math.max(school.get(e.weekday) ?? 0, e.periodNo));
+      if (mode === 'class' && e.classGroupId === activeClass) own.set(e.weekday, Math.max(own.get(e.weekday) ?? 0, e.periodNo));
+    }
+    return (d: number) => own.get(d) ?? school.get(d) ?? Infinity;
+  }, [entries.data, mode, activeClass]);
+
   const subjects = useMemo(() => [...new Set((entries.data ?? []).map((e) => e.subject))].sort((a, b) => a.localeCompare(b, 'tr')), [entries.data]);
 
   const save = useMutation({
@@ -323,12 +335,13 @@ export function Timetable() {
                       const list = lookup.get(`${d}-${p.no}`) ?? [];
                       const e = list[0];
                       const lines = cellLines(list, teacherNames);
+                      const beyond = !e && p.no > dayEnd(d);
                       return (
                         <td key={d} className="p-0 align-top">
                           <div
                             className={clsx(
                               'group relative flex h-full min-h-16 w-full flex-col justify-center gap-1 rounded-lg px-2.5 py-1.5 text-left',
-                              e ? 'bg-brand-50 ring-1 ring-brand-100' : 'items-center bg-slate-50 ring-1 ring-slate-100',
+                              e ? 'bg-brand-50 ring-1 ring-brand-100' : beyond ? 'items-center' : 'items-center bg-slate-50 ring-1 ring-slate-100',
                             )}
                           >
                             {e ? (
@@ -369,7 +382,11 @@ export function Timetable() {
                             ) : (
                               editable &&
                               mode === 'class' && (
-                                <IconButton label="Ders ekle" className="size-8 text-slate-400 hover:bg-surface hover:text-brand-600" onClick={() => openCell(d, p)}>
+                                <IconButton
+                                  label="Ders ekle"
+                                  className={clsx('size-8 text-slate-400 hover:bg-surface hover:text-brand-600', beyond && 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100')}
+                                  onClick={() => openCell(d, p)}
+                                >
                                   <Plus className="size-4" />
                                 </IconButton>
                               )

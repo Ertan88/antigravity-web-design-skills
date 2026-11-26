@@ -446,6 +446,21 @@ describe('mesleki eğitim yetkileri: yönetim, işaretli koordinatör, alan şef
     expect(list.every((x) => !x.canEdit)).toBe(true);
   });
 
+  it('alan şefi kendisine atanan işletmeyi (koordinatör listesinden çıkarılsa da) kendi işletmesi olarak görür; başka alanın işletmesi görünmez', async () => {
+    const teachersList = (await owner.get(`${base}/teachers`)).json() as { id: string; fullName: string }[];
+    const headId = teachersList.find((x) => x.fullName.toLocaleLowerCase('tr-TR').includes('alan şef'))!.id;
+    const before = ((await owner.get(`${base}/internship/coordinators`)).json().teachers as { id: string; designated: boolean }[]).filter((x) => x.designated).map((x) => x.id);
+    expectStatus(await owner.put(`${base}/internship/coordinators`, { teacherIds: [...before, headId] }), 200);
+    const own = (await owner.post(`${base}/internship/businesses`, { name: 'Şef Atölyesi', coordinatorTeacherId: headId })).json().id as string;
+    // Koordinatör listesinden çıkarıldı; işletme ona atanmış kalır
+    expectStatus(await owner.put(`${base}/internship/coordinators`, { teacherIds: before }), 200);
+    const head = client(t.app, (await login(t.app, 'alan-sefi@meslek.test', 'GizliSifre42')).token);
+    const list = (await head.get(`${base}/internship/businesses`)).json() as { id: string; name: string; canEdit: boolean }[];
+    expect(list.find((x) => x.id === own)).toMatchObject({ canEdit: true });
+    expect(list.filter((x) => x.id !== own).every((x) => !x.canEdit)).toBe(true);
+    expectStatus(await owner.del(`${base}/internship/businesses/${own}`), 200);
+  });
+
   it('teknik program: staj tarihleri arasında okul günü yoktur, dışında ders programı geçerlidir', async () => {
     // 12-A pazartesi okulda (5 Ekim). Staj 1-31 Aralık: Aralık pazartesileri işletme günü, Kasım değişmez
     expectStatus(await owner.patch(base, { settings: { internshipTechnical: { classIds: [classId], start: '2026-12-01', end: '2026-12-31' } } }), 200);

@@ -54,7 +54,7 @@ const monthKey = (iso: string) => iso.slice(0, 7);
 const monthTitle = (iso: string) => dayTitle(`${iso.slice(0, 7)}-01`, { month: 'long', year: 'numeric' }).toLocaleUpperCase('tr-TR');
 const weekdayShort = (iso: string) => dayTitle(iso, { weekday: 'short' }).toLocaleUpperCase('tr-TR');
 
-/** Tatil takvimi (A): sıradaki tatile geri sayım; altında aylara ayrılmış tatiller, arifeler ve olası köprü günleri */
+/** Çalışma takvimi (A): sıradaki tatile geri sayım; altında aylara ayrılmış tatiller, arifeler ve olası köprü günleri */
 export default function Tatiller() {
   const q = useUpcomingHolidays();
   const today = localIso();
@@ -74,7 +74,7 @@ export default function Tatiller() {
   }
 
   return (
-    <Screen back title="Tatil takvimi" refreshing={q.isRefetching} onRefresh={() => void q.refetch()}>
+    <Screen back title="Çalışma takvimi" refreshing={q.isRefetching} onRefresh={() => void q.refetch()}>
       <ErrorNote error={q.error} />
       {q.isLoading ? (
         <Loading />

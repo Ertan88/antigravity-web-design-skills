@@ -2,6 +2,7 @@
  * API istemcisi. Erişim anahtarı yalnızca bellekte tutulur (XSS'e karşı); yenileme anahtarı
  * httpOnly çerezdedir. 401 alınırsa bir kez sessizce yenilenir ve istek tekrarlanır.
  */
+import { pacedUpload } from '@okulpano/shared';
 
 let accessToken: string | null = null;
 let refreshing: Promise<boolean> | null = null;
@@ -55,24 +56,32 @@ function sendWithProgress(path: string, method: string, form: FormData, onProgre
     xhr.open(method, path);
     xhr.withCredentials = true;
     if (accessToken) xhr.setRequestHeader('authorization', `Bearer ${accessToken}`);
-    onProgress({ phase: 'upload', percent: 0 });
+    // Yüzde ekranda okunabilsin diye en az ~1,2 sn gösterilir (bkz. pacedUpload)
+    const pace = pacedUpload(onProgress);
     xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) onProgress({ phase: 'upload', percent: Math.min(100, Math.round((e.loaded / e.total) * 100)) });
+      if (e.lengthComputable && e.total > 0) pace.progress(Math.round((e.loaded / e.total) * 100));
     };
     // Gönderim bitti: sunucu dosyayı okuyor (ne kadar süreceği bilinemez)
-    xhr.upload.onload = () => onProgress({ phase: 'reading' });
-    xhr.onload = () =>
-      resolve({
-        status: xhr.status,
-        json: async () => {
-          try {
-            return JSON.parse(xhr.responseText) as unknown;
-          } catch {
-            return null;
-          }
-        },
-      });
-    xhr.onerror = () => reject(new Error('network'));
+    xhr.upload.onload = () => pace.sent();
+    xhr.onload = () => {
+      pace.sent();
+      void pace.ready().then(() =>
+        resolve({
+          status: xhr.status,
+          json: async () => {
+            try {
+              return JSON.parse(xhr.responseText) as unknown;
+            } catch {
+              return null;
+            }
+          },
+        }),
+      );
+    };
+    xhr.onerror = () => {
+      pace.stop();
+      reject(new Error('network'));
+    };
     xhr.send(form);
   });
 }
