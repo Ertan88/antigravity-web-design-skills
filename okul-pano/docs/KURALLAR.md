@@ -136,14 +136,6 @@ kalır; burada tekrarlanmaz.
 
 ## 3. Tasarım sistemi
 
-### Takvim: ders olmayan günler
-- MEB takviminde derslerin başladığı günden önceki (1 Eylül'den itibaren) ve ders yılının bitişinden yaz tatiline
-  kadarki günler `LESSON_FREE` ("Mesleki Çalışma Dönemi") olarak tatil listesine girer: zil, nöbet, ders
-  görevlendirme, servis nöbeti, staj ve pano bildirimleri bu günleri tatil sayar. Tatil listelerinde gösterilmez;
-  öğretmen izinlerinde iş günüdür. Ekranlarda "Bugün tatil" değil "Bugün ders yok" yazar; pano ortada "Dersler …
-  başlıyor" / "Ders yılı sona erdi" gösterir. Tarihe bağlı yeni her özellik bu listeyi (`holidaysInRange`) kullanır.
-- Nöbet çizelgesi Excel'i ders dönemi dışındaki tarihleri yazmaz; dönem içi tam gün tatil tarihiyle ve adıyla yazılır.
-
 ### 3.1 Renk, tema ve katman
 - Renkler yalnızca belirteçlerden gelir: web'de Tailwind belirteçleri (`apps/admin`), mobilde `colors` ve `tiles`
   (`mobile/src/theme.ts`). Bileşenin içine sabit renk yazılmaz. Acil durum kırmızısı gibi temadan bağımsız
@@ -257,6 +249,13 @@ Zayıf TV işlemcilerinde edinilen dersler:
   kursu (DYK), Mesleki Eğitim Merkezi, birden çok bina, izinli öğretmen.
 - Varsayılanlar çoğu okula uyar; seyrek ihtiyaçlar gizlenir ama kaldırılmaz (ör. hafta sonu günleri, "Yalnızca bazı
   sınıflar").
+
+- MEB takviminde derslerin başladığı günden önceki (1 Eylül'den itibaren) ve ders yılının bitişinden yaz tatiline
+  kadarki günler `LESSON_FREE` ("Mesleki Çalışma Dönemi") olarak tatil listesine girer: zil, nöbet, ders
+  görevlendirme, servis nöbeti, staj ve pano bildirimleri bu günleri tatil sayar. Tatil listelerinde gösterilmez;
+  öğretmen izinlerinde iş günüdür. Ekranlarda "Bugün tatil" değil "Bugün ders yok" yazar; pano ortada "Dersler …
+  başlıyor" / "Ders yılı sona erdi" gösterir. Tarihe bağlı yeni her özellik bu listeyi (`holidaysInRange`) kullanır.
+- Nöbet çizelgesi Excel'i ders dönemi dışındaki tarihleri yazmaz; dönem içi tam gün tatil tarihiyle ve adıyla yazılır.
 
 ---
 
