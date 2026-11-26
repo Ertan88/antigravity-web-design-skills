@@ -1,3 +1,4 @@
+import { INTERN_END_REASONS, type InternEndReason } from "@okulpano/shared";
 import { errorText } from "@okulpano/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
@@ -43,6 +44,8 @@ interface Period {
   startDate: string | null;
   endDate: string | null;
   current: boolean;
+  /** Bu işletmeden ayrılma nedeni */
+  endReason?: string | null;
   totals: Totals;
 }
 interface Event {
@@ -184,30 +187,13 @@ export default function InternRecord() {
   const s = d?.student;
   const b = d?.business;
 
-  const leave = async () => {
-    if (!d || !b) return;
-    const ok = await confirm({
-      title: `${d.student.fullName} işletmeden çıkarılsın mı?`,
-      message: `${b.name} için son gün dün (${shortDate(addDays(d.today, -1))}) olur. Geçmiş devam işaretleri silinmez; o işletmenin çizelgesinde kalır.`,
-      confirmLabel: "Çıkar",
-      tone: "danger",
-    });
-    if (!ok) return;
-    setError(null);
-    try {
-      await api(assignPath, {
-        method: "POST",
-        body: { studentIds: [d.student.id], businessId: null, from: d.today },
-      });
-      void qc.invalidateQueries({
-        predicate: (x) =>
-          x.queryKey[0] === school?.id &&
-          String(x.queryKey[1] ?? "").startsWith("internship"),
-      });
-      router.back();
-    } catch (e) {
-      setError(errorText(e, "Çıkarılamadı"));
-    }
+  // İşletme değiştir: taşı ya da çıkar (tarih ve neden), webdeki pencerenin aynısı
+  const change = () => {
+    if (!d) return;
+    router.push({
+      pathname: "/stajyer/tasi",
+      params: { id: d.student.id, ad: d.student.fullName, isletme: b?.id ?? "", isletmeAd: b?.name ?? "" },
+    } as never);
   };
 
   const merged = d ? mergeHalves(d.events) : [];
@@ -345,6 +331,7 @@ export default function InternRecord() {
                   </View>
                   <T size={12.5} color={colors.faint}>
                     {periodText(p, d.yearStart)}
+                    {p.endReason && INTERN_END_REASONS[p.endReason as InternEndReason] ? ` · ${INTERN_END_REASONS[p.endReason as InternEndReason]}` : ""}
                   </T>
                   <T size={12.5} color={colors.muted}>
                     {p.coordinatorName
@@ -455,12 +442,12 @@ export default function InternRecord() {
           {d.editable && b && (
             <View style={{ alignItems: "flex-start", marginTop: 4 }}>
               <Button
-                variant="delete"
+                variant="secondary"
                 size="sm"
-                icon="remove-circle-outline"
-                onPress={() => void leave()}
+                icon="swap-horizontal-outline"
+                onPress={change}
               >
-                İşletmeden çıkar
+                İşletme değiştir
               </Button>
             </View>
           )}

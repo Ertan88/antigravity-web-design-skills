@@ -32,6 +32,7 @@ import {
   vocationalLessonShare,
   isMesem,
   internAssignSchema,
+  INTERN_END_REASONS,
   parseClassName,
   compareClassNames,
   areaShort,
@@ -117,6 +118,9 @@ function requireModule(req: FastifyRequest) {
 }
 
 const today = (req: FastifyRequest) => zonedParts(new Date(), req.ctx.school.timezone).isoDate;
+
+/** "1 Aralık" */
+const trDay = (iso: string) => new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));
 
 const dateText = (iso: string) =>
   new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', weekday: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));
@@ -337,7 +341,7 @@ type Tx = Parameters<Parameters<AppDeps['db']['transaction']>[0]>[0];
  * yeni işletmede `from` ile başlayan dönem açılır (öğrencinin ilk işletmesiyse başlangıç boş kalır: yılın başından). Aynı gün ya da daha önce başlamış açık dönem silinir (yanlış atama
  * düzeltmesi). Öğrencinin şu anki işletmesi (students.businessId) de güncellenir.
  */
-async function moveStudents(tx: Tx, schoolId: string, studentIds: string[], businessId: string | null, from: string) {
+async function moveStudents(tx: Tx, schoolId: string, studentIds: string[], businessId: string | null, from: string, reason: string | null = null) {
   if (!studentIds.length) return;
   const [open, current] = await Promise.all([
     tx
@@ -366,15 +370,79 @@ async function moveStudents(tx: Tx, schoolId: string, studentIds: string[], busi
     }
     if (p) {
       if (p.startDate && p.startDate >= from) await tx.delete(internshipPeriods).where(eq(internshipPeriods.id, p.id));
-      else await tx.update(internshipPeriods).set({ endDate: addIsoDays(from, -1) }).where(eq(internshipPeriods.id, p.id));
+      else await tx.update(internshipPeriods).set({ endDate: addIsoDays(from, -1), endReason: reason }).where(eq(internshipPeriods.id, p.id));
     } else if (st.businessId && st.businessId !== businessId) {
       // Dönemi tutulmamış eski atama: eski işletmedeki süre kaybolmasın (başlangıcı bilinmiyor)
-      await tx.insert(internshipPeriods).values({ schoolId, studentId: st.id, businessId: st.businessId, startDate: null, endDate: addIsoDays(from, -1) });
+      await tx.insert(internshipPeriods).values({ schoolId, studentId: st.id, businessId: st.businessId, startDate: null, endDate: addIsoDays(from, -1), endReason: reason });
       known.add(st.id);
     }
     if (businessId) await tx.insert(internshipPeriods).values({ schoolId, studentId: st.id, businessId, startDate: known.has(st.id) ? from : null });
   }
   await tx.update(students).set({ businessId }).where(and(eq(students.schoolId, schoolId), inArray(students.id, studentIds)));
+}
+
+/** İşletmelerin alanı: işletmenin alanı, seçilmemişse koordinatörünün branşı */
+async function businessAreas(deps: AppDeps, schoolId: string, ids: string[]): Promise<Map<string, string | null>> {
+  if (!ids.length) return new Map();
+  const rows = await deps.db
+    .select({ id: businesses.id, areaId: businesses.areaId, branchId: teachers.branchId })
+    .from(businesses)
+    .leftJoin(teachers, eq(teachers.id, businesses.coordinatorTeacherId))
+    .where(and(eq(businesses.schoolId, schoolId), inArray(businesses.id, ids)));
+  return new Map(rows.map((r) => [r.id, r.areaId ?? r.branchId ?? null]));
+}
+
+/**
+ * Yerleştirilmeyi bekleyenler: işletmeden çıkarılmış (en az bir işletme dönemi olan), şu an işletmesi olmayan ve
+ * okuldan ayrılmamış öğrenciler; son işletmesi, alanı, çıkış tarihi ve nedeni ile.
+ */
+async function unplacedStudents(deps: AppDeps, schoolId: string) {
+  const rows = await deps.db
+    .select({
+      id: students.id,
+      fullName: students.fullName,
+      schoolNo: students.schoolNo,
+      classId: students.classGroupId,
+      className: classGroups.name,
+      periodBusinessId: internshipPeriods.businessId,
+      businessName: businesses.name,
+      endDate: internshipPeriods.endDate,
+      endReason: internshipPeriods.endReason,
+    })
+    .from(students)
+    .innerJoin(internshipPeriods, eq(internshipPeriods.studentId, students.id))
+    .innerJoin(businesses, eq(businesses.id, internshipPeriods.businessId))
+    .leftJoin(classGroups, eq(classGroups.id, students.classGroupId))
+    .where(and(eq(students.schoolId, schoolId), isNull(students.businessId), sql`${students.status} <> 'left'`));
+  const last = new Map<string, (typeof rows)[number]>();
+  for (const r of rows) {
+    const cur = last.get(r.id);
+    if (!cur || (r.endDate ?? '') > (cur.endDate ?? '')) last.set(r.id, r);
+  }
+  const list = [...last.values()];
+  const areas = await businessAreas(deps, schoolId, [...new Set(list.map((r) => r.periodBusinessId))]);
+  return list.map((r) => ({ ...r, areaId: areas.get(r.periodBusinessId) ?? null }));
+}
+
+/** Kişinin alanları (yönetim dışı): alan şefinin alanı ve işaretli koordinatör öğretmenin branşı */
+async function myAreaIds(deps: AppDeps, req: FastifyRequest, r: { head: string | null; designated: boolean }): Promise<Set<string>> {
+  const out = new Set<string>();
+  if (r.head) out.add(r.head);
+  if (r.designated && req.ctx.teacherId) {
+    const [t] = await deps.db.select({ branchId: teachers.branchId }).from(teachers).where(eq(teachers.id, req.ctx.teacherId));
+    if (t?.branchId) out.add(t.branchId);
+  }
+  return out;
+}
+
+/** Hesabı kadrodaki öğretmen kaydına bağlı kullanıcılar */
+async function usersOfTeachers(deps: AppDeps, schoolId: string, teacherIds: string[]): Promise<string[]> {
+  if (!teacherIds.length) return [];
+  const rows = await deps.db
+    .select({ userId: memberships.userId })
+    .from(memberships)
+    .where(and(eq(memberships.schoolId, schoolId), inArray(memberships.teacherId, teacherIds)));
+  return rows.map((r) => r.userId);
 }
 
 /** Öğretim yılının ilk günü (1 Eylül) */
@@ -788,33 +856,111 @@ export async function internshipRoutes(app: FastifyInstance) {
     const body = parse(internAssignSchema, req.body);
     const now = today(req);
     const from = body.from ?? now;
+    const reason = body.reason ?? null;
     if (from > addIsoDays(now, 60)) throw badRequest('Başlangıç tarihi en çok 60 gün sonrası olabilir.');
     if (from < addIsoDays(now, -400)) throw badRequest('Başlangıç tarihi bir yıldan eski olamaz.');
+    const picked = await db
+      .select({ id: students.id, fullName: students.fullName, classId: students.classGroupId, className: classGroups.name, businessId: students.businessId })
+      .from(students)
+      .leftJoin(classGroups, eq(classGroups.id, students.classGroupId))
+      .where(and(eq(students.schoolId, req.ctx.schoolId), inArray(students.id, body.studentIds)));
+    if (picked.length !== body.studentIds.length) throw notFound();
+    // Yerleştirilmeyi bekleyenler (daha önce bir işletmede olmuş, şimdi işletmesiz): yönetim dışında yalnızca o alanın
+    // alan şefi ve koordinatör öğretmeni görür ve yerleştirir
+    const waiting = new Map((await unplacedStudents(deps, req.ctx.schoolId)).map((u) => [u.id, u]));
+    const areas = s.all ? new Set<string>() : await myAreaIds(deps, req, s);
     let bizName = '';
+    let bizCoordinator: string | null = null;
     if (body.businessId) {
       const [b] = await db
-        .select({ name: businesses.name })
+        .select({ name: businesses.name, coordinatorTeacherId: businesses.coordinatorTeacherId })
         .from(businesses)
         .where(and(eq(businesses.id, body.businessId), eq(businesses.schoolId, req.ctx.schoolId)));
       if (!b) throw notFound();
-      if (!s.canEdit(body.businessId)) throw forbidden('Yalnızca koordinatörü olduğunuz işletmelere öğrenci ekleyebilirsiniz.');
       bizName = b.name;
+      bizCoordinator = b.coordinatorTeacherId;
+      // Alan şefi, alanındaki bekleyen öğrenciyi alanındaki bir işletmeye yerleştirebilir (işletmenin koordinatörü olmasa da)
+      const headPlaces =
+        !s.all &&
+        Boolean(s.head) &&
+        (await businessAreas(deps, req.ctx.schoolId, [body.businessId])).get(body.businessId) === s.head &&
+        picked.every((p) => !p.businessId && waiting.get(p.id)?.areaId === s.head);
+      if (!s.canEdit(body.businessId) && !headPlaces) throw forbidden('Yalnızca koordinatörü olduğunuz işletmelere öğrenci ekleyebilirsiniz.');
     }
-    const picked = await db
-      .select({ id: students.id, fullName: students.fullName, classId: students.classGroupId, businessId: students.businessId })
-      .from(students)
-      .where(and(eq(students.schoolId, req.ctx.schoolId), inArray(students.id, body.studentIds)));
-    if (picked.length !== body.studentIds.length) throw notFound();
     const { ids } = await eligibleClasses(deps, req);
     for (const p of picked) {
       if (body.businessId && (!p.classId || !ids.has(p.classId))) throw badRequest(`${p.fullName} işletmeye gidebilecek bir sınıfta değil.`);
       // Başka işletmedeki öğrenciyi yalnızca yönetim taşır; öğretmen kendi işletmesindekini çıkarır ya da taşır
       if (p.businessId && !s.canEdit(p.businessId)) throw forbidden(`${p.fullName} başka bir işletmeye bağlı; koordinatör müdür yardımcısından değiştirmesini isteyin.`);
       if (!body.businessId && !p.businessId) throw badRequest(`${p.fullName} zaten bir işletmeye bağlı değil.`);
+      const w = waiting.get(p.id);
+      if (!p.businessId && w && !s.all && !(w.areaId && areas.has(w.areaId))) throw forbidden(`${p.fullName} başka bir alanın yerleştirilmeyi bekleyen öğrencisi; o alanın şefi ya da idare yerleştirir.`);
     }
-    await db.transaction((tx) => moveStudents(tx, req.ctx.schoolId, body.studentIds, body.businessId, from));
-    await audit(req, 'update', 'İşletme öğrencisi', body.businessId, body.businessId ? `${bizName}: ${picked.length} öğrenci (${from})` : `${picked.length} öğrenci işletmeden çıkarıldı (${from})`);
+    const oldBiz = [...new Set(picked.map((p) => p.businessId).filter((x): x is string => Boolean(x)))];
+    const oldRows = oldBiz.length
+      ? await db.select({ id: businesses.id, name: businesses.name, coordinatorTeacherId: businesses.coordinatorTeacherId }).from(businesses).where(inArray(businesses.id, oldBiz))
+      : [];
+    await db.transaction((tx) => moveStudents(tx, req.ctx.schoolId, body.studentIds, body.businessId, from, reason));
+    await audit(
+      req,
+      'update',
+      'İşletme öğrencisi',
+      body.businessId,
+      body.businessId ? `${bizName}: ${picked.length} öğrenci (${from})` : `${picked.length} öğrenci işletmeden çıkarıldı (${from})`,
+    );
+
+    // Bildirim: eski ve yeni işletmenin koordinatör öğretmeni ve koordinatör müdür yardımcısı (işlemi yapan hariç)
+    const moved = picked.filter((p) => p.businessId !== body.businessId);
+    if (moved.length) {
+      const teacherIds = [...oldRows.map((r) => r.coordinatorTeacherId), bizCoordinator].filter((x): x is string => Boolean(x));
+      const vp = settingsOf(req).internshipManagerUserId;
+      const to = [...new Set([...(await usersOfTeachers(deps, req.ctx.schoolId, teacherIds)), ...(vp ? [vp] : [])])].filter((u) => u !== req.ctx.userId);
+      if (to.length) {
+        const oldName = new Map(oldRows.map((r) => [r.id, r.name]));
+        const day = trDay(from);
+        const lines = moved.map((p) => {
+          const was = p.businessId ? oldName.get(p.businessId) : null;
+          const who = `${p.fullName}${p.className ? ` (${p.className})` : ''}`;
+          return body.businessId
+            ? `${who}: ${day} itibarıyla ${bizName}${was ? ` (önceki işletme: ${was})` : ''}.`
+            : `${who}: ${was ?? 'işletmesinden'} ${day} itibarıyla çıkarıldı.`;
+        });
+        const why = reason ? `\nNeden: ${INTERN_END_REASONS[reason]}` : '';
+        const by = await userName(deps, req.ctx.userId);
+        const title = body.businessId ? 'Öğrencinin işletmesi değişti' : 'Öğrenci işletmeden çıkarıldı';
+        await addToInbox(deps.db, to, {
+          key: `internship:${randomUUID()}`,
+          kind: 'internship',
+          title,
+          body: `İşlemi yapan: ${by}\n${lines.join('\n')}${why}`,
+          to: '/isletmeler?sekme=ogrenciler',
+          schoolId: req.ctx.schoolId,
+        });
+        notifyUsers(deps, to, { title, body: lines.length === 1 ? lines[0]! : `${lines.length} öğrencinin işletmesi değişti.`, url: '/bildirimler' });
+      }
+    }
     return { ok: true, students: picked.length };
+  });
+
+  /** Yerleştirilmeyi bekleyenler: yönetim hepsini; alan şefi ve koordinatör öğretmen yalnızca kendi alanınınkileri görür */
+  app.get(`${base}/unplaced`, member, async (req) => {
+    const s = await scope(deps, req);
+    const list = await unplacedStudents(deps, req.ctx.schoolId);
+    const areas = s.all ? null : await myAreaIds(deps, req, s);
+    return list
+      .filter((u) => !areas || (u.areaId && areas.has(u.areaId)))
+      .map((u) => ({
+        id: u.id,
+        fullName: u.fullName,
+        schoolNo: u.schoolNo,
+        classId: u.classId,
+        className: u.className,
+        lastBusinessName: u.businessName,
+        endDate: u.endDate,
+        endReason: u.endReason,
+        areaId: u.areaId,
+      }))
+      .sort((a, b) => trCompare(a.className ?? '', b.className ?? '') || trCompare(a.fullName, b.fullName));
   });
 
   /**
@@ -831,7 +977,7 @@ export async function internshipRoutes(app: FastifyInstance) {
       .where(and(eq(students.id, id), eq(students.schoolId, req.ctx.schoolId)));
     if (!st) throw notFound();
     const periodRows = await db
-      .select({ id: internshipPeriods.id, businessId: internshipPeriods.businessId, startDate: internshipPeriods.startDate, endDate: internshipPeriods.endDate, businessName: businesses.name, coordinatorName: teachers.fullName })
+      .select({ id: internshipPeriods.id, businessId: internshipPeriods.businessId, startDate: internshipPeriods.startDate, endDate: internshipPeriods.endDate, endReason: internshipPeriods.endReason, businessName: businesses.name, coordinatorName: teachers.fullName })
       .from(internshipPeriods)
       .innerJoin(businesses, eq(businesses.id, internshipPeriods.businessId))
       .leftJoin(teachers, eq(teachers.id, businesses.coordinatorTeacherId))
@@ -912,6 +1058,7 @@ export async function internshipRoutes(app: FastifyInstance) {
         coordinatorName: p.coordinatorName,
         startDate: p.startDate,
         endDate: p.endDate,
+        endReason: p.endReason,
         current: !p.endDate && p.businessId === st.businessId,
         totals: internTotals(perBusiness.get(p.businessId) ?? []),
       })),

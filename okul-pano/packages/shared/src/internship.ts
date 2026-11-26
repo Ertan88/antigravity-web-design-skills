@@ -295,6 +295,19 @@ export const businessStudentsSchema = z.object({ studentIds: z.array(z.uuid()).m
  * Öğrenci ekle / işletme değiştir (mobil): öğrenciler `businessId` işletmesine `from` tarihinden itibaren geçer;
  * businessId null ise işletmeden ayrılır (son günü from'dan bir gün öncesidir). from boşsa bugün.
  */
+/**
+ * İşletmeden ayrılma nedeni (KVKK: serbest metin değil, sabit seçenek). Öğrencinin kapanan işletme döneminde saklanır.
+ */
+export const INTERN_END_REASONS = {
+  closed: 'İşletme kapandı',
+  business: 'İşletmenin isteği',
+  student: 'Öğrenci ya da veli isteği',
+  field: 'Alan uyumu',
+  other: 'Diğer',
+} as const;
+export type InternEndReason = keyof typeof INTERN_END_REASONS;
+export const INTERN_END_REASON_KEYS = Object.keys(INTERN_END_REASONS) as InternEndReason[];
+
 export const internAssignSchema = z.object({
   studentIds: z.array(z.uuid()).min(1, 'Öğrenci seçin').max(200),
   businessId: z.uuid().nullable(),
@@ -302,6 +315,8 @@ export const internAssignSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Tarih YYYY-AA-GG olmalı')
     .optional(),
+  /** Önceki işletmeden ayrılma nedeni (isteğe bağlı) */
+  reason: z.enum(INTERN_END_REASON_KEYS as [InternEndReason, ...InternEndReason[]]).nullish(),
 });
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Tarih YYYY-AA-GG olmalı');

@@ -362,6 +362,22 @@ describe('işletmelerde mesleki eğitim', () => {
     ]);
   });
 
+  it('işletmeden çıkarma nedenle kaydedilir, yerleştirilmeyi bekleyenlere düşer, bildirim gider; idare yeniden yerleştirir', async () => {
+    expectStatus(await owner.post(`${base}/internship/students/assign`, { studentIds: [ids['Burak Şahin']], businessId: null, from: '2026-11-02', reason: 'closed' }), 200);
+    const waiting = (await owner.get(`${base}/internship/unplaced`)).json() as { id: string; lastBusinessName: string; endDate: string; endReason: string }[];
+    expect(waiting.find((w) => w.id === ids['Burak Şahin'])).toMatchObject({ lastBusinessName: 'Kent Dekorasyon', endDate: '2026-11-01', endReason: 'closed' });
+    // Kent Dekorasyon'un alanı yok: koordinatör öğretmen başka alanın bekleyen öğrencisini görmez
+    expect(((await coord.get(`${base}/internship/unplaced`)).json() as { id: string }[]).some((w) => w.id === ids['Burak Şahin'])).toBe(false);
+    // Koordinatör müdür yardımcısına bildirim
+    const items = ((await vp.get(`${base}/inbox`)).json() as { items: { title: string; body: string }[] }).items;
+    expect(items.some((x) => x.title === 'Öğrenci işletmeden çıkarıldı' && x.body.includes('Neden: İşletme kapandı'))).toBe(true);
+    // Öğrenci sayfasında dönemin nedeni görünür; idare yeniden yerleştirir
+    const rec = (await owner.get(`${base}/internship/students/${ids['Burak Şahin']}/record`)).json();
+    expect(rec.periods.find((p: { endDate: string | null }) => p.endDate === '2026-11-01')).toMatchObject({ endReason: 'closed' });
+    expectStatus(await owner.post(`${base}/internship/students/assign`, { studentIds: [ids['Burak Şahin']], businessId: biz.kent, from: '2026-11-02' }), 200);
+    expect(((await owner.get(`${base}/internship/unplaced`)).json() as { id: string }[]).some((w) => w.id === ids['Burak Şahin'])).toBe(false);
+  });
+
   it('meslek öğretmeni de işaretlenmeden modülü görmez; /api/me ünvanı kadrodan verir', async () => {
     const titles = (await owner.get(`${base}/teacher-titles`)).json() as { id: string; name: string }[];
     const title = titles.find((x) => /Uzman/.test(x.name)) ?? titles[0];

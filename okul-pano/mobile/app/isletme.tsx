@@ -1,4 +1,4 @@
-import { errorText } from "@okulpano/shared";
+import { errorText, INTERN_END_REASONS, type InternEndReason } from "@okulpano/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Linking, Pressable, View } from "react-native";
@@ -103,6 +103,10 @@ export default function Isletmelerim() {
   const [forms, setForms] = useState(formlar === "1");
   const tab: "businesses" | "students" = sekme === "ogrenciler" ? "students" : "businesses";
   const [adding, setAdding] = useState(false);
+  // İşletme kartından "Öğrenci ekle": işletme belli, doğrudan öğrenci seçilir
+  const [addingFor, setAddingFor] = useState<string | null>(null);
+  // Yerleştirilmeyi bekleyenler (idare hepsini; alan şefi ve koordinatör öğretmen kendi alanınınkileri)
+  const unplaced = useSchoolQuery<{ id: string; fullName: string; schoolNo: string; className: string | null; lastBusinessName: string; endDate: string | null; endReason: string | null }[]>("internship/unplaced");
   const interns = useSchoolQuery<{ canAdd: boolean; students: Intern[] }>(
     "internship/interns",
   );
@@ -240,6 +244,30 @@ export default function Isletmelerim() {
     >
       {tab === "students" ? (
         <>
+          {Boolean(unplaced.data?.length) && (
+            <Card style={{ gap: 8 }}>
+              <Text style={{ fontSize: 15, fontWeight: "800", color: colors.ink }}>Yerleştirilmeyi bekleyenler · {unplaced.data!.length}</Text>
+              {unplaced.data!.map((u) => (
+                <View key={u.id} style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.divider }}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ fontSize: 14.5, fontWeight: "700", color: colors.ink }} numberOfLines={1}>
+                      {u.fullName}
+                    </Text>
+                    <T size={12} color={colors.faint}>
+                      {[u.className, `No ${u.schoolNo}`, u.lastBusinessName, u.endReason && INTERN_END_REASONS[u.endReason as InternEndReason]].filter(Boolean).join(" · ")}
+                    </T>
+                  </View>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onPress={() => router.push({ pathname: "/stajyer/tasi", params: { id: u.id, ad: u.fullName, yerlestir: "1" } } as never)}
+                  >
+                    Yerleştir
+                  </Button>
+                </View>
+              ))}
+            </Card>
+          )}
           {/* Öğrenciler de önce kendi işletmelerinizinkiler (işletmeler ekranıyla aynı kural) */}
           {(areaHead || manager) && mineCount > 0 && (
             <Segmented<"mine" | "area">
@@ -423,6 +451,11 @@ export default function Isletmelerim() {
                         <View
                           style={{ flexDirection: "row", justifyContent: "flex-end", gap: 8, marginTop: 4 }}
                         >
+                          {b.canEdit && (
+                            <Button variant="secondary" size="sm" icon="person-add-outline" onPress={() => setAddingFor(b.id)}>
+                              Öğrenci ekle
+                            </Button>
+                          )}
                           {b.canEdit && <EditIconButton label="Düzenle" onPress={() => setEditing(b)} />}
                           {b.canManage && <DeleteIconButton label="Sil" onPress={() => void remove(b)} />}
                         </View>
@@ -438,6 +471,7 @@ export default function Isletmelerim() {
         </>
       )}
       {adding && <AddStudentsSheet onClose={() => setAdding(false)} />}
+      {addingFor && <AddStudentsSheet presetBusinessId={addingFor} onClose={() => setAddingFor(null)} />}
       {forms && <FormsSheet onClose={() => setForms(false)} />}
       {editing && (
         <InfoSheet

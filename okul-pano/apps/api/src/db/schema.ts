@@ -563,6 +563,8 @@ export const internshipPeriods = pgTable(
       .references(() => businesses.id, { onDelete: 'cascade' }),
     startDate: date('start_date', { mode: 'string' }),
     endDate: date('end_date', { mode: 'string' }),
+    /** Bu işletmeden ayrılma nedeni (INTERN_END_REASONS anahtarı; isteğe bağlı) */
+    endReason: text('end_reason'),
     createdAt: createdAt(),
   },
   (t) => [index('internship_periods_student_idx').on(t.studentId), index('internship_periods_business_idx').on(t.businessId)],

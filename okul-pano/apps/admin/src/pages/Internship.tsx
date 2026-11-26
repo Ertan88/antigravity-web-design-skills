@@ -1445,7 +1445,7 @@ export function Businesses() {
         />
       </div>
       {manager && tab === "coord" && <CoordinatorsPanel businessCounts={businessCounts} />}
-      {tab === "students" && <InternStudentsPanel />}
+      {tab === "students" && <InternStudentsPanel adding={addingStudents} onCloseAdding={() => setAddingStudents(false)} />}
       {tab === "list" && (
       <>
 
@@ -1605,16 +1605,6 @@ export function Businesses() {
         areas={areas.data?.areas ?? []}
         onClose={() => setEditing(null)}
         onOpenAreas={() => setAreasOpen(true)}
-      />
-      {/* Öğrenci ekle: önce işletme seçilir, sonra o işletmenin öğrenci seçimi açılır (geçiş tarihi orada sorulur) */}
-      <PickBusinessDialog
-        open={addingStudents}
-        businesses={everything.filter((b) => b.canEdit)}
-        onClose={() => setAddingStudents(false)}
-        onPick={(b) => {
-          setAddingStudents(false);
-          setAssigning(b);
-        }}
       />
       <AssignStudents
         business={assigning}
@@ -2414,48 +2404,6 @@ function AssignStudents({
             </div>
           )}
         </div>
-      )}
-    </Modal>
-  );
-}
-
-/** Öğrenci ekle, 1. adım: öğrencilerin ekleneceği işletme (yalnızca kişinin düzenleyebildiği işletmeler) */
-function PickBusinessDialog({ open, businesses, onClose, onPick }: { open: boolean; businesses: Business[]; onClose: () => void; onPick: (b: Business) => void }) {
-  const [id, setId] = useState("");
-  const sorted = [...businesses].sort((a, b) => trCompare(a.name, b.name));
-  const chosen = sorted.find((b) => b.id === id) ?? null;
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="Öğrenci ekle"
-      description="Öğrencilerin ekleneceği işletmeyi seçin; sonraki adımda öğrencileri seçersiniz. Başka işletmeden gelen öğrenci için geçiş tarihi sorulur."
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Vazgeç
-          </Button>
-          <Button disabled={!chosen} onClick={() => chosen && onPick(chosen)}>
-            Devam
-          </Button>
-        </>
-      }
-    >
-      {!sorted.length ? (
-        <Alert>Öğrenci ekleyebileceğiniz işletme yok. Önce İşletmeler sekmesinden işletme ekleyin.</Alert>
-      ) : (
-        <Field label="İşletme">
-          {(fid) => (
-            <Select id={fid} value={id} onChange={(e) => setId(e.target.value)}>
-              <option value="">Seçin</option>
-              {sorted.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
       )}
     </Modal>
   );
