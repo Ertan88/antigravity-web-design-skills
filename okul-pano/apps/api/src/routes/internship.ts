@@ -141,7 +141,21 @@ async function roleOf(deps: AppDeps, req: FastifyRequest) {
   const head = await areaHeadBranch(deps, req);
   const own = designated || head ? await ownBusinessIds(deps, req) : new Set<string>();
   const area = head && !all ? await areaBusinessIds(deps, req.ctx.schoolId, head) : new Set<string>();
-  return { all, designated, own, head, area };
+  // "Benim işletmelerim": yönetimde yalnızca koordinatörü olduğu işletmeler (eklediği koordinatörsüz işletmeler değil);
+  // alan şefi ve koordinatör öğretmende kendi işletmeleri. İşletmeler ve İşletmede Devam önce bunlarla açılır.
+  const mine = all
+    ? req.ctx.teacherId
+      ? new Set(
+          (
+            await deps.db
+              .select({ id: businesses.id })
+              .from(businesses)
+              .where(and(eq(businesses.schoolId, req.ctx.schoolId), eq(businesses.coordinatorTeacherId, req.ctx.teacherId)))
+          ).map((r) => r.id),
+        )
+      : new Set<string>()
+    : own;
+  return { all, designated, own, head, area, mine };
 }
 
 /**
@@ -560,7 +574,7 @@ export async function internshipRoutes(app: FastifyInstance) {
     return rows
       .filter((r) => s.sees(r.id))
       .sort((a, b) => trCompare(a.name, b.name))
-      .map((r) => ({ ...r, students: n.get(r.id) ?? 0, canEdit: s.canEdit(r.id), mine: s.all ? Boolean(req.ctx.teacherId) && r.coordinatorTeacherId === req.ctx.teacherId : s.own.has(r.id), canManage: s.all && isManager(req) }));
+      .map((r) => ({ ...r, students: n.get(r.id) ?? 0, canEdit: s.canEdit(r.id), mine: s.mine.has(r.id), canManage: s.all && isManager(req) }));
   });
 
   /**
@@ -1063,6 +1077,7 @@ export async function internshipRoutes(app: FastifyInstance) {
           businessName: st.businessName,
           areaId: st.areaId,
           editable: s.canEdit(st.businessId),
+          mine: s.mine.has(st.businessId!),
           cells,
           unsent: marks.unsent.get(st.id) ?? [],
           totals: internTotals(cells),

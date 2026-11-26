@@ -332,15 +332,14 @@ export function Layout() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
   useEffect(() => setOpen(false), [location.pathname]);
-  // Öğretmen görünümündeki kişi uygulamanın web sürümüne (/app) geçer (kural mobil uygulamayla ortak: appView).
-  // Telefonda her zaman; bilgisayarda görevi olmayan öğretmen (ders programı, nöbet, izin, gözlem /app'te). Görevi olan
-  // öğretmen (ör. nöbet çizelgesi, duyurular) bilgisayarda panelde kalır: Excel ve geniş tablolar paneldedir.
+  // Öğretmen görünümündeki kişi telefonda uygulamanın web sürümüne (/app) geçer (kural mobil uygulamayla ortak: appView).
+  // Bilgisayarda herkes panelde kalır: öğretmenin Genel Bakış'ı (Bugünüm), gözlem, kadro ve ders programı paneldedir.
   const { me, school } = useAuth();
   const [leaving, setLeaving] = useState(false);
   useEffect(() => {
     if (!me || !school || school.support || me.user.isSuperAdmin) return;
     if (appView(school) !== 'teacher' || panelChosenOnPhone()) return;
-    if (!isPhoneWidth() && school.permissions.some((p) => p !== 'support.contact')) return;
+    if (!isPhoneWidth()) return;
     setLeaving(true);
     void openAppView(me.user.id, school.id).then((ok) => {
       if (!ok) setLeaving(false);

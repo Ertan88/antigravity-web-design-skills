@@ -119,6 +119,8 @@ interface SheetStudent {
   businessName: string;
   areaId: string | null;
   editable: boolean;
+  /** Kişinin kendi işletmesindeki öğrenci (alan şefi ve koordinatörlüğü olan yönetici önce bunları görür) */
+  mine?: boolean;
   cells: [InternCell, InternCell][];
   /** Gönderilmemiş devamsızlıklar: "YYYY-AA-GG|am" */
   unsent?: string[];
@@ -301,15 +303,23 @@ export function InternshipSheet() {
   }, [undo]);
 
   const data = sheet.data;
+  // İşletmeler sayfasıyla aynı kural: alan şefi ve koordinatörlüğü olan yönetici önce kendi işletmelerindeki öğrencileri
+  // görür; isterse alanının (yönetimde bütün okulun) öğrencilerine geçer
+  const access = useInternshipAccess();
+  const scoped = Boolean(access.data?.manage || access.data?.areaHead);
+  const mineCount = (data?.students ?? []).filter((x) => x.mine).length;
+  const [view, setView] = useState<"mine" | "all" | null>(null);
+  const scopeView = scoped && mineCount ? (view ?? "mine") : "all";
   const visible = useMemo(
     () =>
       (data?.students ?? []).filter(
         (s) =>
+          (scopeView === "all" || s.mine) &&
           (!classId || s.classId === classId) &&
           (!businessId || s.businessId === businessId) &&
           (!areaId || s.areaId === areaId),
       ),
-    [data, classId, businessId, areaId],
+    [data, classId, businessId, areaId, scopeView],
   );
   const className = data?.classes.find((c) => c.id === classId)?.name;
 
@@ -354,6 +364,18 @@ export function InternshipSheet() {
           <Button icon={<Send className="size-4" />} onClick={() => setSending(true)}>
             Gönder…
           </Button>
+        </div>
+      )}
+      {scoped && mineCount > 0 && (
+        <div className="mb-4">
+          <Segmented<"mine" | "all">
+            value={scopeView}
+            onChange={setView}
+            options={[
+              { value: "mine", label: `Benim öğrencilerim · ${mineCount}` },
+              { value: "all", label: `${access.data?.manage ? "Bütün öğrenciler" : "Alanımın öğrencileri"} · ${data?.students.length ?? 0}` },
+            ]}
+          />
         </div>
       )}
       {data && !data.managerAssigned && (

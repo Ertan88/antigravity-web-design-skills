@@ -1,11 +1,11 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
-import { useSchoolQuery } from '../src/data.ts';
+import { useInternshipAccess, useSchoolQuery } from '../src/data.ts';
 import { FillSheet, HALF_SHORT, HALVES, LegendBand, letter, PendingStrip, pickable, prevCode, ReportSheet, SendSheet, shortDate, TONE, UndoBar, useMarks, type Cell, type Code, type Half, type PendingMark } from '../src/intern.tsx';
 import { Text } from '../src/text.tsx';
 import { colors, radius } from '../src/theme.ts';
-import { Button, Chip, Empty, ErrorNote, Icon, Loading, Screen, T } from '../src/ui.tsx';
+import { Button, Chip, Empty, ErrorNote, Icon, Loading, Screen, Segmented, T } from '../src/ui.tsx';
 
 /*
  * İşletmede devam (aylık çizelge, webdeki sayfanın mobil hâli): ad sütunu sabit, günler yana kayar; her gün S (sabah) ve
@@ -23,6 +23,8 @@ interface SheetStudent {
   businessId: string;
   businessName: string;
   editable: boolean;
+  /** Kişinin kendi işletmesindeki öğrenci */
+  mine?: boolean;
   cells: [Cell, Cell][];
   unsent?: string[];
   totals: { excused: number; unexcused: number; unchecked?: number };
@@ -98,7 +100,16 @@ export default function IsletmeDevam() {
     setSel(null);
   }, [d?.month]);
 
-  const rows = useMemo(() => (d?.students ?? []).filter((s) => (!classId || s.classId === classId) && (!businessId || s.businessId === businessId)), [d, classId, businessId]);
+  // İşletmeler ekranıyla aynı kural: alan şefi ve koordinatörlüğü olan yönetici önce kendi işletmelerindeki öğrencileri görür
+  const access = useInternshipAccess();
+  const scoped = Boolean(access.data?.manage || access.data?.areaHead);
+  const mineCount = (d?.students ?? []).filter((x) => x.mine).length;
+  const [view, setView] = useState<'mine' | 'all' | null>(null);
+  const scopeView = scoped && mineCount ? (view ?? 'mine') : 'all';
+  const rows = useMemo(
+    () => (d?.students ?? []).filter((s) => (scopeView === 'all' || s.mine) && (!classId || s.classId === classId) && (!businessId || s.businessId === businessId)),
+    [d, classId, businessId, scopeView],
+  );
   const m = d?.month ?? month;
   const student = sel ? d?.students.find((s) => s.id === sel.studentId) : undefined;
   const selDay = sel && d ? d.days[sel.di] : undefined;
@@ -220,6 +231,16 @@ export default function IsletmeDevam() {
         <Empty icon="business-outline" title="Öğrenci yok" text="İşletmeye bağlı öğrenci yok. İşletmeler yönetim panelinden eklenir." />
       ) : (
         <>
+          {scoped && mineCount > 0 && (
+            <Segmented<'mine' | 'all'>
+              value={scopeView}
+              onChange={setView}
+              options={[
+                { value: 'mine', label: `Benim öğrencilerim · ${mineCount}` },
+                { value: 'all', label: `${access.data?.manage ? 'Bütünü' : 'Alanımın'} · ${d.students.length}` },
+              ]}
+            />
+          )}
           {(d.classes.length > 1 || d.businesses.length > 1) && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
               {d.classes.length > 1 && <Chip label="Bütün sınıflar" selected={!classId} onPress={() => setClassId('')} />}
