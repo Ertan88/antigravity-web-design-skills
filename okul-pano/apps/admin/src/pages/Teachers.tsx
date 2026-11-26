@@ -128,7 +128,11 @@ export function Teachers() {
     <>
       <PageHeader
         title="Öğretmen Kadrosu"
-        description="Nöbet çizelgesi, izinler ve ders programında seçilen öğretmenler. e-Okul personel listesi PDF'inden ya da Excel'den toplu yükleyebilir, listeyi Excel'e aktarabilirsiniz."
+        description={
+          editable
+            ? "Nöbet çizelgesi, izinler ve ders programında seçilen öğretmenler. e-Okul personel listesi PDF'inden ya da Excel'den toplu yükleyebilir, listeyi Excel'e aktarabilirsiniz."
+            : 'Okulun öğretmenleri: ad soyad, branş ve görev. İletişim bilgileri yalnızca idarede görünür.'
+        }
       />
 
       <Card>

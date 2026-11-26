@@ -10,7 +10,7 @@ import { useAuth } from '../../lib/auth.tsx';
 import { useSchoolPath } from '../../lib/data.ts';
 import { minutesText, todayLessons, toSec, type MeToday } from '../../lib/teacherDay.ts';
 import { useNow } from './Today.tsx';
-import { LeaveDialog } from '../Me.tsx';
+import { LeaveDialog, MySchedule } from './MyWeek.tsx';
 
 const TONE = {
   sky: 'bg-tile-sky text-tile-sky-ink',
@@ -20,19 +20,29 @@ const TONE = {
 } as const;
 
 /** Bugünüm kartı: küçük etiket, kısa başlık, alt bilgi; dokununca ilgili yer */
-function DayTile({ tone, icon, label, title, hint, to }: { tone: keyof typeof TONE; icon: ReactNode; label: string; title: string; hint?: string | null; to: string }) {
-  return (
-    <Link to={to} className={clsx('group relative flex min-h-32 flex-col rounded-3xl p-5 transition-transform hover:-translate-y-0.5', TONE[tone])}>
+function DayTile({ tone, icon, label, title, hint, to }: { tone: keyof typeof TONE; icon: ReactNode; label: string; title: string; hint?: string | null; to?: string }) {
+  const body = (
+    <>
       <div className="flex items-center gap-2 pr-9 text-[13px] font-bold opacity-75">
         {icon}
         {label}
       </div>
       <div className="mt-auto pt-3 text-xl leading-tight font-extrabold tracking-tight">{title}</div>
       {hint && <div className="mt-1 text-[13px] font-bold opacity-85">{hint}</div>}
-      <span className="absolute top-4 right-4 flex size-8 items-center justify-center rounded-full bg-white/50 transition group-hover:bg-white/80 dark:bg-white/10">
-        <ArrowUpRight className="size-4" />
-      </span>
+      {to && (
+        <span className="absolute top-4 right-4 flex size-8 items-center justify-center rounded-full bg-white/50 transition group-hover:bg-white/80 dark:bg-white/10">
+          <ArrowUpRight className="size-4" />
+        </span>
+      )}
+    </>
+  );
+  const cls = clsx('relative flex min-h-32 flex-col rounded-3xl p-5', TONE[tone]);
+  return to ? (
+    <Link to={to} className={clsx(cls, 'group transition-transform hover:-translate-y-0.5')}>
+      {body}
     </Link>
+  ) : (
+    <div className={cls}>{body}</div>
   );
 }
 
@@ -58,9 +68,9 @@ export function MyDay() {
   const now = useNow(30_000);
   const [asking, setAsking] = useState(false);
 
-  const actions = (
+  const actions = (withLeave: boolean) => (
     <div className="flex flex-wrap gap-2">
-      {hasTeacher && (
+      {hasTeacher && withLeave && (
         <Button icon={<CalendarPlus className="size-4" />} onClick={() => setAsking(true)}>
           İzin bildir
         </Button>
@@ -80,7 +90,7 @@ export function MyDay() {
   if (!hasTeacher || !d) {
     return (
       <>
-        {actions}
+        {actions(true)}
         <LeaveDialog open={asking} onClose={() => setAsking(false)} path={leavesPath} />
       </>
     );
@@ -128,12 +138,13 @@ export function MyDay() {
   return (
     <div className="grid gap-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <DayTile tone="sky" icon={<BookOpen className="size-4" />} {...lessonTile} to="/benim" />
-        <DayTile tone="peach" icon={<ShieldCheck className="size-4" />} {...dutyTile} to="/benim?sekme=nobet" />
-        <DayTile tone="lilac" icon={<CalendarCheck2 className="size-4" />} {...coverTile} to="/benim" />
-        <DayTile tone="mint" icon={<UserMinus className="size-4" />} label="İzin talebim" {...leaveTile} to="/benim?sekme=izin" />
+        <DayTile tone="sky" icon={<BookOpen className="size-4" />} {...lessonTile} />
+        <DayTile tone="peach" icon={<ShieldCheck className="size-4" />} {...dutyTile} />
+        <DayTile tone="lilac" icon={<CalendarCheck2 className="size-4" />} {...coverTile} />
+        <DayTile tone="mint" icon={<UserMinus className="size-4" />} label="İzin talebim" {...leaveTile} />
       </div>
-      {actions}
+      {actions(false)}
+      <MySchedule onAsk={() => setAsking(true)} />
       <LeaveDialog open={asking} onClose={() => setAsking(false)} path={leavesPath} />
     </div>
   );

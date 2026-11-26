@@ -674,7 +674,11 @@ export function MonthStudent() {
     <>
       <PageHeader
         title={`Ayın Öğrencisi · ${monthLabel(month)}`}
-        description="Öğretmenlerin gözlem kayıtlarından ilk 5 öneri. Seçtiğiniz öğrenci panoya yalnızca adı ve sınıfıyla “Ayın öğrencisi” olarak çıkar; puanlar ve sıralama hiçbir zaman panoda görünmez."
+        description={
+          manager
+            ? 'Öğretmenlerin gözlem kayıtlarından ilk 5 öneri. Seçtiğiniz öğrenci panoya yalnızca adı ve sınıfıyla “Ayın öğrencisi” olarak çıkar; puanlar ve sıralama hiçbir zaman panoda görünmez.'
+            : 'Öğretmenlerin gözlem kayıtlarından ilk 5 öneri. Ayın öğrencisini idare seçer; panoya yalnızca adı ve sınıfıyla çıkar, puanlar ve sıralama panoda görünmez.'
+        }
       />
       {/* Araç satırı: kapsam, (gerekirse) sınıf/düzey ve ay tek satırda; satırda yer olduğu için sekme değişince kayma olmaz */}
       <div className="mb-5 flex flex-wrap items-center gap-2">

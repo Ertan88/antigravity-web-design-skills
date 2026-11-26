@@ -125,7 +125,10 @@ describe('gözlem', () => {
   });
 
   it('ayın öğrencisi: en az üç öğretmen şartı; idare seçer, panoya başarı olarak gider', async () => {
-    expect((await teachers[0]!.get(`${base}/conduct/awards/candidates`)).statusCode).toBe(403);
+    // Öğretmen önerileri görür (okul kararı: öğretmene Ayın öğrencisi açık), seçemez
+    expectStatus(await teachers[0]!.get(`${base}/conduct/awards/candidates`), 200);
+    const c0 = (await teachers[0]!.get(`${base}/conduct/awards/candidates`)).json();
+    expect((await teachers[0]!.post(`${base}/conduct/awards`, { month: c0.month, studentId: ids['Ada Yılmaz'] })).statusCode).toBe(403);
     const c = (await counselor.get(`${base}/conduct/awards/candidates`)).json();
     expect(c.candidates.map((x: { student: { fullName: string } }) => x.student.fullName)).toEqual(['Ada Yılmaz']);
     expect(c.candidates[0]).toMatchObject({ plus: 6, minus: 0, teachers: 3, balanced: 6, topLabel: 'Derse katılım', awardedIn: [] });

@@ -13,6 +13,7 @@ import { useAuth } from '../lib/auth.tsx';
 import { useList, useSchoolPath, type Announcement, type Screen } from '../lib/data.ts';
 import { timeAgo } from '../lib/format.ts';
 import { MyDay } from './dashboard/MyDay.tsx';
+import { MineCompact } from './dashboard/MyWeek.tsx';
 import { TodaySummary } from './dashboard/Today.tsx';
 import { CoverBand, MyAssignmentsCard } from './covers/Covers.tsx';
 
@@ -250,6 +251,9 @@ export function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* Derse ya da nöbete giren müdür ve müdür yardımcısının kendi haftası (10A); dersi ve nöbeti yoksa görünmez */}
+      {manager && <MineCompact />}
     </div>
   );
 }

@@ -684,7 +684,8 @@ export async function conductRoutes(app: FastifyInstance) {
 
   app.get(`${base}/awards/candidates`, member, async (req) => {
     const ctx = req.ctx;
-    if (!ctx.permissions.includes('conduct.manage') && !ctx.permissions.includes('conduct.counsel')) throw forbidden();
+    // Öğretmen de önerileri görür (2); seçim (ayın öğrencisi yapma) yalnızca conduct.manage yetkisindedir
+    if (!canRecord(req)) throw forbidden();
     if (ctx.isSupport) throw forbidden('Destek erişimi öğrenci gözlemlerini göremez.');
     const month = monthQuery(req);
     const q = req.query as { scope?: string; key?: string };

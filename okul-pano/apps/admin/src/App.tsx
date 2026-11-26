@@ -31,7 +31,6 @@ const Achievements = page(() => import('./pages/SchoolLife.tsx'), 'Achievements'
 const Events = page(() => import('./pages/SchoolLife.tsx'), 'Events');
 const Books = page(() => import('./pages/SchoolLife.tsx'), 'Books');
 const Leaves = page(() => import('./pages/Leaves.tsx'), 'Leaves');
-const Me = page(() => import('./pages/Me.tsx'), 'Me');
 const PlatformHome = page(() => import('./pages/PlatformHome.tsx'), 'PlatformHome');
 const Platform = page(() => import('./pages/Platform.tsx'), 'Platform');
 const HolidayCalendar = page(() => import('./pages/HolidayCalendar.tsx'), 'HolidayCalendar');
@@ -53,9 +52,14 @@ const InternshipSheet = page(() => import('./pages/Internship.tsx'), 'Internship
 const Businesses = page(() => import('./pages/Internship.tsx'), 'Businesses');
 const InternshipForms = page(() => import('./pages/InternshipForms.tsx'), 'InternshipForms');
 
-function Guard({ permission, children }: { permission: Permission | Permission[]; children: ReactNode }) {
-  const { can } = useAuth();
-  if (!(Array.isArray(permission) ? permission.some((p) => can(p)) : can(permission))) {
+/**
+ * Sayfa yetkisi. `teacher`: kadrodaki öğretmen kaydına bağlı hesap da açar (2): öğretmen gözlem, ayın öğrencisi ve
+ * dönem göstergesini kullanır; öğretmen kadrosu (yalnızca ad, branş, görev), ders programı ve duyuruları salt okur.
+ * Sayfa yetkisi olmayanda düzenleme düğmelerini kendisi gizler.
+ */
+function Guard({ permission, teacher, children }: { permission: Permission | Permission[]; teacher?: boolean; children: ReactNode }) {
+  const { can, school } = useAuth();
+  if (!(teacher && school?.teacherId) && !(Array.isArray(permission) ? permission.some((p) => can(p)) : can(permission))) {
     return (
       <EmptyState
         icon={<Lock className="size-6" />}
@@ -118,8 +122,9 @@ export function App() {
       <Route element={<Layout />}>
         {/* Platform yöneticisi (okul açık değilken) ana sayfada platformun yapılacaklarını görür */}
         <Route index element={!school && me.user.isSuperAdmin ? <PlatformHome /> : needsSchool(<Dashboard />)} />
-        <Route path="benim" element={needsSchool(<Me />)} />
-        <Route path="duyurular" element={needsSchool(<Guard permission="announcements.manage"><Announcements /></Guard>)} />
+        {/* "Benim" sayfası kalktı (10A): içeriği Genel Bakış'ta; eski bağlantılar oraya gider */}
+        <Route path="benim" element={<Navigate to="/" replace />} />
+        <Route path="duyurular" element={needsSchool(<Guard permission="announcements.manage" teacher><Announcements /></Guard>)} />
         <Route path="kayan-yazi" element={needsSchool(<Guard permission="ticker.manage"><Ticker /></Guard>)} />
         <Route path="sinavlar" element={needsSchool(<Guard permission="exams.manage"><Exams /></Guard>)} />
         <Route path="sinav-takvimi" element={needsSchool(<ExamSchedule />)} />
@@ -138,17 +143,17 @@ export function App() {
         <Route path="tasimali" element={<Navigate to="/nobet?bolum=tasimali" replace />} />
         <Route path="izinler" element={needsSchool(<Guard permission="leaves.manage"><Leaves /></Guard>)} />
         <Route path="ogrenciler" element={needsSchool(<Guard permission="students.manage"><Students /></Guard>)} />
-        <Route path="gozlem" element={needsSchool(<Guard permission="conduct.counsel"><ConductStudents /></Guard>)} />
-        <Route path="ayin-ogrencisi" element={needsSchool(<Guard permission="conduct.counsel"><MonthStudent /></Guard>)} />
-        <Route path="donem-gostergesi" element={needsSchool(<Guard permission="conduct.counsel"><ConductReport /></Guard>)} />
+        <Route path="gozlem" element={needsSchool(<Guard permission="conduct.counsel" teacher><ConductStudents /></Guard>)} />
+        <Route path="ayin-ogrencisi" element={needsSchool(<Guard permission="conduct.counsel" teacher><MonthStudent /></Guard>)} />
+        <Route path="donem-gostergesi" element={needsSchool(<Guard permission="conduct.counsel" teacher><ConductReport /></Guard>)} />
         <Route path="rehberlik" element={needsSchool(<Guard permission="conduct.counsel"><ConductAlerts /></Guard>)} />
         <Route path="isletme-devam" element={needsSchool(<InternshipSheet />)} />
         <Route path="isletmeler" element={needsSchool(<Businesses />)} />
         <Route path="isletme-formlari" element={needsSchool(<InternshipForms />)} />
         <Route path="gozlem-kriterleri" element={needsSchool(<Guard permission="conduct.manage"><ConductCriteria /></Guard>)} />
         <Route path="zil-saatleri" element={needsSchool(<Guard permission="schedule.manage"><BellSchedules /></Guard>)} />
-        <Route path="ders-programi" element={needsSchool(<Guard permission="schedule.manage"><Timetable /></Guard>)} />
-        <Route path="ogretmenler" element={needsSchool(<Guard permission="directory.manage"><Teachers /></Guard>)} />
+        <Route path="ders-programi" element={needsSchool(<Guard permission="schedule.manage" teacher><Timetable /></Guard>)} />
+        <Route path="ogretmenler" element={needsSchool(<Guard permission="directory.manage" teacher><Teachers /></Guard>)} />
         {/* Sınıflar artık ders programı sayfasında */}
         <Route path="siniflar" element={<Navigate to="/ders-programi" replace />} />
         <Route path="ekranlar" element={needsSchool(<Guard permission="screens.manage"><Screens /></Guard>)} />

@@ -1,9 +1,9 @@
 import { compareClassNames, parseClassName } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useToast } from '../components/Toast.tsx';
-import { Alert, Button, Field, Input, Modal, Select, Spinner } from '../components/ui.tsx';
+import { Alert, Button, Card, Field, Input, Modal, Select, Spinner } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useList, useSchoolPath, type ClassGroup } from '../lib/data.ts';
@@ -24,7 +24,48 @@ interface InternshipSettings {
  * Mesleki eğitim ayarları (İşletmeler › Ayarlar): koordinatör müdür yardımcısı, günlük formdaki program adı ve teknik
  * program stajı tek pencerede. Genel Ayarlar'da yalnızca modülün açılıp kapandığı anahtar kalır.
  */
-export function InternshipSettingsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+/**
+ * Pencere ya da sayfa içi kart (4A): İşletmeler › Ayarlar sekmesinde ayarlar pencere açılmadan sayfada düzenlenir;
+ * Genel Ayarlar'dan gelinince aynı içerik pencerede açılır.
+ */
+export function SettingsPanel({
+  inline,
+  open,
+  onClose,
+  size,
+  title,
+  description,
+  footer,
+  children,
+}: {
+  inline?: boolean;
+  open: boolean;
+  onClose: () => void;
+  size?: 'md' | 'lg' | 'xl' | '2xl';
+  title: string;
+  description?: string;
+  footer?: ReactNode;
+  children: ReactNode;
+}) {
+  if (!inline)
+    return (
+      <Modal open={open} onClose={onClose} size={size} title={title} description={description} footer={footer}>
+        {children}
+      </Modal>
+    );
+  return (
+    <Card className="grid gap-4 p-5">
+      <div>
+        <h2 className="text-lg font-extrabold tracking-tight">{title}</h2>
+        {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
+      </div>
+      {children}
+      {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4 dark:border-white/10">{footer}</div>}
+    </Card>
+  );
+}
+
+export function InternshipSettingsDialog({ open, onClose, inline }: { open: boolean; onClose: () => void; inline?: boolean }) {
   const { schoolId } = useAuth();
   const path = useSchoolPath('internship');
   const qc = useQueryClient();
@@ -68,7 +109,7 @@ export function InternshipSettingsDialog({ open, onClose }: { open: boolean; onC
       });
       await qc.invalidateQueries({ predicate: (x) => x.queryKey[0] === schoolId && (x.queryKey[1] === 'internship' || x.queryKey[1] === 'school') });
       toast.success('Mesleki eğitim ayarları kaydedildi');
-      onClose();
+      if (!inline) onClose();
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -77,16 +118,19 @@ export function InternshipSettingsDialog({ open, onClose }: { open: boolean; onC
   };
 
   return (
-    <Modal
+    <SettingsPanel
+      inline={inline}
       open={open}
       onClose={onClose}
       size="lg"
       title="Mesleki eğitim ayarları"
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
-            Vazgeç
-          </Button>
+          {!inline && (
+            <Button variant="secondary" onClick={onClose}>
+              Vazgeç
+            </Button>
+          )}
           <Button loading={busy} disabled={!v || badRange} onClick={() => void save()}>
             Kaydet
           </Button>
@@ -169,6 +213,6 @@ export function InternshipSettingsDialog({ open, onClose }: { open: boolean; onC
           </div>
         </div>
       )}
-    </Modal>
+    </SettingsPanel>
   );
 }

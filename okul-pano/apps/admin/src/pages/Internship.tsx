@@ -19,19 +19,16 @@ import {
   Building2,
   CheckCheck,
   Send,
-  GraduationCap,
   Pencil,
   Plus,
-  Printer,
   Search,
-  Settings2,
   Trash2,
   Undo2,
   Users,
   X,
 } from '../components/icons.tsx';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useToast } from "../components/Toast.tsx";
 import {
   ACTION_SHAPE,
@@ -59,7 +56,7 @@ import { api } from "../lib/api.ts";
 import { useAuth } from "../lib/auth.tsx";
 import { useInternshipAccess, useList, useSchoolPath, type Teacher } from "../lib/data.ts";
 import { VISIT_DAYS, VisitDayPicker } from "./InternshipForms.tsx";
-import { InternshipSettingsDialog } from "./InternshipSettings.tsx";
+import { InternshipSettingsDialog, SettingsPanel } from "./InternshipSettings.tsx";
 
 /*
  * İşletmelerde mesleki eğitim: işletmeler ve aylık işletmede devam çizelgesi. Okul günleri ders programından,
@@ -333,7 +330,7 @@ export function InternshipSheet() {
             onClick={() => setFilling(true)}
             disabled={!visible.some((s) => s.editable)}
           >
-            İşaretsizleri İşletmede yap
+            Boş günlere X koy
           </Button>
           </>
         }
@@ -961,7 +958,7 @@ function FillDialog({
     <Modal
       open
       onClose={onClose}
-      title="İşaretsizleri “İşletmede” yap"
+      title="Boş günlere X koy"
       description="Seçilen günlerde yalnızca “?” (kontrol edilmedi) olan bölümler X olur. Koyduğunuz devamsızlık ve diğer işaretlere dokunulmaz. Önce devamsızlıkları işaretleyin."
       footer={
         <>
@@ -1116,10 +1113,10 @@ function useAreas() {
  * mesleki eğitimi görür, kendi işletmelerini ve öğrencilerini girer; işletmeye yalnızca işaretliler atanır.
  */
 /**
- * Koordinatör öğretmenler (1A): sayfada tek satırlık özet; "Değiştir" aramalı, alana göre gruplu pencereyi açar ve
- * seçim pencerede birlikte kaydedilir. Kültür dersi öğretmenleri listede yer almaz.
+ * Koordinatörler sekmesi (4A): alan alan seçilen koordinatör öğretmenler ve işletme sayıları. "Değiştir" aramalı, alana
+ * göre gruplu pencereyi açar; seçim pencerede birlikte kaydedilir. Kültür dersi öğretmenleri listede yer almaz.
  */
-function CoordinatorsCard({ businessCounts }: { businessCounts: Map<string, number> }) {
+function CoordinatorsPanel({ businessCounts }: { businessCounts: Map<string, number> }) {
   const { schoolId } = useAuth();
   const path = useSchoolPath("internship/coordinators");
   const q = useQuery({
@@ -1128,24 +1125,54 @@ function CoordinatorsCard({ businessCounts }: { businessCounts: Map<string, numb
   });
   const [open, setOpen] = useState(false);
   const list = q.data?.teachers ?? [];
-  const on = list.filter((t) => t.designated).sort((a, b) => trCompare(a.fullName, b.fullName));
+  const on = list.filter((t) => t.designated);
+  const groups = [
+    ...on.reduce((m, t) => {
+      const area = t.branchName || "Alan girilmemiş";
+      return m.set(area, [...(m.get(area) ?? []), t]);
+    }, new Map<string, CoordinatorTeacher[]>()),
+  ]
+    .map(([area, ts]) => [area, ts.sort((x, y) => trCompare(x.fullName, y.fullName))] as const)
+    .sort((x, y) => trCompare(x[0], y[0]));
   return (
-    <Card className="mb-4 flex flex-wrap items-center gap-3 px-5 py-4">
-      <div className="min-w-0 flex-1">
-        <div className="font-bold text-ink">Koordinatör öğretmenler{q.data ? ` · ${on.length}` : ""}</div>
-        <div className="truncate text-sm text-slate-500">
-          {!q.data
-            ? "Yükleniyor…"
-            : !list.length
-              ? "Meslek alanı branşlı öğretmen yok."
-              : on.length
-                ? on.map((t) => t.fullName).join(", ")
-                : "Henüz seçilmedi. Yalnızca seçilen meslek öğretmenleri mesleki eğitimi görür."}
+    <Card className="grid gap-4 p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-lg font-extrabold tracking-tight">Koordinatör öğretmenler{q.data ? ` · ${on.length}` : ""}</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Yalnızca seçilen meslek öğretmenleri mesleki eğitimi görür; kendi işletmelerini ve öğrencilerini girebilir, işletmelere koordinatör olarak atanabilir.
+          </p>
         </div>
+        <Button size="sm" variant="secondary" icon={<Pencil className="size-4" />} disabled={!list.length} onClick={() => setOpen(true)}>
+          Değiştir
+        </Button>
       </div>
-      <Button size="sm" variant="secondary" icon={<Pencil className="size-4" />} disabled={!list.length} onClick={() => setOpen(true)}>
-        Değiştir
-      </Button>
+      {q.isLoading ? (
+        <Spinner />
+      ) : !list.length ? (
+        <p className="text-sm text-slate-500">Meslek alanı branşlı öğretmen yok. Ayarlar sekmesinden meslek öğretmenlerinin branşını girin.</p>
+      ) : !on.length ? (
+        <p className="text-sm text-slate-500">Henüz koordinatör öğretmen seçilmedi.</p>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {groups.map(([area, ts]) => (
+            <div key={area} className="rounded-2xl p-4 ring-1 ring-slate-200 dark:ring-white/10">
+              <div className="mb-2 text-xs font-bold tracking-wide text-slate-500">{area.toLocaleUpperCase("tr-TR")}</div>
+              <ul className="grid gap-1.5">
+                {ts.map((t) => {
+                  const n = businessCounts.get(t.id) ?? 0;
+                  return (
+                    <li key={t.id} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="font-semibold text-ink">{t.fullName}</span>
+                      <span className="shrink-0 text-xs font-semibold text-slate-500">{n ? `${n} işletme` : "İşletme yok"}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
       <CoordinatorsDialog open={open} onClose={() => setOpen(false)} teachers={list} businessCounts={businessCounts} path={path} />
     </Card>
   );
@@ -1278,12 +1305,12 @@ export function Businesses() {
   const [assigning, setAssigning] = useState<Business | null>(null);
   const [viewing, setViewing] = useState<Business | null>(null);
   const [areasOpen, setAreasOpen] = useState(false);
-  const navigate = useNavigate();
-  // Genel Ayarlar'daki "Staj ayarlarını aç" bu sayfaya ?ayarlar=1 ile gelir; pencere doğrudan açılır
+  // Sekmeler (4A): İşletmeler · Koordinatörler · Ayarlar (yalnızca yönetim). Genel Ayarlar'daki "Staj ayarlarını aç"
+  // bu sayfaya ?ayarlar=1 ile gelir; Ayarlar sekmesi açılır
   const [settingsParams, setSettingsParams] = useSearchParams();
-  const [settingsOpen, setSettingsOpen] = useState(settingsParams.get("ayarlar") === "1");
-  const closeSettings = () => {
-    setSettingsOpen(false);
+  const [tab, setTabState] = useState<"list" | "coord" | "settings">(settingsParams.get("ayarlar") === "1" ? "settings" : "list");
+  const setTab = (t: "list" | "coord" | "settings") => {
+    setTabState(t);
     if (settingsParams.has("ayarlar")) {
       const next = new URLSearchParams(settingsParams);
       next.delete("ayarlar");
@@ -1365,46 +1392,42 @@ export function Businesses() {
               : "Alanınızdaki işletmeler (alan şefi olarak yalnızca görüntülersiniz)."
         }
         actions={
-          <div className="flex flex-wrap gap-2">
-            {manager && (
-              <Button variant="secondary" icon={<Settings2 className="size-4" />} onClick={() => setSettingsOpen(true)}>
-                Staj ayarları
-              </Button>
-            )}
-            {manager && (
-              <Button
-                variant="secondary"
-                icon={<GraduationCap className="size-4" />}
-                onClick={() => setAreasOpen(true)}
-              >
-                Alanlar ve meslek öğretmenleri
-              </Button>
-            )}
-            <Button
-              variant="secondary"
-              icon={<Printer className="size-4" />}
-              onClick={() => navigate("/isletme-formlari")}
-            >
-              Formlar
+          (manager || designated) && (
+            <Button icon={<Plus className="size-4" />} onClick={() => setEditing("new")}>
+              İşletme ekle
             </Button>
-            {(manager || designated) && (
-              <Button
-                icon={<Plus className="size-4" />}
-                onClick={() => setEditing("new")}
-              >
-                İşletme ekle
-              </Button>
-            )}
-          </div>
+          )
         }
       />
-      {manager && <CoordinatorsCard businessCounts={businessCounts} />}
+      {manager && (
+        <div className="mb-4">
+          <Segmented<"list" | "coord" | "settings">
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: "list", label: `İşletmeler · ${everything.length}` },
+              { value: "coord", label: "Koordinatörler" },
+              { value: "settings", label: "Ayarlar" },
+            ]}
+          />
+        </div>
+      )}
+      {manager && tab === "coord" && <CoordinatorsPanel businessCounts={businessCounts} />}
+      {manager && tab === "settings" && (
+        <div className="grid gap-4">
+          <InternshipSettingsDialog inline open onClose={() => undefined} />
+          <AreasDialog inline open onClose={() => undefined} />
+        </div>
+      )}
+      {(!manager || tab === "list") && (
+      <>
+
       {manager && areas.data && !areas.data.areas.length && (
         <div className="mb-4">
           <Alert>
             Okulda meslek alanı tanınmadı: öğretmenlerin branşı girilmemiş
-            olabilir. "Alanlar ve meslek öğretmenleri" penceresinden meslek
-            öğretmenlerinin branşını girin.
+            olabilir. Ayarlar sekmesindeki "Alanlar ve meslek öğretmenleri"
+            bölümünden meslek öğretmenlerinin branşını girin.
           </Alert>
         </div>
       )}
@@ -1424,39 +1447,6 @@ export function Businesses() {
           />
         </div>
       )}
-      {(areaChips.length > 0 || noArea > 0) && (
-        <div className="mb-3 flex flex-wrap gap-2">
-          {[
-            { id: "", name: "Tümü", n: all.length },
-            ...areaChips,
-            ...(noArea && areaChips.length
-              ? [{ id: "none", name: "Alanı seçilmemiş", n: noArea }]
-              : []),
-          ].map((c) => (
-            <button
-              key={c.id || "all"}
-              type="button"
-              onClick={() => setArea(c.id)}
-              className={clsx(
-                "rounded-full border px-3.5 py-1.5 text-sm font-bold transition-colors",
-                area === c.id
-                  ? "border-ink bg-ink text-surface"
-                  : "border-slate-200 bg-surface text-slate-700 hover:border-slate-400",
-              )}
-            >
-              {c.name}{" "}
-              <span
-                className={clsx(
-                  "ml-1 font-semibold",
-                  area === c.id ? "text-white/70" : "text-slate-400",
-                )}
-              >
-                {c.n}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
       <Card className="overflow-hidden">
         {all.length > 0 && (
           <div className="flex flex-wrap gap-2 border-b border-slate-100 px-5 py-3">
@@ -1469,6 +1459,17 @@ export function Businesses() {
                 className="pl-9"
               />
             </div>
+            {(areaChips.length > 0 || noArea > 0) && (
+              <Select value={area} onChange={(e) => setArea(e.target.value)} aria-label="Alan" className="w-60!">
+                <option value="">Bütün alanlar · {all.length}</option>
+                {areaChips.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} · {c.n}
+                  </option>
+                ))}
+                {noArea > 0 && areaChips.length > 0 && <option value="none">Alanı seçilmemiş · {noArea}</option>}
+              </Select>
+            )}
             {manager && (
               <Select
                 value={coordinator}
@@ -1552,6 +1553,8 @@ export function Businesses() {
           </Table>
         )}
       </Card>
+      </>
+      )}
       <BusinessView
         business={viewing}
         onClose={() => setViewing(null)}
@@ -1575,7 +1578,6 @@ export function Businesses() {
       {manager && (
         <AreasDialog open={areasOpen} onClose={() => setAreasOpen(false)} />
       )}
-      <InternshipSettingsDialog open={settingsOpen && manager} onClose={closeSettings} />
     </div>
   );
 }
@@ -1975,9 +1977,11 @@ function BusinessForm({
 function AreasDialog({
   open,
   onClose,
+  inline,
 }: {
   open: boolean;
   onClose: () => void;
+  inline?: boolean;
 }) {
   const { schoolId } = useAuth();
   const base = useSchoolPath("internship");
@@ -2027,7 +2031,8 @@ function AreasDialog({
   );
 
   return (
-    <Modal
+    <SettingsPanel
+      inline={inline}
       open={open}
       onClose={onClose}
       size="xl"
@@ -2174,7 +2179,7 @@ function AreasDialog({
           </div>
         </div>
       )}
-    </Modal>
+    </SettingsPanel>
   );
 }
 

@@ -166,7 +166,11 @@ export function Timetable() {
     <>
       <PageHeader
         title="Ders Programı ve Sınıflar"
-        description="Sınıf seçip programını düzenleyin ya da e-Okul'dan indirdiğiniz ders programı PDF'ini yükleyin. Pano, zil saatine göre o anda hangi sınıfta hangi dersin ve öğretmenin olduğunu gösterir; teneffüste sıradaki dersi gösterir."
+        description={
+          editable
+            ? "Sınıf seçip programını düzenleyin ya da e-Okul'dan indirdiğiniz ders programı PDF'ini yükleyin. Pano, zil saatine göre o anda hangi sınıfta hangi dersin ve öğretmenin olduğunu gösterir; teneffüste sıradaki dersi gösterir."
+            : 'Okulun haftalık ders programı. Sınıf ya da öğretmen seçerek görüntüleyin.'
+        }
         actions={
           (editable || can('directory.manage')) && (
             <>

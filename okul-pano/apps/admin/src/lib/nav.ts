@@ -28,7 +28,6 @@ import {
   Trophy,
   UserCog,
   UserMinus,
-  UserCircle,
   Users,
   type LucideIcon,
 } from '../components/icons.tsx';
@@ -80,13 +79,12 @@ export const NAV: NavGroup[] = [
     items: [
       { to: '/', label: 'Genel Bakış', icon: LayoutDashboard },
       // Kendi ders programı, nöbetleri ve izinleri: müdür, müdür yardımcısı ve kadroda kaydı olan (görevli öğretmen)
-      { to: '/benim', label: 'Benim', icon: UserCircle, when: (_s, who) => who.role === 'owner' || who.role === 'admin' || Boolean(who.teacherId) },
     ],
   },
   {
     title: 'Pano',
     items: [
-      { to: '/duyurular', label: 'Duyurular', icon: Megaphone, permission: 'announcements.manage' },
+      { to: '/duyurular', label: 'Duyurular', icon: Megaphone, when: (_s, who) => who.can('announcements.manage') || Boolean(who.teacherId) },
       { to: '/kayan-yazi', label: 'Kayan Yazı', icon: TextCursorInput, permission: 'ticker.manage' },
       { to: '/sinavlar', label: 'Sınav Sayacı', icon: GraduationCap, permission: 'exams.manage' },
       { to: '/basarilar', label: 'Başarılar', icon: Trophy, permission: 'highlights.manage' },
@@ -99,7 +97,7 @@ export const NAV: NavGroup[] = [
   {
     title: 'Takvim ve Ders',
     items: [
-      { to: '/ders-programi', label: 'Ders Programı ve Sınıflar', icon: CalendarClock, permission: 'schedule.manage' },
+      { to: '/ders-programi', label: 'Ders Programı ve Sınıflar', icon: CalendarClock, when: (_s, who) => who.can('schedule.manage') || Boolean(who.teacherId) },
       { to: '/zil-saatleri', label: 'Zil Saatleri', icon: BellRing, permission: 'schedule.manage' },
       { to: '/sinav-takvimi', label: 'Sınav Takvimi', icon: ClipboardCheck },
       // Herkes görür; tatil ekleme Nöbet yetkisiyle, MEB takvimini düzeltme yalnızca platform yöneticisinde
@@ -109,7 +107,7 @@ export const NAV: NavGroup[] = [
   {
     title: 'Personel',
     items: [
-      { to: '/ogretmenler', label: 'Öğretmen Kadrosu', icon: Users, permission: 'directory.manage' },
+      { to: '/ogretmenler', label: 'Öğretmen Kadrosu', icon: Users, when: (_s, who) => who.can('directory.manage') || Boolean(who.teacherId) },
       { to: '/nobet', label: 'Nöbet Çizelgesi', icon: ShieldCheck, permission: 'duties.manage' },
       { to: '/izinler', label: 'İzinli Öğretmenler', icon: UserMinus, permission: 'leaves.manage' },
       // İzinli öğretmenin boş dersleri ve nöbet yeri: atama, istatistik, sınıf geçmişi (boş sayısı rozetli)
@@ -121,9 +119,9 @@ export const NAV: NavGroup[] = [
     title: 'Öğrenci Takibi',
     items: [
       { to: '/ogrenciler', label: 'Öğrenciler', icon: Cake, permission: 'students.manage' },
-      { to: '/gozlem', label: 'Öğrenci Gözlemleri', icon: ClipboardCheck, permission: 'conduct.counsel' },
-      { to: '/ayin-ogrencisi', label: 'Ayın Öğrencisi', icon: Star, permission: 'conduct.counsel' },
-      { to: '/donem-gostergesi', label: 'Dönem Göstergesi', icon: Gauge, permission: 'conduct.counsel' },
+      { to: '/gozlem', label: 'Öğrenci Gözlemleri', icon: ClipboardCheck, when: (_s, who) => who.can('conduct.counsel') || Boolean(who.teacherId) },
+      { to: '/ayin-ogrencisi', label: 'Ayın Öğrencisi', icon: Star, when: (_s, who) => who.can('conduct.counsel') || Boolean(who.teacherId) },
+      { to: '/donem-gostergesi', label: 'Dönem Göstergesi', icon: Gauge, when: (_s, who) => who.can('conduct.counsel') || Boolean(who.teacherId) },
       { to: '/rehberlik', label: 'Rehberlik Uyarıları', icon: HeartHandshake, permission: 'conduct.counsel' },
       { to: '/gozlem-kriterleri', label: 'Gözlem Kriterleri', icon: ListChecks, permission: 'conduct.manage' },
     ],
