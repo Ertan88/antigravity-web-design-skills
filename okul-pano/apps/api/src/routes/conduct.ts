@@ -26,12 +26,12 @@ import {
   type SchoolLevel,
   compareClassNames,
 } from '@okulpano/shared';
-import { and, asc, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lt, ne, sql } from 'drizzle-orm';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { audit, schoolGuard, UUID_RE, type AppDeps } from '../context.ts';
-import { academicCalendars, achievements, classGroups, conductAlerts, conductAwards, conductCriteria, conductEntries, memberships, schools, students, users } from '../db/schema.ts';
+import { academicCalendars, achievements, classGroups, conductAlerts, conductAwards, conductCriteria, conductEntries, conductHidden, memberships, schools, students, users } from '../db/schema.ts';
 import { badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 import { newWorkbook, sendXlsx, styleHeader, toBuffer, exportFileName } from '../lib/excel.ts';
 import { tell, usersWithPermission } from '../lib/push.ts';
@@ -260,7 +260,7 @@ export async function conductRoutes(app: FastifyInstance) {
       db
         .select({ classGroupId: students.classGroupId, n: sql<number>`count(*)::int` })
         .from(students)
-        .where(eq(students.schoolId, req.ctx.schoolId))
+        .where(and(eq(students.schoolId, req.ctx.schoolId), ne(students.status, 'left')))
         .groupBy(students.classGroupId),
     ]);
     const byClass = new Map(counts.map((c) => [c.classGroupId, c.n]));
@@ -290,11 +290,12 @@ export async function conductRoutes(app: FastifyInstance) {
     const cls = (await schoolClasses(deps, req.ctx.schoolId)).find((c) => c.id === id);
     if (!cls) throw notFound('Sınıf bulunamadı.');
     const { from, to } = monthBounds(month, tz);
-    const [list, sums, criteria] = await Promise.all([
+    const [list, sums, criteria, hidden] = await Promise.all([
+      // Okuldan ayrılan öğrenci listede yer almaz; sürekli devamsız ve öğretmenin kendi listesinden çıkardığı soluk görünür
       db
-        .select({ id: students.id, schoolNo: students.schoolNo, fullName: students.fullName })
+        .select({ id: students.id, schoolNo: students.schoolNo, fullName: students.fullName, status: students.status })
         .from(students)
-        .where(and(eq(students.schoolId, req.ctx.schoolId), eq(students.classGroupId, id))),
+        .where(and(eq(students.schoolId, req.ctx.schoolId), eq(students.classGroupId, id), ne(students.status, 'left'))),
       db
         .select({
           studentId: conductEntries.studentId,
@@ -317,8 +318,10 @@ export async function conductRoutes(app: FastifyInstance) {
         .from(conductCriteria)
         .where(and(eq(conductCriteria.schoolId, req.ctx.schoolId), eq(conductCriteria.level, cls.resolvedLevel), eq(conductCriteria.isActive, true)))
         .orderBy(asc(conductCriteria.sortOrder)),
+      db.select({ studentId: conductHidden.studentId }).from(conductHidden).where(eq(conductHidden.userId, req.ctx.userId)),
     ]);
     const bySt = new Map(sums.map((s) => [s.studentId, s]));
+    const hiddenSet = new Set(hidden.map((h) => h.studentId));
     // Okul numarası sayısal ise sayı sırasıyla (2, 10, 101), değilse alfabetik
     const noOrder = (a: string, b: string) => (/^\d+$/.test(a) && /^\d+$/.test(b) ? Number(a) - Number(b) : trCompare(a, b));
     return {
@@ -329,7 +332,7 @@ export async function conductRoutes(app: FastifyInstance) {
         .sort((a, b) => noOrder(a.schoolNo, b.schoolNo))
         .map((s) => {
           const t = bySt.get(s.id);
-          return { ...s, plus: t?.plus ?? 0, minus: t?.minus ?? 0, net: (t?.plus ?? 0) - (t?.minus ?? 0) };
+          return { ...s, hidden: hiddenSet.has(s.id), plus: t?.plus ?? 0, minus: t?.minus ?? 0, net: (t?.plus ?? 0) - (t?.minus ?? 0) };
         }),
     };
   });
@@ -349,10 +352,21 @@ export async function conductRoutes(app: FastifyInstance) {
     if (criterion.noteRequired && !note) throw badRequest(`"${criterion.label}" için kısa bir not yazın.`);
     const ids = [...new Set(body.studentIds)];
     const found = await db
-      .select({ id: students.id, fullName: students.fullName })
+      .select({ id: students.id, fullName: students.fullName, status: students.status })
       .from(students)
       .where(and(eq(students.schoolId, schoolId), inArray(students.id, ids)));
     if (found.length !== ids.length) throw badRequest('Öğrencilerden biri bulunamadı.');
+    // Sürekli devamsız ya da ayrılan öğrenciye ve kişinin kendi listesinden çıkardığı öğrenciye gözlem girilmez
+    const passive = found.filter((s) => s.status !== 'active');
+    if (passive.length) throw badRequest(`${passive.map((s) => s.fullName).join(', ')} pasif (${passive[0]!.status === 'left' ? 'okuldan ayrıldı' : 'sürekli devamsız'}); gözlem girilemez.`);
+    const mineHidden = await db
+      .select({ studentId: conductHidden.studentId })
+      .from(conductHidden)
+      .where(and(eq(conductHidden.userId, req.ctx.userId), inArray(conductHidden.studentId, ids)));
+    if (mineHidden.length) {
+      const names = found.filter((s) => mineHidden.some((h) => h.studentId === s.id)).map((s) => s.fullName);
+      throw badRequest(`${names.join(', ')} listenizden çıkarıldı; gözlem girmek için önce listenize geri alın.`);
+    }
     const batchId = randomUUID();
     const name = await userName(deps, req.ctx.userId);
     await db.insert(conductEntries).values(
@@ -422,11 +436,15 @@ export async function conductRoutes(app: FastifyInstance) {
     const id = idParam(req);
     const month = monthQuery(req);
     const [student] = await db
-      .select({ id: students.id, schoolNo: students.schoolNo, fullName: students.fullName, className: classGroups.name })
+      .select({ id: students.id, schoolNo: students.schoolNo, fullName: students.fullName, className: classGroups.name, status: students.status })
       .from(students)
       .leftJoin(classGroups, eq(classGroups.id, students.classGroupId))
       .where(and(eq(students.id, id), eq(students.schoolId, req.ctx.schoolId)));
     if (!student) throw notFound('Öğrenci bulunamadı.');
+    const [hiddenRow] = await db
+      .select({ id: conductHidden.id })
+      .from(conductHidden)
+      .where(and(eq(conductHidden.userId, req.ctx.userId), eq(conductHidden.studentId, id)));
     const { from, to } = monthBounds(month, req.ctx.school.timezone);
     const entries = await db
       .select({
@@ -456,7 +474,9 @@ export async function conductRoutes(app: FastifyInstance) {
     const canSeeAuthors = canSeeDetails(req);
     return {
       month,
-      student,
+      student: { ...student, hidden: Boolean(hiddenRow) },
+      // Öğrencinin durumunu (sürekli devamsız / ayrıldı) yalnızca öğrenci listesini yöneten idare değiştirir
+      canSetStatus: req.ctx.permissions.includes('students.manage'),
       totals: {
         net: entries.reduce((n, e) => n + e.points, 0),
         plus: plus.length,
@@ -473,6 +493,26 @@ export async function conductRoutes(app: FastifyInstance) {
         return { ...e, userName: canSeeAuthors || mine ? e.userName : null, mine };
       }),
     };
+  });
+
+  /**
+   * Öğretmenin kendi gözlem listesinden çıkarma (yalnızca kendisini etkiler): öğrenci soluk görünür, gözlem girilemez.
+   * DELETE ile listeye geri alınır.
+   */
+  app.post(`${base}/students/:id/hide`, member, async (req) => {
+    requireRecorder(req);
+    const id = idParam(req);
+    const [st] = await db.select({ id: students.id }).from(students).where(and(eq(students.id, id), eq(students.schoolId, req.ctx.schoolId)));
+    if (!st) throw notFound('Öğrenci bulunamadı.');
+    await db.insert(conductHidden).values({ schoolId: req.ctx.schoolId, userId: req.ctx.userId, studentId: id }).onConflictDoNothing();
+    return { hidden: true };
+  });
+
+  app.delete(`${base}/students/:id/hide`, member, async (req) => {
+    requireRecorder(req);
+    const id = idParam(req);
+    await db.delete(conductHidden).where(and(eq(conductHidden.userId, req.ctx.userId), eq(conductHidden.studentId, id), eq(conductHidden.schoolId, req.ctx.schoolId)));
+    return { hidden: false };
   });
 
   /* ---------- Dönem göstergesi ---------- */
@@ -495,7 +535,7 @@ export async function conductRoutes(app: FastifyInstance) {
     const list = await db
       .select({ id: students.id, schoolNo: students.schoolNo, fullName: students.fullName, classGroupId: students.classGroupId })
       .from(students)
-      .where(and(eq(students.schoolId, req.ctx.schoolId), inArray(students.classGroupId, classes.map((c) => c.id))));
+      .where(and(eq(students.schoolId, req.ctx.schoolId), inArray(students.classGroupId, classes.map((c) => c.id)), ne(students.status, 'left')));
     const where = [
       eq(conductEntries.schoolId, req.ctx.schoolId),
       inArray(conductEntries.studentId, list.length ? list.map((s) => s.id) : [randomUUID()]),
@@ -667,6 +707,8 @@ export async function conductRoutes(app: FastifyInstance) {
           eq(conductEntries.schoolId, ctx.schoolId),
           gte(conductEntries.createdAt, from),
           lt(conductEntries.createdAt, to),
+          // Sürekli devamsız ve ayrılan öğrenci ayın öğrencisi önerilmez
+          eq(students.status, 'active'),
           ...(classIds ? [inArray(students.classGroupId, classIds)] : []),
         ),
       );

@@ -465,10 +465,37 @@ export const students = pgTable(
     listNo: integer('list_no'),
     /** İşletmelerde mesleki eğitim: öğrencinin gittiği işletme */
     businessId: uuid('business_id').references((): AnyPgColumn => businesses.id, { onDelete: 'set null' }),
+    /**
+     * Okul idaresinin belirlediği durum (bütün kullanıcıları etkiler): 'absent' sürekli devamsız (listelerde soluk,
+     * gözlem girilmez), 'left' okuldan ayrıldı (listelerden çıkar; kayıt ve geçmiş silinmez, geri alınabilir).
+     */
+    status: text('status').$type<StudentStatus>().notNull().default('active'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [index('students_school_idx').on(t.schoolId), uniqueIndex('students_school_no_uq').on(t.schoolId, t.schoolNo)],
+);
+
+export type StudentStatus = 'active' | 'absent' | 'left';
+
+/**
+ * Öğretmenin kendi gözlem listesinden çıkardığı öğrenciler: yalnızca o kişide soluk görünür ve gözlem girilemez,
+ * diğer kullanıcıları etkilemez. Devamsızlık bilgisi saklanmaz; yalnızca "listemden çıkardım".
+ */
+export const conductHidden = pgTable(
+  'conduct_hidden',
+  {
+    id: pk(),
+    schoolId: schoolId(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => students.id, { onDelete: 'cascade' }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('conduct_hidden_user_student_uq').on(t.userId, t.studentId)],
 );
 
 /**

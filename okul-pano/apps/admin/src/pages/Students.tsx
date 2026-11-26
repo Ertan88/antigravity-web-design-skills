@@ -152,8 +152,19 @@ export function Students() {
   const [classFilter, setClassFilter] = useState('');
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const pdfInput = useRef<HTMLInputElement>(null);
-  const { can } = useAuth();
+  const { can, schoolId } = useAuth();
   const studentsPath = useSchoolPath('students');
+  const qcStatus = useQueryClient();
+  const toastStatus = useToast();
+  const changeStatus = async (r: Student, status: 'active' | 'absent' | 'left') => {
+    try {
+      await api(`${studentsPath}/${r.id}/status`, { method: 'PUT', body: { status } });
+      await qcStatus.invalidateQueries({ queryKey: [schoolId] });
+      toastStatus.success(status === 'left' ? `${r.fullName}: okuldan ayrıldı (listelerden çıkarıldı)` : status === 'absent' ? `${r.fullName}: sürekli devamsız` : `${r.fullName}: yeniden etkin`);
+    } catch (err) {
+      toastStatus.error(errorText(err, 'Durum değiştirilemedi'));
+    }
+  };
   const classes = useList<ClassGroup>('classes');
   const studentCount = useList<Student>('students').data?.length ?? 0;
   const school = useSchool();
@@ -269,6 +280,31 @@ export function Students() {
           },
           { header: 'Sınıf', cell: (r) => <span className="text-slate-600">{classNames.get(r.classGroupId ?? '') ?? '—'}</span> },
           { header: 'Doğum tarihi', cell: (r) => <span className="whitespace-nowrap text-slate-600">{formatDate(r.birthDate)}</span> },
+          // Sürekli devamsız / okuldan ayrıldı: bütün kullanıcılarda geçerli; ayrılan öğrenci silinmez, buradan geri alınır
+          {
+            header: 'Durum',
+            cell: (r) =>
+              can('students.manage') ? (
+                <span onClick={(e) => e.stopPropagation()}>
+                  <Select
+                    value={r.status ?? 'active'}
+                    onChange={(e) => void changeStatus(r, e.target.value as 'active' | 'absent' | 'left')}
+                    className="h-9 w-44"
+                    aria-label={`${r.fullName} durumu`}
+                  >
+                    <option value="active">Etkin</option>
+                    <option value="absent">Sürekli devamsız</option>
+                    <option value="left">Okuldan ayrıldı</option>
+                  </Select>
+                </span>
+              ) : r.status === 'absent' ? (
+                <Badge tone="amber">Sürekli devamsız</Badge>
+              ) : r.status === 'left' ? (
+                <Badge tone="slate">Okuldan ayrıldı</Badge>
+              ) : (
+                <span className="text-slate-400">Etkin</span>
+              ),
+          },
         ]}
         emptyForm={() => ({ listNo: '', schoolNo: '', fullName: '', classGroupId: '', birthDate: '' })}
         toForm={(r) => ({ listNo: r.listNo ? String(r.listNo) : '', schoolNo: r.schoolNo, fullName: r.fullName, classGroupId: r.classGroupId ?? '', birthDate: r.birthDate })}

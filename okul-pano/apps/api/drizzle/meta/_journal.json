@@ -414,6 +414,13 @@
       "when": 1797600000000,
       "tag": "0058_no_default_teacher_options",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1797700000000,
+      "tag": "0059_student_status",
+      "breakpoints": true
     }
   ]
 }

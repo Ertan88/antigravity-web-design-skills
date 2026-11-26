@@ -36,6 +36,9 @@ const surname = (full: string) => {
   return p.length > 1 ? p[p.length - 1]! : '';
 };
 
+/** Soluk ve puan verilemez: idarenin pasif yaptığı ya da kişinin kendi listesinden çıkardığı öğrenci */
+const passiveOf = (st: { status?: string; hidden?: boolean }) => Boolean(st.hidden || (st.status && st.status !== 'active'));
+
 export default function Gozlem() {
   const back = useTabBack('gozlem');
   const { me, can } = useAuth();
@@ -134,7 +137,8 @@ export default function Gozlem() {
             icon="people"
             label="Tüm sınıfa"
             onPress={() => {
-              setSelected(s.students.map((x) => x.id));
+              // Pasif öğrenciler (sürekli devamsız, listemden çıkarılan) toplu puana katılmaz
+              setSelected(s.students.filter((x) => !passiveOf(x)).map((x) => x.id));
               setSheet(true);
             }}
           />
@@ -161,12 +165,14 @@ export default function Gozlem() {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {list.map((st) => {
             const on = selected.includes(st.id) && (multi || sheet);
+            const off = passiveOf(st);
             return (
               <Pressable
                 key={st.id}
                 accessibilityRole="button"
-                accessibilityLabel={`${st.fullName}, numara ${st.schoolNo}, bu ay ${signed(st.net)}`}
-                onPress={() => tapStudent(st.id)}
+                accessibilityLabel={`${st.fullName}, numara ${st.schoolNo}, bu ay ${signed(st.net)}${off ? ', pasif' : ''}`}
+                // Pasif öğrenciye artı/eksi verilmez: dokununca genel durum sayfası açılır (oradan listeye geri alınır)
+                onPress={() => (off ? router.push(`/ogrenci/${st.id}` as never) : tapStudent(st.id))}
                 onLongPress={() => router.push(`/ogrenci/${st.id}` as never)}
                 style={({ pressed }) => ({
                   width: '31.8%',
@@ -175,7 +181,7 @@ export default function Gozlem() {
                   borderWidth: on ? 2 : 1,
                   borderColor: on ? colors.ink : colors.border,
                   padding: on ? 9 : 10,
-                  opacity: pressed ? 0.8 : 1,
+                  opacity: off ? 0.42 : pressed ? 0.8 : 1,
                 })}
               >
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -191,7 +197,9 @@ export default function Gozlem() {
                     {surname(st.fullName)}
                   </Text>
                 </View>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: colors.faint }}>No {st.schoolNo}</Text>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: colors.faint }} numberOfLines={1}>
+                  {st.status === 'absent' ? 'Sürekli devamsız' : st.hidden ? 'Listemde değil' : `No ${st.schoolNo}`}
+                </Text>
               </Pressable>
             );
           })}

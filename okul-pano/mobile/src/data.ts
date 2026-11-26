@@ -410,11 +410,15 @@ export interface ConductClassScreen {
   month: string;
   class: { id: string; name: string; level: SchoolLevel };
   criteria: ConductCriterion[];
-  students: { id: string; schoolNo: string; fullName: string; plus: number; minus: number; net: number }[];
+  /** status: idarenin belirlediği durum (absent: sürekli devamsız); hidden: kişinin kendi listesinden çıkardığı */
+  students: { id: string; schoolNo: string; fullName: string; status?: StudentStatus; hidden?: boolean; plus: number; minus: number; net: number }[];
 }
+export type StudentStatus = 'active' | 'absent' | 'left';
 export interface ConductStudentCard {
   month: string;
-  student: { id: string; schoolNo: string; fullName: string; className: string | null };
+  student: { id: string; schoolNo: string; fullName: string; className: string | null; status?: StudentStatus; hidden?: boolean };
+  /** Durumu (sürekli devamsız / ayrıldı) yalnızca öğrenci listesini yöneten idare değiştirir */
+  canSetStatus?: boolean;
   totals: { net: number; plus: number; minus: number; plusPoints: number; minusPoints: number; teachers: number };
   byCriterion: { label: string; group: ConductGroup; points: number; count: number }[];
   entries: { id: string; group: ConductGroup; label: string; points: number; note: string | null; userName: string | null; createdAt: string; mine: boolean }[];

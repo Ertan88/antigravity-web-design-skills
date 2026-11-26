@@ -216,3 +216,51 @@ describe('gözlem', () => {
     expect(deleted).toBe(1);
   });
 });
+
+describe('öğrenci durumu ve öğretmenin kendi listesi', () => {
+  type Row = { id: string; fullName: string; status: string; hidden: boolean };
+  let deniz = '';
+  let plus = '';
+  const list = async (c: ReturnType<typeof client>) => ((await c.get(`${base}/conduct/classes/${classId}/students`)).json().students as Row[]);
+  beforeAll(async () => {
+    expectStatus(await owner.post(`${base}/students/import`, { rows: [{ schoolNo: '44', fullName: 'Deniz Er', className: '9-A', birthDate: '2010-01-05' }] }), 200);
+    deniz = ((await owner.get(`${base}/students`)).json() as { id: string; fullName: string }[]).find((s) => s.fullName === 'Deniz Er')!.id;
+    const criteria = (await owner.get(`${base}/conduct/criteria?level=high`)).json() as { id: string; points: number; noteRequired: boolean }[];
+    plus = criteria.find((c) => c.points > 0 && !c.noteRequired)!.id;
+  });
+
+  it('öğretmen öğrenciyi kendi listesinden çıkarır: yalnızca onda soluk, gözlem giremez; diğerlerini etkilemez', async () => {
+    const [t1, t2] = [teachers[0]!, teachers[1]!];
+    expectStatus(await t1.post(`${base}/conduct/students/${deniz}/hide`), 200);
+    expect((await list(t1)).find((s) => s.id === deniz)).toMatchObject({ hidden: true, status: 'active' });
+    expect((await list(t2)).find((s) => s.id === deniz)).toMatchObject({ hidden: false });
+    const blocked = await t1.post(`${base}/conduct/entries`, { studentIds: [deniz], criterionId: plus });
+    expect(blocked.statusCode).toBe(400);
+    expect(blocked.json().message).toContain('listenizden çıkarıldı');
+    expectStatus(await t2.post(`${base}/conduct/entries`, { studentIds: [deniz], criterionId: plus }), 200);
+    // Listeye geri alınır
+    expectStatus(await t1.del(`${base}/conduct/students/${deniz}/hide`), 200);
+    expect((await list(t1)).find((s) => s.id === deniz)?.hidden).toBe(false);
+  });
+
+  it('idare durumu değiştirir: sürekli devamsız herkeste soluk ve gözlem girilmez; ayrılan listelerden çıkar, silinmez', async () => {
+    // Öğretmen durumu değiştiremez
+    expect((await teachers[0]!.put(`${base}/students/${deniz}/status`, { status: 'absent' })).statusCode).toBe(403);
+    expectStatus(await owner.put(`${base}/students/${deniz}/status`, { status: 'absent' }), 200);
+    expect((await list(teachers[1]!)).find((s) => s.id === deniz)?.status).toBe('absent');
+    const blocked = await teachers[1]!.post(`${base}/conduct/entries`, { studentIds: [deniz], criterionId: plus });
+    expect(blocked.statusCode).toBe(400);
+    expect(blocked.json().message).toContain('sürekli devamsız');
+    // Sürekli devamsız ayın öğrencisi önerilmez
+    const month = new Date().toISOString().slice(0, 7);
+    const cand = (await owner.get(`${base}/conduct/awards/candidates?month=${month}&scope=school&key=`)).json() as { candidates: { studentId: string }[] };
+    expect(cand.candidates.map((c) => c.studentId)).not.toContain(deniz);
+
+    expectStatus(await owner.put(`${base}/students/${deniz}/status`, { status: 'left' }), 200);
+    expect((await list(teachers[1]!)).some((s) => s.id === deniz)).toBe(false);
+    // Kayıt silinmez: öğrenci listesinde durumuyla görünür, geri alınabilir
+    expect(((await owner.get(`${base}/students`)).json() as { id: string; status: string }[]).find((s) => s.id === deniz)?.status).toBe('left');
+    expectStatus(await owner.put(`${base}/students/${deniz}/status`, { status: 'active' }), 200);
+    expect((await list(teachers[1]!)).find((s) => s.id === deniz)?.status).toBe('active');
+  });
+});

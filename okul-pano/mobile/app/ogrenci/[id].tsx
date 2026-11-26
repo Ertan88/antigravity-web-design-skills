@@ -5,11 +5,11 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { api } from '../../src/api.ts';
 import { useSchoolPath } from '../../src/auth.tsx';
-import { useConductStudent } from '../../src/data.ts';
+import { useConductStudent, type StudentStatus } from '../../src/data.ts';
 import { clock } from '../../src/day.ts';
 import { Text } from '../../src/text.tsx';
 import { colors } from '../../src/theme.ts';
-import { BentoRow, Card, confirm, DeleteIconButton, Empty, ErrorNote, Icon, Loading, Screen, SectionTitle, T, Tile } from '../../src/ui.tsx';
+import { BentoRow, Button, Card, confirm, DeleteIconButton, Empty, ErrorNote, Icon, Loading, Screen, SectionTitle, Segmented, T, Tile } from '../../src/ui.tsx';
 
 const shortStamp = (iso: string) => `${new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short' }).format(new Date(iso))} ${clock(iso)}`;
 
@@ -34,9 +34,30 @@ export default function StudentCard() {
   const [month, setMonth] = useState(thisMonth());
   const card = useConductStudent(id, month);
   const path = useSchoolPath('conduct');
+  const studentsPath = useSchoolPath('students');
   const qc = useQueryClient();
   const d = card.data;
   const top = d ? Math.max(1, ...d.byCriterion.map((c) => Math.abs(c.points))) : 1;
+
+  const refresh = () => void qc.invalidateQueries({ predicate: (q) => String(q.queryKey[1] ?? '').startsWith('conduct/') });
+  const [busy, setBusy] = useState(false);
+  // Öğretmenin kendi listesi: yalnızca kendisinde soluk görünür, artı/eksi verilemez; diğer kullanıcıları etkilemez
+  const toggleHidden = async () => {
+    if (!d) return;
+    setBusy(true);
+    await api(`${path}/students/${id}/hide`, { method: d.student.hidden ? 'DELETE' : 'POST' }).catch(() => undefined);
+    setBusy(false);
+    refresh();
+  };
+  // İdare: bütün kullanıcılarda geçerli durum
+  const setStatus = async (status: StudentStatus) => {
+    if (!d || status === (d.student.status ?? 'active')) return;
+    if (status === 'left' && !(await confirm('Okuldan ayrıldı olarak işaretlensin mi?', "Öğrenci bütün kullanıcıların listelerinden çıkar. Kayıtları silinmez; Öğrenci Listesi'nden geri alınabilir.", 'İşaretle'))) return;
+    setBusy(true);
+    await api(`${studentsPath}/${id}/status`, { method: 'PUT', body: { status } }).catch(() => undefined);
+    setBusy(false);
+    void qc.invalidateQueries();
+  };
 
   const remove = async (entryId: string) => {
     if (!(await confirm('Kayıt silinsin mi?', 'Bu gözlem kaydı silinir.', 'Sil'))) return;
@@ -95,6 +116,37 @@ export default function StudentCard() {
               <Tile tone="rose" icon="remove-circle-outline" label="Eksi" value={d.totals.minus} caption={`kayıt · −${d.totals.minusPoints}`} style={{ flex: 1 }} />
             </View>
           </BentoRow>
+          <Card style={{ gap: 10 }}>
+            <Text style={{ fontSize: 14, fontWeight: '800', color: colors.ink }}>Öğrencinin durumu</Text>
+            <T size={13} color={colors.muted}>
+              {d.student.status === 'absent'
+                ? 'Sürekli devamsız: bütün kullanıcılarda soluk, artı ve eksi verilemez.'
+                : d.student.status === 'left'
+                  ? 'Okuldan ayrıldı: listelerde görünmez.'
+                  : d.student.hidden
+                    ? 'Listenizden çıkardınız: yalnızca sizde soluk, artı ve eksi veremezsiniz.'
+                    : 'Etkin'}
+            </T>
+            <Button variant="secondary" icon={d.student.hidden ? 'eye-outline' : 'eye-off-outline'} loading={busy} onPress={() => void toggleHidden()}>
+              {d.student.hidden ? 'Listeme geri al' : 'Listemden çıkar'}
+            </Button>
+            {d.canSetStatus && (
+              <>
+                <T size={12} color={colors.faint}>
+                  İdare için: bütün kullanıcılarda geçerli
+                </T>
+                <Segmented
+                  value={d.student.status ?? 'active'}
+                  onChange={(v) => void setStatus(v)}
+                  options={[
+                    { value: 'active', label: 'Etkin' },
+                    { value: 'absent', label: 'Sürekli devamsız' },
+                    { value: 'left', label: 'Ayrıldı' },
+                  ]}
+                />
+              </>
+            )}
+          </Card>
           <SectionTitle>Kayıtlar</SectionTitle>
           {d.entries.length ? (
             <Card style={{ paddingVertical: 4, gap: 0 }}>

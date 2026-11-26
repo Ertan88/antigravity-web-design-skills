@@ -10,7 +10,7 @@ import {
   zonedParts,
   type DisplayState,
 } from '@okulpano/shared';
-import { and, asc, desc, eq, gt, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, isNull, lte, ne, or, sql } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { UUID_RE } from '../context.ts';
@@ -197,7 +197,8 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
       })
       .from(students)
       .leftJoin(classGroups, eq(classGroups.id, students.classGroupId))
-      .where(and(eq(students.schoolId, id), inArray(sql`to_char(${students.birthDate}, 'MM-DD')`, monthDays)))
+      // Okuldan ayrılan öğrencinin doğum günü panoda çıkmaz
+      .where(and(eq(students.schoolId, id), ne(students.status, 'left'), inArray(sql`to_char(${students.birthDate}, 'MM-DD')`, monthDays)))
       .orderBy(asc(classGroups.name), asc(students.fullName)),
     db
       .select()

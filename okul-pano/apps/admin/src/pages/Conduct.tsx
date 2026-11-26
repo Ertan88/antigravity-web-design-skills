@@ -52,11 +52,18 @@ interface ClassScreen {
   month: string;
   class: { id: string; name: string; level: SchoolLevel };
   criteria: Criterion[];
-  students: { id: string; schoolNo: string; fullName: string; plus: number; minus: number; net: number }[];
+  /** status: idarenin belirlediği durum (absent: sürekli devamsız); hidden: kişinin kendi listesinden çıkardığı */
+  students: { id: string; schoolNo: string; fullName: string; status?: StudentStatus; hidden?: boolean; plus: number; minus: number; net: number }[];
 }
+type StudentStatus = 'active' | 'absent' | 'left';
+/** Soluk ve seçilemez: idarenin pasif yaptığı ya da kişinin kendi listesinden çıkardığı öğrenci */
+const isPassive = (st: { status?: StudentStatus; hidden?: boolean }) => Boolean(st.hidden || (st.status && st.status !== 'active'));
+
 interface StudentCardData {
   month: string;
-  student: { id: string; schoolNo: string; fullName: string; className: string | null };
+  student: { id: string; schoolNo: string; fullName: string; className: string | null; status?: StudentStatus; hidden?: boolean };
+  /** Durumu (sürekli devamsız / ayrıldı) yalnızca öğrenci listesini yöneten idare değiştirir */
+  canSetStatus?: boolean;
   totals: { net: number; plus: number; minus: number; plusPoints: number; minusPoints: number; teachers: number };
   byCriterion: { label: string; group: ConductGroup; points: number; count: number }[];
   entries: { id: string; group: ConductGroup; label: string; points: number; note: string | null; userName: string | null; createdAt: string; mine: boolean }[];
@@ -234,6 +241,25 @@ function StudentCard({ studentId, month, criteria, onClose, readOnly }: { studen
   });
   const d = card.data;
   const picked = criteria.find((c) => c.id === pick);
+  // Kişinin kendi listesinden çıkarma (yalnızca kendisini etkiler) ve idarenin durum değişikliği (herkesi etkiler)
+  const hide = useMutation({
+    mutationFn: (on: boolean) => api(`${path}/students/${studentId}/hide`, { method: on ? 'POST' : 'DELETE' }),
+    onSuccess: (_r, on) => {
+      toast.success(on ? 'Listenizden çıkarıldı; yalnızca sizde soluk görünür' : 'Listenize geri alındı');
+      refresh();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const setStatus = useMutation({
+    mutationFn: (status: StudentStatus) => api(`/api/schools/${schoolId}/students/${studentId}/status`, { method: 'PUT', body: { status } }),
+    onSuccess: (_r, status) => {
+      toast.success(status === 'left' ? 'Okuldan ayrıldı: bütün listelerden çıkarıldı' : status === 'absent' ? 'Sürekli devamsız: bütün kullanıcılarda pasif' : 'Öğrenci yeniden etkin');
+      void qc.invalidateQueries({ queryKey: [schoolId] });
+      if (status === 'left') onClose();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const passive = Boolean(d && (d.student.hidden || (d.student.status ?? 'active') !== 'active'));
   return (
     <Modal open={Boolean(studentId)} onClose={onClose} size="lg" title={d ? d.student.fullName : 'Öğrenci'} description={d ? `${d.student.className ?? 'Sınıfsız'} · No ${d.student.schoolNo} · ${monthLabel(month)}` : undefined}>
       {!d ? (
@@ -273,6 +299,36 @@ function StudentCard({ studentId, month, criteria, onClose, readOnly }: { studen
           )}
 
           {!readOnly && (
+            <div className="flex flex-wrap items-center gap-2 rounded-3xl p-4 ring-1 ring-slate-200">
+              <div className="mr-auto text-sm">
+                <div className="font-extrabold">Öğrencinin durumu</div>
+                <div className="text-slate-500">
+                  {d.student.status === 'absent'
+                    ? 'Sürekli devamsız: bütün kullanıcılarda soluk, gözlem girilmez.'
+                    : d.student.hidden
+                      ? 'Listenizden çıkardınız: yalnızca sizde soluk, gözlem girilmez.'
+                      : 'Etkin'}
+                </div>
+              </div>
+              <Button variant="secondary" size="sm" loading={hide.isPending} onClick={() => hide.mutate(!d.student.hidden)}>
+                {d.student.hidden ? 'Listeme geri al' : 'Listemden çıkar'}
+              </Button>
+              {d.canSetStatus && (
+                <Select
+                  value={d.student.status ?? 'active'}
+                  onChange={(e) => setStatus.mutate(e.target.value as StudentStatus)}
+                  className="w-48"
+                  aria-label="Öğrencinin durumu (bütün kullanıcılar)"
+                >
+                  <option value="active">Etkin</option>
+                  <option value="absent">Sürekli devamsız</option>
+                  <option value="left">Okuldan ayrıldı</option>
+                </Select>
+              )}
+            </div>
+          )}
+
+          {!readOnly && !passive && (
           <div className="rounded-3xl p-4 ring-1 ring-slate-200">
             <div className="mb-2 text-sm font-extrabold">Puan ver</div>
             <GroupedRows
@@ -433,6 +489,7 @@ export function ConductStudents() {
     enabled: Boolean(active),
   });
   const s = screen.data;
+  const activeStudents = (s?.students ?? []).filter((x) => !isPassive(x));
   return (
     <>
       <PageHeader
@@ -490,11 +547,11 @@ export function ConductStudents() {
                     type="checkbox"
                     aria-label="Bütün sınıfı seç"
                     className="size-4 accent-ink"
-                    checked={selected.length === s.students.length}
+                    checked={selected.length > 0 && selected.length === activeStudents.length}
                     ref={(el) => {
-                      if (el) el.indeterminate = selected.length > 0 && selected.length < s.students.length;
+                      if (el) el.indeterminate = selected.length > 0 && selected.length < activeStudents.length;
                     }}
-                    onChange={(e) => setSelected(e.target.checked ? s.students.map((x) => x.id) : [])}
+                    onChange={(e) => setSelected(e.target.checked ? activeStudents.map((x) => x.id) : [])}
                   />,
                   'Okul no',
                   'Ad soyad',
@@ -504,13 +561,16 @@ export function ConductStudents() {
                   '',
                 ]}
               >
-                {s.students.map((st) => (
-                  <tr key={st.id} className={clsx('cursor-pointer hover:bg-slate-50', selected.includes(st.id) && 'bg-slate-50')} onClick={() => setOpen(st.id)}>
+                {s.students.map((st) => {
+                  const off = isPassive(st);
+                  return (
+                  <tr key={st.id} className={clsx('cursor-pointer hover:bg-slate-50', selected.includes(st.id) && 'bg-slate-50', off && 'opacity-45')} onClick={() => setOpen(st.id)}>
                     <td className="w-10 py-3 pl-5 align-middle" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         aria-label={`${st.fullName} seç`}
                         className="size-4 accent-ink"
+                        disabled={off}
                         checked={selected.includes(st.id)}
                         onChange={() => setSelected((cur) => (cur.includes(st.id) ? cur.filter((x) => x !== st.id) : [...cur, st.id]))}
                       />
@@ -520,6 +580,11 @@ export function ConductStudents() {
                       <span className="flex items-center gap-3 font-bold text-ink">
                         <Avatar name={st.fullName} size="size-8" />
                         {st.fullName}
+                        {st.status === 'absent' ? (
+                          <Badge tone="amber">Sürekli devamsız</Badge>
+                        ) : st.hidden ? (
+                          <Badge tone="slate">Listemden çıkarıldı</Badge>
+                        ) : null}
                       </span>
                     </Td>
                     <Td className="font-semibold text-emerald-700 tabular-nums">{st.plus ? `+${st.plus}` : '—'}</Td>
@@ -531,7 +596,8 @@ export function ConductStudents() {
                       <ArrowUpRight className="ml-auto size-4 text-slate-400" />
                     </Td>
                   </tr>
-                ))}
+                  );
+                })}
               </Table>
               </>
             )}

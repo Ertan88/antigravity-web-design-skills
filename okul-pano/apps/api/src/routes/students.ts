@@ -1,12 +1,12 @@
 import { compareClassNames, normalizeClassName, normalizeName, studentImportSchema, studentSchema, trCompare, schoolFullName } from '@okulpano/shared';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { audit, schoolGuard } from '../context.ts';
+import { audit, schoolGuard, UUID_RE } from '../context.ts';
 import type { DB } from '../db/client.ts';
 import { classGroups, students, teachers } from '../db/schema.ts';
 import { applyAdvisor } from '../lib/advisor.ts';
-import { parse } from '../lib/errors.ts';
+import { notFound, parse } from '../lib/errors.ts';
 import { exportFileName, sendXlsx } from '../lib/excel.ts';
 import { badRequest } from '../lib/errors.ts';
 import { parseClassListPdf } from '../lib/sheets/eokulStudents.ts';
@@ -77,6 +77,26 @@ export async function studentRoutes(app: FastifyInstance) {
     toRow: (i) => ({ ...i, classGroupId: i.classGroupId ?? null }),
   });
 
+  /**
+   * Öğrencinin durumu (yalnızca idare; bütün kullanıcıları etkiler): sürekli devamsız ya da okuldan ayrıldı.
+   * Ayrılan öğrenci gözlem ve diğer listelerden çıkar ama silinmez; "Etkin" ile geri alınır.
+   */
+  app.put(`${base}/:id/status`, write, async (req) => {
+    const { id } = req.params as { id: string };
+    if (!UUID_RE.test(id)) throw notFound();
+    const { status } = parse(z.object({ status: z.enum(['active', 'absent', 'left']) }), req.body);
+    const [row] = await db
+      .update(students)
+      .set({ status })
+      .where(and(eq(students.id, id), eq(students.schoolId, req.ctx.schoolId)))
+      .returning({ id: students.id, fullName: students.fullName });
+    if (!row) throw notFound('Öğrenci bulunamadı.');
+    const text = { active: 'etkin', absent: 'sürekli devamsız', left: 'okuldan ayrıldı' }[status];
+    await audit(req, 'update', 'Öğrenci durumu', id, `${row.fullName}: ${text}`);
+    bus.contentChanged(req.ctx.schoolId);
+    return { id, status };
+  });
+
   /** Öğrenci listesini tamamen siler (sınıflar kalır; ders programında kullanılırlar) */
   app.post(`${base}/delete-all`, write, async (req) => {
     parse(z.object({ confirm: z.literal('delete-all', { error: 'Silme onayı eksik' }) }), req.body);
@@ -87,7 +107,7 @@ export async function studentRoutes(app: FastifyInstance) {
   });
 
   /**
-   * Toplu içe aktarma (Excel önizlemesinden ya da yapıştırılan listeden). Eksik sınıflar oluşturulur;
+   * Toplu içe aktarma (Excel ya da e-Okul PDF önizlemesinden). Eksik sınıflar oluşturulur;
    * aynı okul numaralı öğrenci varsa yeni kayıt açılmaz, adı, sınıfı ve doğum tarihi güncellenir.
    */
   app.post(`${base}/import`, write, async (req) => {

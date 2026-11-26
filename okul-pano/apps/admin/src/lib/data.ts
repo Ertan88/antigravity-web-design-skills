@@ -108,6 +108,8 @@ export interface Student extends Base {
   birthDate: string;
   /** e-Okul sınıf listesindeki sıra numarası (S.No) */
   listNo: number | null;
+  /** İdarenin belirlediği durum: sürekli devamsız ya da okuldan ayrıldı (bütün kullanıcıları etkiler) */
+  status?: 'active' | 'absent' | 'left';
 }
 export interface BellSchedule extends Base {
   name: string;
