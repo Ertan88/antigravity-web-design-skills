@@ -211,7 +211,16 @@ export function Select({
   name,
   'aria-label': ariaLabel,
   plain,
-}: SelectHTMLAttributes<HTMLSelectElement> & { invalid?: boolean; /** Kutu stili tamamen className'den (ör. tablo içi küçük alanlar) */ plain?: boolean }) {
+  onClear,
+  clearLabel = 'Kaldır',
+}: SelectHTMLAttributes<HTMLSelectElement> & {
+  invalid?: boolean;
+  /** Kutu stili tamamen className'den (ör. tablo içi küçük alanlar) */
+  plain?: boolean;
+  /** Dolu kutuda ok yerine kırmızı ×: seçimi kaldırır (ortak sil görünümü) */
+  onClear?: () => void;
+  clearLabel?: string;
+}) {
   const options = collectOptions(children);
   const [inner, setInner] = useState(String(defaultValue ?? options[0]?.value ?? ''));
   const current = value !== undefined ? String(value) : inner;
@@ -299,8 +308,11 @@ export function Select({
     }
   };
 
+  const clearable = Boolean(onClear && current && !disabled);
+  // × varken kutu ve düğme aynı konumda üst üste durur; yoksa sarmalayıcı yok (yerleşim değişmez)
+  const Wrap = clearable ? 'span' : Fragment;
   return (
-    <>
+    <Wrap {...(clearable ? { className: 'relative block' } : {})}>
       <button
         ref={button}
         id={id}
@@ -317,8 +329,24 @@ export function Select({
         className={clsx(plain ? 'flex cursor-pointer items-center gap-1.5 text-left disabled:cursor-default' : [control, 'flex h-10 cursor-pointer items-center gap-2 text-left disabled:cursor-default'], invalid && 'ring-red-400', className)}
       >
         <span className="min-w-0 flex-1 truncate">{selected?.label}</span>
-        <ChevronDown className={clsx('size-4 shrink-0 text-slate-500 transition-transform', open && 'rotate-180')} />
+        {clearable ? (
+          // Düğme içinde düğme olmasın: × ayrı düğmedir, okun yerine üstte durur
+          <span className="size-6 shrink-0" aria-hidden="true" />
+        ) : (
+          <ChevronDown className={clsx('size-4 shrink-0 text-slate-500 transition-transform', open && 'rotate-180')} />
+        )}
       </button>
+      {clearable && (
+        <button
+          type="button"
+          aria-label={clearLabel}
+          title={clearLabel}
+          onClick={() => onClear!()}
+          className={clsx('absolute top-1/2 right-1.5 flex size-6 -translate-y-1/2 items-center justify-center rounded-lg', DELETE_TONE)}
+        >
+          <X className="size-3.5" />
+        </button>
+      )}
       {open &&
         pos &&
         createPortal(
@@ -357,7 +385,7 @@ export function Select({
           </div>,
           document.body,
         )}
-    </>
+    </Wrap>
   );
 }
 

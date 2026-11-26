@@ -7,6 +7,7 @@ import { ExcelImportDialog, NewTeachersOption, type ImportPreview } from '../com
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Badge, Button, Card, EmptyState, Select, Spinner } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
+import { formatDate } from '../lib/format.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useList, useSchool, useSchoolPath, type Duty, type Leave, type Teacher } from '../lib/data.ts';
 import {
@@ -55,7 +56,17 @@ function TransportCell({
   onSave: (ids: string[]) => Promise<void>;
 }) {
   const [state, run] = useSaveState();
+  const toast = useToast();
   const ids = assigned.map((t) => t.id);
+  const remove = (i: number) => {
+    const before = ids;
+    const name = assigned[i]?.fullName ?? 'Görevli';
+    // Kayıt başarılı olursa "Geri al"lı bildirim (hata olursa kaydetme zaten hata gösterir)
+    void run(async () => {
+      await onSave(ids.filter((_, j) => j !== i));
+      toast.success(`${name}, ${formatDate(day.iso).replace(/ \d{4}$/, '')} servis nöbetinden çıkarıldı.`, { label: 'Geri al', onClick: () => void run(() => onSave(before)) });
+    });
+  };
   const known = new Set([...dutyTeachers, ...otherTeachers].map((t) => t.id));
   const setSlot = (i: number, id: string) => {
     const next = [...ids];
@@ -78,9 +89,11 @@ function TransportCell({
             onChange={(e) => setSlot(i, e.target.value)}
             aria-label={`${day.iso} servis nöbetçisi ${i + 1}`}
             className={clsx(fieldClass, !ids[i] && 'text-slate-400')}
+            // Gelemeyen görevli o günden çıkarılır: tutmadığı nöbet istatistikte sayılmaz
+            onClear={editable ? () => remove(i) : undefined}
+            clearLabel="Görevden çıkar"
           >
-            {/* Dolu kutuda ilk seçenek görevliyi o günden çıkarır (gelemedi): tutmadığı nöbet istatistikte sayılmaz */}
-            <option value="">{ids[i] ? 'Görevden çıkar' : i === 0 ? 'Görevli seçin' : i > ids.length ? '—' : '2. görevli'}</option>
+            <option value="">{i === 0 ? 'Görevli seçin' : i > ids.length ? '—' : '2. görevli'}</option>
             {ids[i] && !known.has(ids[i]) && <option value={ids[i]}>{assigned[i]?.fullName}</option>}
             {dutyTeachers.length > 0 && (
               <optgroup label="O günün nöbetçileri">

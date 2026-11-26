@@ -263,7 +263,7 @@ Zayıf TV işlemcilerinde edinilen dersler:
 - Nöbet çizelgesi Excel'i ders dönemi dışındaki tarihleri yazmaz; dönem içi tam gün tatil tarihiyle ve adıyla yazılır.
 - Servis (taşımalı) nöbeti: izin geçerli olunca öğretmen izin günlerindeki servis nöbetlerinden çıkarılır, görevlisiz
   kalan gün için nöbet sorumlularına bildirim gider; izinli öğretmen o güne yazılamaz, otomatik dağıtım izinliyi
-  atlar. Gelemeyen görevli çizelgede "Görevden çıkar" ile çıkarılır. Nöbet sayıları yalnızca Nöbet dengesi
+  atlar. Gelemeyen görevli çizelgede kutunun sağındaki kırmızı × ile çıkarılır ("Geri al" bildirimi çıkar). Nöbet sayıları yalnızca Nöbet dengesi
   (istatistik) bölümünde görünür; çizelgedeki seçim listesinde ad yanında sayı yazılmaz.
 
 ---

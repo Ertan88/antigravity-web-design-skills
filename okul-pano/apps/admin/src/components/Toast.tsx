@@ -2,14 +2,21 @@ import { errorText } from '@okulpano/shared';
 import { CheckCircle2, XCircle } from './icons.tsx';
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
+/** Bildirimdeki eylem (ör. "Geri al"): tıklanınca çalışır, bildirim kapanır */
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 interface ToastItem {
   id: number;
   kind: 'success' | 'error';
   message: string;
+  action?: ToastAction;
 }
 
 interface ToastApi {
-  success: (message: string) => void;
+  success: (message: string, action?: ToastAction) => void;
   error: (message: string) => void;
 }
 
@@ -18,14 +25,19 @@ const ToastContext = createContext<ToastApi | null>(null);
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
 
-  const push = useCallback((kind: ToastItem['kind'], message: string) => {
-    const id = Date.now() + Math.random();
-    setItems((list) => [...list.slice(-3), { id, kind, message }]);
-    setTimeout(() => setItems((list) => list.filter((t) => t.id !== id)), kind === 'error' ? 6000 : 3000);
-  }, []);
+  const close = useCallback((id: number) => setItems((list) => list.filter((t) => t.id !== id)), []);
+  const push = useCallback(
+    (kind: ToastItem['kind'], message: string, action?: ToastAction) => {
+      const id = Date.now() + Math.random();
+      setItems((list) => [...list.slice(-3), { id, kind, message, action }]);
+      // Eylemli bildirim (geri al) okunup tıklanabilsin diye daha uzun kalır
+      setTimeout(() => close(id), kind === 'error' || action ? 6000 : 3000);
+    },
+    [close],
+  );
 
   const api = useMemo<ToastApi>(
-    () => ({ success: (m) => push('success', m), error: (m) => push('error', errorText(m)) }),
+    () => ({ success: (m, action) => push('success', m, action), error: (m) => push('error', errorText(m)) }),
     [push],
   );
 
@@ -44,6 +56,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <XCircle className="size-5 shrink-0 text-red-400" />
             )}
             {t.message}
+            {t.action && (
+              <button
+                type="button"
+                className="ml-2 shrink-0 rounded-lg px-2 py-1 text-sm font-bold text-brand-300 hover:bg-white/10"
+                onClick={() => {
+                  close(t.id);
+                  t.action!.onClick();
+                }}
+              >
+                {t.action.label}
+              </button>
+            )}
           </div>
         ))}
       </div>
