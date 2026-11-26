@@ -435,11 +435,11 @@ function FormSettings({ settings, report }: { settings: FormsData["settings"]; r
     <p className={clsx("text-xs", missing ? "font-semibold text-amber-700 dark:text-amber-300" : "text-slate-500")}>
       {text}.{" "}
       {settings.canEdit ? (
-        <Link to="/ayarlar" className="font-semibold underline">
-          Okul Ayarları'ndan değiştirilir
+        <Link to={`/ayarlar?sekme=${report ? "okul" : "mesleki"}`} className="font-semibold underline">
+          Genel Ayarlar › {report ? "Okul" : "Mesleki eğitim"} sekmesinden değiştirilir
         </Link>
       ) : (
-        "Okul Ayarları'ndan değiştirilir"
+        `Genel Ayarlar › ${report ? "Okul" : "Mesleki eğitim"} sekmesinden değiştirilir`
       )}
       {missing && report ? "; il ve ilçe girilmezse raporda boş kalır." : "."}
     </p>

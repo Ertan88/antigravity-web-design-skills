@@ -1,3 +1,4 @@
+import { SettingsLink } from '../../components/SettingsLink.tsx';
 import { resolveLayout, SPECIAL_THEMES, type BoardLayout, type SchoolSettings } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -218,9 +219,14 @@ export function Appearance({ editable }: { editable: boolean }) {
               </Select>
             )}
           </Field>
-          <Field label="Öğle arası eşiği (dk)" help="Günün en uzun arası bundan uzunsa 'Öğle Arası' yazar; öteki aralar teneffüs">
-            {(id) => <Input id={id} type="number" min={10} max={180} disabled={!editable} value={s.lunchThresholdMin} onChange={(e) => set('lunchThresholdMin', Number(e.target.value))} />}
-          </Field>
+          {/* Öğle arası eşiği okulun zil ayarıdır (Genel Ayarlar › Takvim ve zil); burada yalnızca gösterilir */}
+          <div className="grid content-start gap-1.5">
+            <span className="text-sm font-medium text-ink">Öğle arası eşiği</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold tabular-nums">{s.lunchThresholdMin} dk</span>
+              <SettingsLink tab="takvim" label="Değiştir" />
+            </div>
+          </div>
         </div>
         <Toggle
           checked={s.showEmptyCards}

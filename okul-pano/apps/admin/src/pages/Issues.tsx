@@ -1,3 +1,4 @@
+import { SettingsLink } from '../components/SettingsLink.tsx';
 import { isVocationalBranchName, ISSUE_CATEGORIES, ISSUE_CATEGORY_KEYS, ISSUE_STATUSES, trCompare, type IssueCategory, type IssueMessage, type IssueStatus, type SchoolIssue, errorText } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
@@ -124,9 +125,7 @@ export function Issues() {
         actions={
           <div className="flex gap-2">
             {manager && (
-              <Button variant="secondary" icon={<Users className="size-4" />} onClick={() => setOwners(true)}>
-                Sorumlular
-              </Button>
+              <SettingsLink tab="gorev" label="Sorumlular" />
             )}
             <Button icon={<Send className="size-4" />} onClick={() => setCreating(true)}>
               Sorun bildir
@@ -430,7 +429,7 @@ export function IssueForm({ onClose }: { onClose: () => void }) {
  * Kategori sorumluları (okul ayarı): her kategoride bir idareci (issueOwners; seçilmezse bütün idareciler) ve isteğe bağlı
  * ek sorumlular (issueHelpers; ör. meslek ya da bilişim öğretmeni). Bildirim ikisine birden gider; ek sorumlu durumu değiştirebilir.
  */
-function OwnersDialog({ onClose }: { onClose: () => void }) {
+export function OwnersDialog({ onClose }: { onClose: () => void }) {
   const { school: access } = useAuth();
   const school = useSchool();
   const path = useSchoolPath('issues');

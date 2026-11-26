@@ -188,7 +188,7 @@ export function Students() {
         title="Öğrenciler"
         description={
           <>
-            Okul numarası her öğrenci için zorunludur ve okul içinde benzersizdir; gözlem kayıtları ve Excel aktarımı bu numarayla eşleşir. Doğum günü olan öğrenciler o gün panoda kutlanır. Gizlilik için varsayılan olarak soyadın yalnızca baş harfi gösterilir (Ayşe Y.); bunu Okul Ayarları'ndan değiştirebilirsiniz.
+            Okul numarası her öğrenci için zorunludur ve okul içinde benzersizdir; gözlem kayıtları ve Excel aktarımı bu numarayla eşleşir. Doğum günü olan öğrenciler o gün panoda kutlanır. Gizlilik için varsayılan olarak soyadın yalnızca baş harfi gösterilir (Ayşe Y.); bunu Panolar sayfasındaki pano ayarlarından değiştirebilirsiniz.
             {hidden && <span className="mt-1 block font-medium text-amber-700">Doğum günü alanı şu an pano düzeninde yok (Panolar › Pano düzeni).</span>}
           </>
         }

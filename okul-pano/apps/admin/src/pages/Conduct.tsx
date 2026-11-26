@@ -1,3 +1,4 @@
+import { SettingsLink } from '../components/SettingsLink.tsx';
 import {
   CONDUCT_BANDS,
   CONDUCT_GROUPS,
@@ -1003,19 +1004,13 @@ export function ConductCriteria() {
               </div>
             </Card>
           )}
-          <Card className="p-5">
-            <div className="text-lg font-extrabold tracking-tight">Saklama süresi (KVKK)</div>
-            <p className="mt-1 mb-4 text-sm text-slate-500">
-              Gözlem kayıtları yalnızca öğretmenler, rehber öğretmenler ve idare tarafından görülür; veliler ve pano görmez. Kayıtların gereğinden uzun saklanmaması önerilir.
-            </p>
-            <Toggle
-              checked={retention === 'year'}
-              onChange={(v) => saveSettings.mutate({ conductRetention: v ? 'year' : 'keep' })}
-              label="Öğretim yılı sonunda kayıtları sil"
-              description="Yeni öğretim yılı başlayınca (1 Eylül) önceki yılın gözlem kayıtları ve rehberlik uyarıları kendiliğinden silinir. Ayın öğrencisi seçimleri kalır."
-            />
+          <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
+            <div className="min-w-0">
+              <div className="font-extrabold text-ink">Saklama süresi ve rehberlik uyarısı</div>
+              <p className="text-sm text-slate-500">Kayıtların öğretim yılı sonunda silinmesi ve kısa sürede çok eksi alan öğrenci uyarısı.</p>
+            </div>
+            <SettingsLink tab="ogrenci" label="Ayarları aç" />
           </Card>
-          {school.data && <ConductSettingsCards settings={school.data.settings} onSave={(s) => saveSettings.mutate(s)} />}
         </div>
       </div>
 
@@ -1498,5 +1493,43 @@ function ConductSettingsCards({ settings, onSave }: { settings: SchoolSettings |
         </div>
       </Card>
     </>
+  );
+}
+
+/**
+ * Gözlem kayıtlarının saklama süresi (KVKK) ve rehberlik uyarısı: Genel Ayarlar › Öğrenci takibi sekmesinde.
+ * Her değişiklik hemen kaydedilir.
+ */
+export function ConductDataSettings() {
+  const { schoolId } = useAuth();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const school = useSchool();
+  const retention = school.data?.settings.conductRetention ?? 'year';
+  const save = useMutation({
+    mutationFn: (settings: Partial<SchoolSettings>) => api<School>(schoolRoot(schoolId), { method: 'PATCH', body: { settings } }),
+    onSuccess: (data) => {
+      qc.setQueryData([schoolId, 'school'], data);
+      toast.success('Kaydedildi');
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  if (!school.data) return null;
+  return (
+    <div className="grid gap-4">
+          <Card className="p-5">
+            <div className="text-lg font-extrabold tracking-tight">Saklama süresi (KVKK)</div>
+            <p className="mt-1 mb-4 text-sm text-slate-500">
+              Gözlem kayıtları yalnızca öğretmenler, rehber öğretmenler ve idare tarafından görülür; veliler ve pano görmez. Kayıtların gereğinden uzun saklanmaması önerilir.
+            </p>
+            <Toggle
+              checked={retention === 'year'}
+              onChange={(v) => save.mutate({ conductRetention: v ? 'year' : 'keep' })}
+              label="Öğretim yılı sonunda kayıtları sil"
+              description="Yeni öğretim yılı başlayınca (1 Eylül) önceki yılın gözlem kayıtları ve rehberlik uyarıları kendiliğinden silinir. Ayın öğrencisi seçimleri kalır."
+            />
+          </Card>
+      <ConductSettingsCards settings={school.data.settings} onSave={(x) => save.mutate(x)} />
+    </div>
   );
 }

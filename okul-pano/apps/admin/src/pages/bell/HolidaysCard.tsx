@@ -1,3 +1,4 @@
+import { SettingsLink } from '../../components/SettingsLink.tsx';
 import { academicYearOf, isLessonFree, semesterBreak, SUMMER_BREAK, type AcademicCalendarData } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
@@ -5,7 +6,7 @@ import { CalendarDays, CalendarPlus, GraduationCap, Plus, Sunset, Trash2 } from 
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useToast } from '../../components/Toast.tsx';
-import { Badge, Button, ACTION_SHAPE, Card, DELETE_TONE, Input, Toggle } from '../../components/ui.tsx';
+import { Badge, Button, ACTION_SHAPE, Card, DELETE_TONE, Input } from '../../components/ui.tsx';
 import { api } from '../../lib/api.ts';
 import { useAuth } from '../../lib/auth.tsx';
 import { useSchool, useSchoolPath, type School } from '../../lib/data.ts';
@@ -94,6 +95,7 @@ export function HolidaysCard() {
   const path = useSchoolPath('holidays');
   const schoolPath = useSchoolPath();
   const school = useSchool();
+  const savedEnd = school.data?.settings.halfDayEnd ?? '13:00';
   const qc = useQueryClient();
   const toast = useToast();
   const [params] = useSearchParams();
@@ -125,17 +127,6 @@ export function HolidaysCard() {
     onError: (e) => toast.error(e.message),
   });
 
-  const [endsAt, setEndsAt] = useState('');
-  const savedEnd = school.data?.settings.halfDayEnd ?? '13:00';
-  const saveEnd = useMutation({
-    mutationFn: (halfDayEnd: string) => api<School>(schoolPath, { method: 'PATCH', body: { settings: { halfDayEnd } } }),
-    onSuccess: (data) => {
-      qc.setQueryData([schoolId, 'school'], data);
-      setEndsAt('');
-      toast.success(`Arifede son zil ${data.settings.halfDayEnd}`);
-    },
-    onError: (e) => toast.error(e.message),
-  });
 
   const [newDate, setNewDate] = useState('');
   const [newName, setNewName] = useState('');
@@ -176,23 +167,12 @@ export function HolidaysCard() {
             </ul>
             <AcademicYearBox canSettings={canSettings} />
             <div className="rounded-xl bg-amber-50 p-3 ring-1 ring-amber-200">
-              <label htmlFor="half-day-end" className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+              <div className="flex items-center gap-2 text-sm font-semibold text-amber-900">
                 <Sunset className="size-4" /> Arifede son zil
-              </label>
-              <div className="mt-2 flex items-center gap-2">
-                <Input
-                  id="half-day-end"
-                  type="time"
-                  className="w-32"
-                  value={endsAt || savedEnd}
-                  disabled={!canSettings}
-                  onChange={(e) => setEndsAt(e.target.value)}
-                />
-                {canSettings && endsAt && endsAt !== savedEnd && (
-                  <Button size="sm" loading={saveEnd.isPending} onClick={() => saveEnd.mutate(endsAt)}>
-                    Kaydet
-                  </Button>
-                )}
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="text-lg font-extrabold text-amber-900 tabular-nums">{savedEnd}</span>
+                {canSettings && <SettingsLink tab="takvim" label="Değiştir" />}
               </div>
               <p className="mt-2 text-xs text-amber-800">Kamuda arife 13:00'ten itibaren tatildir. Arife tam gün tatil ilan edilirse o günü aşağıdan tatil olarak ekleyin.</p>
             </div>
@@ -279,15 +259,6 @@ function AcademicYearBox({ canSettings }: { canSettings: boolean }) {
   const qc = useQueryClient();
   const toast = useToast();
   const cal = useQuery({ queryKey: [schoolId, 'holidays', 'academic'], queryFn: () => api<SchoolAcademic>(path), enabled: Boolean(schoolId) });
-  const toggle = useMutation({
-    mutationFn: (followMebCalendar: boolean) => api<School>(schoolPath, { method: 'PATCH', body: { settings: { followMebCalendar } } }),
-    onSuccess: (data) => {
-      qc.setQueryData([schoolId, 'school'], data);
-      void qc.invalidateQueries({ queryKey: [schoolId, 'holidays'] });
-      toast.success(data.settings.followMebCalendar ? 'MEB takvimindeki tatiller uygulanıyor' : 'MEB takvimindeki tatiller okulda uygulanmıyor');
-    },
-    onError: (e) => toast.error(e.message),
-  });
   const years = cal.data?.years ?? [];
   if (!cal.data) return null;
   return (
@@ -324,7 +295,10 @@ function AcademicYearBox({ canSettings }: { canSettings: boolean }) {
         <p className="mt-2 text-xs text-slate-600">Bu eğitim yılının takvimi henüz yayımlanmadı. MEB yayımlayınca kendiliğinden eklenir.</p>
       )}
       <div className="mt-3 border-t border-emerald-200 pt-2">
-        <Toggle checked={cal.data.follow} disabled={!canSettings} onChange={(v) => toggle.mutate(v)} label="MEB takvimindeki tatilleri uygula" />
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm font-semibold text-emerald-900">
+          <span>{cal.data.follow ? 'MEB takvimindeki tatiller uygulanıyor' : 'MEB takvimindeki tatiller uygulanmıyor'}</span>
+          {canSettings && <SettingsLink tab="takvim" label="Değiştir" />}
+        </div>
       </div>
       <p className="mt-1 text-[11px] text-slate-500">Takvim her yıl haziran ortasından itibaren MEB'in sitesinden otomatik alınır.</p>
     </div>

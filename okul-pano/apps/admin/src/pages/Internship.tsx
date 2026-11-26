@@ -1,3 +1,4 @@
+import { SettingsLink } from '../components/SettingsLink.tsx';
 import { errorText } from '@okulpano/shared';
 import {
   INTERN_HALF_SHORT,
@@ -28,7 +29,7 @@ import {
   X,
 } from '../components/icons.tsx';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import { useToast } from "../components/Toast.tsx";
 import {
   ACTION_SHAPE,
@@ -359,8 +360,8 @@ export function InternshipSheet() {
         <div className="mb-4">
           <Alert>
             Koordinatör müdür yardımcısı seçilmemiş: devamsızlık ve rapor
-            bildirimleri kimseye gitmiyor. İşletmeler sayfasındaki Staj ayarları
-            penceresinden seçin.
+            bildirimleri kimseye gitmiyor. Genel Ayarlar › Mesleki eğitim
+            sekmesinden seçin.
           </Alert>
         </div>
       )}
@@ -1307,18 +1308,10 @@ export function Businesses() {
   const [assigning, setAssigning] = useState<Business | null>(null);
   const [viewing, setViewing] = useState<Business | null>(null);
   const [areasOpen, setAreasOpen] = useState(false);
-  // Sekmeler (4A): İşletmeler · Koordinatörler · Ayarlar (yalnızca yönetim). Genel Ayarlar'daki "Staj ayarlarını aç"
-  // bu sayfaya ?ayarlar=1 ile gelir; Ayarlar sekmesi açılır
-  const [settingsParams, setSettingsParams] = useSearchParams();
-  const [tab, setTabState] = useState<"list" | "coord" | "settings">(settingsParams.get("ayarlar") === "1" ? "settings" : "list");
-  const setTab = (t: "list" | "coord" | "settings") => {
-    setTabState(t);
-    if (settingsParams.has("ayarlar")) {
-      const next = new URLSearchParams(settingsParams);
-      next.delete("ayarlar");
-      setSettingsParams(next, { replace: true });
-    }
-  };
+  // Sekmeler: İşletmeler · Koordinatörler (yalnızca yönetim). Staj ayarları Genel Ayarlar › Mesleki eğitim'de; eski
+  // ?ayarlar=1 bağlantısı oraya yönlenir
+  const [settingsParams] = useSearchParams();
+  const [tab, setTab] = useState<"list" | "coord">("list");
   const [area, setArea] = useState<string>("");
   const [coordinator, setCoordinator] = useState("");
   const [q, setQ] = useState("");
@@ -1382,6 +1375,7 @@ export function Businesses() {
   }));
   const noArea = all.filter((b) => !b.areaId).length;
 
+  if (settingsParams.get("ayarlar") === "1") return <Navigate to="/ayarlar?sekme=mesleki" replace />;
   return (
     <div>
       <PageHeader
@@ -1396,33 +1390,30 @@ export function Businesses() {
               : "Alanınızdaki işletmeler (alan şefi olarak yalnızca görüntülersiniz)."
         }
         actions={
-          (manager || designated) && (
-            <Button icon={<Plus className="size-4" />} onClick={() => setEditing("new")}>
-              İşletme ekle
-            </Button>
-          )
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Staj ayarları Genel Ayarlar › Mesleki eğitim sekmesinde (tek yerde) */}
+            {manager && <SettingsLink tab="mesleki" label="Staj ayarları" />}
+            {(manager || designated) && (
+              <Button icon={<Plus className="size-4" />} onClick={() => setEditing("new")}>
+                İşletme ekle
+              </Button>
+            )}
+          </div>
         }
       />
       {manager && (
         <div className="mb-4">
-          <Segmented<"list" | "coord" | "settings">
+          <Segmented<"list" | "coord">
             value={tab}
             onChange={setTab}
             options={[
               { value: "list", label: `İşletmeler · ${everything.length}` },
               { value: "coord", label: "Koordinatörler" },
-              { value: "settings", label: "Ayarlar" },
             ]}
           />
         </div>
       )}
       {manager && tab === "coord" && <CoordinatorsPanel businessCounts={businessCounts} />}
-      {manager && tab === "settings" && (
-        <div className="grid gap-4">
-          <InternshipSettingsDialog inline open onClose={() => undefined} />
-          <AreasDialog inline open onClose={() => undefined} />
-        </div>
-      )}
       {(!manager || tab === "list") && (
       <>
 
@@ -1987,7 +1978,7 @@ function BusinessForm({
 }
 
 /** Alanlar (meslek alanı olan branşlar) ve branşı girilmemiş öğretmenler */
-function AreasDialog({
+export function AreasDialog({
   open,
   onClose,
   inline,

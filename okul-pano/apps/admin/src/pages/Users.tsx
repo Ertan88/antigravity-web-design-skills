@@ -1,3 +1,4 @@
+import { SettingsLink } from '../components/SettingsLink.tsx';
 import { schoolFullName } from '@okulpano/shared';
 import { errorText, type EnrollRole } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
@@ -112,9 +113,7 @@ export function Users() {
         actions={
           <div className="flex flex-wrap gap-2">
             {full && (
-              <Button variant="secondary" icon={<Tags className="size-4" />} onClick={() => setMapping(true)}>
-                Görev → rol
-              </Button>
+              <SettingsLink tab="gorev" label="Görev → rol" />
             )}
             <Button variant="secondary" icon={<QrCodeIcon className="size-4" />} onClick={() => void openMeeting()}>
               Toplantı QR’ı

@@ -1,5 +1,5 @@
 import { PlaceSelect } from '../components/PlaceSelect.tsx';
-import { RESPONSIBILITY_AREAS, SCHOOL_TYPE_OPTIONS, shortTitle, SPECIAL_DAYS, type Member, type ResponsibilityArea, specialDayFor, splitSchoolName, updateSchoolSchema, type SchoolSettings, errorText } from '@okulpano/shared';
+import { RESPONSIBILITY_AREAS, SCHOOL_TYPE_OPTIONS, shortTitle, SPECIAL_DAYS, type Member, type ResponsibilityArea, specialDayFor, splitSchoolName, updateSchoolSchema, type SchoolSettings, type EnrollRole, errorText } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Download, ExternalLink, FileText, MapPin, Search, Settings2 } from '../components/icons.tsx';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -8,13 +8,21 @@ import { SampleDataCard } from '../components/Onboarding.tsx';
 import { SupportAccessCard } from '../components/SupportAccess.tsx';
 import { SaveBar } from '../components/SaveBar.tsx';
 import { useToast } from '../components/Toast.tsx';
-import { Alert, Badge, Button, Card, Field, Input, PageHeader, Select, Spinner, Textarea, Toggle } from '../components/ui.tsx';
+import { Alert, Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, Spinner, Textarea, Toggle } from '../components/ui.tsx';
 import { confirm } from '../components/confirm.tsx';
 import { downloadJson } from '../lib/download.ts';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import clsx from 'clsx';
+import { SettingsLink, type SettingsTab } from '../components/SettingsLink.tsx';
+import { TickerSources } from './TickerSources.tsx';
+import { ConductDataSettings } from './Conduct.tsx';
+import { AreasDialog } from './Internship.tsx';
+import { InternshipSettingsDialog } from './InternshipSettings.tsx';
+import { OwnersDialog } from './Issues.tsx';
+import { TitleRoleDialog } from './users/dialogs.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
-import { useSchool, useSchoolPath, type School } from '../lib/data.ts';
+import { useInternshipAccess, useList, useSchool, useSchoolPath, type School, type TeacherOption } from '../lib/data.ts';
 import { useForm } from '../lib/form.ts';
 
 interface GeoResult {
@@ -262,7 +270,7 @@ function ResponsibilitiesTable({ value, onChange, internship }: { value: SchoolS
             </tr>
           ))}
           {fixed('Ders görevlendirme', 'O günün nöbetçi müdür yardımcısı (Nöbet Çizelgesi)')}
-          {internship && fixed('Mesleki eğitim', 'Koordinatör müdür yardımcısı (İşletmeler › Ayarlar)')}
+          {internship && fixed('Mesleki eğitim', 'Koordinatör müdür yardımcısı (Mesleki eğitim sekmesi)')}
         </tbody>
       </table>
       <p className="mt-2 text-xs text-slate-500">Bir işte kimse işaretlenmezse bildirim, o işin yetkisi olan bütün yöneticilere gider. Okul sorunlarında kategori sorumluları ayrıca bildirim alır.</p>
@@ -306,9 +314,27 @@ function SchoolTypeField({ id, value, derived, onChange }: { id: string; value: 
   );
 }
 
+/** Genel Ayarlar kategorileri (sırasıyla); `keywords` "Ayar ara" kutusunda aranır */
+const TABS: { key: SettingsTab; label: string; hint: string; keywords: string }[] = [
+  { key: 'okul', label: 'Okul', hint: 'Ad, logo, konum, KVKK', keywords: 'okul adı türü kurum kodu logo il ilçe konum hava durumu kvkk aydınlatma örnek veri' },
+  { key: 'gorev', label: 'Görev dağılımı', hint: 'Bildirim, sorun sorumluları', keywords: 'görev dağılımı bildirim onay izin nöbet sorun sorumlu rol görev rol eşleştirme' },
+  { key: 'moduller', label: 'Modüller', hint: 'Duyuru onayı, staj, taşımalı', keywords: 'modül duyuru onayı mesleki eğitim işletme staj taşımalı eğitim servis' },
+  { key: 'takvim', label: 'Takvim ve zil', hint: 'MEB takvimi, arife, öğle arası', keywords: 'takvim meb tatil arife yarım gün son zil öğle arası teneffüs zil' },
+  { key: 'ogrenci', label: 'Öğrenci takibi', hint: 'Saklama süresi, uyarı', keywords: 'öğrenci gözlem saklama süresi kvkk rehberlik uyarı eksi' },
+  { key: 'mesleki', label: 'Mesleki eğitim', hint: 'Koordinatör, staj, alanlar', keywords: 'mesleki eğitim staj koordinatör müdür yardımcısı program adı teknik atp alan meslek öğretmeni branş' },
+  { key: 'pano', label: 'Pano ve yayın', hint: 'Özel günler, kayan yazı', keywords: 'pano özel gün mesaj kayan yazı rss günün sözü hava uyarısı bugün tarihte' },
+  { key: 'destek', label: 'Destek', hint: 'Süreli erişim', keywords: 'destek erişim platform yardım' },
+];
+
 export function Settings() {
-  const navigate = useNavigate();
-  const { schoolId, reloadMe } = useAuth();
+  const { schoolId, reloadMe, can, school: access } = useAuth();
+  const role = access?.role;
+  const internship = useInternshipAccess();
+  const titles = useList<TeacherOption>('teacher-titles');
+  const [params, setParams] = useSearchParams();
+  const [query, setQuery] = useState('');
+  const [ownersOpen, setOwnersOpen] = useState(false);
+  const [rolesOpen, setRolesOpen] = useState(false);
   const path = useSchoolPath();
   const qc = useQueryClient();
   const toast = useToast();
@@ -359,15 +385,68 @@ export function Settings() {
 
   const s = v.settings;
   const dirty = Boolean(school.data) && JSON.stringify(v) !== JSON.stringify(toForm(school.data!));
+  const full = can('settings.manage');
+  // Koordinatör müdür yardımcısı ve "Mesleki eğitimi yönetir" yetkisi olan, ayar yetkisi olmasa da Mesleki eğitim sekmesini görür
+  const internshipManager = Boolean(internship.data?.manage);
+  const tabs = TABS.filter((t) => (t.key === 'mesleki' ? full || internshipManager : full));
+  const needle = query.trim().toLocaleLowerCase('tr-TR');
+  const listed = needle ? tabs.filter((t) => `${t.label} ${t.keywords}`.toLocaleLowerCase('tr-TR').includes(needle)) : tabs;
+  const asked = params.get('sekme') as SettingsTab | null;
+  const active: SettingsTab | undefined = tabs.find((t) => t.key === asked)?.key ?? tabs[0]?.key;
+  const open = (k: SettingsTab) => {
+    setParams({ sekme: k }, { replace: true });
+    setQuery('');
+  };
+
+  if (!tabs.length)
+    return <EmptyState icon={<Settings2 className="size-6" />} title="Bu sayfa için yetkiniz yok" description="Okul ayarlarını okul müdürü ve ayar yetkisi verilen kişiler değiştirir." />;
+
   return (
     <div>
-      <PageHeader title="Genel Ayarlar" description="Okul bilgileri, konum ve modüller. Panoların görünümü ve düzeni Panolar sayfasında." />
+      <PageHeader title="Genel Ayarlar" description="Okulun bütün ayarları kategorilere ayrılmış olarak burada. Panoların görünümü ve düzeni Panolar sayfasında." />
       {form.errors._form && (
         <div className="mb-4">
           <Alert tone="red">{form.errors._form}</Alert>
         </div>
       )}
-      <Card className="p-6 sm:p-8">
+      {/* Düzen (A): solda arama ve kategori listesi, sağda seçili kategori; telefonda liste açılır seçime döner */}
+      <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <nav aria-label="Ayar kategorileri" className="grid content-start gap-1 lg:sticky lg:top-20">
+          <div className="relative mb-1 hidden lg:block">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ayar ara" aria-label="Ayar ara" className="pl-9" />
+          </div>
+          <div className="lg:hidden">
+            <Select value={active} onChange={(e) => open(e.target.value as SettingsTab)} aria-label="Ayar kategorisi">
+              {tabs.map((t) => (
+                <option key={t.key} value={t.key}>
+                  {t.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+          {listed.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => open(t.key)}
+              aria-current={active === t.key ? 'page' : undefined}
+              className={clsx(
+                'hidden rounded-xl px-3 py-2 text-left transition-colors lg:block',
+                active === t.key ? 'bg-ink text-surface' : 'text-slate-600 hover:bg-slate-100 dark:hover:bg-white/5',
+              )}
+            >
+              <span className="block text-sm font-bold">{t.label}</span>
+              <span className={clsx('block text-xs', active === t.key ? 'text-surface/70' : 'text-slate-400')}>{t.hint}</span>
+            </button>
+          ))}
+          {needle && !listed.length && <p className="hidden px-3 text-sm text-slate-500 lg:block">Aramaya uyan ayar yok.</p>}
+        </nav>
+
+        <div className="grid min-w-0 content-start gap-5">
+          {active === 'okul' && (
+            <>
+              <Card className="p-6 sm:p-8">
         <Section title="Okul bilgileri" description="Panonun sol üstünde logo ile birlikte okul adı (kalın) ve altında okul türü görünür.">
           <Field label="Okul adı" error={form.errors.name}>
             {(id) => <Input id={id} value={v.name} onChange={(e) => set('name', e.target.value)} />}
@@ -430,6 +509,16 @@ export function Settings() {
           </div>
         </Section>
 
+              </Card>
+              <Card className="p-6 sm:p-8">
+                <PrivacySection value={s.privacyNotice ?? ''} onChange={(x) => setting('privacyNotice', x)} slug={school.data!.slug} />
+              </Card>
+              <SampleDataCard />
+            </>
+          )}
+          {active === 'gorev' && (
+            <>
+              <Card className="p-6 sm:p-8">
         <Section title="Görev dağılımı" description="Hangi işin bildirimi ve onayı hangi yöneticiye gider.">
           <ResponsibilitiesTable
             value={s.responsibilities ?? { leaves: [], duties: [], issues: [], announcements: [] }}
@@ -438,54 +527,127 @@ export function Settings() {
           />
         </Section>
 
-        <Section title="Modüller" description="Okulunuzda kullanılan isteğe bağlı bölümler.">
-          <p className="text-sm text-slate-500">
-            Taşımalı eğitim (servis) modülü{' '}
-            <Link to="/nobet" className="font-semibold text-brand-700 hover:underline">
-              Nöbet Çizelgesi
-            </Link>{' '}
-            sayfasından açılır.
-          </p>
-          <Toggle
-            checked={s.requireApproval}
-            onChange={(x) => setting('requireApproval', x)}
-            label="Duyurular onaydan sonra yayınlansın"
-            description="Açıkken 'Duyuruları onaylama' yetkisi olmayan kullanıcıların (ör. öğretmenler) eklediği ya da değiştirdiği duyurular, okul müdürü, yöneticiler veya bu yetkiyi verdiğiniz kişiler (ör. müdür yardımcısı) onaylayınca panoya çıkar. Yetkiyi Kişiler ve Yetkiler sayfasında kişinin kartından (Diğer yetkiler) verin."
-          />
-          <Toggle
-            checked={Boolean(s.internshipEnabled)}
-            onChange={(x) => setting('internshipEnabled', x)}
-            label="İşletmelerde mesleki eğitim"
-            description="Meslek liseleri için: işletmeler, koordinatör öğretmenler ve aylık işletmede devam çizelgesi. Koordinatör öğretmenler devamsızlık ve raporu mobil uygulamadan girer."
-          />
-          {s.internshipEnabled && (
-            <div className="flex flex-wrap items-center gap-3">
-              <Button size="sm" variant="secondary" icon={<Settings2 className="size-4" />} onClick={() => navigate('/isletmeler?ayarlar=1')}>
-                Staj ayarlarını aç
-              </Button>
-              <span className="text-sm text-slate-500">Koordinatör müdür yardımcısı, program adı ve teknik program stajı</span>
-            </div>
+              </Card>
+              <Card className="grid gap-3 p-6 sm:p-8">
+                <SettingRow title="Okul sorunları sorumluları" text="Her sorun kategorisinde bildirimi alan idareci ve yardımcıları. Seçilmezse bildirim bütün idarecilere gider.">
+                  <Button size="sm" variant="secondary" onClick={() => setOwnersOpen(true)}>
+                    Düzenle
+                  </Button>
+                </SettingRow>
+                <SettingRow title="Görev → hesap rolü" text="Kadrodaki göreve göre hesap açılırken önerilen rol (ör. Müdür Yardımcısı → Yönetici).">
+                  <Button size="sm" variant="secondary" onClick={() => setRolesOpen(true)}>
+                    Düzenle
+                  </Button>
+                </SettingRow>
+              </Card>
+            </>
           )}
-          <p className="text-sm text-slate-500">
-            Panodaki kartların yeri, renkler ve slayt süreleri{' '}
-            <Link to="/ekranlar" className="font-semibold text-brand-700 hover:underline">
-              Panolar
-            </Link>{' '}
-            sayfasında.
-          </p>
-        </Section>
-        <SpecialDaysSection value={s.specialDays} schoolName={v.name} onChange={(x) => setting('specialDays', x)} />
-        <PrivacySection value={s.privacyNotice ?? ''} onChange={(x) => setting('privacyNotice', x)} slug={school.data!.slug} />
-        {/* Pano düzenindeki gibi: yalnızca değişiklik varsa altta yapışık Kaydet / İptal */}
-        <SaveBar
-          show={dirty}
-          saving={save.isPending}
-          onSave={() => void submit()}
-          onCancel={() => school.data && form.reset(toForm(school.data))}
-        />
-      </Card>
-      <SampleDataCard />
-      <SupportAccessCard />
+          {active === 'moduller' && (
+            <Card className="grid gap-5 p-6 sm:p-8">
+              <Toggle
+                checked={s.requireApproval}
+                onChange={(x) => setting('requireApproval', x)}
+                label="Duyurular onaydan sonra yayınlansın"
+                description="Açıkken 'Duyuruları onaylama' yetkisi olmayan kullanıcıların (ör. öğretmenler) eklediği ya da değiştirdiği duyurular, okul müdürü, yöneticiler veya bu yetkiyi verdiğiniz kişiler onaylayınca panoya çıkar."
+              />
+              <Toggle
+                checked={Boolean(s.internshipEnabled)}
+                onChange={(x) => setting('internshipEnabled', x)}
+                label="İşletmelerde mesleki eğitim"
+                description="Meslek liseleri için: işletmeler, koordinatör öğretmenler ve aylık işletmede devam çizelgesi. Ayarları Mesleki eğitim sekmesinde."
+              />
+              <Toggle
+                checked={Boolean(s.hasTransport)}
+                onChange={(x) => setting('hasTransport', x)}
+                label="Taşımalı eğitim"
+                description="Servisle gelen öğrenciler için sabah, öğle ve akşam görevlileri (Nöbet › Taşımalı eğitim). Görevliler panoda o günün nöbet kartında görünür."
+              />
+            </Card>
+          )}
+          {active === 'takvim' && (
+            <Card className="grid gap-5 p-6 sm:p-8">
+              <Toggle
+                checked={s.followMebCalendar !== false}
+                onChange={(x) => setting('followMebCalendar', x)}
+                label="MEB takvimindeki tatilleri uygula"
+                description="Ara tatiller, yarıyıl ve yaz tatili okulda tatil sayılır. Takvim her yıl MEB'in sitesinden kendiliğinden alınır."
+              />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Arifede son zil" help="Kamuda arife 13.00'ten itibaren tatildir. Bu saatten sonra başlayan dersler yapılmaz.">
+                  {(id) => <Input id={id} type="time" className="max-w-40" value={s.halfDayEnd ?? '13:00'} onChange={(e) => setting('halfDayEnd', e.target.value)} />}
+                </Field>
+                <Field label="Öğle arası eşiği (dakika)" help="Günün en uzun arası bundan uzunsa panoda 'Öğle Arası' yazar; öteki aralar teneffüstür.">
+                  {(id) => <Input id={id} type="number" min={10} max={180} className="max-w-40" value={s.lunchThresholdMin} onChange={(e) => setting('lunchThresholdMin', Number(e.target.value))} />}
+                </Field>
+              </div>
+              <p className="text-sm text-slate-500">
+                Eğitim düzeni (tam gün ya da ikili eğitim) ve öğlenci sınıflar, zil düzenleriyle birlikte{' '}
+                <Link to="/zil-saatleri" className="font-semibold text-brand-700 hover:underline">
+                  Zil Saatleri
+                </Link>{' '}
+                sayfasında seçilir.
+              </p>
+            </Card>
+          )}
+          {active === 'ogrenci' && <ConductDataSettings />}
+          {active === 'mesleki' &&
+            (s.internshipEnabled || school.data?.settings.internshipEnabled ? (
+              <>
+                <InternshipSettingsDialog inline open onClose={() => undefined} />
+                {full && <AreasDialog inline open onClose={() => undefined} />}
+              </>
+            ) : (
+              <Card className="p-6">
+                <Alert>İşletmelerde mesleki eğitim kapalı. Açmak için Modüller sekmesini kullanın.</Alert>
+              </Card>
+            ))}
+          {active === 'pano' && (
+            <>
+              <Card className="p-6 sm:p-8">
+                <SpecialDaysSection value={s.specialDays} schoolName={v.name} onChange={(x) => setting('specialDays', x)} />
+              </Card>
+              <TickerSources />
+              <p className="text-sm text-slate-500">
+                Panodaki kartların yeri, renkler, uyku saatleri ve slayt süreleri{' '}
+                <Link to="/ekranlar" className="font-semibold text-brand-700 hover:underline">
+                  Panolar
+                </Link>{' '}
+                sayfasında, canlı önizlemeyle ayarlanır.
+              </p>
+            </>
+          )}
+          {active === 'destek' && <SupportAccessCard />}
+        </div>
+      </div>
+      {/* Bilgiler ve seçimler bütün sekmelerde birlikte kaydedilir; yalnızca değişiklik varsa altta yapışık Kaydet / İptal */}
+      <SaveBar show={dirty} saving={save.isPending} onSave={() => void submit()} onCancel={() => school.data && form.reset(toForm(school.data))} />
+      {ownersOpen && <OwnersDialog onClose={() => setOwnersOpen(false)} />}
+      <TitleRoleDialog
+        open={rolesOpen}
+        onClose={() => setRolesOpen(false)}
+        titles={titles.data ?? []}
+        value={(s.titleRoles ?? {}) as Record<string, EnrollRole>}
+        isOwner={role === 'owner'}
+        onSave={async (x) => {
+          const data = await api<School>(path, { method: 'PATCH', body: { settings: { titleRoles: x } } });
+          qc.setQueryData([schoolId, 'school'], data);
+          toast.success('Görev → rol eşleştirmesi kaydedildi');
+          setRolesOpen(false);
+        }}
+      />
+    </div>
+  );
+}
+
+/** Ayar satırı: başlık, açıklama, sağda düğme */
+function SettingRow({ title, text, children }: { title: string; text: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <div className="min-w-0 flex-1">
+        <div className="font-semibold text-ink">{title}</div>
+        <p className="text-sm text-slate-500">{text}</p>
+      </div>
+      {children}
     </div>
   );
 }

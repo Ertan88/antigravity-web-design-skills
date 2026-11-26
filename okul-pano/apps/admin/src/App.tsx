@@ -158,7 +158,8 @@ export function App() {
         <Route path="siniflar" element={<Navigate to="/ders-programi" replace />} />
         <Route path="ekranlar" element={needsSchool(<Guard permission="screens.manage"><Screens /></Guard>)} />
         <Route path="kullanicilar" element={needsSchool(<Guard permission={['users.manage', 'accounts.enroll', 'roles.assign']}><Users /></Guard>)} />
-        <Route path="ayarlar" element={needsSchool(<Guard permission="settings.manage"><Settings /></Guard>)} />
+        {/* Genel Ayarlar sekmeleri yetkiye göre açılır (ayar yetkisi; Mesleki eğitim sekmesi koordinatör müdür yardımcısına da) */}
+        <Route path="ayarlar" element={needsSchool(<Settings />)} />
         <Route path="basliklar" element={needsSchool(<Guard permission="labels.manage"><Labels /></Guard>)} />
         <Route path="gecmis" element={needsSchool(<Guard permission="users.manage"><Audit /></Guard>)} />
         <Route path="hesap" element={<Account />} />

@@ -108,7 +108,7 @@ export function schoolGuard(permission?: Permission) {
       // KVKK: platform yöneticisi üyesi olmadığı okulun verilerini yalnızca okulun verdiği süreli destek erişimiyle görür
       if (!m) {
         if (!school.supportAccessUntil || school.supportAccessUntil.getTime() < Date.now()) {
-          throw forbidden('Bu okulun verilerine erişim kapalı. Okul yöneticisi Genel Ayarlar › Destek erişimi bölümünden süreli erişim verebilir.');
+          throw forbidden('Bu okulun verilerine erişim kapalı. Okul müdürü Genel Ayarlar › Destek sekmesinden süreli erişim verebilir.');
         }
         isSupport = true;
         role = 'owner';

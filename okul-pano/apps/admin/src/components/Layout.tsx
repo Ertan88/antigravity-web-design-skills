@@ -140,7 +140,11 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       return;
     }
     el.scrollTop = saved;
-    if (Math.abs(el.scrollTop - saved) < 2) restored.current = true;
+    if (Math.abs(el.scrollTop - saved) < 2) {
+      restored.current = true;
+      // Kaldığı yer açık sayfayı göstermiyorsa (başka sayfaya bağlantıyla gelince) açık sayfa görünür yere gelir
+      el.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest' });
+    }
   });
   useEffect(() => {
     const t = setTimeout(() => (restored.current = true), 4000);

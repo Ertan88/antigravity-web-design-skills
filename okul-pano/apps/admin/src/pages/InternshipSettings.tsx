@@ -21,11 +21,11 @@ interface InternshipSettings {
 }
 
 /**
- * Mesleki eğitim ayarları (İşletmeler › Ayarlar): koordinatör müdür yardımcısı, günlük formdaki program adı ve teknik
+ * Mesleki eğitim ayarları (Genel Ayarlar › Mesleki eğitim): koordinatör müdür yardımcısı, günlük formdaki program adı ve teknik
  * program stajı tek pencerede. Genel Ayarlar'da yalnızca modülün açılıp kapandığı anahtar kalır.
  */
 /**
- * Pencere ya da sayfa içi kart (4A): İşletmeler › Ayarlar sekmesinde ayarlar pencere açılmadan sayfada düzenlenir;
+ * Pencere ya da sayfa içi kart: Genel Ayarlar › Mesleki eğitim sekmesinde sayfada düzenlenir;
  * Genel Ayarlar'dan gelinince aynı içerik pencerede açılır.
  */
 export function SettingsPanel({

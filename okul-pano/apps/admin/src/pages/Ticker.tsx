@@ -5,7 +5,7 @@ import { Field, Input, Toggle } from '../components/ui.tsx';
 import type { TickerItem } from '../lib/data.ts';
 import { expiredRowState, isoToLocalInput, localInputToIso, sortByPublish } from '../lib/format.ts';
 import { PublishCell } from './Announcements.tsx';
-import { TickerSources } from './TickerSources.tsx';
+import { SettingsLink } from '../components/SettingsLink.tsx';
 
 type Form = { text: string; startsAt: string; endsAt: string; isActive: boolean };
 
@@ -23,7 +23,7 @@ export function Ticker() {
       addLabel="Yeni kayan yazı"
       activeToggle
       reorderable
-      tabs={<TickerSources />}
+      tabs={<div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">Hava uyarıları, günün sözü ve RSS kaynakları Genel Ayarlar'da. <SettingsLink tab="pano" label="Kayan yazı kaynakları" /></div>}
       select={(rows) => sortByPublish(rows)}
       rowState={expiredRowState}
       schema={tickerSchema}

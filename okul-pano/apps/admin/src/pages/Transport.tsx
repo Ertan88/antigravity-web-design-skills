@@ -24,7 +24,7 @@ import {
   type Holiday,
 } from './duties/calendar.tsx';
 import { MonthChoice, type MonthResolution } from './duties/MonthChoice.tsx';
-import { TransportSwitch } from './duties/TransportToggle.tsx';
+import { SettingsLink } from '../components/SettingsLink.tsx';
 import { AutoFillDialog, BalanceCard, useTransportStats } from './transport/Balance.tsx';
 
 type TeacherOption = { id: string; fullName: string };
@@ -282,7 +282,7 @@ export function TransportView({ month }: { month: string }) {
           icon={<Bus className="size-6" />}
           title="Okulunuzda taşımalı eğitim var mı?"
           description="Açarsanız servisle gelen öğrenciler için sabah, öğle ve akşam görevlilerini gün gün belirlersiniz; görevliler panoda o günün nöbet kartında görünür."
-          action={can('settings.manage') ? <TransportSwitch label="Taşımalı eğitimi aç" /> : undefined}
+          action={can('settings.manage') ? <SettingsLink tab="moduller" label="Genel Ayarlar › Modüller'den açın" /> : undefined}
         />
       </Card>
     );
@@ -341,7 +341,7 @@ export function TransportView({ month }: { month: string }) {
             ))}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {can('settings.manage') && <TransportSwitch label="Açık" compact />}
+            {can('settings.manage') && <SettingsLink tab="moduller" label="Modül ayarı" />}
             {editable && (
               <Button size="sm" variant="secondary" icon={<Wand2 className="size-4" />} onClick={() => setAutoFill(true)}>
                 Adil dağıt

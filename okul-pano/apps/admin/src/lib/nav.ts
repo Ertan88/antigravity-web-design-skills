@@ -167,7 +167,7 @@ export const NAV: NavGroup[] = [
     items: [
       // Dar yetki "Öğretmen hesabı açma" olan kişi yalnızca Kadro sekmesini görür
       { to: '/kullanicilar', label: 'Kişiler ve Yetkiler', icon: UserCog, when: (_s, who) => who.can('users.manage') || who.can('accounts.enroll') || who.can('roles.assign') },
-      { to: '/ayarlar', label: 'Genel Ayarlar', icon: Settings, permission: 'settings.manage' },
+      { to: '/ayarlar', label: 'Genel Ayarlar', icon: Settings, when: (_s, who) => who.can('settings.manage') || Boolean(who.internship?.manage) },
       { to: '/gecmis', label: 'Etkinlik Geçmişi', icon: History, permission: 'users.manage' },
     ],
   },

@@ -222,7 +222,7 @@ export function PlatformHome() {
               <section className="rounded-3xl bg-surface p-5 ring-1 ring-slate-200/70 dark:ring-white/10">
                 <h2 className="text-lg font-extrabold text-ink">Destek erişimi açık</h2>
                 {!supportOpen.length ? (
-                  <p className="mt-2 text-sm text-slate-500">Şu an destek erişimi veren okul yok. Okul müdürü Genel Ayarlar'dan süreli erişim verir.</p>
+                  <p className="mt-2 text-sm text-slate-500">Şu an destek erişimi veren okul yok. Okul müdürü Genel Ayarlar › Destek sekmesinden süreli erişim verir.</p>
                 ) : (
                   <ul className="mt-1 divide-y divide-slate-100 dark:divide-white/10">
                     {supportOpen.map((s) => {
