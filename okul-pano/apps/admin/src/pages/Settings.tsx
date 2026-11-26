@@ -427,9 +427,6 @@ export function Settings() {
               {(id) => <Input id={id} inputMode="decimal" value={v.longitude} onChange={(e) => set('longitude', e.target.value)} placeholder="32.8597" />}
             </Field>
           </div>
-          <Field label="Saat dilimi" error={form.errors.timezone} help="Zil sayacı ve tarih bu saat dilimine göre hesaplanır; cihaz saati yanlış olsa da pano doğru çalışır.">
-            {(id) => <Input id={id} value={v.timezone} onChange={(e) => set('timezone', e.target.value)} />}
-          </Field>
         </Section>
 
         <Section title="Görev dağılımı" description="Hangi işin bildirimi ve onayı hangi yöneticiye gider.">

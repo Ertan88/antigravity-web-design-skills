@@ -417,7 +417,7 @@ export function DayFlow({
           <span>
             <b>{holiday}.</b> Tam gün tatil; zil çalmaz.{' '}
             <Link to="/tatil-takvimi" className="font-semibold underline-offset-2 hover:underline">
-              Tatil Takvimi
+              Çalışma Takvimi
             </Link>
           </span>
         </div>

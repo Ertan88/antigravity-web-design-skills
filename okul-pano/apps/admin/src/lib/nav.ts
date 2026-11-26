@@ -102,7 +102,7 @@ export const NAV: NavGroup[] = [
       { to: '/zil-saatleri', label: 'Zil Saatleri', icon: BellRing, permission: 'schedule.manage' },
       { to: '/sinav-takvimi', label: 'Sınav Takvimi', icon: ClipboardCheck },
       // Herkes görür; tatil ekleme Nöbet yetkisiyle, MEB takvimini düzeltme yalnızca platform yöneticisinde
-      { to: '/tatil-takvimi', label: 'Tatil Takvimi', icon: CalendarRange },
+      { to: '/tatil-takvimi', label: 'Çalışma Takvimi', icon: CalendarRange },
     ],
   },
   {

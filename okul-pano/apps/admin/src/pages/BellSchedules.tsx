@@ -416,7 +416,7 @@ export function BellSchedules() {
   const counts = useMemo(() => (timetable.data?.length ? lessonCounts(timetable.data, classList, dual) : null), [timetable.data, classList, dual]);
   const bellClasses = useMemo(() => (timetable.data?.length ? bellClassDays(timetable.data, classList) : null), [timetable.data, classList]);
 
-  // Hafta (hafta sonu ders yoksa gelecek hafta); tatil ve arifeler Tatil Takvimi'nden
+  // Hafta (hafta sonu ders yoksa gelecek hafta); tatil ve arifeler Çalışma Takvimi'nden
   const todayIso = now.iso;
   const upcoming = useUpcomingHolidays();
   const weekendNoLessons = now.weekday >= 6 && !counts?.[`${shift}:${now.weekday}`];

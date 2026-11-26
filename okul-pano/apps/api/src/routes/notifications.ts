@@ -149,7 +149,7 @@ export async function notificationRoutes(app: FastifyInstance) {
       }
     }
 
-    // Önümüzdeki 3 hafta: bayrama bitişik olası köprü günleri (idari izin ilan edilirse Tatil Takvimi'nden işaretlenir)
+    // Önümüzdeki 3 hafta: bayrama bitişik olası köprü günleri (idari izin ilan edilirse Çalışma Takvimi'nden işaretlenir)
     if (await assigned('duties', 'duties.manage')) {
       const today = zonedParts(new Date(), school.timezone).isoDate;
       const { bridges } = await upcomingHolidays(db, schoolId, today, 21);

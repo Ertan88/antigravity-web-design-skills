@@ -7,7 +7,7 @@ import { HolidaysCard } from './bell/HolidaysCard.tsx';
 import { AcademicCalendarCard } from './platform/AcademicCalendarCard.tsx';
 
 /**
- * Tatil Takvimi: MEB çalışma takvimi (ara tatil, yarıyıl, yaz), resmî ve dini tatiller, arifeler, köprü günleri ve
+ * Çalışma Takvimi: MEB çalışma takvimi (ara tatil, yarıyıl, yaz), resmî ve dini tatiller, arifeler, köprü günleri ve
  * okulun kendi tatilleri tek yerde. Okul takvimi görür ve kendi tatillerini ekler; MEB takvimini tarama, onaylama ve
  * düzeltme yalnızca platform yöneticisindedir (bütün okullar için ortak).
  */
@@ -27,7 +27,7 @@ export function HolidayCalendar() {
         <PageHeader title="MEB Çalışma Takvimi" description="Bütün okulların ara tatil, yarıyıl ve yaz tatili bu takvimden gelir. Yeni yılın takvimini tarayıp onaylayın." />
       ) : (
         <PageHeader
-          title="Tatil Takvimi"
+          title="Çalışma Takvimi"
           description="Panoda zilin çalmadığı günler, yarım günler ve eğitim yılının takvimi. Ara tatil, yarıyıl ve yaz tatili her yıl MEB çalışma takviminden otomatik gelir; resmî ve dini bayramlar kendiliğinden hesaplanır."
         />
       )}

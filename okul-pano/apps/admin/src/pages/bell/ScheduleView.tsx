@@ -248,7 +248,7 @@ export function ScheduleView({
                 ? 'Tam gün tatil; zil çalmaz, dersler yapılmaz.'
                 : `Yarım gün; son zil ${day.endsAt}. Bu saatten sonra başlayan dersler yapılmaz, taşan ders son zilde biter.`}{' '}
               <Link to="/tatil-takvimi" className="font-semibold underline-offset-2 opacity-80 hover:underline">
-                Tatil Takvimi
+                Çalışma Takvimi
               </Link>
             </span>
           </div>
