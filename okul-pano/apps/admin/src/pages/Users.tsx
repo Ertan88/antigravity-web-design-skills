@@ -113,7 +113,7 @@ export function Users() {
           <div className="flex flex-wrap gap-2">
             {full && (
               <Button variant="secondary" icon={<Tags className="size-4" />} onClick={() => setMapping(true)}>
-                Ünvan → rol
+                Görev → rol
               </Button>
             )}
             <Button variant="secondary" icon={<QrCodeIcon className="size-4" />} onClick={() => void openMeeting()}>
@@ -188,7 +188,7 @@ export function Users() {
           await api(schoolPath, { method: 'PATCH', body: { settings: { titleRoles: v } } });
           void qc.invalidateQueries({ queryKey: [schoolId, 'school'] });
           refresh();
-          toast.success('Ünvan → rol eşleştirmesi kaydedildi');
+          toast.success('Görev → rol eşleştirmesi kaydedildi');
           setMapping(false);
         }}
       />

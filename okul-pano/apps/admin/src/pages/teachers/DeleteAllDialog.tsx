@@ -97,7 +97,7 @@ export function DeleteAllDialog({ open, onClose }: { open: boolean; onClose: () 
             </ul>
           )}
         </Alert>
-        <p className="text-slate-600">Branş ve ünvan listeleri silinmez. Önce "Excel'e aktar" ile yedek almanızı öneririz.</p>
+        <p className="text-slate-600">Branş ve görev listeleri silinmez. Önce "Excel'e aktar" ile yedek almanızı öneririz.</p>
         <Field label='Onaylamak için "SİL" yazın'>
           {(id) => <Input id={id} value={word} onChange={(e) => setWord(e.target.value)} autoComplete="off" placeholder="SİL" />}
         </Field>

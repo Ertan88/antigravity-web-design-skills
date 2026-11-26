@@ -5,7 +5,7 @@ import { QrCode } from '../../components/QrCode.tsx';
 import { Alert, Badge, Button, Input, Modal, Select } from '../../components/ui.tsx';
 import type { TeacherOption } from '../../lib/data.ts';
 
-/* Kişiler ve Yetkiler: giriş kodu, toplantı QR'ı ve ünvan → rol pencereleri */
+/* Kişiler ve Yetkiler: giriş kodu, toplantı QR'ı ve görev → rol pencereleri */
 
 export const formatCode = (c: string) => `${c.slice(0, 4)}-${c.slice(4)}`;
 
@@ -119,8 +119,8 @@ export function TitleRoleDialog({
     <Modal
       open={open}
       onClose={onClose}
-      title="Ünvan → rol"
-      description="Kadrodaki ünvana göre hesap açılırken önerilecek rol. Müdür yardımcısı ünvanları için Yönetici önerilir; isterseniz değiştirin. Her öğretmen için ayrıca da değiştirebilirsiniz."
+      title="Görev → rol"
+      description="Kadrodaki göreve göre hesap açılırken önerilecek rol. Müdür yardımcısı görevi için Yönetici önerilir; isterseniz değiştirin. Her öğretmen için ayrıca da değiştirebilirsiniz."
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>

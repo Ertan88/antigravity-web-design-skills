@@ -1,6 +1,6 @@
 import { errorText } from '@okulpano/shared';
 import { FileDown, FileSpreadsheet, Upload } from './icons.tsx';
-import { useRef, useState, type ReactNode } from 'react';
+import { useRef, useState } from 'react';
 import { downloadFile, excelFileName } from '../lib/api.ts';
 import { useSchool } from '../lib/data.ts';
 import { useToast } from './Toast.tsx';
@@ -18,7 +18,6 @@ export function ExcelButtons({
   onFile,
   query,
   size,
-  afterImport,
 }: {
   basePath: string;
   /** Dosya adındaki modül adı: "<Okul> - <modül>.xlsx"; şablon okul adı olmadan "<modül> Şablonu.xlsx" */
@@ -31,8 +30,6 @@ export function ExcelButtons({
   query?: string;
   /** Liste üstündeki araç çubuğunda küçük düğmeler */
   size?: 'sm';
-  /** "Excel'den yükle"nin hemen ardından gelecek düğme (ör. yapıştırarak ekle) */
-  afterImport?: ReactNode;
 }) {
   const toast = useToast();
   const school = useSchool();
@@ -74,7 +71,6 @@ export function ExcelButtons({
           />
         </>
       )}
-      {afterImport}
       <Button variant="secondary" size={size} icon={<FileDown className="size-4" />} loading={busy === 'export'} onClick={() => void download('export')}>
         Excel'e aktar
       </Button>

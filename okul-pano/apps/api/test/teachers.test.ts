@@ -52,12 +52,13 @@ afterAll(async () => {
   await t.database.close();
 });
 
-describe('branş ve ünvan listeleri', () => {
-  it('yeni okul önerilen listelerle açılır', async () => {
+describe('branş ve görev listeleri', () => {
+  it('yeni okul boş listelerle açılır (varsayılan liste yok); okul kendi listesini ekler', async () => {
+    expect((await owner.get(path('teacher-branches'))).json()).toEqual([]);
+    expect((await owner.get(path('teacher-titles'))).json()).toEqual([]);
+    for (const name of ['Matematik', 'Fizik', 'Türkçe', 'Fen Bilimleri', 'İngilizce']) expectStatus(await owner.post(path('teacher-branches'), { name }), 201);
+    for (const name of ['Öğretmen', 'Uzman Öğretmen', 'Müdür Yardımcısı']) expectStatus(await owner.post(path('teacher-titles'), { name }), 201);
     const branches = (await owner.get(path('teacher-branches'))).json();
-    const titles = (await owner.get(path('teacher-titles'))).json();
-    expect(branches.map((b: { name: string }) => b.name)).toContain('Matematik');
-    expect(titles.map((b: { name: string }) => b.name)).toEqual(expect.arrayContaining(['Öğretmen', 'Uzman Öğretmen', 'Başöğretmen']));
     expect(branches[0]).toMatchObject({ teacherCount: 0 });
   });
 
@@ -68,9 +69,8 @@ describe('branş ve ünvan listeleri', () => {
     expectStatus(await owner.post(path('teacher-branches'), { name: 'Robotik ve Kodlama' }), 201);
   });
 
-  it('önerilen listeyi tekrar eklemek çift kayıt oluşturmaz', async () => {
-    const res = await owner.post(path('teacher-catalog/defaults'));
-    expect(res.json()).toEqual({ branchesAdded: 0, titlesAdded: 0 });
+  it('önerilen liste eklenemez (uç nokta kaldırıldı)', async () => {
+    expect((await owner.post(path('teacher-catalog/defaults'))).statusCode).toBe(404);
   });
 });
 
@@ -111,7 +111,7 @@ describe('Excel', () => {
     const wb = await readWorkbook(res.rawPayload);
     expect(wb.worksheets.map((w) => w.name)).toEqual(['Öğretmenler', 'Listeler', 'Açıklama']);
     const sheet = wb.getWorksheet('Öğretmenler')!;
-    expect(sheet.getRow(1).values).toEqual([undefined, 'Ad Soyad', 'Branş', 'Ünvan', 'E-posta', 'Telefon']);
+    expect(sheet.getRow(1).values).toEqual([undefined, 'Ad Soyad', 'Branş', 'Görev', 'E-posta', 'Telefon']);
     expect(sheet.getCell('B2').dataValidation).toMatchObject({ type: 'list' });
     const lists = wb.getWorksheet('Listeler')!;
     expect(lists.state).toBe('veryHidden');
@@ -143,7 +143,7 @@ describe('Excel', () => {
       { row: 5, message: 'Ad soyad boş' },
       { row: 6, message: expect.stringMatching(/iki kez var \(ilk: 3\. satır\)/) },
     ]);
-    expect(body.newBranches).toEqual(['Drama']);
+    expect(body.newBranches).toEqual(['Drama', 'Kimya']);
     expect(body.newTitles).toEqual([]);
     expect(body.totals).toEqual({ new: 2, update: 1, unchanged: 0, skipped: 2 });
   });
@@ -165,7 +165,7 @@ describe('Excel', () => {
     ];
     const first = await owner.post(path('teachers/import'), { rows });
     expectStatus(first, 200);
-    expect(first.json()).toEqual({ created: 2, updated: 1, unchanged: 0, branchesCreated: 1, titlesCreated: 0 });
+    expect(first.json()).toEqual({ created: 2, updated: 1, unchanged: 0, branchesCreated: 2, titlesCreated: 0 });
 
     const again = await owner.post(path('teachers/import'), { rows });
     expect(again.json()).toMatchObject({ created: 0, updated: 0, unchanged: 3 });
@@ -185,7 +185,7 @@ describe('Excel', () => {
     const names = sheet.getColumn(1).values.slice(2) as string[];
     expect(names).toEqual(['Cem Yıldırım', 'Deniz Ak', 'Kemal Tunç', 'Zehra Çınar']);
     // İletişim sütunları yalnızca kadro ya da kullanıcı yönetimi yetkisi olana dolu gelir
-    expect(sheet.getRow(1).values).toEqual([undefined, 'Ad Soyad', 'Branş', 'Ünvan', 'E-posta', 'Telefon', 'Durum']);
+    expect(sheet.getRow(1).values).toEqual([undefined, 'Ad Soyad', 'Branş', 'Görev', 'E-posta', 'Telefon', 'Durum']);
     expect(sheet.getCell('F2').value).toBe('Aktif');
 
     const roundtrip = await upload(res.rawPayload);
@@ -228,7 +228,7 @@ describe('tüm listeyi silme', () => {
     expect(res.json()).toMatchObject({ deleted: 4, duties: 1 });
     expect((await owner.get(path('teachers/usage'))).json()).toMatchObject({ teachers: 0, duties: 0 });
     // Branş listesi korunur
-    expect((await owner.get(path('teacher-branches'))).json().length).toBeGreaterThan(20);
+    expect((await owner.get(path('teacher-branches'))).json().length).toBeGreaterThan(4);
   });
 });
 

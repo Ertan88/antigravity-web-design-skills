@@ -34,7 +34,7 @@ function tempPassword() {
 
 /**
  * Tek "Hesap aç" penceresi: 1) kimler (kadrodan) 2) nasıl giriş yapacaklar (e-posta daveti, giriş kodu,
- * toplantı QR'ı, geçici şifre) 3) rol (ünvandan önerilir). Görevler hesap açıldıktan sonra kişi kartından verilir.
+ * toplantı QR'ı, geçici şifre) 3) rol (görevden önerilir). Görevler hesap açıldıktan sonra kişi kartından verilir.
  */
 export function OpenAccountsDialog({
   open,
@@ -239,7 +239,7 @@ export function OpenAccountsDialog({
         ) : (
           <section>
             <div className="text-sm font-semibold text-slate-700">
-              2 · Kimler <span className="font-normal text-slate-400">· rol ünvandan önerildi, değiştirebilirsiniz</span>
+              2 · Kimler <span className="font-normal text-slate-400">· rol görevden önerildi, değiştirebilirsiniz</span>
             </div>
             <div className="mt-2 divide-y divide-slate-100">
               {rows.map((r) => {

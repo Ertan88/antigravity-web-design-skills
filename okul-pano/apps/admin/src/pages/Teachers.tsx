@@ -199,7 +199,7 @@ export function Teachers() {
                 Örnek şablon
               </Button>
               <Button size="sm" variant="secondary" icon={<Tags className="size-4" />} onClick={() => setManaging(true)}>
-                Branş ve ünvanlar
+                Branş ve görevler
               </Button>
             </>
           )}
@@ -212,7 +212,7 @@ export function Teachers() {
         <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-3 sm:px-5 lg:flex-row lg:items-center">
           <div className="relative lg:w-72">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ad, branş ya da ünvan ara" className="pl-9" aria-label="Öğretmen ara" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ad, branş ya da görev ara" className="pl-9" aria-label="Öğretmen ara" />
           </div>
           <div className="grid grid-cols-2 gap-3 lg:flex">
             <Select value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)} aria-label="Branşa göre filtrele" className="lg:w-56">
@@ -327,7 +327,7 @@ export function Teachers() {
           <Field label="Branş" error={form.errors.branchId}>
             {(id) => <OptionSelect id={id} kind="teacher-branches" options={sortedBranches} value={form.values.branchId} onChange={(v) => form.set('branchId', v)} />}
           </Field>
-          <Field label="Ünvan" error={form.errors.titleId}>
+          <Field label="Görev" error={form.errors.titleId}>
             {(id) => <OptionSelect id={id} kind="teacher-titles" options={sortedTitles} value={form.values.titleId} onChange={(v) => form.set('titleId', v)} />}
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">

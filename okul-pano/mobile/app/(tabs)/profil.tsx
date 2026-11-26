@@ -286,7 +286,7 @@ export default function Menu() {
           ? { title: 'Nöbetlerim', subtitle: 'Bu hafta ve yerine görevlendirmeler', icon: 'shield-checkmark-outline', to: '/nobet' }
           : can('duties.manage') && { title: 'Nöbet çizelgesi', subtitle: 'Bugünkü nöbetçiler ve haftalık çizelge', icon: 'shield-checkmark-outline', to: '/nobet?g=cizelge' }),
       can('duties.manage') && notTab('gorevlendirme') && { title: 'Ders görevlendirme', subtitle: 'İzinli öğretmenin dersleri ve nöbet yeri', icon: 'people-outline', to: '/gorevlendirme' },
-      can('directory.manage') && { title: 'Öğretmen kadrosu', subtitle: 'Ad, branş, ünvan, iletişim · ekle, düzenle', icon: 'school-outline', to: '/kadro' },
+      can('directory.manage') && { title: 'Öğretmen kadrosu', subtitle: 'Ad, branş, görev, iletişim · ekle, düzenle', icon: 'school-outline', to: '/kadro' },
       isTeacher && {
         title: role === 'teacher' ? 'İzinlerim' : 'İzin bildir',
         subtitle: pendingLeaves ? `${pendingLeaves} bildirim onay bekliyor` : 'Onay durumu',

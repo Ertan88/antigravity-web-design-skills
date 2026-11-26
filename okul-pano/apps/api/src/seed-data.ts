@@ -26,7 +26,6 @@ import {
 } from './db/schema.ts';
 import { hashPassword, randomToken, sha256 } from './lib/crypto.ts';
 import type { FileStorage } from './lib/storage.ts';
-import { addDefaultTeacherOptions } from './routes/teachers.ts';
 
 export interface SeedResult {
   schoolId: string;
@@ -308,7 +307,6 @@ export async function seedDemo(
     accounts.push({ role: p.role === 'owner' ? 'Okul müdürü' : 'Editör (duyuru + kayan yazı)', email: p.email, password: p.password });
   }
 
-  await addDefaultTeacherOptions(db, schoolId);
   const { teacherIds } = await seedSchoolContent(db, schoolId, { storage: opts.storage, now, timezone: tz });
   // Mobil uygulama denemesi için öğretmen hesabı: kadrodaki ilk öğretmene bağlı (kendi nöbetleri ve programı)
   {

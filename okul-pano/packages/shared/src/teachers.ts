@@ -1,6 +1,9 @@
 /** Öğretmen kadrosu için ortak yardımcılar: önerilen listeler ve Türkçe'ye uygun ad karşılaştırma. */
 
-/** Yeni okullara önerilen branşlar (MEB branş adlarına göre) */
+/**
+ * MEB branş adlarının doğru yazımı. Okullara liste olarak eklenmez (varsayılan liste yok); yalnızca e-Okul'dan gelen
+ * kısa ya da farklı yazımları ("Ahlâk" → "Ahlak") bu yazıma çevirmek için kullanılır.
+ */
 export const DEFAULT_BRANCHES = [
   'Almanca',
   'Beden Eğitimi ve Spor',
@@ -27,18 +30,6 @@ export const DEFAULT_BRANCHES = [
   'Türkçe',
 ] as const;
 
-/** Yeni okullara önerilen ünvanlar (Öğretmenlik Meslek Kanunu kariyer basamakları ve idari görevler) */
-export const DEFAULT_TITLES = [
-  'Öğretmen',
-  'Uzman Öğretmen',
-  'Başöğretmen',
-  'Aday Öğretmen',
-  'Sözleşmeli Öğretmen',
-  'Ücretli Öğretmen',
-  'Okul Müdürü',
-  'Müdür Başyardımcısı',
-  'Müdür Yardımcısı',
-] as const;
 
 /** "  ayşe   DEMİR " ve "Ayşe Demir" aynı kişi sayılır: boşluk ve büyük/küçük harf (Türkçe kurallarıyla) yok sayılır. */
 export function normalizeName(name: string): string {

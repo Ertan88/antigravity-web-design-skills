@@ -47,7 +47,6 @@ export const ChevronRight = wrap(T.IconChevronRight, 'ChevronRight');
 export const ChevronsUpDown = wrap(T.IconSelector, 'ChevronsUpDown');
 export const CircleAlert = wrap(T.IconAlertCircle, 'CircleAlert');
 export const ClipboardCheck = wrap(T.IconClipboardCheck, 'ClipboardCheck');
-export const ClipboardPaste = wrap(T.IconClipboardText, 'ClipboardPaste');
 export const Clock = wrap(T.IconClock, 'Clock');
 export const CloudLightning = wrap(T.IconCloudStorm, 'CloudLightning');
 export const Coffee = wrap(T.IconCoffee, 'Coffee');

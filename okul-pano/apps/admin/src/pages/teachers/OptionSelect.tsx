@@ -11,13 +11,13 @@ export type OptionKind = 'teacher-branches' | 'teacher-titles';
 
 export const OPTION_LABEL: Record<OptionKind, { one: string; many: string }> = {
   'teacher-branches': { one: 'branş', many: 'Branşlar' },
-  'teacher-titles': { one: 'ünvan', many: 'Ünvanlar' },
+  'teacher-titles': { one: 'görev', many: 'Görevler' },
 };
 
 const NEW = '__new__';
 
 /**
- * Branş / ünvan seçici. Listenin sonundaki "Yeni ... ekle" ile formdan çıkmadan
+ * Branş / görev seçici. Listenin sonundaki "Yeni ... ekle" ile formdan çıkmadan
  * yeni değer eklenir ve seçili hale gelir.
  */
 export function OptionSelect({

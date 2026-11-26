@@ -75,7 +75,7 @@ export default function Kadro() {
       onRefresh={() => void teachers.refetch()}
     >
       <ErrorNote error={teachers.error} />
-      <Field label="Ara" value={q} onChangeText={setQ} placeholder="Ad, branş ya da ünvan" autoCapitalize="none" />
+      <Field label="Ara" value={q} onChangeText={setQ} placeholder="Ad, branş ya da görev" autoCapitalize="none" />
       {branchChips.length > 1 && (
         // Yatay kaydırma: çipler ekranın altına doğru uzamasın
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8 }}>
@@ -120,7 +120,7 @@ function TeacherRow({ t, last, onEdit }: { t: Teacher; last: boolean; onEdit: ()
           {t.fullName}
         </Text>
         <Text style={{ fontSize: 12.5, color: colors.muted }} numberOfLines={1}>
-          {[t.title ?? 'Ünvan yok', t.branch ?? 'Branş yok'].join(' · ')}
+          {[t.title ?? 'Görev yok', t.branch ?? 'Branş yok'].join(' · ')}
         </Text>
       </View>
       {!t.isActive && <Badge tone="muted">Pasif</Badge>}
@@ -196,7 +196,7 @@ function EditSheet({ teacher, branches, titles, onClose }: { teacher: Teacher | 
       <SheetScroll style={{ maxHeight: 470 }} contentContainerStyle={{ gap: 10 }}>
         <Field label="Ad soyad" value={form.fullName} onChangeText={(v) => set('fullName', v)} autoCapitalize="words" />
         <OptionPicker label="Branş" empty="Branş yok" value={form.branchId} options={branches} onChange={(v) => set('branchId', v)} />
-        <OptionPicker label="Ünvan" empty="Ünvan yok" value={form.titleId} options={titles} onChange={(v) => set('titleId', v)} />
+        <OptionPicker label="Görev" empty="Görev yok" value={form.titleId} options={titles} onChange={(v) => set('titleId', v)} />
         <Field label="E-posta (isteğe bağlı)" value={form.email} onChangeText={(v) => set('email', v)} keyboardType="email-address" autoCapitalize="none" />
         <Field label="Telefon (isteğe bağlı)" value={form.phone} onChangeText={(v) => set('phone', v)} keyboardType="phone-pad" />
         <ToggleRow label="Aktif" description="Pasif öğretmen nöbet, ders programı ve hesap açmada seçilmez." value={form.isActive} onChange={(v) => set('isActive', v)} />

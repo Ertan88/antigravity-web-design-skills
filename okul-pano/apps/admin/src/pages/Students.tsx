@@ -1,12 +1,12 @@
 import { compareClassNames, layoutModules, normalizeClassName, resolveLayout, studentSchema, errorText } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { Cake, ClipboardPaste, FileUp, Search, Trash2 } from '../components/icons.tsx';
-import { useMemo, useRef, useState } from 'react';
+import { Cake, FileUp, Search, Trash2 } from '../components/icons.tsx';
+import { useRef, useState } from 'react';
 import { CrudPage } from '../components/CrudPage.tsx';
 import { ExcelButtons } from '../components/ExcelButtons.tsx';
 import { ExcelImportDialog, type ImportPreview } from '../components/ExcelImportDialog.tsx';
 import { useToast } from '../components/Toast.tsx';
-import { Alert, Badge, Button, Field, Input, Modal, Select, Textarea, Toggle } from '../components/ui.tsx';
+import { Badge, Button, Field, Input, Select, Toggle } from '../components/ui.tsx';
 import { confirm } from '../components/confirm.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
@@ -14,50 +14,6 @@ import { nameMap, useList, useSchool, useSchoolPath, type ClassGroup, type Stude
 import { formatDate } from '../lib/format.ts';
 
 type Form = { listNo: string; schoolNo: string; fullName: string; classGroupId: string; birthDate: string };
-
-interface ParsedRow {
-  schoolNo: string;
-  fullName: string;
-  className: string | null;
-  birthDate: string;
-}
-
-const DATE = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$|^(\d{4})-(\d{2})-(\d{2})$/;
-const CLASS = /^(\d{1,2}\s*[-/]?\s*[A-ZÇĞİÖŞÜa-zçğıöşü]{1,2}|anasınıfı.*|ana sınıfı.*)$/i;
-
-/**
- * Excel'den, Google E-Tablolar'dan ya da e-Okul listesinden kopyalanan satırları çözer.
- * Sütun sırası serbesttir: tarih ve sınıf biçimlerinden, okul numarası satırdaki ilk sayıdan tanınır,
- * kalan metin ad soyad kabul edilir.
- */
-function parseRows(text: string): { rows: ParsedRow[]; skipped: number } {
-  const rows: ParsedRow[] = [];
-  let skipped = 0;
-  for (const line of text.split(/\r?\n/)) {
-    if (!line.trim()) continue;
-    const cells = (line.includes('\t') ? line.split('\t') : line.includes(';') ? line.split(';') : line.split(',')).map((c) => c.trim());
-    let birthDate: string | null = null;
-    let className: string | null = null;
-    let schoolNo: string | null = null;
-    const nameParts: string[] = [];
-    for (const cell of cells) {
-      const d = DATE.exec(cell);
-      if (d && !birthDate) {
-        birthDate = d[4] ? `${d[4]}-${d[5]}-${d[6]}` : `${d[3]}-${d[2]!.padStart(2, '0')}-${d[1]!.padStart(2, '0')}`;
-      } else if (CLASS.test(cell) && !className) {
-        className = normalizeClassName(cell);
-      } else if (/^\d+$/.test(cell)) {
-        schoolNo ??= cell;
-      } else if (cell) {
-        nameParts.push(cell);
-      }
-    }
-    const fullName = nameParts.join(' ').replace(/\s+/g, ' ').trim();
-    if (birthDate && schoolNo && fullName.length >= 2) rows.push({ schoolNo, fullName, className, birthDate });
-    else skipped++;
-  }
-  return { rows, skipped };
-}
 
 function studentImportMessage(res: { created: number; updated: number; classesCreated: number }): string {
   const parts = [`${res.created} öğrenci eklendi`];
@@ -146,92 +102,6 @@ function ExcelImport({ file, onClose }: { file: File | null; onClose: () => void
   );
 }
 
-function ImportModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { schoolId } = useAuth();
-  const qc = useQueryClient();
-  const toast = useToast();
-  const [text, setText] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const parsed = useMemo(() => parseRows(text), [text]);
-
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await api<{ created: number; updated: number; classesCreated: number }>(`/api/schools/${schoolId}/students/import`, {
-        method: 'POST',
-        body: { rows: parsed.rows },
-      });
-      await qc.invalidateQueries({ queryKey: [schoolId] });
-      toast.success(studentImportMessage(res));
-      setText('');
-      onClose();
-    } catch (err) {
-      setError(errorText(err, 'İçe aktarma başarısız.'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      size="lg"
-      title="Listeden yapıştır"
-      description="Excel ya da e-Okul listesindeki satırları kopyalayıp aşağıya yapıştırın."
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Vazgeç
-          </Button>
-          <Button loading={busy} disabled={!parsed.rows.length} onClick={() => void submit()}>
-            {parsed.rows.length ? `${parsed.rows.length} öğrenciyi aktar` : 'Aktar'}
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        {error && <Alert tone="red">{error}</Alert>}
-        <Textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          rows={8}
-          className="font-mono text-xs"
-          placeholder={'1203\tAyşe Yılmaz\t9-A\t14.03.2010\n1207\tMehmet Demir\t9-B\t02.11.2009'}
-          aria-label="Öğrenci listesi"
-        />
-        <p className="text-xs text-slate-500">
-          Her satırda okul numarası, ad soyad, sınıf (9-A) ve doğum tarihi (GG.AA.YYYY) bulunmalı; sütun sırası önemli değil. Satırdaki ilk sayı okul numarası kabul edilir.
-        </p>
-        {text && (
-          <div className="rounded-xl ring-1 ring-slate-200">
-            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5 text-sm">
-              <span className="font-semibold">{parsed.rows.length} satır tanındı</span>
-              {parsed.skipped > 0 && <span className="text-amber-700">{parsed.skipped} satır atlandı (başlık ya da eksik bilgi)</span>}
-            </div>
-            <ul className="divide-y divide-slate-100 text-sm">
-              {parsed.rows.slice(0, 5).map((r, i) => (
-                <li key={i} className="flex justify-between gap-3 px-4 py-2">
-                  <span className="font-medium">
-                    <span className="mr-2 text-slate-400 tabular-nums">{r.schoolNo}</span>
-                    {r.fullName}
-                  </span>
-                  <span className="text-slate-500">
-                    {r.className ?? 'sınıfsız'} · {formatDate(r.birthDate)}
-                  </span>
-                </li>
-              ))}
-              {parsed.rows.length > 5 && <li className="px-4 py-2 text-xs text-slate-500">… ve {parsed.rows.length - 5} öğrenci daha</li>}
-            </ul>
-          </div>
-        )}
-      </div>
-    </Modal>
-  );
-}
-
 /** Öğrenci listesini tamamen siler: yanlış ya da eski yıla ait liste yüklendiğinde baştan başlamak için */
 function ClearStudents({ count }: { count: number }) {
   const { schoolId } = useAuth();
@@ -280,7 +150,6 @@ export function Students() {
   const [q, setQ] = useState('');
   const [onlyToday, setOnlyToday] = useState(false);
   const [classFilter, setClassFilter] = useState('');
-  const [importing, setImporting] = useState(false);
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const pdfInput = useRef<HTMLInputElement>(null);
   const { can } = useAuth();
@@ -348,13 +217,6 @@ export function Students() {
               canImport={can('students.manage')}
               onFile={setExcelFile}
               size="sm"
-              afterImport={
-                can('students.manage') && (
-                  <Button variant="secondary" size="sm" icon={<ClipboardPaste className="size-4" />} onClick={() => setImporting(true)}>
-                    Yapıştırarak ekle
-                  </Button>
-                )
-              }
             />
             {can('students.manage') && studentCount > 0 && <ClearStudents count={studentCount} />}
           </>
@@ -441,7 +303,6 @@ export function Students() {
           </>
         )}
       />
-      <ImportModal open={importing} onClose={() => setImporting(false)} />
       <ExcelImport file={excelFile} onClose={() => setExcelFile(null)} />
     </>
   );

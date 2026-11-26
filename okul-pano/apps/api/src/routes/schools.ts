@@ -11,7 +11,6 @@ import { notifyUsers } from '../lib/push.ts';
 import { addToInbox, untilText } from './notifications.ts';
 import { geocode } from '../lib/weather.ts';
 import { SAMPLE_TABLES, seedSchoolContent, type SampleData } from '../seed-data.ts';
-import { addDefaultTeacherOptions } from './teachers.ts';
 import { PLATFORM_MEMBER_ERROR } from '../lib/platformAccount.ts';
 import { duplicateInstitutionCodes, warnDuplicateInstitution } from '../lib/institutionCode.ts';
 import { trySendMail } from '../lib/mailer.ts';
@@ -351,7 +350,6 @@ export async function schoolRoutes(app: FastifyInstance) {
         .returning();
       if (owner!.isSuperAdmin) throw badRequest(PLATFORM_MEMBER_ERROR);
       await tx.insert(memberships).values({ userId: owner!.id, schoolId: school!.id, role: 'owner' });
-      await addDefaultTeacherOptions(tx, school!.id);
       return school!;
     });
     return reply.status(201).send(publicSchool(result));

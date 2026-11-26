@@ -72,7 +72,7 @@ export async function parseTeachersWorkbook(data: Buffer): Promise<{ sheetName: 
   const wb = await loadWorkbook(data);
   const ws = pickSheet(wb, 'ogretmen', (s) => Boolean(findHeaderRow(s, ALIASES, hasName)));
   const header = findHeaderRow(ws, ALIASES, hasName);
-  if (!header) throw badRequest('Başlık satırı bulunamadı. Şablondaki "Ad Soyad", "Branş" ve "Ünvan" başlıklarını kullanın.');
+  if (!header) throw badRequest('Başlık satırı bulunamadı. Şablondaki "Ad Soyad", "Branş" ve "Görev" başlıklarını kullanın.');
 
   const { cols } = header;
   const rows: ParsedTeacherRow[] = [];
@@ -93,7 +93,7 @@ export async function parseTeachersWorkbook(data: Buffer): Promise<{ sheetName: 
     if (fullName.length < 2) issues.push({ row: r, message: 'Ad soyad boş' });
     else if (fullName.length > 80) issues.push({ row: r, message: 'Ad soyad 80 karakterden uzun' });
     else if (branch && branch.length > 60) issues.push({ row: r, message: 'Branş 60 karakterden uzun' });
-    else if (title && title.length > 60) issues.push({ row: r, message: 'Ünvan 60 karakterden uzun' });
+    else if (title && title.length > 60) issues.push({ row: r, message: 'Görev 60 karakterden uzun' });
     else if (!email.success) issues.push({ row: r, message: `E-posta geçersiz: ${rawEmail}` });
     else if (!phone.success) issues.push({ row: r, message: `Telefon geçersiz: ${rawPhone}` });
     else rows.push({ row: r, fullName, branch, title, email: email.data ?? null, phone: phone.data ?? null, isActive: parseStatus(get(row, 'status')) });
@@ -122,7 +122,7 @@ export async function buildTeachersWorkbook(opts: {
   ws.columns = [
     { header: 'Ad Soyad', key: 'fullName', width: 34 },
     { header: 'Branş', key: 'branch', width: 34 },
-    { header: 'Ünvan', key: 'title', width: 26 },
+    { header: 'Görev', key: 'title', width: 26 },
     ...(withContact ? [{ header: 'E-posta', key: 'email', width: 30 }, { header: 'Telefon', key: 'phone', width: 18 }] : []),
     ...(withStatus ? [{ header: 'Durum', key: 'status', width: 12 }] : []),
   ];
@@ -136,7 +136,7 @@ export async function buildTeachersWorkbook(opts: {
   const [branchRange, titleRange] = addListsSheet(wb, [opts.branches, opts.titles]);
   const lastRow = Math.max(TEMPLATE_ROWS, (opts.rows?.length ?? 0) + 200);
   validations(ws).add(`B2:B${lastRow}`, listRule(branchRange!, 'Branş', { allowNew: true }));
-  validations(ws).add(`C2:C${lastRow}`, listRule(titleRange!, 'Ünvan', { allowNew: true }));
+  validations(ws).add(`C2:C${lastRow}`, listRule(titleRange!, 'Görev', { allowNew: true }));
   if (withStatus) validations(ws).add(`${statusCol}2:${statusCol}${lastRow}`, { type: 'list', allowBlank: true, formulae: ['"Aktif,Pasif"'] });
 
   addHelpSheet(
@@ -144,14 +144,14 @@ export async function buildTeachersWorkbook(opts: {
     `${opts.schoolName} · Öğretmen listesi`,
     [
       '1. "Öğretmenler" sayfasında her satıra bir öğretmen yazın. Ad Soyad zorunludur.',
-      '2. Branş ve Ünvan hücrelerine tıklayınca açılan listeden seçebilirsiniz. Listede olmayan bir değer yazarsanız içe aktarırken otomatik eklenir.',
+      '2. Branş ve Görev hücrelerine tıklayınca açılan listeden seçebilirsiniz. Listede olmayan bir değer yazarsanız içe aktarırken otomatik eklenir.',
       '3. Adı ve soyadı ayrı sütunlarda olan listeler (ör. MEBBİS çıktısı) da kabul edilir: başlıkları "Adı" ve "Soyadı" olmalı.',
-      '4. Sistemde aynı ad soyadla kayıtlı öğretmen varsa yeni kayıt açılmaz, branşı ve ünvanı güncellenir.',
+      '4. Sistemde aynı ad soyadla kayıtlı öğretmen varsa yeni kayıt açılmaz, branşı ve görevi güncellenir.',
       '5. Durum sütununa "Pasif" yazılan öğretmenler nöbet ve ders programı seçimlerinde gizlenir.',
       '6. E-posta ve Telefon isteğe bağlıdır. E-postası yazılan öğretmene hesap açma daveti gönderilebilir; boş bırakılırsa öğretmen hesabını açarken e-postasını kendisi girer. Bu bilgiler yalnızca okul idaresince görülür (KVKK).',
       '7. Dosyayı .xlsx olarak kaydedip yönetim panelinde Öğretmen Kadrosu → Excel\'den yükle ile yükleyin.',
     ],
-    { header: ['Ad Soyad', 'Branş', 'Ünvan', 'E-posta', 'Telefon'], row: ['Ayşe Demir', 'Matematik', 'Uzman Öğretmen', 'ayse.demir@ornek.k12.tr', '0555 000 00 00'] },
+    { header: ['Ad Soyad', 'Branş', 'Görev', 'E-posta', 'Telefon'], row: ['Ayşe Demir', 'Matematik', 'Öğretmen', 'ayse.demir@ornek.k12.tr', '0555 000 00 00'] },
   );
   return toBuffer(wb);
 }

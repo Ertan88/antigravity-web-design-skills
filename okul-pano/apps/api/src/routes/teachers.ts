@@ -1,6 +1,4 @@
 import {
-  DEFAULT_BRANCHES,
-  DEFAULT_TITLES,
   normalizeName,
   teacherImportSchema,
   teacherOptionSchema,
@@ -77,12 +75,6 @@ async function optionNames(db: DB, table: OptionTable, schoolId: string): Promis
   return rows.map((r) => r.name).sort(trCompare);
 }
 
-/** Yeni okul açılırken önerilen branş ve ünvan listelerini ekler. */
-export async function addDefaultTeacherOptions(tx: Tx | DB, schoolId: string) {
-  const b = await ensureOptions(tx, teacherBranches, schoolId, [...DEFAULT_BRANCHES]);
-  const t = await ensureOptions(tx, teacherTitles, schoolId, [...DEFAULT_TITLES]);
-  return { branchesAdded: b.created, titlesAdded: t.created };
-}
 
 const MAX_TEACHER_UPLOAD = 10 * 1024 * 1024;
 
@@ -114,7 +106,7 @@ export async function teacherRoutes(app: FastifyInstance) {
 
   const optionLists = [
     { path: 'teacher-branches', table: teacherBranches, fk: teachers.branchId, entity: 'Branş' },
-    { path: 'teacher-titles', table: teacherTitles, fk: teachers.titleId, entity: 'Ünvan' },
+    { path: 'teacher-titles', table: teacherTitles, fk: teachers.titleId, entity: 'Görev' },
   ] as const;
 
   for (const o of optionLists) {
@@ -144,11 +136,6 @@ export async function teacherRoutes(app: FastifyInstance) {
     });
   }
 
-  app.post(`${base}/teacher-catalog/defaults`, write, async (req) => {
-    const result = await db.transaction((tx) => addDefaultTeacherOptions(tx, req.ctx.schoolId));
-    await audit(req, 'create', 'Branş ve ünvan', null, `${result.branchesAdded} branş, ${result.titlesAdded} ünvan eklendi`);
-    return result;
-  });
 
   /* ---------- Öğretmenler ---------- */
 

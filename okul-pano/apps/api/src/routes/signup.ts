@@ -8,7 +8,6 @@ import { hashPassword, randomToken, sha256 } from '../lib/crypto.ts';
 import { dropLinksTo } from '../lib/accountLinks.ts';
 import { trySendMail } from '../lib/mailer.ts';
 import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
-import { addDefaultTeacherOptions } from './teachers.ts';
 import { warnDuplicateInstitution } from '../lib/institutionCode.ts';
 import { recordSignupMarks, signupFlags, tellPlatformReview } from '../lib/trialGuard.ts';
 
@@ -112,7 +111,6 @@ async function openSchool(deps: AppDeps, signup: typeof signups.$inferSelect, ac
       .values({ email: signup.email, fullName: signup.ownerName, passwordHash: signup.passwordHash })
       .returning();
     await tx.insert(memberships).values({ userId: owner!.id, schoolId: school!.id, role: 'owner' });
-    await addDefaultTeacherOptions(tx, school!.id);
     await tx.update(signups).set({ verifiedAt: new Date(), schoolId: school!.id }).where(eq(signups.id, signup.id));
     return school!;
   });

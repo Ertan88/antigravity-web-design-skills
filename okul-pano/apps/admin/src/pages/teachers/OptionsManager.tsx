@@ -1,6 +1,6 @@
 import { trCompare } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Check, ListPlus, Plus, Search, Trash2, X } from '../../components/icons.tsx';
+import { Check, Plus, Search, Trash2, X } from '../../components/icons.tsx';
 import { useState } from 'react';
 import { useToast } from '../../components/Toast.tsx';
 import { Badge, Button, EditButton, IconButton, Input, Modal, Segmented, Spinner } from '../../components/ui.tsx';
@@ -104,10 +104,8 @@ export function OptionsManager({ open, onClose }: { open: boolean; onClose: () =
   const [q, setQ] = useState('');
   const [error, setError] = useState<string | null>(null);
   const qc = useQueryClient();
-  const toast = useToast();
   const list = useList<TeacherOption>(kind);
   const path = useSchoolPath(kind);
-  const defaultsPath = useSchoolPath('teacher-catalog/defaults');
   const label = OPTION_LABEL[kind];
 
   const add = useMutation({
@@ -118,16 +116,6 @@ export function OptionsManager({ open, onClose }: { open: boolean; onClose: () =
       setError(null);
     },
     onError: (e) => setError(e.message),
-  });
-  const defaults = useMutation({
-    mutationFn: () => api<{ branchesAdded: number; titlesAdded: number }>(defaultsPath, { method: 'POST' }),
-    onSuccess: async (r) => {
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: [schoolId, 'teacher-branches'] }),
-        qc.invalidateQueries({ queryKey: [schoolId, 'teacher-titles'] }),
-      ]);
-      toast.success(r.branchesAdded + r.titlesAdded ? `${r.branchesAdded} branş ve ${r.titlesAdded} ünvan eklendi` : 'Önerilen listenin tamamı zaten mevcut');
-    },
   });
 
   const needle = q.trim().toLocaleLowerCase('tr-TR');
@@ -140,13 +128,10 @@ export function OptionsManager({ open, onClose }: { open: boolean; onClose: () =
       open={open}
       onClose={onClose}
       size="lg"
-      title="Branş ve ünvanlar"
-      description="Bir adı değiştirdiğinizde o branştaki ya da ünvandaki tüm öğretmenlerde değişir."
+      title="Branş ve görevler"
+      description="Bir adı değiştirdiğinizde o branştaki ya da görevdeki tüm öğretmenlerde değişir."
       footer={
         <>
-          <Button variant="ghost" className="mr-auto" icon={<ListPlus className="size-4" />} loading={defaults.isPending} onClick={() => defaults.mutate()}>
-            Önerilen listeyi ekle
-          </Button>
           <Button onClick={onClose}>Tamam</Button>
         </>
       }
@@ -161,7 +146,7 @@ export function OptionsManager({ open, onClose }: { open: boolean; onClose: () =
           }}
           options={[
             { value: 'teacher-branches', label: 'Branşlar' },
-            { value: 'teacher-titles', label: 'Ünvanlar' },
+            { value: 'teacher-titles', label: 'Görevler' },
           ]}
         />
         <form

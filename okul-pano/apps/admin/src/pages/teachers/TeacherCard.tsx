@@ -73,7 +73,7 @@ export function TeacherCard({
         >
           {teacher.fullName}
         </h3>
-        <p className="mt-0.5 line-clamp-2 text-sm leading-snug text-slate-500">{teacher.title ?? 'Ünvan girilmemiş'}</p>
+        <p className="mt-0.5 line-clamp-2 text-sm leading-snug text-slate-500">{teacher.title ?? 'Görev girilmemiş'}</p>
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
           {teacher.branch ? (
             <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs leading-snug font-semibold break-words text-slate-700">{teacher.branch}</span>

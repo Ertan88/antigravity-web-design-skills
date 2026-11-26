@@ -35,7 +35,7 @@ export function ImportDialog({ file, onClose }: { file: File | null; onClose: ()
       columns={[
         { header: 'Ad soyad', cell: (r) => <span className="font-medium whitespace-nowrap text-ink">{r.fullName}</span> },
         { header: 'Branş', cell: (r) => r.branch ?? '—' },
-        { header: 'Ünvan', cell: (r) => r.title ?? '—' },
+        { header: 'Görev', cell: (r) => r.title ?? '—' },
         { header: 'E-posta', cell: (r) => r.email ?? '—' },
         { header: 'Telefon', cell: (r) => r.phone ?? '—' },
       ]}
@@ -47,14 +47,14 @@ export function ImportDialog({ file, onClose }: { file: File | null; onClose: ()
       ]}
       additions={(p) => [
         { label: 'Listeye eklenecek branşlar', values: p.newBranches },
-        { label: 'Listeye eklenecek ünvanlar', values: p.newTitles },
+        { label: 'Listeye eklenecek görevler', values: p.newTitles },
       ]}
       renderOptions={(p, o, set) =>
         p.totals.update > 0 && (
           <Toggle
             checked={o.updateExisting}
             onChange={(v) => set({ updateExisting: v })}
-            label="Sistemde kayıtlı öğretmenlerin ad yazımını, branş, ünvan ve iletişim bilgisini güncelle"
+            label="Sistemde kayıtlı öğretmenlerin ad yazımını, branş, görev ve iletişim bilgisini güncelle"
             description="Kapalıysa yalnızca yeni öğretmenler eklenir. Dosyadaki boş hücreler mevcut bilgiyi silmez."
           />
         )
