@@ -1,4 +1,5 @@
 import { EMERGENCY_INFO } from '@okulpano/shared/emergency';
+import { isLessonFree } from '@okulpano/shared/academicCalendar';
 import { router } from 'expo-router';
 import { Pressable } from 'react-native';
 import { membershipLabel, useAuth } from './auth.tsx';
@@ -65,7 +66,7 @@ export function ManagerHome() {
               <Banner tone="danger" icon="warning" title={`Acil durum sürüyor: ${EMERGENCY_INFO[c.emergency.type].label}`} text={[clock(c.emergency.startedAt), c.emergency.startedBy].filter(Boolean).join(' · ')} />
             </Pressable>
           )}
-          {me.data ? <DayBanner data={me.data} /> : c.holiday ? <Banner icon="sunny" title="Bugün tatil" text={`${c.holiday}. Zil çalmıyor.`} /> : null}
+          {me.data ? <DayBanner data={me.data} /> : c.holiday ? <Banner icon="sunny" title={isLessonFree(c.holiday) ? 'Bugün ders yok' : 'Bugün tatil'} text={`${c.holiday}. Zil çalmıyor.`} /> : null}
           {me.data && <AssignmentNotice data={me.data} />}
           {me.data && <BellStrip data={me.data} />}
           <StatusCards cards={statusCards(c, cover.data, duty.data, can('duties.manage'), openLessons)} />
@@ -106,7 +107,7 @@ function statusCards(c: ControlCenter, cover: CoverSummary | undefined, duty: Du
       icon: 'people-outline',
       label: 'İzinli',
       value: cover?.holiday ? '–' : (cover?.absent.length ?? '–'),
-      caption: !cover ? '' : cover.holiday ? 'Bugün tatil' : openLessons ? `${openLessons} ders boş` : cover.absent.length ? 'Dersler görevlendirildi' : 'İzinli yok',
+      caption: !cover ? '' : cover.holiday ? (isLessonFree(cover.holiday) ? 'Bugün ders yok' : 'Bugün tatil') : openLessons ? `${openLessons} ders boş` : cover.absent.length ? 'Dersler görevlendirildi' : 'İzinli yok',
       to: canCover ? '/gorevlendirme' : '/nobet',
     },
     {
@@ -115,7 +116,7 @@ function statusCards(c: ControlCenter, cover: CoverSummary | undefined, duty: Du
       icon: 'shield-checkmark-outline',
       label: 'Nöbet',
       value: !duty || duty.holiday ? '–' : people,
-      caption: !duty ? '' : duty.holiday ? 'Bugün tatil' : !duty.entries.length ? 'Nöbet girilmemiş' : open ? `${open} yer boş` : 'Bütün yerler dolu',
+      caption: !duty ? '' : duty.holiday ? (isLessonFree(duty.holiday) ? 'Bugün ders yok' : 'Bugün tatil') : !duty.entries.length ? 'Nöbet girilmemiş' : open ? `${open} yer boş` : 'Bütün yerler dolu',
       to: '/nobet',
     },
     {

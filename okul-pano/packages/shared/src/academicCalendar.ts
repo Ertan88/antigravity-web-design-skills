@@ -31,6 +31,13 @@ export interface AcademicCalendarData {
 
 export const SEMESTER_BREAK = 'Yarıyıl Tatili';
 export const SUMMER_BREAK = 'Yaz Tatili';
+/**
+ * Ders yok ama öğretmenler görevde: eylülde derslerin başladığı güne kadar ve haziranda ders yılının bitişinden yaz
+ * tatiline kadar (mesleki çalışma). Zil, nöbet, ders görevlendirme, servis nöbeti ve staj günlerinde tatil gibi
+ * sayılır; tatil listelerinde gösterilmez; öğretmen izinlerinde iş günüdür.
+ */
+export const LESSON_FREE = 'Mesleki Çalışma Dönemi';
+export const isLessonFree = (name: string | null | undefined) => name === LESSON_FREE;
 
 /** "2026-2027" */
 export const academicYearLabel = (startYear: number) => `${startYear}-${startYear + 1}`;
@@ -77,9 +84,8 @@ export function summerBreak(cal: AcademicCalendarData, startYear: number): { sta
 }
 
 /**
- * Takvimdeki tatil günleri: ara tatiller, yarıyıl tatili ve yaz tatili. Öğretmenlerin mesleki çalışma (seminer) günleri
- * tatil sayılmaz ve listelenmez: yaz tatili yıl sonu seminerinin ertesinde başlar, 31 Ağustos'ta biter; eylülde
- * derslerden önceki günler de tatil değildir. Resmî tatiller (bayramlar) ayrıca hesaplanır ve aynı güne düşerse onların adı görünür.
+ * Takvimdeki tatil günleri: ara tatiller, yarıyıl tatili ve yaz tatili; ayrıca ders olmayan mesleki çalışma günleri
+ * (LESSON_FREE). Yaz tatili yıl sonu seminerinin ertesinde başlar, 31 Ağustos'ta biter. Resmî tatiller (bayramlar) ayrıca hesaplanır ve aynı güne düşerse onların adı görünür.
  */
 export function academicHolidays(cal: AcademicCalendarData, startYear: number): { date: string; name: string }[] {
   const out: { date: string; name: string }[] = [];
@@ -91,6 +97,9 @@ export function academicHolidays(cal: AcademicCalendarData, startYear: number): 
   range(sem.start, sem.end, SEMESTER_BREAK);
   const summer = summerBreak(cal, startYear);
   range(summer.start, summer.end, SUMMER_BREAK);
+  // Ders yok, öğretmenler görevde: eylülde derslerden önce, haziranda ders yılının bitişinden yaz tatiline kadar
+  range(`${startYear}-09-01`, addDays(cal.lessonsStart, -1), LESSON_FREE);
+  range(addDays(cal.lessonsEnd, 1), addDays(summer.start, -1), LESSON_FREE);
   return out;
 }
 
@@ -285,4 +294,23 @@ function lastWeekdayBefore(iso: string): string {
 export function isCalendarTitle(title: string, startYear: number): boolean {
   const t = lower(title);
   return new RegExp(`${startYear}\\s*[-–/]\\s*${startYear + 1}`).test(t) && /takvim/.test(t);
+}
+
+const NOTICE_MONTHS = ['', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+const NOTICE_DAYS = ['', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+
+/**
+ * Ders olmayan mesleki çalışma gününde panonun duyurusu. Eylülde: derslerin başladığı ilk gün (tatil ve hafta sonu
+ * olmayan ilk iş günü, `offDates` içinde aranır); haziranda: ders yılı bitti.
+ */
+export function lessonFreeNotice(today: string, offDates: ReadonlySet<string>): { title: string; body: string | null } {
+  if (Number(today.slice(5, 7)) <= 8) return { title: 'Ders yılı sona erdi', body: 'Öğrencilerimize iyi tatiller dileriz.' };
+  for (let i = 1, d = addDays(today, 1); i <= 45; i++, d = addDays(d, 1)) {
+    const wd = ((new Date(`${d}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
+    if (wd <= 5 && !offDates.has(d)) {
+      const [, m, day] = d.split('-').map(Number) as [number, number, number];
+      return { title: `Dersler ${day} ${NOTICE_MONTHS[m]} ${NOTICE_DAYS[wd]} başlıyor`, body: null };
+    }
+  }
+  return { title: 'Dersler yakında başlıyor', body: null };
 }

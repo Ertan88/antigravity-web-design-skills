@@ -1,4 +1,4 @@
-import { computeBellStatus, halfDayPeriods, lunchIndex, parseClock, periodLabel, pickSchedule, sortPeriods, WEEKDAY_NAMES, WEEKDAY_SHORT, zonedParts, type Period } from '@okulpano/shared';
+import { computeBellStatus, halfDayPeriods, isLessonFree, lunchIndex, parseClock, periodLabel, pickSchedule, sortPeriods, WEEKDAY_NAMES, WEEKDAY_SHORT, zonedParts, type Period } from '@okulpano/shared';
 import clsx from 'clsx';
 import { BellRing, CalendarOff, Clock, Coffee, CopyPlus, Pencil, Sunrise, Sunset, Utensils } from '../../components/icons.tsx';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -424,7 +424,7 @@ export function ScheduleView({
           </div>
           {off === 'holiday' && (
             <>
-              <div className="mt-2 text-2xl font-bold">{isToday ? 'Bugün tatil' : 'Tatil'}</div>
+              <div className="mt-2 text-2xl font-bold">{isLessonFree(day.holiday) ? (isToday ? 'Bugün ders yok' : 'Ders yok') : isToday ? 'Bugün tatil' : 'Tatil'}</div>
               <div className="mt-1 text-sm text-white/90">{day.holiday}</div>
               <div className="mt-1 text-sm text-white/75">Zil çalmaz, dersler yapılmaz.</div>
             </>

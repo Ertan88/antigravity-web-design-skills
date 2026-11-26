@@ -83,11 +83,14 @@ describe('MEB çalışma takvimi', () => {
     expectStatus(await root.post('/api/platform/academic-calendars/2027/accept'), 200);
     list = (await root.get('/api/platform/academic-calendars')).json();
     expect(list.find((r) => r.startYear === 2027)).toMatchObject({ status: 'confirmed', data: { lessonsStart: '2027-09-14' }, pending: null });
-    // Seminer (öğretmenlerin mesleki çalışması) günleri tatil sayılmaz ve listelenmez; yaz tatili 31 Ağustos'ta biter
+    // Seminer (öğretmenlerin mesleki çalışması) günleri ders olmayan gün: zil, nöbet, görevlendirme için tatil gibi
+    // sayılır (listelerde ayrı adıyla gizlenir); dersler başlayınca biter. Yaz tatili 31 Ağustos'ta biter.
     const sep = (await owner.get(path('holidays?month=2027-09'))).json() as Holiday[];
-    expect(sep.some((h) => h.date === '2027-09-01' || h.date === '2027-09-10')).toBe(false);
+    expect(sep.find((h) => h.date === '2027-09-01')?.name).toBe('Mesleki Çalışma Dönemi');
+    expect(sep.find((h) => h.date === '2027-09-10')?.name).toBe('Mesleki Çalışma Dönemi');
+    expect(sep.some((h) => h.date === '2027-09-14')).toBe(false);
     const jun = (await owner.get(path('holidays?month=2027-06'))).json() as Holiday[];
-    expect(jun.some((h) => h.date === '2027-06-28')).toBe(false);
+    expect(jun.find((h) => h.date === '2027-06-28')?.name).toBe('Mesleki Çalışma Dönemi');
     const aug = (await owner.get(path('holidays?month=2027-08'))).json() as Holiday[];
     expect(aug.find((h) => h.date === '2027-08-31')?.name).toBe('Yaz Tatili');
 

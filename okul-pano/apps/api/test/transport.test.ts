@@ -233,4 +233,14 @@ describe('taşımalı öğrenci (servis) görevlileri', () => {
     expect((await owner.post(path('transport-duties/auto-fill'), { month: '2027-10', perDay: 1, teacherIds: pool })).json()).toEqual({ days: 0, assignments: 0 });
     expectStatus(await owner.post(path('transport-duties/auto-fill'), { month: '2027-11', perDay: 2, teacherIds: [ids['Ali Kaya']] }), 400);
   });
+
+  it('derslerden önceki mesleki çalışma günlerine görev yazılmaz (dersler 14 Eylül 2026)', async () => {
+    const pool = [ids['Ayşe Demir'], ids['Ali Kaya']];
+    const res = await owner.post(path('transport-duties/auto-fill'), { month: '2026-09', perDay: 1, teacherIds: pool });
+    expectStatus(res, 200);
+    // Eylül 2026: 14–30 Eylül arası 13 iş günü
+    expect(res.json()).toMatchObject({ days: 13 });
+    const days = (await owner.get(path('transport-duties?month=2026-09'))).json() as Day[];
+    expect(days.filter((d) => d.teachers.length).every((d) => d.date >= '2026-09-14')).toBe(true);
+  });
 });

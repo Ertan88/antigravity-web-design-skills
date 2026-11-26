@@ -1,4 +1,4 @@
-import { academicYearOf, semesterBreak, SUMMER_BREAK, type AcademicCalendarData } from '@okulpano/shared';
+import { academicYearOf, isLessonFree, semesterBreak, SUMMER_BREAK, type AcademicCalendarData } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { CalendarDays, CalendarPlus, GraduationCap, Plus, Sunset, Trash2 } from '../../components/icons.tsx';
@@ -63,8 +63,8 @@ const groupName = (name: string) => name.replace(/ \d+\. Gün$/, '');
 function groupHolidays(list: Upcoming['holidays']): Extract<Row, { kind: 'holiday' }>[] {
   const out: Extract<Row, { kind: 'holiday' }>[] = [];
   for (const h of list) {
-    // Yaz tatili listede gösterilmez (günler hesapta tatil sayılmaya devam eder)
-    if (h.name === SUMMER_BREAK) continue;
+    // Yaz tatili ve ders olmayan mesleki çalışma günleri listede gösterilmez (günler hesapta tatil sayılmaya devam eder)
+    if (h.name === SUMMER_BREAK || isLessonFree(h.name)) continue;
     const last = out[out.length - 1];
     if (last && h.source !== 'school' && last.source === h.source && groupName(last.name) === groupName(h.name) && nextDay(last.end ?? last.date) === h.date) {
       last.end = h.date;

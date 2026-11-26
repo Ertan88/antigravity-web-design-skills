@@ -6,6 +6,7 @@ import { useEvents, useExamSchedule, useExams, useInbox, useMeToday, useNow, use
 import { relativeDayWord } from '@okulpano/shared/coverText';
 import { examRoles } from '@okulpano/shared/examCore';
 import { zonedParts } from '@okulpano/shared/time';
+import { isLessonFree } from '@okulpano/shared/academicCalendar';
 import { classDayPeriods, classLabel, clock, dative, dayTitle, localIso, schoolDayEnded, teacherDay } from './day.ts';
 import { colors, tiles, type TileTone } from './theme.ts';
 import { CoverTag, LiveLesson } from './lesson.tsx';
@@ -377,6 +378,7 @@ export function AssignmentNotice({ data }: { data: MeToday }) {
 export function DayBanner({ data }: { data: MeToday }) {
   const now = useNow(60_000);
   const day = teacherDay(data, now);
+  if (isLessonFree(day.holiday)) return <Banner icon="school-outline" tone="gold" title="Bugün ders yok" text={`${day.holiday} · zil çalmıyor, nöbet tutulmuyor`} />;
   if (day.holiday) return <Banner icon="sunny" tone="gold" title="Bugün tatil" text={`${day.holiday} · zil çalmıyor, panolar tatil görünümünde`} />;
   if (day.halfDay) return <Banner icon="partly-sunny" tone="warning" title={`Yarım gün · ${day.halfDay}`} text={`Dersler ${day.endsAt} saatinde biter; öğleden sonra tatil`} />;
   return null;

@@ -41,6 +41,8 @@ import {
   examGroupClasses,
   groupExams,
   type ExamSlideRow,
+  isLessonFree,
+  lessonFreeNotice,
 } from '@okulpano/shared/client';
 import type { CSSProperties, ReactNode } from 'react';
 import type { DisplayAuth } from './api.ts';
@@ -233,7 +235,9 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
   const nextShort = nextDay ? (nextDay.date === tomorrow.date ? 'Yarın' : nextDay.date <= addIsoDays(today.isoDate, 6) ? DAY_NAMES[nextDay.weekday]! : dayLabel(nextDay.date)) : '';
   const upcoming =
     bell.kind === 'after' && tomorrow.holiday
-      ? `Yarın tatil · ${tomorrow.holiday}`
+      ? isLessonFree(tomorrow.holiday)
+        ? 'Yarın ders yok'
+        : `Yarın tatil · ${tomorrow.holiday}`
       : bell.kind === 'after' && tomorrow.halfDay
         ? `Yarın ${tomorrow.halfDay} · yarım gün`
         : nextDay && nextFirst
@@ -333,7 +337,22 @@ export function Board({ auth, onUnauthorized }: { auth: DisplayAuth; onUnauthori
           },
         ]
       : [];
-  const slides = [...onAir, ...examSlide, ...achievementSlides];
+  // Mesleki çalışma günü (ders yok): ortadaki alanda "Dersler 14 Eylül Pazartesi başlıyor" / "Ders yılı sona erdi"
+  const lessonFreeSlide: DisplayAnnouncement[] = isLessonFree(day.holiday)
+    ? [
+        {
+          id: 'lesson-free',
+          kind: 'text',
+          ...lessonFreeNotice(today.isoDate, new Set((state.holidays ?? []).map((h) => h.date))),
+          imageUrl: null,
+          youtubeUrl: null,
+          durationSec: null,
+          startsAt: null,
+          endsAt: null,
+        },
+      ]
+    : [];
+  const slides = [...lessonFreeSlide, ...onAir, ...examSlide, ...achievementSlides];
 
   // Kartlar panonun düzenine göre (panoya özel ya da okulun) sol / sağ sütuna yerleşir
   const layout = state.layout ?? resolveLayout(s);

@@ -1,4 +1,4 @@
-import { formatDuration, gradeHue, groupExams, periodLabel, type BellStatus, type DisplayState } from '@okulpano/shared/client';
+import { formatDuration, gradeHue, groupExams, isLessonFree, periodLabel, type BellStatus, type DisplayState } from '@okulpano/shared/client';
 import type { CSSProperties } from 'react';
 import { AutoPager } from './AutoPager.tsx';
 import { useLabel } from './Labels.tsx';
@@ -76,6 +76,10 @@ export function describeBell(status: BellStatus, ctx: BellDayContext = {}) {
         tone: 'idle',
       };
     default:
+      // Mesleki çalışma günü: ders yok ama tatil değil (öğretmenler okulda)
+      if (isLessonFree(ctx.holiday)) {
+        return { title: 'Bugün ders yok', caption: ctx.holiday ?? '', range: null, next: ctx.upcoming ?? null, remaining: null, progress: null, tone: 'idle' };
+      }
       if (ctx.holiday) {
         return { title: 'Bugün tatil', caption: ctx.holiday, range: wish(ctx.holiday), next: ctx.upcoming ?? null, remaining: null, progress: null, tone: 'idle' };
       }
