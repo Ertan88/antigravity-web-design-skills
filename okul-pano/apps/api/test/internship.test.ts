@@ -456,7 +456,11 @@ describe('mesleki eğitim yetkileri: yönetim, işaretli koordinatör, alan şef
     expectStatus(await owner.put(`${base}/internship/coordinators`, { teacherIds: before }), 200);
     const head = client(t.app, (await login(t.app, 'alan-sefi@meslek.test', 'GizliSifre42')).token);
     const list = (await head.get(`${base}/internship/businesses`)).json() as { id: string; name: string; canEdit: boolean }[];
-    expect(list.find((x) => x.id === own)).toMatchObject({ canEdit: true });
+    expect(list.find((x) => x.id === own)).toMatchObject({ canEdit: true, mine: true });
+    expect(list.filter((x) => x.id !== own).every((x) => !(x as { mine?: boolean }).mine)).toBe(true);
+    // Neden bütün işletmeleri görüyor: alan şefinde yok, müdürde "owner"
+    expect((await head.get(`${base}/internship/access`)).json()).toMatchObject({ all: false, why: null });
+    expect((await owner.get(`${base}/internship/access`)).json()).toMatchObject({ all: true, why: 'owner' });
     expect(list.filter((x) => x.id !== own).every((x) => !x.canEdit)).toBe(true);
     expectStatus(await owner.del(`${base}/internship/businesses/${own}`), 200);
   });

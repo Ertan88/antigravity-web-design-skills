@@ -64,6 +64,8 @@ export interface InternshipAccess {
   manage: boolean;
   teacher: boolean;
   areaHead: boolean;
+  /** Bütün işletmeleri neden görüyor: okul müdürü, koordinatör müdür yardımcısı, "Mesleki eğitimi yönetir" yetkisi */
+  why?: 'owner' | 'vp' | 'granted' | null;
   canPickManager: boolean;
 }
 

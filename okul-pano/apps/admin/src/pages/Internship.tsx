@@ -83,6 +83,8 @@ interface Business {
   isActive: boolean;
   students: number;
   canEdit: boolean;
+  /** Kişinin kendi işletmesi: koordinatörü olduğu ya da eklediği (koordinatör atanmamış) */
+  mine?: boolean;
   canManage: boolean;
 }
 
@@ -1344,9 +1346,11 @@ export function Businesses() {
   });
 
   const everything = list.data ?? [];
-  const mineCount = everything.filter((b) => b.canEdit).length;
-  const scopeView = areaHead ? (view ?? (mineCount ? "mine" : "area")) : "area";
-  const all = scopeView === "mine" ? everything.filter((b) => b.canEdit) : everything;
+  // Kendi işletmesi olan alan şefi ve yönetimdeki kişi (müdür, koordinatör müdür yardımcısı aynı zamanda koordinatörse)
+  // önce kendi işletmelerini görür
+  const mineCount = everything.filter((b) => b.mine).length;
+  const scopeView = (areaHead || manager) && mineCount ? (view ?? "mine") : "area";
+  const all = scopeView === "mine" ? everything.filter((b) => b.mine) : everything;
   const businessCounts = everything.reduce(
     (m, b) => (b.coordinatorTeacherId ? m.set(b.coordinatorTeacherId, (m.get(b.coordinatorTeacherId) ?? 0) + 1) : m),
     new Map<string, number>(),
@@ -1431,7 +1435,16 @@ export function Businesses() {
           </Alert>
         </div>
       )}
-      {areaHead && mineCount > 0 && (
+      {manager && access.data?.why && (
+        <p className="mb-3 text-sm text-slate-500">
+          {access.data.why === "owner"
+            ? "Okul müdürü olduğunuz için okulun bütün işletmelerini görürsünüz."
+            : access.data.why === "vp"
+              ? "Koordinatör müdür yardımcısı olduğunuz için okulun bütün işletmelerini görürsünüz."
+              : "“Mesleki eğitimi yönetir” yetkiniz olduğu için okulun bütün işletmelerini görürsünüz (Kişiler ve Yetkiler)."}
+        </p>
+      )}
+      {(areaHead || manager) && mineCount > 0 && (
         <div className="mb-3">
           <Segmented<"mine" | "area">
             value={scopeView}
@@ -1442,7 +1455,7 @@ export function Businesses() {
             }}
             options={[
               { value: "mine", label: `Benim işletmelerim · ${mineCount}` },
-              { value: "area", label: `Alanımın işletmeleri · ${everything.length}` },
+              { value: "area", label: `${manager ? "Bütün işletmeler" : "Alanımın işletmeleri"} · ${everything.length}` },
             ]}
           />
         </div>

@@ -60,6 +60,8 @@ interface Business {
   visitWeekday: number | null;
   students: number;
   canEdit: boolean;
+  /** Kişinin kendi işletmesi: koordinatörü olduğu ya da eklediği (koordinatör atanmamış) */
+  mine?: boolean;
   canManage: boolean;
 }
 type InfoKey =
@@ -95,9 +97,9 @@ export default function Isletmelerim() {
   const [open, setOpen] = useState<string | null>(null);
   const [editing, setEditing] = useState<Business | "new" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [forms, setForms] = useState(false);
-  // Menüde iki ayrı ekran: İşletmeler (/isletme) ve Öğrenciler (/isletme?sekme=ogrenciler)
-  const { sekme } = useLocalSearchParams<{ sekme?: string }>();
+  // Menüde üç giriş: İşletmeler (/isletme), Öğrenciler (/isletme?sekme=ogrenciler), Formlar (/isletme?formlar=1)
+  const { sekme, formlar } = useLocalSearchParams<{ sekme?: string; formlar?: string }>();
+  const [forms, setForms] = useState(formlar === "1");
   const tab: "businesses" | "students" = sekme === "ogrenciler" ? "students" : "businesses";
   const [adding, setAdding] = useState(false);
   const interns = useSchoolQuery<{ canAdd: boolean; students: Intern[] }>(
@@ -115,9 +117,12 @@ export default function Isletmelerim() {
   const [area, setArea] = useState("");
   const [coordinator, setCoordinator] = useState("");
   const everything = list.data ?? [];
-  const mineCount = everything.filter((b) => b.canEdit).length;
-  const scopeView = areaHead ? (view ?? (mineCount ? "mine" : "area")) : "area";
-  const all = scopeView === "mine" ? everything.filter((b) => b.canEdit) : everything;
+  // Kendi işletmesi olan alan şefi ve yönetimdeki kişi (müdür, koordinatör müdür yardımcısı aynı zamanda koordinatörse)
+  // önce kendi işletmelerini görür
+  const mineCount = everything.filter((b) => b.mine).length;
+  const scopeView = (areaHead || manager) && mineCount ? (view ?? "mine") : "area";
+  const all = scopeView === "mine" ? everything.filter((b) => b.mine) : everything;
+  const mineIds = new Set(everything.filter((b) => b.mine).map((b) => b.id));
   const businessCounts = everything.reduce(
     (m, b) => (b.coordinatorTeacherId ? m.set(b.coordinatorTeacherId, (m.get(b.coordinatorTeacherId) ?? 0) + 1) : m),
     new Map<string, number>(),
@@ -233,7 +238,27 @@ export default function Isletmelerim() {
       }
     >
       {tab === "students" ? (
-        <StudentsTab data={interns.data} error={interns.error} />
+        <>
+          {/* Öğrenciler de önce kendi işletmelerinizinkiler (işletmeler ekranıyla aynı kural) */}
+          {(areaHead || manager) && mineCount > 0 && (
+            <Segmented<"mine" | "area">
+              value={scopeView}
+              onChange={setView}
+              options={[
+                { value: "mine", label: "Benim öğrencilerim" },
+                { value: "area", label: manager ? "Bütünü" : "Alanımın" },
+              ]}
+            />
+          )}
+          <StudentsTab
+            data={
+              interns.data && scopeView === "mine"
+                ? { ...interns.data, students: interns.data.students.filter((x) => mineIds.has(x.businessId)) }
+                : interns.data
+            }
+            error={interns.error}
+          />
+        </>
       ) : (
         <>
           {manager && (
@@ -253,7 +278,16 @@ export default function Isletmelerim() {
             <SettingsTab />
           ) : (
           <>
-          {areaHead && mineCount > 0 && (
+          {manager && access.data?.why && (
+            <T size={12.5} color={colors.muted}>
+              {access.data.why === "owner"
+                ? "Okul müdürü olduğunuz için okulun bütün işletmelerini görürsünüz."
+                : access.data.why === "vp"
+                  ? "Koordinatör müdür yardımcısı olduğunuz için okulun bütün işletmelerini görürsünüz."
+                  : "“Mesleki eğitimi yönetir” yetkiniz olduğu için okulun bütün işletmelerini görürsünüz (Kişiler ve yetkiler)."}
+            </T>
+          )}
+          {(areaHead || manager) && mineCount > 0 && (
             <Segmented<"mine" | "area">
               value={scopeView}
               onChange={(v) => {
@@ -263,7 +297,7 @@ export default function Isletmelerim() {
               }}
               options={[
                 { value: "mine", label: `Benim işletmelerim · ${mineCount}` },
-                { value: "area", label: `Alanımın · ${everything.length}` },
+                { value: "area", label: `${manager ? "Bütünü" : "Alanımın"} · ${everything.length}` },
               ]}
             />
           )}

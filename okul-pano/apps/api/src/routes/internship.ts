@@ -138,9 +138,9 @@ async function roleOf(deps: AppDeps, req: FastifyRequest) {
   const designated = !all && req.ctx.teacherId ? (await designatedCoordinators(deps, req)).has(req.ctx.teacherId) : false;
   // İşaretlenmemiş öğretmen kendi eklediği ya da koordinatörü olduğu işletmeyi de görmez; alan şefi ise kendisine atanan
   // işletmeleri (koordinatörü olduğu) her zaman kendi işletmesi olarak görür ve işaretler
-  const head = all ? null : await areaHeadBranch(deps, req);
+  const head = await areaHeadBranch(deps, req);
   const own = designated || head ? await ownBusinessIds(deps, req) : new Set<string>();
-  const area = head ? await areaBusinessIds(deps, req.ctx.schoolId, head) : new Set<string>();
+  const area = head && !all ? await areaBusinessIds(deps, req.ctx.schoolId, head) : new Set<string>();
   return { all, designated, own, head, area };
 }
 
@@ -401,7 +401,9 @@ export async function internshipRoutes(app: FastifyInstance) {
     const canPickManager = !req.ctx.isSupport && (req.ctx.role === 'owner' || isGranted(req));
     if (!enabled) return { enabled: false, all: false, coordinator: false, manage: false, teacher: false, areaHead: false, canPickManager };
     const r = await roleOf(deps, req);
-    return { enabled: true, all: r.all, coordinator: r.designated, manage: r.all, teacher: r.designated, areaHead: Boolean(r.head), canPickManager };
+    // Bütün işletmeleri neden görüyor: okul müdürü, koordinatör müdür yardımcısı ya da "Mesleki eğitimi yönetir" yetkisi
+    const why = !r.all ? null : req.ctx.role === 'owner' ? 'owner' : isVp(req) ? 'vp' : 'granted';
+    return { enabled: true, all: r.all, coordinator: r.designated, manage: r.all, teacher: r.designated, areaHead: Boolean(r.head), canPickManager, why };
   });
 
   /**
@@ -558,7 +560,7 @@ export async function internshipRoutes(app: FastifyInstance) {
     return rows
       .filter((r) => s.sees(r.id))
       .sort((a, b) => trCompare(a.name, b.name))
-      .map((r) => ({ ...r, students: n.get(r.id) ?? 0, canEdit: s.canEdit(r.id), canManage: s.all && isManager(req) }));
+      .map((r) => ({ ...r, students: n.get(r.id) ?? 0, canEdit: s.canEdit(r.id), mine: s.all ? Boolean(req.ctx.teacherId) && r.coordinatorTeacherId === req.ctx.teacherId : s.own.has(r.id), canManage: s.all && isManager(req) }));
   });
 
   /**
