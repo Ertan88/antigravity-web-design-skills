@@ -6,6 +6,7 @@ import { openChoice } from './confirm.tsx';
 import { printPdf, sharePdf } from './download.ts';
 import { useSchoolPath } from './auth.tsx';
 import { useSchoolQuery } from './data.ts';
+import { InlineSelect } from './internshipManage.tsx';
 import { Sheet, SheetScroll } from './sheet.tsx';
 import { Text } from './text.tsx';
 import { colors } from './theme.ts';
@@ -68,6 +69,8 @@ interface FormItem {
   unchecked?: { halves: number; students: number } | null;
 }
 
+const NO_COORD = '__none__';
+
 const TITLES: Record<FormType, string> = {
   daily: 'Günlük rehberlik formu',
   attendance: 'Aylık devam-devamsızlık çizelgesi',
@@ -109,7 +112,11 @@ export function FormsSheet({ onClose }: { onClose: () => void }) {
     setPicked(new Set(items.filter((b) => usable(b) && !b.holiday).map((b) => b.id)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
-  const shown = items.filter(usable).sort((a, b) => (daily ? (a.date ?? '').localeCompare(b.date ?? '') : 0));
+  // Koordinatör öğretmene göre süzme (4A): seçilen öğretmenin işletmeleri yazdırılır; birden çok koordinatör varsa çıkar
+  const [coord, setCoord] = useState('');
+  const coordNames = [...new Set(items.filter(usable).map((b) => b.coordinatorName ?? ''))].sort((a, b) => a.localeCompare(b, 'tr'));
+  const coordOn = coord && coordNames.includes(coord === NO_COORD ? '' : coord) ? coord : '';
+  const shown = items.filter((b) => usable(b) && (!coordOn || (b.coordinatorName ?? '') === (coordOn === NO_COORD ? '' : coordOn))).sort((a, b) => (daily ? (a.date ?? '').localeCompare(b.date ?? '') : 0));
   const noDay = attendance ? 0 : items.filter((b) => !b.visitWeekday).length;
   const settings = q.data?.settings;
   const placeMissing = type === 'report' && settings && (!settings.province || !settings.district);
@@ -175,7 +182,7 @@ export function FormsSheet({ onClose }: { onClose: () => void }) {
         options={[
           { value: 'daily', label: 'Günlük' },
           { value: 'attendance', label: 'Devam' },
-          { value: 'report', label: 'Rapor' },
+          { value: 'report', label: 'Rehberlik' },
         ]}
         value={type}
         onChange={setType}
@@ -186,6 +193,16 @@ export function FormsSheet({ onClose }: { onClose: () => void }) {
         <Text style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: '800', color: colors.ink }}>{period}</Text>
         <Button variant="secondary" size="sm" icon="chevron-forward" accessibilityLabel={daily ? 'Sonraki hafta' : 'Sonraki ay'} onPress={() => (daily ? setWeek(addDays(week, 7)) : setMonth(addMonths(month, 1)))} />
       </View>
+      {coordNames.length > 1 && (
+        <View style={{ marginTop: 10 }}>
+          <InlineSelect
+            label="Koordinatör"
+            value={coordOn}
+            onChange={setCoord}
+            options={[{ value: '', label: 'Bütün koordinatörler' }, ...coordNames.map((n) => ({ value: n || NO_COORD, label: n || 'Koordinatörü seçilmemiş' }))]}
+          />
+        </View>
+      )}
       <SheetScroll style={{ maxHeight: 340, marginTop: 10 }} contentContainerStyle={{ gap: 8 }}>
         {!q.data ? (
           <Loading />

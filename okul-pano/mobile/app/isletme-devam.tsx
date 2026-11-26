@@ -333,7 +333,7 @@ export default function IsletmeDevam() {
           </T>
           {rows.some((s) => s.editable) && (
             <Button variant="secondary" icon="checkmark-done" onPress={() => setFilling(true)}>
-              İşaretsiz (?) günleri İşletmede yap…
+              Boş günlere X koy…
             </Button>
           )}
           {marks.error && (

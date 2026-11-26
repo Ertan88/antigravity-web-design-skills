@@ -423,7 +423,7 @@ export function FillSheet({
     setError(null);
     try {
       const r = await api<{ changed: number }>(path, { method: 'POST', body: { from: RANGES.find((x) => x.key === range)!.from, until: RANGES.find((x) => x.key === range)!.until, businessId: biz || null } });
-      onDone(r.changed ? `${days(r.changed / 2)} gün “İşletmede” işaretlendi.` : 'İşaretsiz gün yoktu.');
+      onDone(r.changed ? `${days(r.changed / 2)} gün “İşletmede” işaretlendi.` : 'Boş gün yoktu.');
     } catch (e) {
       setError(errorText(e, 'Kaydedilemedi'));
     } finally {
@@ -432,7 +432,7 @@ export function FillSheet({
   };
   return (
     <Sheet open onClose={onClose}>
-      <Text style={{ fontSize: 17, fontWeight: '800', color: colors.ink }}>İşaretsizleri “İşletmede” yap</Text>
+      <Text style={{ fontSize: 17, fontWeight: '800', color: colors.ink }}>Boş günlere X koy</Text>
       <T size={12.5} color={colors.faint} style={{ marginTop: 4 }}>
         Önce devamsızlıkları (D, İ, R, H) işaretleyin. Bu işlem yalnızca “?” olan bölümleri X yapar; konan işaretlere dokunmaz.
       </T>

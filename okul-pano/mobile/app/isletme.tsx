@@ -16,6 +16,7 @@ import {
   type Intern,
 } from "../src/internshipStudents.tsx";
 import { useInternshipAccess, useSchoolQuery } from "../src/data.ts";
+import { CoordinatorsTab, InlineSelect, SearchBox, SettingsTab } from "../src/internshipManage.tsx";
 import { Sheet, SheetScroll } from "../src/sheet.tsx";
 import { Text } from "../src/text.tsx";
 import { colors } from "../src/theme.ts";
@@ -24,6 +25,9 @@ import {
   Button,
   Card,
   confirm,
+  DeleteIconButton,
+  EditIconButton,
+  Segmented,
   Empty,
   ErrorNote,
   Field,
@@ -49,7 +53,9 @@ interface Business {
   trainerName: string | null;
   email: string | null;
   notes: string | null;
+  areaId: string | null;
   areaName: string | null;
+  coordinatorTeacherId: string | null;
   coordinatorName: string | null;
   visitWeekday: number | null;
   students: number;
@@ -98,6 +104,38 @@ export default function Isletmelerim() {
     "internship/interns",
   );
   const canAdd = Boolean(access.data?.manage || access.data?.teacher);
+  // İdare sekmeleri (1A): İşletmeler · Koordinatörler · Ayarlar (webdeki gibi)
+  const manager = Boolean(access.data?.manage);
+  const [mgrTab, setMgrTab] = useState<"list" | "coord" | "settings">("list");
+  const [editingCoords, setEditingCoords] = useState(false);
+  // Alan şefi: önce kendi işletmeleri (koordinatörü olduğu ya da eklediği), isterse alanının bütün işletmeleri
+  const areaHead = !manager && Boolean(access.data?.areaHead);
+  const [view, setView] = useState<"mine" | "area" | null>(null);
+  const [q, setQ] = useState("");
+  const [area, setArea] = useState("");
+  const [coordinator, setCoordinator] = useState("");
+  const everything = list.data ?? [];
+  const mineCount = everything.filter((b) => b.canEdit).length;
+  const scopeView = areaHead ? (view ?? (mineCount ? "mine" : "area")) : "area";
+  const all = scopeView === "mine" ? everything.filter((b) => b.canEdit) : everything;
+  const businessCounts = everything.reduce(
+    (m, b) => (b.coordinatorTeacherId ? m.set(b.coordinatorTeacherId, (m.get(b.coordinatorTeacherId) ?? 0) + 1) : m),
+    new Map<string, number>(),
+  );
+  const areaOptions = [...new Map(all.filter((b) => b.areaId).map((b) => [b.areaId!, b.areaName ?? ""])).entries()]
+    .sort((a, b) => a[1].localeCompare(b[1], "tr"))
+    .map(([id, name]) => ({ value: id, label: name, count: all.filter((b) => b.areaId === id).length }));
+  const noArea = all.filter((b) => !b.areaId).length;
+  const coordOptions = [...new Map(all.filter((b) => b.coordinatorTeacherId).map((b) => [b.coordinatorTeacherId!, b.coordinatorName ?? ""])).entries()]
+    .sort((a, b) => a[1].localeCompare(b[1], "tr"))
+    .map(([id, name]) => ({ value: id, label: name }));
+  const needle = q.trim().toLocaleLowerCase("tr-TR");
+  const shown = all.filter(
+    (b) =>
+      (!area || (area === "none" ? !b.areaId : b.areaId === area)) &&
+      (!coordinator || (coordinator === "none" ? !b.coordinatorTeacherId : b.coordinatorTeacherId === coordinator)) &&
+      (!needle || [b.name, b.contactName, b.address].some((x) => x?.toLocaleLowerCase("tr-TR").includes(needle))),
+  );
   const refresh = () =>
     void qc.invalidateQueries({
       predicate: (q) =>
@@ -162,7 +200,11 @@ export default function Isletmelerim() {
         void interns.refetch();
       }}
       footer={
-        tab === "students" ? (
+        tab === "businesses" && manager && mgrTab === "settings" ? undefined : tab === "businesses" && manager && mgrTab === "coord" ? (
+          <Button icon="create-outline" onPress={() => setEditingCoords(true)}>
+            Değiştir
+          </Button>
+        ) : tab === "students" ? (
           interns.data?.canAdd ? (
             <Button icon="person-add-outline" onPress={() => setAdding(true)}>
               Öğrenci ekle
@@ -194,6 +236,58 @@ export default function Isletmelerim() {
         <StudentsTab data={interns.data} error={interns.error} />
       ) : (
         <>
+          {manager && (
+            <Segmented<"list" | "coord" | "settings">
+              value={mgrTab}
+              onChange={setMgrTab}
+              options={[
+                { value: "list", label: `İşletmeler${list.data ? ` · ${everything.length}` : ""}` },
+                { value: "coord", label: "Koordinatörler" },
+                { value: "settings", label: "Ayarlar" },
+              ]}
+            />
+          )}
+          {manager && mgrTab === "coord" ? (
+            <CoordinatorsTab businessCounts={businessCounts} editing={editingCoords} onCloseEdit={() => setEditingCoords(false)} />
+          ) : manager && mgrTab === "settings" ? (
+            <SettingsTab />
+          ) : (
+          <>
+          {areaHead && mineCount > 0 && (
+            <Segmented<"mine" | "area">
+              value={scopeView}
+              onChange={(v) => {
+                setView(v);
+                setArea("");
+                setCoordinator("");
+              }}
+              options={[
+                { value: "mine", label: `Benim işletmelerim · ${mineCount}` },
+                { value: "area", label: `Alanımın · ${everything.length}` },
+              ]}
+            />
+          )}
+          {all.length > 3 && <SearchBox value={q} onChange={setQ} placeholder="İşletme, yetkili, adres ara" />}
+          {areaOptions.length > 1 && (
+            <InlineSelect
+              label="Alan"
+              value={area}
+              onChange={setArea}
+              options={[
+                { value: "", label: "Bütün alanlar", count: all.length },
+                ...areaOptions,
+                ...(noArea ? [{ value: "none", label: "Alanı seçilmemiş", count: noArea }] : []),
+              ]}
+            />
+          )}
+          {manager && coordOptions.length > 1 && (
+            <InlineSelect
+              label="Koordinatör"
+              value={coordinator}
+              onChange={setCoordinator}
+              options={[{ value: "", label: "Bütün koordinatörler" }, ...coordOptions, { value: "none", label: "Koordinatörü seçilmemiş" }]}
+            />
+          )}
           <ErrorNote error={list.error} />
           {error && (
             <T size={13} color={colors.danger}>
@@ -202,14 +296,18 @@ export default function Isletmelerim() {
           )}
           {!list.data ? (
             <Loading />
-          ) : !list.data.length ? (
-            <Empty
-              icon="business-outline"
-              title="İşletme yok"
-              text="Eklediğiniz ya da koordinatörü olduğunuz işletme yok. Yeni işletmeyi aşağıdan ekleyebilirsiniz."
-            />
+          ) : !shown.length ? (
+            all.length ? (
+              <Empty icon="business-outline" title="Bu süzgeçte işletme yok" />
+            ) : (
+              <Empty
+                icon="business-outline"
+                title="İşletme yok"
+                text={manager ? "Henüz işletme yok. Yeni işletmeyi aşağıdan ekleyebilirsiniz." : "Eklediğiniz ya da koordinatörü olduğunuz işletme yok. Yeni işletmeyi aşağıdan ekleyebilirsiniz."}
+              />
+            )
           ) : (
-            list.data.map((b) => {
+            shown.map((b) => {
               const expanded = open === b.id;
               return (
                 <Card key={b.id} style={{ gap: 8 }}>
@@ -283,29 +381,12 @@ export default function Isletmelerim() {
                       </View>
                       <InfoRows b={b} />
                       {(b.canEdit || b.canManage) && (
+                        // Düzenle ve Sil yan yana, ortak simge düğmeleriyle (webdeki satır düzeni)
                         <View
-                          style={{ flexDirection: "row", gap: 8, marginTop: 4 }}
+                          style={{ flexDirection: "row", justifyContent: "flex-end", gap: 8, marginTop: 4 }}
                         >
-                          {b.canEdit && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              icon="create-outline"
-                              onPress={() => setEditing(b)}
-                            >
-                              Düzenle
-                            </Button>
-                          )}
-                          {b.canManage && (
-                            <Button
-                              variant="delete"
-                              size="sm"
-                              icon="trash-outline"
-                              onPress={() => void remove(b)}
-                            >
-                              Sil
-                            </Button>
-                          )}
+                          {b.canEdit && <EditIconButton label="Düzenle" onPress={() => setEditing(b)} />}
+                          {b.canManage && <DeleteIconButton label="Sil" onPress={() => void remove(b)} />}
                         </View>
                       )}
                     </>
@@ -313,6 +394,8 @@ export default function Isletmelerim() {
                 </Card>
               );
             })
+          )}
+          </>
           )}
         </>
       )}
