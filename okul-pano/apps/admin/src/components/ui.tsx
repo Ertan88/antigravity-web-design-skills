@@ -1,6 +1,7 @@
 import { WEEKDAY_SHORT } from '@okulpano/shared';
 import clsx from 'clsx';
 import { AlertTriangle, Check, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, Loader2, Pencil, Trash2, X } from './icons.tsx';
+import type { UploadProgress } from '../lib/api.ts';
 import {
   Children,
   Fragment,
@@ -895,6 +896,37 @@ export function MonthPicker({
           </div>,
           document.body,
         )}
+    </div>
+  );
+}
+
+/**
+ * Dosya yükleme göstergesi (bütün yükleme sayfalarında aynı): önce gerçek gönderim yüzdesi, gönderim bitince
+ * "okunuyor" aşamasında kayan şerit (sunucunun okuma süresi önceden bilinemez, yüzde uydurulmaz).
+ */
+export function UploadBar({ progress, reading = 'Dosya okunuyor…', className }: { progress: UploadProgress | null; reading?: string; className?: string }) {
+  const uploading = !progress || progress.phase === 'upload';
+  const percent = progress?.phase === 'upload' ? progress.percent : 100;
+  return (
+    <div className={clsx('w-full max-w-sm', className)} role="status" aria-live="polite">
+      <div className="mb-1.5 flex items-center justify-between text-sm font-medium text-slate-600">
+        <span>{uploading ? 'Dosya gönderiliyor' : reading}</span>
+        {uploading && <span className="tabular-nums">%{percent}</span>}
+      </div>
+      <div
+        className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10"
+        role="progressbar"
+        aria-label={uploading ? 'Dosya gönderiliyor' : reading}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={uploading ? percent : undefined}
+      >
+        {uploading ? (
+          <div className="h-full rounded-full bg-brand-600 transition-[width] duration-200" style={{ width: `${percent}%` }} />
+        ) : (
+          <div className="animate-upload-reading h-full w-2/5 rounded-full bg-brand-600" />
+        )}
+      </div>
     </div>
   );
 }

@@ -6,8 +6,8 @@ import { useSearchParams } from 'react-router-dom';
 import { Bug, Bulb, HelpCircle, Lifebuoy2, Lock, Paperclip, Send, X } from '../components/icons.tsx';
 import { shrinkImage } from '../components/ImageUpload.tsx';
 import { useToast } from '../components/Toast.tsx';
-import { Alert, Badge, Button, EmptyState, Field, Input, Modal, PageHeader, Spinner, Textarea } from '../components/ui.tsx';
-import { api, uploadImage } from '../lib/api.ts';
+import { Alert, Badge, Button, EmptyState, Field, Input, Modal, PageHeader, Spinner, Textarea, UploadBar } from '../components/ui.tsx';
+import { api, uploadImage, type UploadProgress } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useSchoolPath } from '../lib/data.ts';
 import { Thread } from './Issues.tsx';
@@ -152,12 +152,18 @@ function NewTicket({ base, onClose, onCreated }: { base: string; onClose: () => 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const file = useRef<HTMLInputElement>(null);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
+  const [attaching, setAttaching] = useState(false);
   const attach = async (f: File | undefined) => {
     if (!f) return;
+    setAttaching(true);
+    setProgress(null);
     try {
-      setV({ ...v, attachmentUrl: await uploadImage(schoolId, await shrinkImage(f)) });
+      setV({ ...v, attachmentUrl: await uploadImage(schoolId, await shrinkImage(f), setProgress) });
     } catch (err) {
       setError(errorText(err, 'Yüklenemedi'));
+    } finally {
+      setAttaching(false);
     }
   };
   const save = async () => {
@@ -217,9 +223,13 @@ function NewTicket({ base, onClose, onCreated }: { base: string; onClose: () => 
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="secondary" icon={<Paperclip className="size-4" />} onClick={() => file.current?.click()}>
-            {v.attachmentUrl ? 'Ekran görüntüsü eklendi' : 'Ekran görüntüsü ekle'}
-          </Button>
+          {attaching ? (
+            <UploadBar progress={progress} reading="Ekran görüntüsü kaydediliyor…" className="max-w-56" />
+          ) : (
+            <Button size="sm" variant="secondary" icon={<Paperclip className="size-4" />} onClick={() => file.current?.click()}>
+              {v.attachmentUrl ? 'Ekran görüntüsü eklendi' : 'Ekran görüntüsü ekle'}
+            </Button>
+          )}
           {v.attachmentUrl && (
             <button type="button" aria-label="Eki kaldır" onClick={() => setV({ ...v, attachmentUrl: null })}>
               <X className="size-4 text-slate-500" />

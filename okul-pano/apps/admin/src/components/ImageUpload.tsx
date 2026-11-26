@@ -1,8 +1,9 @@
 import { errorText } from '@okulpano/shared';
 import clsx from 'clsx';
-import { ImagePlus, Loader2, X } from './icons.tsx';
+import { ImagePlus, X } from './icons.tsx';
 import { useRef, useState } from 'react';
-import { uploadImage } from '../lib/api.ts';
+import { uploadImage, type UploadProgress } from '../lib/api.ts';
+import { UploadBar } from './ui.tsx';
 import { useAuth } from '../lib/auth.tsx';
 
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -49,6 +50,7 @@ export function ImageUpload({
   const { schoolId } = useAuth();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [drag, setDrag] = useState(false);
 
@@ -57,10 +59,11 @@ export function ImageUpload({
     setError(null);
     if (!file.type.startsWith('image/')) return setError('Lütfen bir görsel dosyası seçin.');
     setBusy(true);
+    setProgress(null);
     try {
       const ready = await shrinkImage(file);
       if (ready.size > MAX_BYTES) return setError('Dosya 10 MB sınırını aşıyor.');
-      onChange(await uploadImage(schoolId, ready));
+      onChange(await uploadImage(schoolId, ready, setProgress));
     } catch (err) {
       setError(errorText(err, 'Yükleme başarısız.'));
     } finally {
@@ -104,9 +107,15 @@ export function ImageUpload({
           drag ? 'border-brand-500 bg-brand-50' : invalid ? 'border-red-300 bg-red-50/40' : 'border-slate-200 bg-slate-50 hover:border-brand-300 hover:bg-brand-50/40',
         )}
       >
-        {busy ? <Loader2 className="size-7 animate-spin text-brand-600" /> : <ImagePlus className="size-7 text-slate-400" />}
-        <span className="text-sm font-semibold text-slate-700">{busy ? 'Yükleniyor…' : 'Görsel seçin ya da buraya sürükleyin'}</span>
-        <span className="text-xs text-slate-500">{hint}</span>
+        {busy ? (
+          <UploadBar progress={progress} reading="Görsel kaydediliyor…" />
+        ) : (
+          <>
+            <ImagePlus className="size-7 text-slate-400" />
+            <span className="text-sm font-semibold text-slate-700">Görsel seçin ya da buraya sürükleyin</span>
+            <span className="text-xs text-slate-500">{hint}</span>
+          </>
+        )}
       </button>
       <input ref={input} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={(e) => void handle(e.target.files?.[0])} />
       {error && <p className="mt-1.5 text-xs font-medium text-red-600">{error}</p>}

@@ -37,10 +37,44 @@ export function refreshSession(): Promise<boolean> {
   return refreshing;
 }
 
+/** Yükleme aşaması: dosya gönderiliyor (gerçek yüzde) ya da gönderildi, sunucu okuyor (süre bilinmez) */
+export type UploadProgress = { phase: 'upload'; percent: number } | { phase: 'reading' };
+
 interface Options {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   form?: FormData;
+  /** Dosya yüklemesinde aşama ve gönderim yüzdesi (fetch yüzde vermez; bu durumda XMLHttpRequest kullanılır) */
+  onProgress?: (p: UploadProgress) => void;
+}
+
+/** Yüzdeli gönderim: Response benzeri sonuç döner (yalnızca status ve json) */
+function sendWithProgress(path: string, method: string, form: FormData, onProgress: (p: UploadProgress) => void): Promise<{ status: number; json: () => Promise<unknown> }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, path);
+    xhr.withCredentials = true;
+    if (accessToken) xhr.setRequestHeader('authorization', `Bearer ${accessToken}`);
+    onProgress({ phase: 'upload', percent: 0 });
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress({ phase: 'upload', percent: Math.min(100, Math.round((e.loaded / e.total) * 100)) });
+    };
+    // Gönderim bitti: sunucu dosyayı okuyor (ne kadar süreceği bilinemez)
+    xhr.upload.onload = () => onProgress({ phase: 'reading' });
+    xhr.onload = () =>
+      resolve({
+        status: xhr.status,
+        json: async () => {
+          try {
+            return JSON.parse(xhr.responseText) as unknown;
+          } catch {
+            return null;
+          }
+        },
+      });
+    xhr.onerror = () => reject(new Error('network'));
+    xhr.send(form);
+  });
 }
 
 /**
@@ -67,10 +101,10 @@ async function readFormFiles(form: FormData): Promise<FormData> {
   return out;
 }
 
-export async function api<T = unknown>(path: string, { method = 'GET', body, form: rawForm }: Options = {}): Promise<T> {
+export async function api<T = unknown>(path: string, { method = 'GET', body, form: rawForm, onProgress }: Options = {}): Promise<T> {
   const form = rawForm ? await readFormFiles(rawForm) : undefined;
-  const send = () =>
-    fetch(path, {
+  const send = (): Promise<{ status: number; ok?: boolean; json: () => Promise<unknown> }> =>
+    form && onProgress ? sendWithProgress(path, method, form, onProgress) : fetch(path, {
       method,
       credentials: 'same-origin',
       headers: {
@@ -80,7 +114,7 @@ export async function api<T = unknown>(path: string, { method = 'GET', body, for
       body: form ?? (body !== undefined ? JSON.stringify(body) : undefined),
     });
 
-  let res: Response;
+  let res: { status: number; json: () => Promise<unknown> };
   try {
     res = await send();
   } catch {
@@ -92,14 +126,14 @@ export async function api<T = unknown>(path: string, { method = 'GET', body, for
   }
   if (res.status === 204) return undefined as T;
   const data = (await res.json().catch(() => null)) as { message?: string; issues?: { path: string; message: string }[] } | null;
-  if (!res.ok) throw new ApiError(res.status, data?.message ?? 'Beklenmeyen bir hata oluştu.', data?.issues);
+  if (res.status < 200 || res.status >= 300) throw new ApiError(res.status, data?.message ?? 'Beklenmeyen bir hata oluştu.', data?.issues);
   return data as T;
 }
 
-export async function uploadImage(schoolId: string, file: File): Promise<string> {
+export async function uploadImage(schoolId: string, file: File, onProgress?: (p: UploadProgress) => void): Promise<string> {
   const form = new FormData();
   form.append('file', file);
-  const { url } = await api<{ url: string }>(`/api/schools/${schoolId}/uploads`, { method: 'POST', form });
+  const { url } = await api<{ url: string }>(`/api/schools/${schoolId}/uploads`, { method: 'POST', form, onProgress });
   return url;
 }
 

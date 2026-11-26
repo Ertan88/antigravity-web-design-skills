@@ -18,8 +18,8 @@ import {
   X,
 } from '../components/icons.tsx';
 import { useToast } from '../components/Toast.tsx';
-import { Alert, Badge, Button, EmptyState, Field, Input, Modal, PageHeader, Segmented, Select, Spinner } from '../components/ui.tsx';
-import { api, downloadFile } from '../lib/api.ts';
+import { Alert, Badge, Button, EmptyState, Field, Input, Modal, PageHeader, Segmented, Select, Spinner, UploadBar } from '../components/ui.tsx';
+import { api, downloadFile, type UploadProgress } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useSchoolPath } from '../lib/data.ts';
 
@@ -837,6 +837,7 @@ function ExamImportDialog({ file, onClose }: { file: File | null; onClose: () =>
   const toast = useToast();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
   const preview = useQuery({
     queryKey: ['exam-import', file?.name, file?.lastModified, file?.size],
     enabled: Boolean(file),
@@ -845,7 +846,8 @@ function ExamImportDialog({ file, onClose }: { file: File | null; onClose: () =>
     queryFn: () => {
       const form = new FormData();
       form.append('file', file!);
-      return api<Preview>(`${path}/import/preview`, { method: 'POST', form });
+      setProgress(null);
+      return api<Preview>(`${path}/import/preview`, { method: 'POST', form, onProgress: setProgress });
     },
   });
   const p = preview.data;
@@ -903,7 +905,11 @@ function ExamImportDialog({ file, onClose }: { file: File | null; onClose: () =>
         <span className="text-slate-400">—</span>
         {step(3, 'Kaydet', 'off')}
       </div>
-      {preview.isLoading && <Spinner label="Dosya okunuyor…" />}
+      {preview.isLoading && (
+        <div className="flex justify-center py-8">
+          <UploadBar progress={progress} />
+        </div>
+      )}
       {preview.error && <Alert tone="red">{(preview.error as Error).message}</Alert>}
       {error && <Alert tone="red">{error}</Alert>}
       {p && (

@@ -269,6 +269,29 @@ input[list]::-webkit-calendar-picker-indicator {
   animation: fade-in 0.18s ease-out both;
 }
 
+/* Yükleme çubuğu: gönderim bitince sunucu dosyayı okurken süre bilinmez; kayan şerit gösterilir */
+@keyframes upload-reading {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+.animate-upload-reading {
+  animation: upload-reading 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-upload-reading {
+    animation: none;
+    transform: none;
+    width: 100% !important;
+    opacity: 0.5;
+  }
+}
+
 /*
  * Telefonda tablolar (640 px'den dar; masaüstü görünümü değişmez):
  * - .rt-cards: kişi/kayıt listeleri; her satır etiketli bir kart olur (etiketleri lib/responsiveTables.ts yazar)

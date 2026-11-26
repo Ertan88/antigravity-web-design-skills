@@ -34,10 +34,11 @@ export function ImportDialog({ file, onClose }: { file: File | null; onClose: ()
       initialOptions={{ updateExisting: true }}
       columns={[
         { header: 'Ad soyad', cell: (r) => <span className="font-medium whitespace-nowrap text-ink">{r.fullName}</span> },
-        { header: 'Branş', cell: (r) => r.branch ?? '—' },
-        { header: 'Görev', cell: (r) => r.title ?? '—' },
-        { header: 'E-posta', cell: (r) => r.email ?? '—' },
-        { header: 'Telefon', cell: (r) => r.phone ?? '—' },
+        { header: 'Branş', cell: (r) => r.branch ?? '—', value: (r) => r.branch },
+        { header: 'Görev', cell: (r) => r.title ?? '—', value: (r) => r.title },
+        // e-Okul PDF'inde e-posta ve telefon yoktur: bütün satırlarda boşsa sütun gösterilmez
+        { header: 'E-posta', cell: (r) => r.email ?? '—', value: (r) => r.email },
+        { header: 'Telefon', cell: (r) => r.phone ?? '—', value: (r) => r.phone },
       ]}
       stats={(p) => [
         { label: 'Yeni öğretmen', value: p.totals.new, tone: 'green' },

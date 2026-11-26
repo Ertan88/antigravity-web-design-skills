@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useToast } from '../../components/Toast.tsx';
-import { Alert, Badge, Button, Modal, Spinner, Toggle } from '../../components/ui.tsx';
-import { api } from '../../lib/api.ts';
+import { Alert, Badge, Button, Modal, Toggle, UploadBar } from '../../components/ui.tsx';
+import { api, type UploadProgress } from '../../lib/api.ts';
 import { useAuth } from '../../lib/auth.tsx';
 import { useSchoolPath } from '../../lib/data.ts';
 
@@ -37,11 +37,13 @@ export function EokulImport({ file, onClose }: { file: File | null; onClose: () 
   const [useBells, setUseBells] = useState(true);
   const [exemptSpecial, setExemptSpecial] = useState(true);
 
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
   const preview = useMutation({
     mutationFn: (f: File) => {
       const form = new FormData();
       form.append('file', f);
-      return api<Preview>(`${path}/preview`, { method: 'POST', form });
+      setProgress(null);
+      return api<Preview>(`${path}/preview`, { method: 'POST', form, onProgress: setProgress });
     },
   });
   const apply = useMutation({
@@ -95,9 +97,8 @@ export function EokulImport({ file, onClose }: { file: File | null; onClose: () 
       }
     >
       {preview.isPending ? (
-        <div className="py-10">
-          <Spinner />
-          <p className="mt-3 text-center text-sm text-slate-500">PDF okunuyor…</p>
+        <div className="flex justify-center py-10">
+          <UploadBar progress={progress} reading="PDF okunuyor…" />
         </div>
       ) : preview.error ? (
         <Alert tone="red">{preview.error.message}</Alert>

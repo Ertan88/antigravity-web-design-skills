@@ -1,12 +1,12 @@
 import { errorText } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { AlertTriangle, FileSpreadsheet, Loader2, UserPlus } from './icons.tsx';
+import { AlertTriangle, FileSpreadsheet, UserPlus } from './icons.tsx';
 import { useEffect, useState, type ReactNode } from 'react';
-import { api } from '../lib/api.ts';
+import { api, type UploadProgress } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useToast } from './Toast.tsx';
-import { Alert, Badge, Button, Modal } from './ui.tsx';
+import { Alert, Badge, Button, Modal, UploadBar } from './ui.tsx';
 
 export type RowStatus = 'new' | 'update' | 'unchanged' | 'skip';
 
@@ -71,7 +71,11 @@ export interface ExcelImportDialogProps<R, P extends ImportPreview<R>, O> {
   onClose: () => void;
   /** ör. /api/schools/:id/students */
   basePath: string;
-  columns: { header: string; cell: (row: P['rows'][number]) => ReactNode }[];
+  /**
+   * Önizleme tablosunun sütunları. `value` verilirse bütün satırlarda boş olan sütun gösterilmez (ör. e-Okul PDF'inde
+   * e-posta ve telefon yoktur).
+   */
+  columns: { header: string; cell: (row: P['rows'][number]) => ReactNode; value?: (row: P['rows'][number]) => unknown }[];
   initialOptions: O;
   stats: (p: P, o: O) => { label: string; value: number; tone: Tone }[];
   /** Listeye eklenecek yeni değerler (branş, sınıf, nöbet yeri…) */
@@ -103,6 +107,7 @@ export function ExcelImportDialog<R, P extends ImportPreview<R>, O>(props: Excel
   const [preview, setPreview] = useState<P | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [saving, setSaving] = useState(false);
   const [options, setOptions] = useState<O>(props.initialOptions);
 
@@ -119,9 +124,10 @@ export function ExcelImportDialog<R, P extends ImportPreview<R>, O>(props: Excel
     let alive = true;
     setError(null);
     setLoading(true);
+    setProgress(null);
     const form = new FormData();
     form.append('file', file);
-    api<P>(`${basePath}/import/preview${query}`, { method: 'POST', form })
+    api<P>(`${basePath}/import/preview${query}`, { method: 'POST', form, onProgress: (p) => alive && setProgress(p) })
       .then((p) => alive && setPreview(p))
       .catch((err: Error) => alive && setError(err.message))
       .finally(() => alive && setLoading(false));
@@ -136,6 +142,11 @@ export function ExcelImportDialog<R, P extends ImportPreview<R>, O>(props: Excel
   }, [file]);
 
   const count = preview ? props.commitCount(preview, options) : 0;
+  // Bütün satırlarda boş olan sütunlar gizlenir
+  const columns = props.columns.filter((c) => !c.value || !preview || preview.rows.some((r) => {
+    const v = c.value!(r);
+    return v !== null && v !== undefined && v !== '';
+  }));
 
   const commit = async () => {
     if (!preview) return;
@@ -173,8 +184,8 @@ export function ExcelImportDialog<R, P extends ImportPreview<R>, O>(props: Excel
       }
     >
       {loading && !preview && (
-        <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-500">
-          <Loader2 className="size-5 animate-spin" /> Dosya okunuyor…
+        <div className="flex items-center justify-center py-16">
+          <UploadBar progress={progress} />
         </div>
       )}
       {error && <Alert tone="red">{error}</Alert>}
@@ -227,13 +238,13 @@ export function ExcelImportDialog<R, P extends ImportPreview<R>, O>(props: Excel
                 <table className="rt-scroll min-w-full text-sm">
                   <thead className="sticky top-0 bg-slate-50 text-left text-xs font-semibold tracking-wide text-slate-500 uppercase">
                     <tr>
-                      <th className="px-3 py-2">Satır</th>
-                      {props.columns.map((c) => (
-                        <th key={c.header} className="px-3 py-2">
+                      <th className="px-3 py-2 whitespace-nowrap">Satır</th>
+                      {columns.map((c) => (
+                        <th key={c.header} className="px-3 py-2 whitespace-nowrap">
                           {c.header}
                         </th>
                       ))}
-                      <th className="px-3 py-2">Sonuç</th>
+                      <th className="px-3 py-2 whitespace-nowrap">Sonuç</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -242,8 +253,9 @@ export function ExcelImportDialog<R, P extends ImportPreview<R>, O>(props: Excel
                       return (
                         <tr key={i}>
                           <td className="px-3 py-2 font-mono text-xs text-slate-400">{r.row}</td>
-                          {props.columns.map((c) => (
-                            <td key={c.header} className="px-3 py-2 text-slate-700">
+                          {/* Hücreler tek satır: uzun içerikte tablo yana kayar, sütunlar üst üste binmez */}
+                          {columns.map((c) => (
+                            <td key={c.header} className="px-3 py-2 whitespace-nowrap text-slate-700">
                               {c.cell(r)}
                             </td>
                           ))}

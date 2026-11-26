@@ -23,8 +23,8 @@ import {
 } from '../components/icons.tsx';
 import { shrinkImage } from '../components/ImageUpload.tsx';
 import { useToast } from '../components/Toast.tsx';
-import { Alert, Badge, Button, EmptyState, Field, Input, Modal, PageHeader, Select, Spinner, Textarea } from '../components/ui.tsx';
-import { api } from '../lib/api.ts';
+import { Alert, Badge, Button, EmptyState, Field, Input, Modal, PageHeader, Select, Spinner, Textarea, UploadBar } from '../components/ui.tsx';
+import { api, type UploadProgress } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useList, useSchool, useSchoolPath, type Teacher } from '../lib/data.ts';
 
@@ -306,17 +306,19 @@ export function IssueForm({ onClose }: { onClose: () => void }) {
   const [v, setV] = useState({ category: '' as IssueCategory | '', location: '', description: '', urgent: false, photoUrl: null as string | null });
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const file = useRef<HTMLInputElement>(null);
 
   const upload = async (f: File | undefined) => {
     if (!f) return;
     setUploading(true);
+    setProgress(null);
     setError(null);
     try {
       const form = new FormData();
       form.append('file', await shrinkImage(f));
-      const { url } = await api<{ url: string }>(`${path}/photo`, { method: 'POST', form });
+      const { url } = await api<{ url: string }>(`${path}/photo`, { method: 'POST', form, onProgress: setProgress });
       setV((x) => ({ ...x, photoUrl: url }));
     } catch (err) {
       setError(errorText(err, 'Fotoğraf yüklenemedi'));
@@ -381,9 +383,13 @@ export function IssueForm({ onClose }: { onClose: () => void }) {
         <Field label="Nerede?">{(id) => <Input id={id} value={v.location} maxLength={80} placeholder="ör. 2. kat koridor, 10-B sınıfı, bahçe" onChange={(e) => setV({ ...v, location: e.target.value })} />}</Field>
         <Field label="Açıklama">{(id) => <Textarea id={id} rows={3} value={v.description} maxLength={1000} placeholder="Sorunu kısaca anlatın" onChange={(e) => setV({ ...v, description: e.target.value })} />}</Field>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="secondary" size="sm" icon={<Camera className="size-4" />} loading={uploading} onClick={() => file.current?.click()}>
-            {v.photoUrl ? 'Fotoğrafı değiştir' : 'Fotoğraf ekle'}
-          </Button>
+          {uploading ? (
+            <UploadBar progress={progress} reading="Fotoğraf kaydediliyor…" className="max-w-56" />
+          ) : (
+            <Button variant="secondary" size="sm" icon={<Camera className="size-4" />} onClick={() => file.current?.click()}>
+              {v.photoUrl ? 'Fotoğrafı değiştir' : 'Fotoğraf ekle'}
+            </Button>
+          )}
           <input ref={file} type="file" accept="image/*" className="hidden" onChange={(e) => void upload(e.target.files?.[0])} />
           <button
             type="button"
