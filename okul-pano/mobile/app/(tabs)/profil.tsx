@@ -276,10 +276,11 @@ export default function Menu() {
     ]);
     // Yönetim, işaretli koordinatör öğretmen ve alan şefi görür; diğer öğretmenler görmez
     if (internship.data?.enabled && (internship.data.all || internship.data.teacher || internship.data.areaHead)) {
+      // Sıra: İşletmeler · Öğrenciler · İşletmede devam · Formlar
       add('Mesleki eğitim', [
-        { title: 'İşletmede devam', subtitle: 'Aylık çizelge: X, D, İ, R, H, K, T · özürlü / özürsüz', icon: 'grid-outline', to: '/isletme-devam' },
         { title: 'İşletmeler', subtitle: 'İşletme bilgileri, ekle, düzenle', icon: 'business-outline', to: '/isletme' },
         { title: 'Öğrenciler', subtitle: 'İşletmedeki öğrenciler, öğrenci ekle', icon: 'people-outline', to: '/isletme?sekme=ogrenciler' },
+        { title: 'İşletmede devam', subtitle: 'Aylık çizelge: X, D, İ, R, H, K, T · özürlü / özürsüz', icon: 'grid-outline', to: '/isletme-devam' },
         { title: 'Formlar', subtitle: 'Günlük rehberlik formu, devam çizelgesi, aylık rehberlik raporu', icon: 'print-outline', to: '/isletme?formlar=1' },
       ]);
     }
