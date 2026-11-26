@@ -224,13 +224,14 @@ describe('nöbet çizelgesi Excel', () => {
     expect(ws.getCell('A1').value).toBe('ÖĞRETMEN NÖBET ÇİZELGESİ');
     expect(ws.getCell('A2').value).toBe('AİT OLDUĞU AY: EYLÜL 2026');
     expect(ws.getCell('E4').value).toBe('TARİH');
-    // Pazartesi bloğu: Eylül 2026'da 4 pazartesi var; 2 nöbet satırı + 2 yalnızca tarihli satır
-    expect([5, 6, 7, 8].map((r) => ws.getCell(r, 1).value)).toEqual(['PAZARTESİ', 'PAZARTESİ', 'PAZARTESİ', 'PAZARTESİ']);
+    // Pazartesi bloğu: dersler 14 Eylül 2026'da başlar (MEB takvimi), öncesi yazılmaz: 14, 21, 28 Eylül;
+    // 2 nöbet satırı + 1 yalnızca tarihli satır
+    expect([5, 6, 7].map((r) => ws.getCell(r, 1).value)).toEqual(['PAZARTESİ', 'PAZARTESİ', 'PAZARTESİ']);
     expect([ws.getCell('B5').value, ws.getCell('C5').value, ws.getCell('D5').value]).toEqual([1, 'Ayşe Demir', 'Bahçe']);
     expect([ws.getCell('C6').value, ws.getCell('D6').value]).toEqual(['Fatma Aydın', 'Kantin']);
-    expect(ws.getCell('E5').value).toBe('07.09.2026');
-    expect(ws.getCell('E8').value).toBe('28.09.2026');
-    expect(ws.getCell('A9').value).toBe('SALI');
+    expect(ws.getCell('E5').value).toBe('14.09.2026');
+    expect(ws.getCell('E7').value).toBe('28.09.2026');
+    expect(ws.getCell('A8').value).toBe('SALI');
     expect(ws.pageSetup.orientation).toBe('landscape');
     expect(ws.getCell('C5').dataValidation).toMatchObject({ type: 'list' });
     const lastDay = [...Array(ws.rowCount).keys()].map((i) => ws.getCell(i + 1, 1).value).filter(Boolean).pop();
@@ -242,6 +243,25 @@ describe('nöbet çizelgesi Excel', () => {
     expect(roundtrip.weekdays).toEqual([1, 2]);
     expect(roundtrip.issues).toEqual([]);
     expect(roundtrip.totals).toMatchObject({ new: 0, unchanged: 4, removed: 0, skipped: 0, supervisors: 0 });
+  });
+
+  it('dönem içindeki tam gün tatil tarihiyle yazılır, yanında tatil adı çıkar; MEB takvimi kapalıysa bütün günler yazılır', async () => {
+    const dates = (ws: ExcelJS.Worksheet) =>
+      [...Array(ws.rowCount).keys()].map((i) => [ws.getCell(i + 1, 5).value, ws.getCell(i + 1, 6).value] as const).filter(([d]) => typeof d === 'string' && /^\d{2}\.\d{2}\.\d{4}$/.test(d));
+    const oct = await readSheet((await owner.get(path('duties/export?month=2026-10'))).rawPayload, 'Nöbet Çizelgesi');
+    const bayram = dates(oct.ws).find(([d]) => d === '29.10.2026');
+    expect(bayram?.[1]).toBe('29 Ekim Cumhuriyet Bayramı');
+    // Arife (28 Ekim, yarım gün) nöbet günüdür: tatil adı yazılmaz
+    expect(dates(oct.ws).find(([d]) => d === '28.10.2026')?.[1] ?? null).toBeNull();
+    // Geri yüklenince tatil, müdür yardımcısı sanılmaz
+    const back = (await preview('duties', (await owner.get(path('duties/export?month=2026-10'))).rawPayload)).json();
+    expect(back.issues).toEqual([]);
+    expect(back.totals.supervisors).toBe(0);
+
+    expectStatus(await owner.patch(`/api/schools/${schoolId}`, { settings: { followMebCalendar: false } }), 200);
+    const sep = await readSheet((await owner.get(path('duties/export?month=2026-09'))).rawPayload, 'Nöbet Çizelgesi');
+    expect(dates(sep.ws).map(([d]) => d)).toContain('07.09.2026');
+    expectStatus(await owner.patch(`/api/schools/${schoolId}`, { settings: { followMebCalendar: true } }), 200);
   });
 
   it('okulun aylık çizelgesini okur: birleşik gün blokları, sıra no, tarih ve nöbetçi müdür yardımcısı', async () => {

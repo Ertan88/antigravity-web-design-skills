@@ -4,6 +4,7 @@ import {
   dutySchema,
   dutySupervisorSchema,
   holidayDatesInMonth,
+  isHalfDayHoliday,
   monthSchema,
   normalizeName,
   tidyName,
@@ -21,6 +22,7 @@ import { badRequest, conflict, parse } from '../lib/errors.ts';
 import { exportFileName, readXlsxUpload, sendXlsx } from '../lib/excel.ts';
 import { buildDutiesWorkbook, parseDutiesWorkbook, trDate } from '../lib/sheets/duties.ts';
 import { registerResource } from './crud.ts';
+import { holidaysInRange, lessonTermsInRange } from './holidays.ts';
 import { MONTH_RE, monthRange, remapDate, resolveMonth } from '../lib/months.ts';
 import { addTeachersToRoster, isNewTeacher, loadRoster } from '../lib/roster.ts';
 import { saveHolidays } from './holidays.ts';
@@ -405,6 +407,11 @@ export async function dutyRoutes(app: FastifyInstance) {
     ]);
     const days = new Map<number, { area: string; teacherName: string }[]>();
     if (withData) for (const r of rows) days.set(r.weekday, [...(days.get(r.weekday) ?? []), { area: r.area, teacherName: r.teacherName }]);
+    // Ders dönemi: derslerin başladığı günden önceki ve bittiği günden sonraki tarihler (seminer, yaz tatili)
+    // çizelgeye yazılmaz. Dönem içindeki tam gün tatiller tarihiyle yazılır, yanında tatil adı çıkar; arife nöbet günüdür.
+    const [terms, holidayList] = await Promise.all([lessonTermsInRange(db, schoolId, from, to), holidaysInRange(db, schoolId, from, to)]);
+    const isListed = (iso: string) => !terms || terms.some((t) => iso >= t.start && iso <= t.end);
+    const holidays = new Map(holidayList.filter((h) => !isHalfDayHoliday(h.name)).map((h) => [h.date, h.name]));
     return buildDutiesWorkbook({
       schoolName: schoolFullName(school.name, school.settings?.schoolType),
       teachers: roster.rows.filter((t) => t.isActive).map((t) => t.fullName).sort(trCompare),
@@ -415,6 +422,8 @@ export async function dutyRoutes(app: FastifyInstance) {
       month: Number(month.slice(5, 7)),
       days,
       supervisors: new Map(sups.map((x) => [x.date, x.name])),
+      isListed,
+      holidays,
     });
   }
 

@@ -35,6 +35,24 @@ async function mebHolidaysInRange(db: DB, schoolId: string, from: string, to: st
   return years.flatMap((y) => academicHolidays(y.data, y.startYear).filter((h) => h.date >= from && h.date <= to));
 }
 
+/**
+ * Aralığa düşen ders dönemleri (MEB çalışma takviminde derslerin başladığı ve bittiği gün). Ders başlangıcından
+ * önceki ve bitişinden sonraki günler (seminer, yaz tatili) ders günü değildir. Okul MEB takvimini uygulamıyorsa ya
+ * da takvim girilmemişse null: dönem bilinmez, bütün günler ders günü sayılır.
+ */
+export async function lessonTermsInRange(db: DB, schoolId: string, from: string, to: string): Promise<{ start: string; end: string }[] | null> {
+  const [school] = await db.select({ settings: schools.settings }).from(schools).where(eq(schools.id, schoolId));
+  if (school?.settings?.followMebCalendar === false) return null;
+  const years = await db
+    .select()
+    .from(academicCalendars)
+    .where(and(gte(academicCalendars.startYear, academicYearOf(from) - 1), lte(academicCalendars.startYear, academicYearOf(to))));
+  const terms = years.map((y) => ({ start: y.data.lessonsStart, end: y.data.lessonsEnd })).filter((t) => t.end >= from && t.start <= to);
+  // Aralığa dokunan eğitim yılının takvimi yoksa dönem bilinmez
+  for (let y = academicYearOf(from); y <= academicYearOf(to); y++) if (!years.some((r) => r.startYear === y)) return null;
+  return terms;
+}
+
 /** Ay içindeki tatiller: resmi / dini tatiller + MEB çalışma takvimi + okulun eklediği (Excel'den ya da elle) */
 export async function holidaysInRange(db: DB, schoolId: string, from: string, to: string) {
   const own = await db

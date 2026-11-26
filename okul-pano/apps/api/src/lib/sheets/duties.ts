@@ -317,6 +317,10 @@ export async function buildDutiesWorkbook(opts: {
   days?: Map<number, { area: string; teacherName: string }[]>;
   /** YYYY-AA-GG -> müdür yardımcısı */
   supervisors?: Map<string, string>;
+  /** Çizelgeye yazılacak günler (ders dönemi içindekiler); verilmezse ayın bütün günleri */
+  isListed?: (iso: string) => boolean;
+  /** YYYY-AA-GG -> tam gün tatil adı: tarih yazılır, müdür yardımcısı yerine tatil adı çıkar */
+  holidays?: Map<string, string>;
 }): Promise<Buffer> {
   const wb = newWorkbook();
   const ws = wb.addWorksheet('Nöbet Çizelgesi', {
@@ -371,10 +375,11 @@ export async function buildDutiesWorkbook(opts: {
   ws.getRow(4).height = 18;
 
   const areas = opts.areas.length ? opts.areas : DEFAULT_DUTY_AREAS;
+  const holidayRows = new Set<number>();
   let r = 5;
   for (const day of opts.weekdays) {
     const slots = opts.days?.get(day)?.length ? opts.days.get(day)! : areas.map((area) => ({ area, teacherName: '' }));
-    const dates = monthDates(opts.year, opts.month, day);
+    const dates = monthDates(opts.year, opts.month, day).filter((d) => opts.isListed?.(d) ?? true);
     const height = Math.max(slots.length, dates.length, 1);
     const first = r;
     for (let i = 0; i < height; i++, r++) {
@@ -388,7 +393,10 @@ export async function buildDutiesWorkbook(opts: {
       const date = dates[i];
       if (date) {
         row.getCell(5).value = trDate(date);
-        row.getCell(6).value = opts.supervisors?.get(date) ?? null;
+        // Tatil: içe aktarma bu sütundaki tatil adını tanır (okullar da tatili buraya yazar)
+        const holiday = opts.holidays?.get(date);
+        row.getCell(6).value = holiday ?? opts.supervisors?.get(date) ?? null;
+        if (holiday) holidayRows.add(r);
       }
       row.height = 20;
     }
@@ -411,7 +419,7 @@ export async function buildDutiesWorkbook(opts: {
         cell.font = { name: 'Calibri', size: 11 };
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
       } else {
-        cell.font = { name: 'Calibri', size: 11 };
+        cell.font = c === 6 && holidayRows.has(row) ? { name: 'Calibri', size: 11, italic: true, color: { argb: 'FF64748B' } } : { name: 'Calibri', size: 11 };
         cell.alignment = { vertical: 'middle', wrapText: true };
       }
     }
