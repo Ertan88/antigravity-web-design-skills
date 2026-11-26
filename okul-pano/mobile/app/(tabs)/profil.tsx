@@ -296,12 +296,12 @@ export default function Menu() {
         icon: 'people-outline',
         to: '/kullanicilar',
       },
-      role === 'owner' && !school?.support && !me?.user.isSuperAdmin && {
-        title: 'Destek erişimi',
-        subtitle: 'Platform desteğine 24 saat ya da 7 gün onay ver, kapat',
-        icon: 'key-outline',
-        tone: 'gold',
-        to: '/destek',
+      // Okulun ayarları tek yerde (webdeki Genel Ayarlar); destek erişimi de buradaki Destek kategorisinde
+      (can('settings.manage') || Boolean(internship.data?.manage)) && {
+        title: 'Genel ayarlar',
+        subtitle: 'Okul, modüller, takvim ve zil, mesleki eğitim, destek…',
+        icon: 'settings-outline',
+        to: '/genel-ayarlar',
       },
       managerial && { title: 'Etkinlik geçmişi', subtitle: 'Kim ne zaman neyi değiştirdi', icon: 'time-outline', tone: 'muted', to: '/gecmis' },
     ]);

@@ -290,7 +290,7 @@ export function FormsSheet({ onClose }: { onClose: () => void }) {
         )}
         {placeMissing && (
           <T size={12.5} weight="700" color={colors.warning}>
-            Okul Ayarları'nda il ve ilçe girilmemiş; raporda boş kalır.
+            Genel ayarlar › Okul bölümünde il ve ilçe girilmemiş; raporda boş kalır.
           </T>
         )}
         {noDay > 0 && (

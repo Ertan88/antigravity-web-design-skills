@@ -59,6 +59,7 @@ import IconCalendarEvent from '@tabler/icons-react-native/IconCalendarEvent';
 import IconCalendarFilled from '@tabler/icons-react-native/IconCalendarFilled';
 import IconCalendarMonth from '@tabler/icons-react-native/IconCalendarMonth';
 import IconCalendarWeek from '@tabler/icons-react-native/IconCalendarWeek';
+import IconSettings from '@tabler/icons-react-native/IconSettings';
 import IconCamera from '@tabler/icons-react-native/IconCamera';
 import IconChartLine from '@tabler/icons-react-native/IconChartLine';
 import IconCheck from '@tabler/icons-react-native/IconCheck';
@@ -167,6 +168,8 @@ export const ICONS = {
   'calendar-number-outline': IconCalendarMonth,
   // Çalışma takvimi (web panelindeki simgeyle aynı)
   'calendar-week': IconCalendarWeek,
+  // Genel ayarlar (web panelindeki simgeyle aynı)
+  'settings-outline': IconSettings,
   'camera-outline': IconCamera,
   'checkbox': IconSquareCheckFilled,
   'checkbox-outline': IconSquareCheck,

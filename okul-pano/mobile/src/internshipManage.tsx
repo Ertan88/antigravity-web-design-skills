@@ -117,7 +117,7 @@ export function CoordinatorsTab({ businessCounts, editing, onCloseEdit }: { busi
       {!q.data ? (
         <Loading />
       ) : !list.length ? (
-        <Empty icon="people-outline" title="Meslek öğretmeni yok" text="Öğretmenlerin branşları web panelindeki İşletmeler › Ayarlar sekmesinden girilir." />
+        <Empty icon="people-outline" title="Meslek öğretmeni yok" text="Öğretmenlerin branşları web panelindeki Genel Ayarlar › Mesleki eğitim sekmesinden girilir." />
       ) : !groups.length ? (
         <Empty icon="people-outline" title="Koordinatör seçilmedi" text="Aşağıdaki “Değiştir” ile meslek öğretmenlerini seçin." />
       ) : (
@@ -353,7 +353,7 @@ export function SettingsTab() {
       </View>
       <Card tone="warning">
         <T size={12.5} color={colors.muted}>
-          Alanlar ve meslek öğretmenlerinin branşları uzun bir liste olduğu için web panelindeki İşletmeler › Ayarlar sekmesinden düzenlenir.
+          Alanlar ve meslek öğretmenlerinin branşları uzun bir liste olduğu için web panelindeki Genel Ayarlar › Mesleki eğitim sekmesinden düzenlenir.
         </T>
       </Card>
       {error && (

@@ -2,7 +2,7 @@ import { errorText } from "@okulpano/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Linking, Pressable, View } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { api } from "../src/api.ts";
 import { useAuth, useSchoolPath } from "../src/auth.tsx";
 import {
@@ -16,7 +16,7 @@ import {
   type Intern,
 } from "../src/internshipStudents.tsx";
 import { useInternshipAccess, useSchoolQuery } from "../src/data.ts";
-import { CoordinatorsTab, InlineSelect, SearchBox, SettingsTab } from "../src/internshipManage.tsx";
+import { CoordinatorsTab, InlineSelect, SearchBox } from "../src/internshipManage.tsx";
 import { Sheet, SheetScroll } from "../src/sheet.tsx";
 import { Text } from "../src/text.tsx";
 import { colors } from "../src/theme.ts";
@@ -31,6 +31,7 @@ import {
   Empty,
   ErrorNote,
   Field,
+  ListRow,
   Loading,
   Screen,
   T,
@@ -108,7 +109,7 @@ export default function Isletmelerim() {
   const canAdd = Boolean(access.data?.manage || access.data?.teacher);
   // İdare sekmeleri (1A): İşletmeler · Koordinatörler · Ayarlar (webdeki gibi)
   const manager = Boolean(access.data?.manage);
-  const [mgrTab, setMgrTab] = useState<"list" | "coord" | "settings">("list");
+  const [mgrTab, setMgrTab] = useState<"list" | "coord">("list");
   const [editingCoords, setEditingCoords] = useState(false);
   // Alan şefi: önce kendi işletmeleri (koordinatörü olduğu ya da eklediği), isterse alanının bütün işletmeleri
   const areaHead = !manager && Boolean(access.data?.areaHead);
@@ -205,7 +206,7 @@ export default function Isletmelerim() {
         void interns.refetch();
       }}
       footer={
-        tab === "businesses" && manager && mgrTab === "settings" ? undefined : tab === "businesses" && manager && mgrTab === "coord" ? (
+        tab === "businesses" && manager && mgrTab === "coord" ? (
           <Button icon="create-outline" onPress={() => setEditingCoords(true)}>
             Değiştir
           </Button>
@@ -262,20 +263,23 @@ export default function Isletmelerim() {
       ) : (
         <>
           {manager && (
-            <Segmented<"list" | "coord" | "settings">
+            <Segmented<"list" | "coord">
               value={mgrTab}
               onChange={setMgrTab}
               options={[
                 { value: "list", label: `İşletmeler${list.data ? ` · ${everything.length}` : ""}` },
                 { value: "coord", label: "Koordinatörler" },
-                { value: "settings", label: "Ayarlar" },
               ]}
             />
           )}
           {manager && mgrTab === "coord" ? (
-            <CoordinatorsTab businessCounts={businessCounts} editing={editingCoords} onCloseEdit={() => setEditingCoords(false)} />
-          ) : manager && mgrTab === "settings" ? (
-            <SettingsTab />
+            <>
+              <CoordinatorsTab businessCounts={businessCounts} editing={editingCoords} onCloseEdit={() => setEditingCoords(false)} />
+              {/* Staj ayarları tek yerde: Genel ayarlar › Mesleki eğitim */}
+              <Card style={{ paddingVertical: 4, gap: 0 }}>
+                <ListRow title="Staj ayarları" subtitle="Koordinatör müdür yardımcısı, program adı, teknik program stajı" icon="settings-outline" onPress={() => router.push("/genel-ayarlar/mesleki")} last />
+              </Card>
+            </>
           ) : (
           <>
           {manager && access.data?.why && (
