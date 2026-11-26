@@ -3,6 +3,9 @@
  * çizilir. Tarayıcının onay kutusu ve sil düğmesinin yanında açılan küçük kutu bunun yerine kullanılmaz.
  *
  * - Ton: nötr (bilgi), uyarı (amber), tehlike (kırmızı). Simge ve renk tondan gelir.
+ * - Seviyeler (KURALLAR 3.5): küçük işler "Geri al" bildirimiyle; tek kayıt silme onay penceresiyle; toplu ya da geri
+ *   dönüşü olmayan işler `hold` ile (1,5 sn basılı tut); en ağır işler (hesap / okul silme, tümünü silme, sahiplik devri)
+ *   `hold` ve `typed` ile (önce sayı ya da adı yazmak, sonra basılı tutmak).
  * - `hold`: kritik işlemlerde onay düğmesine 1,5 sn basılı tutmak gerekir (yanlış tıklamaya karşı).
  * - Esc, dışarı tıklama ve Vazgeç "hayır" sayılır; ilk odak Vazgeç'tedir, Enter yanlışlıkla bir şey silmez.
  */
@@ -28,6 +31,8 @@ export type ConfirmOptions = {
   hold?: boolean;
   /** Basılı tutma düğmesinin yazısı (varsayılan "Onaylamak için basılı tutun") */
   holdLabel?: string;
+  /** En ağır işler: bu değer (ör. silinecek öğretmen sayısı ya da okul adı) yazılmadan onay düğmesi açılmaz */
+  typed?: { value: string; label: string };
 };
 
 /** Seçenekli soru (ör. duyurudan çıkarken: taslak olarak kaydet / sil / devam et) */
@@ -89,8 +94,11 @@ const TONE: Record<ConfirmTone, { tile: string; button: string; icon: AppIcon }>
 
 const HOLD_MS = 1500;
 
+/** Yazılan değer doğru mu (büyük-küçük harf ve baştaki/sondaki boşluk önemsiz; Türkçe harflerle) */
+export const typedOk = (typed: string, value: string) => typed.trim().toLocaleUpperCase('tr-TR') === value.trim().toLocaleUpperCase('tr-TR');
+
 /** Basılı tutunca dolan onay düğmesi; bırakınca boşalır. Fare, dokunma, Boşluk ve Enter ile çalışır. */
-function HoldButton({ label, onDone, tone }: { label: string; onDone: () => void; tone: ConfirmTone }) {
+export function HoldButton({ label, onDone, tone, disabled }: { label: string; onDone: () => void; tone: ConfirmTone; disabled?: boolean }) {
   const [p, setP] = useState(0);
   const start = useRef<number | null>(null);
   const raf = useRef(0);
@@ -104,12 +112,17 @@ function HoldButton({ label, onDone, tone }: { label: string; onDone: () => void
       done.current = true;
       start.current = null;
       onDone();
+      // İşlem başarısız olup pencere açık kalırsa düğme yeniden kullanılabilsin
+      setTimeout(() => {
+        done.current = false;
+        setP(0);
+      }, 1200);
       return;
     }
     raf.current = requestAnimationFrame(tick);
   };
   const begin = () => {
-    if (start.current != null || done.current) return;
+    if (disabled || start.current != null || done.current) return;
     start.current = performance.now();
     raf.current = requestAnimationFrame(tick);
   };
@@ -144,7 +157,8 @@ function HoldButton({ label, onDone, tone }: { label: string; onDone: () => void
       onBlur={end}
       onContextMenu={(e) => e.preventDefault()}
       aria-label={label}
-      className={clsx('relative h-10 touch-none overflow-hidden rounded-full px-5 text-sm font-bold select-none', soft)}
+      aria-disabled={disabled || undefined}
+      className={clsx('relative h-10 touch-none overflow-hidden rounded-full px-5 text-sm font-bold select-none', soft, disabled && 'cursor-not-allowed opacity-50')}
     >
       <span className={clsx('absolute inset-y-0 left-0', fill, p === 0 && 'transition-[width] duration-200')} style={{ width: pct }} />
       <span className="relative">{label}</span>
@@ -168,9 +182,11 @@ export function ConfirmHost() {
     () => current,
   );
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const [typed, setTyped] = useState('');
 
   useEffect(() => {
     if (!pending) return;
+    setTyped('');
     cancelRef.current?.focus();
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && settle(false);
     document.addEventListener('keydown', onKey);
@@ -217,6 +233,19 @@ export function ConfirmHost() {
                 ))}
               </ul>
             )}
+            {pending.typed && (
+              <label className="mt-4 grid gap-1.5 text-sm font-medium text-ink">
+                {pending.typed.label}
+                <input
+                  value={typed}
+                  onChange={(e) => setTyped(e.target.value)}
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder={pending.typed.value}
+                  className="block w-full rounded-xl border-0 bg-surface px-3.5 py-2 text-sm text-ink ring-1 ring-slate-200 placeholder:text-slate-300 focus:ring-2 focus:ring-ink focus:outline-none dark:ring-white/15"
+                />
+              </label>
+            )}
           </div>
         </div>
         <div className="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50/60 px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
@@ -241,12 +270,13 @@ export function ConfirmHost() {
               </button>
             ))
           ) : pending.hold ? (
-            <HoldButton label={pending.holdLabel ?? 'Onaylamak için basılı tutun'} tone={tone} onDone={() => settle(true)} />
+            <HoldButton label={pending.holdLabel ?? 'Onaylamak için basılı tutun'} tone={tone} disabled={Boolean(pending.typed) && !typedOk(typed, pending.typed!.value)} onDone={() => settle(true)} />
           ) : (
             <button
               type="button"
+              disabled={Boolean(pending.typed) && !typedOk(typed, pending.typed!.value)}
               onClick={() => settle(true)}
-              className={clsx('inline-flex h-10 items-center justify-center gap-2 rounded-full px-5 text-sm font-bold', t.button)}
+              className={clsx('inline-flex h-10 items-center justify-center gap-2 rounded-full px-5 text-sm font-bold disabled:opacity-50', t.button)}
             >
               {tone === 'danger' && !pending.icon && <Trash2 className="size-4" />}
               {label}

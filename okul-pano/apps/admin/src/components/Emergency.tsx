@@ -1,3 +1,4 @@
+import { confirm } from './confirm.tsx';
 import { EMERGENCY_INFO, EMERGENCY_TYPES, type EmergencyType } from '@okulpano/shared';
 // Siren tarayıcıya özgü (AudioContext): sunucu tarafı paketlere girmesin diye ayrı giriş noktasından
 import { startWailSiren } from '@okulpano/shared/siren';
@@ -188,7 +189,17 @@ export function EmergencyBanner() {
           <button
             type="button"
             disabled={stop.isPending}
-            onClick={() => stop.mutate()}
+            onClick={async () => {
+              // Mobildeki gibi: acil durumu bitirmek için basılı tutmak gerekir (KURALLAR 3.5)
+              const ok = await confirm({
+                title: 'Acil durum bitirilsin mi?',
+                message: 'Panolardaki acil durum ekranı kapanır, normal yayın döner.',
+                tone: 'warning',
+                hold: true,
+                holdLabel: 'Bitirmek için basılı tutun',
+              });
+              if (ok) stop.mutate();
+            }}
             className="ml-auto rounded-lg bg-white px-3 py-1.5 text-sm font-bold text-[#b91c1c] shadow transition hover:bg-red-50 disabled:opacity-60"
           >
             Acil durumu bitir

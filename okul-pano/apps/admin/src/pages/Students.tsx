@@ -136,6 +136,8 @@ function ClearStudents({ count }: { count: number }) {
             tone: 'danger',
             hold: true,
             holdLabel: 'Silmek için basılı tutun',
+            // En ağır işlem (KURALLAR 3.5): önce silinecek öğrenci sayısı yazılır
+            typed: { value: String(count), label: `Onaylamak için silinecek öğrenci sayısını yazın: ${count}` },
           });
           if (ok) void clear();
         }}

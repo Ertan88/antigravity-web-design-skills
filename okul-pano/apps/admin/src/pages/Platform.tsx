@@ -1,3 +1,4 @@
+import { HoldButton } from '../components/confirm.tsx';
 import { schoolFullName } from '@okulpano/shared';
 import { createSchoolSchema, PLANS, trialStatus, type Plan, errorText } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -365,9 +366,13 @@ export function Platform() {
             <Button variant="secondary" onClick={() => setDeleting(null)}>
               Vazgeç
             </Button>
-            <Button variant="danger" loading={remove.isPending} disabled={confirmSlug !== deleting?.slug} onClick={() => deleting && remove.mutate(deleting)}>
-              Kalıcı olarak sil
-            </Button>
+            {/* En ağır işlem (KURALLAR 3.5): kısa adı yazmak ve basılı tutmak */}
+            <HoldButton
+              label={remove.isPending ? 'Siliniyor…' : 'Kalıcı silmek için basılı tutun'}
+              tone="danger"
+              disabled={remove.isPending || confirmSlug !== deleting?.slug}
+              onDone={() => deleting && remove.mutate(deleting)}
+            />
           </>
         }
       >

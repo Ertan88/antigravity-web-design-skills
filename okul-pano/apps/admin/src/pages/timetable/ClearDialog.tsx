@@ -1,3 +1,4 @@
+import { HoldButton, typedOk } from '../../components/confirm.tsx';
 import { errorText } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -9,8 +10,6 @@ import { useSchoolPath } from '../../lib/data.ts';
 
 export type ClearScope = { scope: 'all' } | { scope: 'class' | 'teacher'; id: string; name: string };
 
-/** Türkçe klavyede "SİL", "SIL" ya da "sil" yazılabilir; hepsi kabul edilir. */
-const isConfirmWord = (v: string) => ['sil', 'sıl'].includes(v.trim().toLocaleLowerCase('tr-TR'));
 
 /** Bir sınıfın, bir öğretmenin ya da okulun bütün ders programını silme onayı */
 export function ClearDialog({ target, count, onClose }: { target: ClearScope | null; count: number; onClose: () => void }) {
@@ -64,9 +63,13 @@ export function ClearDialog({ target, count, onClose }: { target: ClearScope | n
           <Button variant="secondary" onClick={close}>
             Vazgeç
           </Button>
-          <Button variant="danger" loading={busy} disabled={!count || (all && !isConfirmWord(word))} onClick={() => void run()}>
-            {count ? `${count} ders saatini sil` : 'Silinecek ders yok'}
-          </Button>
+          {/* Toplu silme (KURALLAR 3.5): basılı tut; bütün programda önce ders saati sayısı yazılır */}
+          <HoldButton
+            label={busy ? 'Siliniyor…' : count ? `${count} ders saatini silmek için basılı tutun` : 'Silinecek ders yok'}
+            tone="danger"
+            disabled={busy || !count || (all && !typedOk(word, String(count)))}
+            onDone={() => void run()}
+          />
         </>
       }
     >
@@ -90,8 +93,8 @@ export function ClearDialog({ target, count, onClose }: { target: ClearScope | n
         </Alert>
         <p className="text-slate-600">Sınıflar, öğretmenler ve zil saatleri silinmez. Programı e-Okul PDF'ini yeniden yükleyerek geri getirebilirsiniz.</p>
         {all && (
-          <Field label='Onaylamak için "SİL" yazın'>
-            {(id) => <Input id={id} value={word} onChange={(e) => setWord(e.target.value)} autoComplete="off" placeholder="SİL" />}
+          <Field label={`Onaylamak için silinecek ders saati sayısını yazın: ${count}`}>
+            {(id) => <Input id={id} value={word} onChange={(e) => setWord(e.target.value)} autoComplete="off" inputMode="numeric" placeholder={String(count)} />}
           </Field>
         )}
       </div>

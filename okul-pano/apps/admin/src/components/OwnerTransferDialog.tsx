@@ -73,6 +73,8 @@ export function OwnerTransferDialog({
       tone: 'danger',
       hold: true,
       holdLabel: 'Devretmek için basılı tutun',
+      // En ağır işlem (KURALLAR 3.5): önce yeni müdürün adı yazılır
+      typed: target?.fullName ? { value: target.fullName, label: `Onaylamak için yeni müdürün adını yazın: ${target.fullName}` } : undefined,
     });
     if (!ok) return;
     setBusy(true);

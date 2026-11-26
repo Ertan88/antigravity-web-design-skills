@@ -1,3 +1,4 @@
+import { confirm } from '../../components/confirm.tsx';
 import { SettingsLink } from '../../components/SettingsLink.tsx';
 import { academicYearOf, isLessonFree, semesterBreak, SUMMER_BREAK, type AcademicCalendarData } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -211,7 +212,16 @@ export function HolidaysCard() {
                         type="button"
                         aria-label={`${r.name} tatilini kaldır`}
                         title={r.name.startsWith('İdari İzin') || r.name.endsWith('Arifesi') ? 'Kaldırınca önceki haline döner' : 'Kaldır'}
-                        onClick={() => remove.mutate(r.id!)}
+                        onClick={async () => {
+                          // Tek kayıt silme (KURALLAR 3.5): onay penceresi
+                          const ok = await confirm({
+                            title: `${r.name} kaldırılsın mı?`,
+                            message: r.name.startsWith('İdari İzin') || r.name.endsWith('Arifesi') ? 'Gün önceki hâline döner (ders günü ya da arife).' : 'Bu gün yeniden ders günü sayılır; nöbet çizelgesi ve pano buna göre değişir.',
+                            confirmLabel: 'Kaldır',
+                            tone: 'danger',
+                          });
+                          if (ok) remove.mutate(r.id!);
+                        }}
                         className={clsx(ACTION_SHAPE, DELETE_TONE)}
                       >
                         <Trash2 className="size-4" />

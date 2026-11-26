@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import { BellOff, CheckCheck, Mail, MailOpen, Trash2 } from '../components/icons.tsx';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useToast } from '../components/Toast.tsx';
 import { Badge, Button, ACTION_SHAPE, Card, DELETE_TONE, EmptyState, PageHeader, Segmented, Spinner } from '../components/ui.tsx';
 import { confirm } from '../components/confirm.tsx';
 import { kindStyle, useInboxActions, useInboxList, useOpenNotification, type InboxFilter, type InboxItem } from '../lib/inbox.tsx';
@@ -28,7 +29,45 @@ export function NotificationsPage() {
   const { read, unread, remove, readAll, clearRead } = useInboxActions();
   const openItem = useOpenNotification();
   const pages = list.data?.pages ?? [];
-  const items = pages.flatMap((p) => p.items);
+  // Bildirimi silme küçük ve geri alınabilir bir iş (KURALLAR 3.5, seviye 1): hemen gizlenir, 8 saniye "Geri al"
+  // sunulur; geri alınmazsa silinir. Sayfadan çıkılırsa bekleyen silmeler hemen yapılır.
+  const toast = useToast();
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  useEffect(
+    () => () => {
+      for (const [id, t] of timers.current) {
+        clearTimeout(t);
+        remove.mutate(id);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const removeLater = (id: string) => {
+    setHidden((h) => new Set(h).add(id));
+    timers.current.set(
+      id,
+      setTimeout(() => {
+        timers.current.delete(id);
+        remove.mutate(id);
+      }, 8000),
+    );
+    toast.success('Bildirim silindi', {
+      label: 'Geri al',
+      onClick: () => {
+        const t = timers.current.get(id);
+        if (t) clearTimeout(t);
+        timers.current.delete(id);
+        setHidden((h) => {
+          const n = new Set(h);
+          n.delete(id);
+          return n;
+        });
+      },
+    });
+  };
+  const items = pages.flatMap((p) => p.items).filter((n) => !hidden.has(n.id));
   const first = pages[0];
   const unreadCount = first?.unread ?? 0;
   const readCount = Math.max(0, (first?.total ?? 0) - unreadCount);
@@ -135,7 +174,7 @@ export function NotificationsPage() {
                             type="button"
                             title="Sil"
                             aria-label={`${n.title}: sil`}
-                            onClick={() => remove.mutate(n.id)}
+                            onClick={() => removeLater(n.id)}
                             className={clsx(ACTION_SHAPE, DELETE_TONE)}
                           >
                             <Trash2 className="size-4" />

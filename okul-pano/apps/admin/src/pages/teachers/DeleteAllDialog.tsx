@@ -1,3 +1,4 @@
+import { HoldButton, typedOk } from '../../components/confirm.tsx';
 import { errorText } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -14,8 +15,6 @@ interface Usage {
   timetable: number;
 }
 
-/** Türkçe klavyede "SİL", "SIL" ya da "sil" yazılabilir; hepsi kabul edilir. */
-const isConfirmWord = (v: string) => ['sil', 'sıl'].includes(v.trim().toLocaleLowerCase('tr-TR'));
 
 export function DeleteAllDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { schoolId } = useAuth();
@@ -64,9 +63,13 @@ export function DeleteAllDialog({ open, onClose }: { open: boolean; onClose: () 
           <Button variant="secondary" onClick={close}>
             Vazgeç
           </Button>
-          <Button variant="danger" loading={busy} disabled={!isConfirmWord(word) || !u?.teachers} onClick={() => void run()}>
-            {u ? `${u.teachers} öğretmeni sil` : 'Sil'}
-          </Button>
+          {/* En ağır işlem (KURALLAR 3.5): önce silinecek sayıyı yazmak, sonra basılı tutmak */}
+          <HoldButton
+            label={busy ? 'Siliniyor…' : u ? `${u.teachers} öğretmeni silmek için basılı tutun` : 'Silmek için basılı tutun'}
+            tone="danger"
+            disabled={busy || !u?.teachers || !typedOk(word, String(u.teachers))}
+            onDone={() => void run()}
+          />
         </>
       }
     >
@@ -98,8 +101,8 @@ export function DeleteAllDialog({ open, onClose }: { open: boolean; onClose: () 
           )}
         </Alert>
         <p className="text-slate-600">Branş ve görev listeleri silinmez. Önce "Excel'e aktar" ile yedek almanızı öneririz.</p>
-        <Field label='Onaylamak için "SİL" yazın'>
-          {(id) => <Input id={id} value={word} onChange={(e) => setWord(e.target.value)} autoComplete="off" placeholder="SİL" />}
+        <Field label={`Onaylamak için silinecek öğretmen sayısını yazın: ${u?.teachers ?? ''}`}>
+          {(id) => <Input id={id} value={word} onChange={(e) => setWord(e.target.value)} autoComplete="off" inputMode="numeric" placeholder={String(u?.teachers ?? '')} />}
         </Field>
       </div>
     </Modal>

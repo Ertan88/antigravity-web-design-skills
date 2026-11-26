@@ -81,6 +81,8 @@ export function AccountFinderDialog({ open, onClose, onChanged }: { open: boolea
       tone: 'danger',
       hold: true,
       holdLabel: 'Silmek için basılı tutun',
+      // En ağır işlem (KURALLAR 3.5): önce hesabın e-postası yazılır
+      typed: { value: account.email, label: `Onaylamak için e-postayı yazın: ${account.email}` },
     });
     if (!ok) return;
     setBusy('delete');

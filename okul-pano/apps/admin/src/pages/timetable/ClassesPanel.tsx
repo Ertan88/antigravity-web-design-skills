@@ -1,3 +1,4 @@
+import { confirm } from '../../components/confirm.tsx';
 import { compareClassNames, gradeHue, gradeOf, normalizeClassName, errorText } from '@okulpano/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
@@ -35,7 +36,6 @@ export function ClassesPanel({
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const refresh = () => qc.invalidateQueries({ queryKey: [schoolId, 'classes'] });
 
@@ -90,7 +90,6 @@ export function ClassesPanel({
       await api(`${path}/${id}`, { method: 'DELETE' });
       await refresh();
       await qc.invalidateQueries({ queryKey: [schoolId, 'timetable'] });
-      setConfirmDelete(null);
       if (id === activeId) onSelect('');
       toast.success('Sınıf silindi');
     } catch (err) {
@@ -195,17 +194,7 @@ export function ClassesPanel({
 
                     </button>
                     {editable &&
-                      (confirmDelete === c.id ? (
-                        <button
-                          type="button"
-                          onClick={() => void remove(c.id)}
-                          onBlur={() => setConfirmDelete(null)}
-                          autoFocus
-                          className="absolute inset-0 rounded-xl bg-red-600 text-xs font-semibold text-white"
-                        >
-                          Silinsin mi?
-                        </button>
-                      ) : (
+                      (
                         <span className={clsx('absolute top-1/2 right-1 hidden -translate-y-1/2 gap-1 pointer-fine:group-hover:flex', active && 'pointer-coarse:flex')}>
                           <button
                             type="button"
@@ -218,13 +207,17 @@ export function ClassesPanel({
                           <button
                             type="button"
                             aria-label={`${c.name} sil`}
-                            onClick={() => setConfirmDelete(c.id)}
+                            onClick={async () => {
+                              // Tek kayıt silme (KURALLAR 3.5): ortak onay penceresi (Enter vazgeçer)
+                              const ok = await confirm({ title: `${c.name} sınıfı silinsin mi?`, message: 'Sınıfın ders programı silinir; öğrencilerin sınıf bağı kalkar.', tone: 'danger' });
+                              if (ok) void remove(c.id);
+                            }}
                             className={clsx(ACTION_SHAPE, 'size-6 rounded-lg', DELETE_TONE)}
                           >
                             <Trash2 className="size-3" />
                           </button>
                         </span>
-                      ))}
+                      )}
                   </li>
                 );
               })}

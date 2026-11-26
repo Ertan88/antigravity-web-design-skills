@@ -1,3 +1,4 @@
+import { confirm } from '../components/confirm.tsx';
 import { SettingsLink } from '../components/SettingsLink.tsx';
 import {
   CONDUCT_BANDS,
@@ -323,7 +324,21 @@ function StudentCard({ studentId, month, criteria, onClose, readOnly }: { studen
               {d.canSetStatus && (
                 <Select
                   value={d.student.status ?? 'active'}
-                  onChange={(e) => setStatus.mutate(e.target.value as StudentStatus)}
+                  onChange={async (e) => {
+                    const next = e.target.value as StudentStatus;
+                    // Önemli değişiklik (KURALLAR 3.5): "Okuldan ayrıldı" öğrenciyi bütün listelerden çıkarır, onay ister
+                    if (
+                      next === 'left' &&
+                      !(await confirm({
+                        title: 'Okuldan ayrıldı olarak işaretlensin mi?',
+                        message: "Öğrenci bütün kullanıcıların listelerinden çıkar. Kayıtları silinmez; Öğrenci Listesi'nden geri alınabilir.",
+                        confirmLabel: 'İşaretle',
+                        tone: 'warning',
+                      }))
+                    )
+                      return;
+                    setStatus.mutate(next);
+                  }}
                   className="w-48"
                   aria-label="Öğrencinin durumu (bütün kullanıcılar)"
                 >

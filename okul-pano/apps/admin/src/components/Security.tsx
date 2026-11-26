@@ -1,3 +1,4 @@
+import { confirm } from './confirm.tsx';
 import { changePasswordSchema, errorText } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -414,7 +415,10 @@ function SessionsDialog({ open, onClose, sessions, others }: { open: boolean; on
               <div className="text-sm text-slate-500">{s.current ? 'Şu an kullanılıyor' : `Son kullanım: ${timeAgo(s.lastUsedAt)}`}</div>
             </div>
             {!s.current && (
-              <Button size="sm" variant="delete" loading={busy === s.id} disabled={Boolean(busy)} onClick={() => void run(s.id, () => api(`/api/me/sessions/${s.id}`, { method: 'DELETE' }), 'Oturum kapatıldı')}>
+              <Button size="sm" variant="delete" loading={busy === s.id} disabled={Boolean(busy)} onClick={async () => {
+                  if (!(await confirm({ title: 'Bu oturum kapatılsın mı?', message: 'O cihazda yeniden giriş yapmak gerekir.', confirmLabel: 'Kapat', tone: 'warning' }))) return;
+                  void run(s.id, () => api(`/api/me/sessions/${s.id}`, { method: 'DELETE' }), 'Oturum kapatıldı');
+                }}>
                 Kapat
               </Button>
             )}

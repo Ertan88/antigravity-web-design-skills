@@ -196,6 +196,22 @@ kalır; burada tekrarlanmaz.
 
 ---
 
+### 3.5 Yanlışlıkla yapılan işlemlere karşı koruma (üç seviye)
+
+Silme, değiştirme ve geri dönüşü olmayan işlemler tek tıkla, fark edilmeden tamamlanmaz. Her tıklamada onay sorulmaz
+(kişi okumadan "Evet"e basmaya alışır); koruma işin ağırlığına göredir. Web ve mobil aynı kuralı uygular.
+
+| Seviye | İşler | Koruma |
+|---|---|---|
+| 1 · Küçük, geri alınabilir | Devam işareti, açma/kapama anahtarı, sıra değiştirme, bildirimi silme, servis görevinden çıkarma, Listemden çıkar | Tek tık + 8 saniye "Geri al" bildirimi; onay penceresi yok |
+| 2 · Tek kayıt silme, önemli değişiklik | Duyuru, öğretmen, işletme, sınıf, tatil, branş ve görev silme; öğrenciyi işletmeden çıkarma; öğrenci "Okuldan ayrıldı"; oturum kapatma; acil durumu bitirme | Ortak onay penceresi (web `confirm`, mobil `confirm`): ne olacağı yazar, ilk odak Vazgeç'tedir, Enter ve Esc vazgeçer. Acil durumu bitirme mobildeki gibi basılı tutarak |
+| 3 · Toplu ya da geri dönüşü olmayan | Bütün ders programını, bir sınıfın ya da öğretmenin programını silme; örnek veriyi silme; aboneliği kapatma | Onay penceresi + düğmeye 1,5 sn basılı tutma (`hold`, `HoldButton`) |
+| 3+ · En ağır işler | Tüm öğretmenleri silme, öğrenci listesini temizleme, bütün ders programını silme, müdürlüğü devretme, hesap silme, okul silme | Seviye 3 + önce sayıyı ya da adı yazma (`typed`): silinecek sayı, yeni müdürün adı, e-posta ya da okulun kısa adı |
+
+- Satır içinde ikinci tıkla silme ("Silinsin mi?" kutusu) kullanılmaz; ortak onay penceresi kullanılır.
+- Basılı tutma düğmesi yazı yazılmadan açılmaz; istek başarısız olursa yeniden kullanılabilir.
+- Yeni bir silme ya da toplu işlem eklenirken seviyesi belirlenir ve bu tabloya uygun koruma konur.
+
 ## 4. Mobil uygulama (Android)
 
 ### 4.1 İzinler ve Google Play politikaları

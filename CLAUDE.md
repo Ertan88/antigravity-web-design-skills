@@ -51,6 +51,9 @@ Böyle bir durum varsa kullanıcı **onaylanmaz**. Yanlış açıkça söylenir;
   duyuru alanının içinde tasarlanır. (Acil durum ekranı ve panelden seçilen "Yalnızca duyurular / Tam ekran saat"
   biçimleri okulun kendi seçimidir, bu kuralın dışındadır.)
 
+- **Yanlışlıkla yapılan işlemlere karşı koruma** (üç seviye): küçük işler "Geri al" bildirimiyle, tek kayıt silme ortak
+  onay penceresiyle, toplu ya da geri dönüşü olmayan işler basılı tutarak; en ağır işlerde önce sayı ya da ad yazılır.
+  Tek tıkla silme yoktur. Ayrıntı ve liste: `KURALLAR.md` 3.5.
 - **Ortak arayüz standartları** (acil düğmesi yalnızca ana sayfada, menüde açıklama yok, kısa düğme yazıları,
   "Md. Yrd." kısaltması, okul adı türüyle, formlarda "Ayşe YILMAZ" yazımı): `KURALLAR.md` 3.3 ve 3.4.
 - **Okul adı her yerde türüyle yazılır** (menü, hesap listesi, başlık, bildirim, e-posta, platform listeleri, API
