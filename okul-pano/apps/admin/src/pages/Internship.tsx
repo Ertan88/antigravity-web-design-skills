@@ -334,14 +334,6 @@ export function InternshipSheet() {
           >
             İşaretsizleri İşletmede yap
           </Button>
-          <Button
-            variant="secondary"
-            icon={<Printer className="size-4" />}
-            onClick={() => window.print()}
-            disabled={!visible.length}
-          >
-            Yazdır / PDF
-          </Button>
           </>
         }
       />
@@ -367,8 +359,8 @@ export function InternshipSheet() {
         <div className="mb-4">
           <Alert>
             Koordinatör müdür yardımcısı seçilmemiş: devamsızlık ve rapor
-            bildirimleri kimseye gitmiyor. Genel Ayarlar › Modüller bölümünden
-            seçin.
+            bildirimleri kimseye gitmiyor. İşletmeler sayfasındaki Staj ayarları
+            penceresinden seçin.
           </Alert>
         </div>
       )}
