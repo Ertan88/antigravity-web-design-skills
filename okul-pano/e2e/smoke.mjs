@@ -82,7 +82,8 @@ const expectText = async (page, text, timeout = 15000) => page.getByText(text).f
 await step('Panel: müdür girişi ve Genel Bakış', async (page) => {
   await panelLogin(page, MUDUR);
   await expectText(page, 'Genel Bakış');
-  await expectText(page, /İyi (sabahlar|günler|akşamlar|geceler)/);
+  // Selam saate göre değişir (Dashboard: 11'den önce "Günaydın", 17'ye kadar "İyi günler", sonra "İyi akşamlar")
+  await expectText(page, /Günaydın|İyi (sabahlar|günler|akşamlar|geceler)/);
 });
 
 await step('Panel: Duyurular, Nöbet Çizelgesi ve Zil Saatleri açılır', async (page) => {
