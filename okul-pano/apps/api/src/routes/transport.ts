@@ -4,6 +4,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { audit, schoolGuard } from '../context.ts';
 import { duties, teachers, transportDuties } from '../db/schema.ts';
 import { badRequest, parse } from '../lib/errors.ts';
+import { approvedLeavesOn } from '../lib/transportLeave.ts';
 import { exportFileName, readXlsxUpload, sendXlsx } from '../lib/excel.ts';
 import { monthRange, remapDate, resolveMonth } from '../lib/months.ts';
 import { addTeachersToRoster, isNewTeacher, loadRoster } from '../lib/roster.ts';
@@ -79,6 +80,13 @@ export async function transportRoutes(app: FastifyInstance) {
         .from(teachers)
         .where(and(eq(teachers.schoolId, schoolId), inArray(teachers.id, ids)));
       if (found.length !== ids.length) throw badRequest('Öğretmen bulunamadı.');
+      // İzinli öğretmen o güne yazılamaz (tutmadığı nöbet istatistikte sayılmasın)
+      const onLeave = await approvedLeavesOn(app.deps, schoolId, date, date);
+      const away = ids.filter((id) => onLeave(date, id));
+      if (away.length) {
+        const names = await db.select({ fullName: teachers.fullName }).from(teachers).where(inArray(teachers.id, away));
+        throw badRequest(`${names.map((n) => n.fullName).join(', ')} o gün izinli; servis nöbetine yazılamaz.`);
+      }
     }
     await db.transaction(async (tx) => {
       await tx.delete(transportDuties).where(and(eq(transportDuties.schoolId, schoolId), eq(transportDuties.date, date)));
@@ -310,6 +318,8 @@ export async function transportRoutes(app: FastifyInstance) {
     const names = new Map(pool.map((t) => [t.id, t.fullName]));
 
     const workdays = monthDays(body.month).filter((d) => d.weekday <= 5 && !off.has(d.date));
+    // İzinli öğretmen o güne yazılmaz
+    const onLeave = workdays.length ? await approvedLeavesOn(app.deps, schoolId, workdays[0]!.date, workdays[workdays.length - 1]!.date) : () => false;
     const filled: { date: string; teacherIds: string[] }[] = [];
     let previous: string[] = [];
     for (const d of workdays) {
@@ -317,7 +327,7 @@ export async function transportRoutes(app: FastifyInstance) {
       const need = body.perDay - current.length;
       if (need > 0) {
         const picks = [...count.keys()]
-          .filter((id) => !current.includes(id))
+          .filter((id) => !current.includes(id) && !onLeave(d.date, id))
           .sort(
             (a, b) =>
               count.get(a)! - count.get(b)! ||

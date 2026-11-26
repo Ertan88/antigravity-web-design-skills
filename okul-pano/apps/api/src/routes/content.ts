@@ -32,6 +32,7 @@ import {
   users,
 } from '../db/schema.ts';
 import { badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
+import { releaseTransportForLeave } from '../lib/transportLeave.ts';
 import { notifyUsers, tell as tellUser, usersWithPermission } from '../lib/push.ts';
 import { registerResource } from './crud.ts';
 import { tell } from './issues.ts';
@@ -227,6 +228,8 @@ export async function contentRoutes(app: FastifyInstance) {
     // Yöneticinin girdiği izin hemen geçerlidir: o günlerin nöbetçi müdür yardımcısına ders görevlendirme bildirimi
     afterWrite: async (req, row, op) => {
       if (op === 'create' && row.approvalStatus !== 'pending') await coverNeed(req, row as typeof teacherLeaves.$inferSelect);
+      // Geçerli izin: öğretmen izin günlerindeki servis nöbetlerinden çıkarılır (istatistik doğru kalır)
+      if ((op === 'create' || op === 'update') && row.approvalStatus === 'approved') await releaseTransportForLeave(app.deps, req.ctx.schoolId, row as typeof teacherLeaves.$inferSelect);
     },
   });
 
@@ -258,7 +261,10 @@ export async function contentRoutes(app: FastifyInstance) {
     if (!updated) throw notFound();
     await audit(req, status === 'approved' ? 'approve' : 'reject', 'İzin', id, `${updated.startDate} – ${updated.endDate}`);
     app.deps.bus.contentChanged(req.ctx.schoolId);
-    if (status === 'approved') await coverNeed(req, updated);
+    if (status === 'approved') {
+      await coverNeed(req, updated);
+      await releaseTransportForLeave(app.deps, req.ctx.schoolId, updated);
+    }
     // İzin sahibine sonuç: bildirim kutusuna yazılır ve telefona gider; izin türü / mazereti ve (onaylanmadıysa)
     // yöneticinin gerekçesi metinde yer alır
     if (updated.requestedBy && updated.requestedBy !== req.ctx.userId) {

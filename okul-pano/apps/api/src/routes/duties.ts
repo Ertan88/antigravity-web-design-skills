@@ -23,6 +23,7 @@ import { exportFileName, readXlsxUpload, sendXlsx } from '../lib/excel.ts';
 import { buildDutiesWorkbook, parseDutiesWorkbook, trDate } from '../lib/sheets/duties.ts';
 import { registerResource } from './crud.ts';
 import { holidaysInRange, lessonTermsInRange } from './holidays.ts';
+import { rosterSpelling } from '../lib/rosterNames.ts';
 import { MONTH_RE, monthRange, remapDate, resolveMonth } from '../lib/months.ts';
 import { addTeachersToRoster, isNewTeacher, loadRoster } from '../lib/roster.ts';
 import { saveHolidays } from './holidays.ts';
@@ -57,6 +58,8 @@ export async function dutyRoutes(app: FastifyInstance) {
     toRow: (i) => ({ date: i.date, name: tidyName(i.name) }),
     summary: (r) => `${trDate(String(r.date))} · ${r.name}`,
     validate: async (req, row, id) => {
+      // Ad kadrodaki yazımla kaydedilir ("ÜMİT KILIÇ", "Md. Yrd. Ümit Kılıç" → "Ümit Kılıç")
+      row.name = (await rosterSpelling(db, req.ctx.schoolId))(row.name as string);
       const [other] = await db
         .select({ id: dutySupervisors.id })
         .from(dutySupervisors)
@@ -71,7 +74,8 @@ export async function dutyRoutes(app: FastifyInstance) {
         const [from, to] = monthRange(month);
         where.push(gte(dutySupervisors.date, from), lte(dutySupervisors.date, to));
       }
-      return db.select().from(dutySupervisors).where(and(...where)).orderBy(asc(dutySupervisors.date));
+      const [rows, spell] = await Promise.all([db.select().from(dutySupervisors).where(and(...where)).orderBy(asc(dutySupervisors.date)), rosterSpelling(db, req.ctx.schoolId)]);
+      return rows.map((r) => ({ ...r, name: spell(r.name) }));
     },
   });
 
@@ -250,6 +254,8 @@ export async function dutyRoutes(app: FastifyInstance) {
   app.post(`${base}/import`, write, async (req) => {
     const body = parse(dutyImportSchema, req.body);
     const schoolId = req.ctx.schoolId;
+    // Müdür yardımcısı adları kadrodaki yazımla (işlemden önce okunur: işlem içinde ikinci bağlantı beklemesin)
+    const spell = await rosterSpelling(db, schoolId);
     const result = await db.transaction(async (tx) => {
       // İstenirse kadroda olmayan öğretmenler önce kadroya eklenir
       const { roster, added: teachersAdded } = body.addTeachers
@@ -318,7 +324,7 @@ export async function dutyRoutes(app: FastifyInstance) {
           );
       }
       if (supervisorsInMonth.length) {
-        const byDate = new Map(supervisorsInMonth.map((x) => [x.date, tidyName(x.name)]));
+        const byDate = new Map(supervisorsInMonth.map((x) => [x.date, spell(x.name)]));
         const written = await tx
           .insert(dutySupervisors)
           .values([...byDate].map(([date, name]) => ({ schoolId, date, name })))
@@ -411,6 +417,7 @@ export async function dutyRoutes(app: FastifyInstance) {
     // çizelgeye yazılmaz. Dönem içindeki tam gün tatiller tarihiyle yazılır, yanında tatil adı çıkar; arife nöbet günüdür.
     const [terms, holidayList] = await Promise.all([lessonTermsInRange(db, schoolId, from, to), holidaysInRange(db, schoolId, from, to)]);
     const isListed = (iso: string) => !terms || terms.some((t) => iso >= t.start && iso <= t.end);
+    const spellSup = await rosterSpelling(db, schoolId);
     const holidays = new Map(holidayList.filter((h) => !isHalfDayHoliday(h.name)).map((h) => [h.date, h.name]));
     return buildDutiesWorkbook({
       schoolName: schoolFullName(school.name, school.settings?.schoolType),
@@ -421,7 +428,7 @@ export async function dutyRoutes(app: FastifyInstance) {
       year: Number(month.slice(0, 4)),
       month: Number(month.slice(5, 7)),
       days,
-      supervisors: new Map(sups.map((x) => [x.date, x.name])),
+      supervisors: new Map(sups.map((x) => [x.date, spellSup(x.name)])),
       isListed,
       holidays,
     });

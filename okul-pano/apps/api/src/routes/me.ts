@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { accessUser, audit, schoolGuard } from '../context.ts';
 import { bellOverrides, bellSchedules, classGroups, examReminderAcks, examSchedule, pushTokens, teacherLeaves, teachers, timetableEntries, users } from '../db/schema.ts';
 import { addDays, dutyDay, dutyScheduleStatus, effectiveHolidays, holidaysAndHalfDays, monthEnd, teacherDutyDays } from '../lib/dayinfo.ts';
+import { releaseTransportForLeave } from '../lib/transportLeave.ts';
 import { badRequest, notFound, parse } from '../lib/errors.ts';
 import { notifyUsers, usersWithPermission } from '../lib/push.ts';
 import { teacherCovers } from './covers.ts';
@@ -212,6 +213,7 @@ export async function meRoutes(app: FastifyInstance) {
     await audit(req, 'create', 'İzin bildirimi', row!.id, `${t?.fullName ?? ''} · ${body.startDate} – ${body.endDate}`);
     if (autoApprove) {
       bus.contentChanged(schoolId);
+      await releaseTransportForLeave(app.deps, schoolId, row!);
       await notifyCoverNeed(app.deps, schoolId, req.ctx.school.settings, zonedParts(new Date(), req.ctx.school.timezone).isoDate, { teacherName: t?.fullName ?? '', startDate: body.startDate, endDate: body.endDate }, (ids, n) => tell(app.deps, ids, n));
     } else {
       // Bildirim kutusunda onay bekleyen izin olarak görünür (notifications.ts); telefona da gönderilir

@@ -2,6 +2,7 @@ import { officialHolidays, zonedParts } from '@okulpano/shared';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { effectiveHolidays } from '../src/lib/dayinfo.ts';
 import { sentPushes } from '../src/lib/push.ts';
+import { transportDuties } from '../src/db/schema.ts';
 import { client, createTestApp, expectStatus, login, SUPER, type TestCtx } from './helpers.ts';
 
 let t: TestCtx;
@@ -140,7 +141,13 @@ describe('izin bildirimi ve boş nöbet', () => {
   });
 
   it('nöbetlerim: ayın nöbetleri, taşımalı görev ve birlikte görevliler; çizelge durumu', async () => {
-    expectStatus(await owner.put(path(`transport-duties/${today.isoDate}`), { teacherIds: [teacherIds['Ayşe Demir'], teacherIds['Ali Can']] }), 200);
+    // Ayşe Demir bugün izinli: izinli öğretmen servis nöbetine yazılamaz (API reddeder). Gösterimi sınamak için kayıt
+    // doğrudan yazılır (izin girilmeden önce yazılmış görev gibi)
+    expect((await owner.put(path(`transport-duties/${today.isoDate}`), { teacherIds: [teacherIds['Ayşe Demir'], teacherIds['Ali Can']] })).statusCode).toBe(400);
+    await t.database.db.insert(transportDuties).values([
+      { schoolId, date: today.isoDate, teacherId: teacherIds['Ayşe Demir']!, sortOrder: 0 },
+      { schoolId, date: today.isoDate, teacherId: teacherIds['Ali Can']!, sortOrder: 1 },
+    ]);
     // Okulda taşımalı eğitim kapalıyken taşımalı görev gösterilmez (kayıt silinmez)
     const closed = (await teacherUser.get(path('me/duties'))).json();
     expect(closed.hasTransport).toBe(false);
@@ -188,7 +195,7 @@ describe('izin bildirimi ve boş nöbet', () => {
     expectStatus(await owner.post(path('members'), { email: 'ali@kumanda.local', fullName: 'Ali Can', password: 'AliCan12345!', role: 'editor', permissions: [], teacherId: teacherIds['Ali Can'] }), 201);
     const ali = client(t.app, (await login(t.app, 'ali@kumanda.local', 'AliCan12345!')).token);
     // Önceki testteki taşımalı görev kaldırılır: Ali Can'ın bu ay kalan görevi yok
-    expectStatus(await owner.put(path(`transport-duties/${today.isoDate}`), { teacherIds: [teacherIds['Ayşe Demir']] }), 200);
+    expectStatus(await owner.put(path(`transport-duties/${today.isoDate}`), { teacherIds: [] }), 200);
     const before = (await ali.get(path('me/duties'))).json();
     expect(before).toMatchObject({ days: [], nextMonth: { entered: false } });
     expect(before.showing).toBe(before.month);

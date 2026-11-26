@@ -8,7 +8,7 @@ import { useToast } from '../components/Toast.tsx';
 import { Alert, Badge, Button, Card, EmptyState, Select, Spinner } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
-import { useList, useSchool, useSchoolPath, type Duty, type Teacher } from '../lib/data.ts';
+import { useList, useSchool, useSchoolPath, type Duty, type Leave, type Teacher } from '../lib/data.ts';
 import {
   ClearMonthButton,
   DayShell,
@@ -38,7 +38,7 @@ function TransportCell({
   editable,
   dutyTeachers,
   otherTeachers,
-  counts,
+  onLeave,
   holiday,
   onSave,
 }: {
@@ -49,8 +49,8 @@ function TransportCell({
   /** O günün nöbetçileri; listede önce bunlar gelir */
   dutyTeachers: TeacherOption[];
   otherTeachers: TeacherOption[];
-  /** Eğitim yılında tutulan servis nöbeti sayısı: adil dağıtım için listede adın yanında */
-  counts: Map<string, number>;
+  /** O gün onaylı izinli öğretmenler: seçilemez */
+  onLeave: Set<string>;
   holiday?: Holiday;
   onSave: (ids: string[]) => Promise<void>;
 }) {
@@ -79,21 +79,22 @@ function TransportCell({
             aria-label={`${day.iso} servis nöbetçisi ${i + 1}`}
             className={clsx(fieldClass, !ids[i] && 'text-slate-400')}
           >
-            <option value="">{i === 0 ? 'Görevli seçin' : i > ids.length ? '—' : '2. görevli'}</option>
+            {/* Dolu kutuda ilk seçenek görevliyi o günden çıkarır (gelemedi): tutmadığı nöbet istatistikte sayılmaz */}
+            <option value="">{ids[i] ? 'Görevden çıkar' : i === 0 ? 'Görevli seçin' : i > ids.length ? '—' : '2. görevli'}</option>
             {ids[i] && !known.has(ids[i]) && <option value={ids[i]}>{assigned[i]?.fullName}</option>}
             {dutyTeachers.length > 0 && (
               <optgroup label="O günün nöbetçileri">
                 {dutyTeachers.map((t) => (
-                  <option key={t.id} value={t.id} disabled={ids.includes(t.id) && ids[i] !== t.id}>
-                    {t.fullName} · {counts.get(t.id) ?? 0}
+                  <option key={t.id} value={t.id} disabled={(ids.includes(t.id) && ids[i] !== t.id) || onLeave.has(t.id)}>
+                    {onLeave.has(t.id) ? `${t.fullName} · izinli` : t.fullName}
                   </option>
                 ))}
               </optgroup>
             )}
             <optgroup label="Diğer öğretmenler · yıl içinde en az tutan üstte">
               {otherTeachers.map((t) => (
-                <option key={t.id} value={t.id} disabled={ids.includes(t.id) && ids[i] !== t.id}>
-                  {t.fullName} · {counts.get(t.id) ?? 0}
+                <option key={t.id} value={t.id} disabled={(ids.includes(t.id) && ids[i] !== t.id) || onLeave.has(t.id)}>
+                  {onLeave.has(t.id) ? `${t.fullName} · izinli` : t.fullName}
                 </option>
               ))}
             </optgroup>
@@ -254,6 +255,7 @@ export function TransportView({ month }: { month: string }) {
   const toast = useToast();
   const teachers = useList<Teacher>('teachers');
   const duties = useList<Duty>('duties');
+  const leaves = useList<Leave>('leaves');
   const holidays = useHolidays(month);
   const stats = useTransportStats(month);
   const [autoFill, setAutoFill] = useState(false);
@@ -360,7 +362,7 @@ export function TransportView({ month }: { month: string }) {
                   editable={editable}
                   dutyTeachers={dutyTeachers}
                   otherTeachers={byCount.filter((t) => !dutyTeachers.some((x) => x.id === t.id))}
-                  counts={counts}
+                  onLeave={new Set((leaves.data ?? []).filter((l) => l.approvalStatus === 'approved' && l.startDate <= d.iso && l.endDate >= d.iso).map((l) => l.teacherId))}
                   holiday={holidays.get(d.iso)}
                   onSave={(ids) => save(d.iso, ids)}
                 />

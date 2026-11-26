@@ -3,6 +3,7 @@ import { and, asc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import type { DB } from '../db/client.ts';
 import { duties, dutySubstitutions, dutySupervisors, schools, teacherLeaves, teachers, transportDuties } from '../db/schema.ts';
 import { holidaysInRange } from '../routes/holidays.ts';
+import { rosterSpelling } from './rosterNames.ts';
 
 /** ISO hafta günü (1 = Pazartesi) */
 export const weekdayOf = (iso: string) => ((new Date(`${iso}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
@@ -82,7 +83,7 @@ export async function dutyDay(db: DB, schoolId: string, date: string): Promise<D
     date,
     weekday,
     holiday: holidays[0]?.name ?? null,
-    supervisor: supervisor?.name ?? null,
+    supervisor: supervisor ? (await rosterSpelling(db, schoolId))(supervisor.name) : null,
     entries: rows.map((r) => {
       const sub = subByDuty.get(r.dutyId);
       return {
@@ -185,7 +186,8 @@ export async function teacherDutyDays(
   const myName = me?.fullName ?? opts.name;
   const myKey = myName ? normalizeName(myName) : null;
   const holidayOf = new Map(holidays.map((h) => [h.date, h.name]));
-  const supervisorOf = new Map(supervisors.map((s) => [s.date, s.name]));
+  const spell = await rosterSpelling(db, schoolId);
+  const supervisorOf = new Map(supervisors.map((s) => [s.date, spell(s.name)]));
   const out: TeacherDutyDay[] = [];
   for (let date = from; date <= to; date = addDays(date, 1)) {
     const weekday = weekdayOf(date);

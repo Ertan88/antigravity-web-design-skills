@@ -244,3 +244,34 @@ describe('taşımalı öğrenci (servis) görevlileri', () => {
     expect(days.filter((d) => d.teachers.length).every((d) => d.date >= '2026-09-14')).toBe(true);
   });
 });
+
+describe('servis nöbeti ve izin', () => {
+  type Day = { date: string; teachers: { id: string; fullName: string }[] };
+  const day = async (date: string) => ((await owner.get(path(`transport-duties?month=${date.slice(0, 7)}`))).json() as Day[]).find((d) => d.date === date);
+
+  it('izin girilince öğretmen izin günlerindeki servis nöbetinden çıkarılır; izinli öğretmen yazılamaz', async () => {
+    expectStatus(await owner.put(path('transport-duties/2027-03-02'), { teacherIds: [ids['Mehmet Öztürk'], ids['Fatma Aydın']] }), 200);
+    expectStatus(await owner.put(path('transport-duties/2027-03-03'), { teacherIds: [ids['Mehmet Öztürk']] }), 200);
+    expectStatus(await owner.post(path('leaves'), { teacherId: ids['Mehmet Öztürk'], startDate: '2027-03-02', endDate: '2027-03-03' }), 201);
+    expect((await day('2027-03-02'))?.teachers.map((x) => x.fullName)).toEqual(['Fatma Aydın']);
+    expect(await day('2027-03-03')).toBeUndefined();
+    // İzinli gün ve istatistik: tutmadığı nöbet sayılmaz
+    const res = await owner.put(path('transport-duties/2027-03-02'), { teacherIds: [ids['Fatma Aydın'], ids['Mehmet Öztürk']] });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().message).toContain('Mehmet Öztürk o gün izinli');
+  });
+
+  it('elle çıkarma: gelemeyen görevli o günden kaldırılır', async () => {
+    expectStatus(await owner.put(path('transport-duties/2027-03-04'), { teacherIds: [ids['Zeynep Arslan'], ids['Fatma Aydın']] }), 200);
+    expectStatus(await owner.put(path('transport-duties/2027-03-04'), { teacherIds: [ids['Fatma Aydın']] }), 200);
+    expect((await day('2027-03-04'))?.teachers.map((x) => x.fullName)).toEqual(['Fatma Aydın']);
+  });
+
+  it('otomatik dağıtım izinli öğretmeni o güne yazmaz', async () => {
+    expectStatus(await owner.post(path('leaves'), { teacherId: ids['Ayşe Demir'], startDate: '2027-04-01', endDate: '2027-04-30' }), 201);
+    const r = await owner.post(path('transport-duties/auto-fill'), { month: '2027-04', perDay: 1, teacherIds: [ids['Ayşe Demir'], ids['Ali Kaya']] });
+    expectStatus(r, 200);
+    const days = (await owner.get(path('transport-duties?month=2027-04'))).json() as Day[];
+    expect(days.flatMap((d) => d.teachers.map((x) => x.fullName))).not.toContain('Ayşe Demir');
+  });
+});

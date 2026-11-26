@@ -186,6 +186,11 @@ kalır; burada tekrarlanmaz.
   okunuşa göre değişir ve kolay yanlış yazılır.
 - Resmî formlarda ve belgelerde kişi adı MEB yazımıyla yazılır: ad ilk harfi büyük, soyadı tamamı büyük
   ("Ayşe YILMAZ"). Ad soyadın zaten yazdığı yerde ayrıca "Adı Soyadı" başlığı tekrarlanmaz.
+- Resmî formlar dışında kişi adı her yerde **kadrodaki yazımla** görünür; ad kısaltılmaz, büyük-küçük harfi
+  değiştirilmez (müdür ve müdür yardımcıları da kadrodadır). Elle ya da Excel'den yazılan ad (ör. nöbetçi müdür
+  yardımcısı "ÜMİT KILIÇ", "Md. Yrd. Ümit Kılıç") kadroda tek kişiyle eşleşirse kadrodaki yazıma çevrilir
+  (`lib/rosterNames.ts`). Kadroya bağlı hesabın adı kadrodaki yazımla eşitlenir; kadroda ad değişince hesap adı da
+  değişir (`syncLinkedNames`). Doğum günü kartındaki "Ayşe Y." biçimi okulun KVKK tercihidir, istisnadır.
 - Formlarda okul adı ve türü en üstte yazar; öğrenci "No · Sınıf" biçiminde gösterilir; uzun alan adı kısaltılır
   (ör. "Bilişim Tek.").
 
@@ -256,6 +261,10 @@ Zayıf TV işlemcilerinde edinilen dersler:
   öğretmen izinlerinde iş günüdür. Ekranlarda "Bugün tatil" değil "Bugün ders yok" yazar; pano ortada "Dersler …
   başlıyor" / "Ders yılı sona erdi" gösterir. Tarihe bağlı yeni her özellik bu listeyi (`holidaysInRange`) kullanır.
 - Nöbet çizelgesi Excel'i ders dönemi dışındaki tarihleri yazmaz; dönem içi tam gün tatil tarihiyle ve adıyla yazılır.
+- Servis (taşımalı) nöbeti: izin geçerli olunca öğretmen izin günlerindeki servis nöbetlerinden çıkarılır, görevlisiz
+  kalan gün için nöbet sorumlularına bildirim gider; izinli öğretmen o güne yazılamaz, otomatik dağıtım izinliyi
+  atlar. Gelemeyen görevli çizelgede "Görevden çıkar" ile çıkarılır. Nöbet sayıları yalnızca Nöbet dengesi
+  (istatistik) bölümünde görünür; çizelgedeki seçim listesinde ad yanında sayı yazılmaz.
 
 ---
 

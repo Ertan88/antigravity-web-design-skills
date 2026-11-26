@@ -36,4 +36,14 @@ describe('nöbetçi müdür yardımcısı', () => {
     expect(days.map((d) => d.date)).toEqual(['2026-12-03']);
     expect(await teacherDutyDays(t.database.db, schoolId, null, '2026-12-01', '2026-12-31')).toEqual([]);
   });
+  it('ad kadrodaki yazımla kaydedilir (büyük harf ve ünvan farkı yok sayılır)', async () => {
+    const owner = client(t.app, (await login(t.app, 'mudur@nobet.local', 'MudurNB123!')).token);
+    const list = (await owner.get(`/api/schools/${schoolId}/duty-supervisors?month=2026-12`)).json() as { date: string; name: string }[];
+    expect(list.find((x) => x.date === '2026-12-02')?.name).toBe('Veli Yardımcı');
+    expectStatus(await owner.post(`/api/schools/${schoolId}/duty-supervisors`, { date: '2026-12-04', name: 'Md. Yrd. veli yardımcı' }), 201);
+    const again = (await owner.get(`/api/schools/${schoolId}/duty-supervisors?month=2026-12`)).json() as { date: string; name: string }[];
+    expect(again.find((x) => x.date === '2026-12-04')?.name).toBe('Veli Yardımcı');
+    // Kadroda olmayan ad olduğu gibi kalır
+    expect(again.find((x) => x.date === '2026-12-03')?.name).toBe('Başka Kişi');
+  });
 });

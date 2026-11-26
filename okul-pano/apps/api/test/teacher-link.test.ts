@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { memberships } from '../src/db/schema.ts';
+import { memberships, users } from '../src/db/schema.ts';
 import { client, createTestApp, expectStatus, login, SUPER, type TestCtx } from './helpers.ts';
 
 /*
@@ -39,6 +39,13 @@ describe('kadrodaki öğretmen kaydıyla kendiliğinden bağlama', () => {
     expect(await teacherOf(ownerMember.id)).toBeNull();
     const kemal = (await owner.post(path('teachers'), { fullName: 'Kemal ÖZ' })).json().id as string;
     expect(await teacherOf(ownerMember.id)).toBe(kemal);
+
+    // Hesap adı kadrodaki yazımı alır; kadroda ad değişince hesap adı da değişir
+    const names = async () => Object.fromEntries((await t.database.db.select({ email: users.email, fullName: users.fullName }).from(users)).map((u) => [u.email, u.fullName]));
+    expect((await names())['ayse@bag.test']).toBe('Ayşe YILMAZ');
+    expect((await names())['mudur@bag.test']).toBe('Kemal ÖZ');
+    expectStatus(await owner.put(path(`teachers/${ayse}`), { fullName: 'Ayşe Nur YILMAZ' }), 200);
+    expect((await names())['ayse@bag.test']).toBe('Ayşe Nur YILMAZ');
   });
 
   it('kadroda aynı adda iki kayıt varsa bağlanmaz; yetkilinin kaldırdığı bağ yeniden kurulmaz', async () => {

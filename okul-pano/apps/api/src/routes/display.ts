@@ -47,6 +47,7 @@ import { noteScreenSeen, noticeScreenPaired, revokedReason } from '../lib/screen
 import { listExams } from '../lib/examSchedule.ts';
 import { isQuietHour, QUIET_TOUCH_MS } from '../lib/quietHours.ts';
 import { deviceHashOf } from '../lib/trialGuard.ts';
+import { rosterSpelling } from '../lib/rosterNames.ts';
 import { noteScreenAlive, touchScreen } from '../lib/screenOffline.ts';
 
 const PAIRING_TTL_MS = 10 * 60 * 1000;
@@ -137,6 +138,7 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
 
   const settingsEarly = schoolSettingsSchema.parse(school.settings ?? {});
 
+  const spell = await rosterSpelling(db, id);
   const [examRows, dutyRows, holidayRows, supervisorRows, transportRows, leaveRows, birthdayRows, annRows, tickerRows, bellRows, ttRows, achievementRows, eventRows, bookRows, rssRows, subRows, overrideRows] = await Promise.all([
     db
       .select({ id: exams.id, title: exams.title, examAt: exams.examAt })
@@ -300,7 +302,8 @@ export async function buildDisplayState(db: DB, auth: DisplayAuth, now = new Dat
     exams: examRows.map((e) => ({ ...e, examAt: e.examAt.toISOString() })),
     scheduledExams: scheduled.map((e) => ({ id: e.id, date: e.date, periodNo: e.periodNo, classId: e.classGroupId, className: e.className, classLabel: e.classLabel, subject: e.subject, kind: e.kind, start: e.start, end: e.end })),
     duties: dutyRows,
-    dutySupervisors: supervisorRows,
+    // Müdür yardımcısının adı kadrodaki yazımla
+    dutySupervisors: supervisorRows.map((r) => ({ ...r, name: spell(r.name) })),
     holidays: holidayRows.holidays,
     halfDays: holidayRows.halfDays,
     // Tatil günlerinde taşımalı görevli gösterilmez (eskiden kalmış kayıt olsa da)

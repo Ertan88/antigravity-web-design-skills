@@ -1,5 +1,5 @@
 import { normalizeName } from '@okulpano/shared';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { DB } from '../db/client.ts';
 import { auditLogs, memberships, teachers, users } from '../db/schema.ts';
 
@@ -18,7 +18,10 @@ export async function autoLinkTeachers(db: DB, schoolId: string): Promise<number
     .innerJoin(users, eq(users.id, memberships.userId))
     .where(eq(memberships.schoolId, schoolId));
   const open = accounts.filter((a) => !a.teacherId && !a.manual);
-  if (!open.length) return 0;
+  if (!open.length) {
+    await syncLinkedNames(db, schoolId);
+    return 0;
+  }
   const roster = await db
     .select({ id: teachers.id, fullName: teachers.fullName })
     .from(teachers)
@@ -47,7 +50,22 @@ export async function autoLinkTeachers(db: DB, schoolId: string): Promise<number
     n++;
     await db.insert(auditLogs).values({ schoolId, userId: null, action: 'update', entity: 'Kullanıcı öğretmen eşleşmesi', entityId: a.id, summary: `${a.fullName} kadrodaki kayıtla kendiliğinden eşleşti` });
   }
+  await syncLinkedNames(db, schoolId);
   return n;
+}
+
+/**
+ * Kadroya bağlı hesapların adı kadrodaki yazımla aynı olur (menü, bildirim, onaylayan, kullanıcı listesi…): kadroda ad
+ * değişince ya da hesap kadroya bağlanınca hesap adı da değişir. Kişi birden çok okuldaysa son değişen kadronun yazımı
+ * geçerlidir.
+ */
+export async function syncLinkedNames(db: DB, schoolId: string): Promise<number> {
+  const rows = await db.execute(sql`
+    update users u set full_name = t.full_name
+    from memberships m join teachers t on t.id = m.teacher_id
+    where m.school_id = ${schoolId} and m.user_id = u.id and u.full_name <> t.full_name and u.is_super_admin = false
+    returning u.id`);
+  return (rows as unknown as { rows?: unknown[] }).rows?.length ?? 0;
 }
 
 /** Kişinin bütün okullarında (ör. adını değiştirince) */
