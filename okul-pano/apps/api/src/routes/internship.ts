@@ -1325,8 +1325,9 @@ export async function internshipRoutes(app: FastifyInstance) {
     return {
       s,
       list: rows
-        .filter((r) => s.sees(r.id))
-        .map((r) => ({ ...r, students: n.get(r.id) ?? 0 }))
+        // Formlar: idare bütün işletmeleri ("Benim / Bütünü" anahtarıyla), öğretmen ve alan şefi yalnızca kendi işletmelerini görür
+        .filter((r) => s.sees(r.id) && (s.all || s.mine.has(r.id)))
+        .map((r) => ({ ...r, students: n.get(r.id) ?? 0, mine: s.mine.has(r.id) }))
         .sort((a, b) => trCompare(a.coordinatorName ?? 'ZZZ', b.coordinatorName ?? 'ZZZ') || trCompare(a.name, b.name)),
     };
   }
@@ -1429,7 +1430,7 @@ export async function internshipRoutes(app: FastifyInstance) {
         settings,
         monday: r.monday,
         friday: r.friday,
-        items: r.items.map((b) => ({ id: b.id, name: b.name, coordinatorName: b.coordinatorName, students: b.students, visitWeekday: b.visitWeekday, date: b.date, holiday: b.holiday })),
+        items: r.items.map((b) => ({ id: b.id, name: b.name, coordinatorName: b.coordinatorName, mine: b.mine, students: b.students, visitWeekday: b.visitWeekday, date: b.date, holiday: b.holiday })),
       };
     }
     const month = q.month ?? today(req).slice(0, 7);
@@ -1458,6 +1459,7 @@ export async function internshipRoutes(app: FastifyInstance) {
         id: b.id,
         name: b.name,
         coordinatorName: b.coordinatorName,
+        mine: b.mine,
         // Devam çizelgesi: ay içinde işletmede bulunmuş öğrenciler (ayrılanlar dahil)
         students: q.type === 'attendance' ? (rowCount.get(b.id) ?? 0) : b.students,
         visitWeekday: b.visitWeekday,

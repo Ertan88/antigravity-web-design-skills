@@ -67,6 +67,80 @@
     setPaused(paused);
   }
 
+  /* Telefon: alttaki deneme çubuğu baştaki düğmeler görünmez olunca çıkar, sondaki çağrıya gelince kaybolur */
+  var phone = window.matchMedia('(max-width: 640px)');
+  var mbar = document.querySelector('.mbar');
+  if (mbar) {
+    var heroCta = document.querySelector('.hero .cta-row');
+    var finalCta = document.querySelector('.final');
+    var seen = { hero: true, final: false };
+    var update = function () {
+      var on = phone.matches && !seen.hero && !seen.final;
+      mbar.classList.toggle('on', on);
+      mbar.setAttribute('aria-hidden', on ? 'false' : 'true');
+      mbar.querySelectorAll('a').forEach(function (a) { a.tabIndex = on ? 0 : -1; });
+    };
+    if ('IntersectionObserver' in window && heroCta) {
+      mbar.hidden = false;
+      document.body.classList.add('has-mbar');
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          // Baştaki düğmeler görünüyor (ya da henüz aşılmadı); sondaki çağrı görünüyor (ya da aşıldı)
+          if (e.target === heroCta) seen.hero = e.isIntersecting || e.boundingClientRect.top > 0;
+          else seen.final = e.isIntersecting || e.boundingClientRect.top < 0;
+        });
+        update();
+      });
+      io.observe(heroCta);
+      if (finalCta) io.observe(finalCta);
+      if (phone.addEventListener) phone.addEventListener('change', update);
+      update();
+    }
+  }
+
+  /* Telefon: fiyat kartları yana kaydırılır; en kapsamlı paket ortada açılır */
+  var prices = document.querySelector('.swipe.prices');
+  var best = prices && prices.querySelector('.best');
+  if (best && phone.matches) prices.scrollLeft = best.offsetLeft - (prices.clientWidth - best.clientWidth) / 2;
+
+  /* Telefon: ürün turundaki görsele dokununca büyük açılır, yana kaydırılarak bakılır */
+  var stage = document.querySelector('.tour-stage');
+  if (stage) {
+    stage.addEventListener('click', function (ev) {
+      if (!phone.matches || (ev.target && ev.target.closest && ev.target.closest('button'))) return;
+      var cur = stage.querySelector('.tour-slide.on img');
+      if (!cur) return;
+      var box = document.createElement('div');
+      box.className = 'zoom';
+      box.setAttribute('role', 'dialog');
+      box.setAttribute('aria-modal', 'true');
+      box.setAttribute('aria-label', cur.alt);
+      var bar = document.createElement('div');
+      bar.className = 'zoom-bar';
+      var hint = document.createElement('span');
+      hint.textContent = 'Yana kaydırarak bakın';
+      var close = document.createElement('button');
+      close.type = 'button';
+      close.textContent = 'Kapat';
+      bar.appendChild(hint);
+      bar.appendChild(close);
+      var scroller = document.createElement('div');
+      scroller.className = 'zoom-scroll';
+      var big = document.createElement('img');
+      big.src = cur.currentSrc || cur.src;
+      big.alt = cur.alt;
+      scroller.appendChild(big);
+      box.appendChild(bar);
+      box.appendChild(scroller);
+      var done = function () { box.remove(); document.removeEventListener('keydown', onKey); stage.focus && stage.focus(); };
+      var onKey = function (e) { if (e.key === 'Escape') done(); };
+      close.addEventListener('click', done);
+      document.addEventListener('keydown', onKey);
+      document.body.appendChild(box);
+      close.focus();
+    });
+  }
+
   /* İletişim formu */
   var form = document.querySelector('form[data-contact]');
   if (form) {

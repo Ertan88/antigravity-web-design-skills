@@ -6,7 +6,6 @@ import { openChoice } from './confirm.tsx';
 import { printPdf, sharePdf } from './download.ts';
 import { useSchoolPath } from './auth.tsx';
 import { useSchoolQuery } from './data.ts';
-import { InlineSelect } from './internshipManage.tsx';
 import { Sheet, SheetScroll } from './sheet.tsx';
 import { Text } from './text.tsx';
 import { colors } from './theme.ts';
@@ -60,6 +59,8 @@ interface FormItem {
   id: string;
   name: string;
   coordinatorName: string | null;
+  /** Kişinin kendi (koordinatörü olduğu) işletmesi */
+  mine?: boolean;
   students: number;
   visitWeekday: number | null;
   date?: string | null;
@@ -69,7 +70,6 @@ interface FormItem {
   unchecked?: { halves: number; students: number } | null;
 }
 
-const NO_COORD = '__none__';
 
 const TITLES: Record<FormType, string> = {
   daily: 'Günlük rehberlik formu',
@@ -112,11 +112,14 @@ export function FormsSheet({ onClose }: { onClose: () => void }) {
     setPicked(new Set(items.filter((b) => usable(b) && !b.holiday).map((b) => b.id)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
-  // Koordinatör öğretmene göre süzme (4A): seçilen öğretmenin işletmeleri yazdırılır; birden çok koordinatör varsa çıkar
-  const [coord, setCoord] = useState('');
-  const coordNames = [...new Set(items.filter(usable).map((b) => b.coordinatorName ?? ''))].sort((a, b) => a.localeCompare(b, 'tr'));
-  const coordOn = coord && coordNames.includes(coord === NO_COORD ? '' : coord) ? coord : '';
-  const shown = items.filter((b) => usable(b) && (!coordOn || (b.coordinatorName ?? '') === (coordOn === NO_COORD ? '' : coordOn))).sort((a, b) => (daily ? (a.date ?? '').localeCompare(b.date ?? '') : 0));
+  // İdare: önce kendi işletmeleri, "Bütün işletmeler" ile hepsi. Öğretmen ve alan şefine sunucu yalnızca kendi
+  // işletmelerini gönderir.
+  const [view, setView] = useState<'mine' | 'all' | null>(null);
+  const mineCount = items.filter((b) => usable(b) && b.mine).length;
+  const allCount = items.filter(usable).length;
+  const toggle = mineCount > 0 && mineCount < allCount;
+  const scopeView = toggle ? (view ?? 'mine') : 'all';
+  const shown = items.filter((b) => usable(b) && (scopeView === 'all' || b.mine)).sort((a, b) => (daily ? (a.date ?? '').localeCompare(b.date ?? '') : 0));
   const noDay = attendance ? 0 : items.filter((b) => !b.visitWeekday).length;
   const settings = q.data?.settings;
   const placeMissing = type === 'report' && settings && (!settings.province || !settings.district);
@@ -193,13 +196,15 @@ export function FormsSheet({ onClose }: { onClose: () => void }) {
         <Text style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: '800', color: colors.ink }}>{period}</Text>
         <Button variant="secondary" size="sm" icon="chevron-forward" accessibilityLabel={daily ? 'Sonraki hafta' : 'Sonraki ay'} onPress={() => (daily ? setWeek(addDays(week, 7)) : setMonth(addMonths(month, 1)))} />
       </View>
-      {coordNames.length > 1 && (
+      {toggle && (
         <View style={{ marginTop: 10 }}>
-          <InlineSelect
-            label="Koordinatör"
-            value={coordOn}
-            onChange={setCoord}
-            options={[{ value: '', label: 'Bütün koordinatörler' }, ...coordNames.map((n) => ({ value: n || NO_COORD, label: n || 'Koordinatörü seçilmemiş' }))]}
+          <Segmented<'mine' | 'all'>
+            value={scopeView}
+            onChange={setView}
+            options={[
+              { value: 'mine', label: `Benim · ${mineCount}` },
+              { value: 'all', label: `Bütünü · ${allCount}` },
+            ]}
           />
         </View>
       )}
@@ -308,7 +313,7 @@ export function FormsSheet({ onClose }: { onClose: () => void }) {
         {formCount ? (
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Button variant="secondary" icon="share-outline" loading={busy === 'share'} disabled={Boolean(busy)} onPress={() => void run('share')} style={{ flex: 1 }}>
-              PDF paylaş / Kaydet
+              PDF kaydet
             </Button>
             <Button icon="print-outline" loading={busy === 'print'} disabled={Boolean(busy)} onPress={() => void run('print')} style={{ flex: 1 }}>
               Yazdır

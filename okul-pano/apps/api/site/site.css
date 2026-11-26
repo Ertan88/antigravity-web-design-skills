@@ -252,3 +252,62 @@ ul.check li::before { content: '✓'; position: absolute; left: 0; color: var(--
 .legal ul { margin: 8px 0 0 22px; }
 .legal .meta { margin-top: 10px; }
 .draft { margin-top: 18px; background: var(--note-bg); border: 1px solid var(--note-line); color: var(--note-ink); border-radius: 14px; padding: 12px 16px; font-size: 14px; font-weight: 700; }
+
+/* Telefon (dar ekran): okunmayan masaüstü görüntüleri yerine telefon görüntüsü, kaydırmalı kartlar, açılır SSS,
+   altta sabit deneme çubuğu. Masaüstü görünümü değişmez. */
+.only-phone { display: none; }
+.mbar { display: none; }
+details.card summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+details.card summary::-webkit-details-marker { display: none; }
+details.card summary::after { content: '+'; font-size: 22px; font-weight: 800; line-height: 1; color: var(--brand); }
+details.card[open] summary::after { content: '–'; }
+details.card summary h3 { margin-bottom: 0; }
+details.card[open] summary { margin-bottom: 8px; }
+.zoom { position: fixed; inset: 0; z-index: 60; background: #000; display: flex; flex-direction: column; }
+.zoom-scroll { flex: 1; min-height: 0; overflow: auto; display: flex; padding: 0 12px 12px; -webkit-overflow-scrolling: touch; }
+.zoom-scroll img { height: 100%; width: auto; max-width: none; flex: none; margin: 0 auto; object-fit: contain; }
+.zoom-bar { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; color: #fff; font-size: 14px; font-weight: 700; }
+.zoom-bar button { background: #fff; color: var(--ink); border: 0; border-radius: 999px; padding: 10px 18px; font: inherit; font-weight: 800; }
+@media (max-width: 640px) {
+  .wrap { padding: 0 16px; }
+  .sec { padding: 44px 0; }
+  .nav { height: 62px; gap: 8px; }
+  .brand { font-size: 20px; }
+  .brand svg, .brand img { width: 30px; height: 30px; }
+  .nav .nav-trial { display: none; }
+  .nav .nav-login { padding: 7px 14px; min-height: 40px; font-size: 14px; }
+  .top.open .nav-links { top: 62px; padding: 8px 16px 16px; }
+  .hero { padding: 24px 0 8px; }
+  .hero h1 { font-size: 32px; }
+  .hero .cta-row .btn { flex: 1 1 100%; }
+  .hero-shots { margin-top: 24px; }
+  .only-phone { display: block; }
+  .only-desk, .feat-media.no-phone { display: none; }
+  .feat { margin-top: 36px; gap: 16px; }
+  .feat .phone { max-width: 230px; }
+  .tour-stage { cursor: zoom-in; }
+  /* Yana kaydırılan kart sıraları: bir sonraki kartın ucu görünür */
+  .swipe { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 12px; margin-left: -16px; margin-right: -16px; padding: 4px 16px 10px; scrollbar-width: none; }
+  .swipe::-webkit-scrollbar { display: none; }
+  .swipe > * { flex: 0 0 78%; scroll-snap-align: center; }
+  .swipe.prices > * { flex-basis: 86%; }
+  .mod-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .mod-grid .card { padding: 14px; }
+  .mod-grid h3 { font-size: 14.5px; }
+  .mod-grid p { font-size: 12.5px; }
+  .steps .card { display: grid; grid-template-columns: 40px 1fr; column-gap: 14px; padding: 16px; }
+  .steps .card h3 { margin-top: 0; align-self: center; }
+  .steps .card p { grid-column: 2; }
+  .steps .grid3 { gap: 10px; }
+  .faq .grid2 { gap: 10px; }
+  .faq .card { padding: 16px; }
+  .final { padding: 36px 18px; border-radius: 22px; }
+  .foot-grid { grid-template-columns: 1fr 1fr; gap: 22px 16px; }
+  .foot-grid > :first-child { grid-column: 1 / -1; }
+  .mbar:not([hidden]) { display: flex; gap: 8px; position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); background: rgba(255, 255, 255, .96); border-top: 1px solid var(--line); box-shadow: 0 -10px 24px rgba(0, 0, 0, .08); transform: translateY(110%); transition: transform .25s ease; }
+  .mbar.on { transform: none; }
+  .mbar .btn { min-height: 44px; padding: 10px 12px; font-size: 14.5px; }
+  .mbar .btn-brand { flex: 1.4; }
+  .mbar .btn-line { flex: 1; }
+  body.has-mbar .foot { padding-bottom: 96px; }
+}

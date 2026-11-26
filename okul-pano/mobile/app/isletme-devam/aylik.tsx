@@ -71,7 +71,7 @@ export default function AylikCizelge() {
         </Button>
       )}
       <Button style={{ flex: 1 }} disabled={!pendingDays} onPress={() => setSending(true)}>
-        {pendingDays ? `Gönder · ${fmtDays(pendingDays)} gün` : 'Gönder'}
+        Gönder
       </Button>
     </View>
   );

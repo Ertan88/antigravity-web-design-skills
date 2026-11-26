@@ -1058,7 +1058,7 @@ function SendDialog({ rows, onClose, onDone }: { rows: PendingMark[]; onClose: (
             Vazgeç
           </Button>
           <Button icon={<Send className="size-4" />} loading={send.isPending} disabled={!ids.length} onClick={() => send.mutate()}>
-            {ids.length ? `${formatDays(ids.length / 2)} günü gönder` : "Seçim yok"}
+            {ids.length ? "Gönder" : "Seçim yok"}
           </Button>
         </>
       }

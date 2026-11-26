@@ -362,7 +362,7 @@ export function SendSheet({ rows, onClose, onSent }: { rows: PendingMark[]; onCl
       )}
       <View style={{ marginTop: 12 }}>
         <Button loading={busy} disabled={!ids.length} icon="send" onPress={() => void send()}>
-          {ids.length ? `${days(ids.length / 2)} günü gönder` : 'Seçim yok'}
+          {ids.length ? 'Gönder' : 'Seçim yok'}
         </Button>
       </View>
     </Sheet>

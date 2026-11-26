@@ -478,6 +478,13 @@ describe('mesleki eğitim yetkileri: yönetim, işaretli koordinatör, alan şef
     expect((await head.get(`${base}/internship/access`)).json()).toMatchObject({ all: false, why: null });
     expect((await owner.get(`${base}/internship/access`)).json()).toMatchObject({ all: true, why: 'owner' });
     expect(list.filter((x) => x.id !== own).every((x) => !x.canEdit)).toBe(true);
+    // Formlar: alan şefi yalnızca kendi işletmesini görür; idare bütün işletmeleri "mine" işaretiyle görür
+    const headForms = (await head.get(`${base}/internship/forms?type=attendance&month=2026-11`)).json().items as { id: string; mine: boolean }[];
+    expect(headForms.map((x) => x.id)).toEqual([own]);
+    expect(headForms[0]!.mine).toBe(true);
+    const ownerForms = (await owner.get(`${base}/internship/forms?type=attendance&month=2026-11`)).json().items as { id: string; mine: boolean }[];
+    expect(ownerForms.length).toBeGreaterThan(1);
+    expect(ownerForms.every((x) => x.mine === false)).toBe(true);
     expectStatus(await owner.del(`${base}/internship/businesses/${own}`), 200);
   });
 

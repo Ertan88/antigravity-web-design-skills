@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, FileDown, Printer } from "../components/icon
 import { useToast } from "../components/Toast.tsx";
 import { Link, useNavigate } from "react-router-dom";
 import { choose } from "../components/confirm.tsx";
-import { Alert, Button, MonthPicker, PageHeader, Select, Spinner } from "../components/ui.tsx";
+import { Alert, Button, MonthPicker, PageHeader, Segmented, Spinner } from "../components/ui.tsx";
 import { api, fetchBlob, saveBlob } from "../lib/api.ts";
 import { useAuth } from "../lib/auth.tsx";
 import { useSchoolPath } from "../lib/data.ts";
@@ -15,8 +15,6 @@ import { useSchoolPath } from "../lib/data.ts";
  * İşletmelerde mesleki eğitim formları: günlük rehberlik formu (hafta), aylık devam-devamsızlık çizelgesi ve aylık
  * rehberlik raporu (ay). Görev tarihleri işletmenin görev gününden gelir; PDF'te her form A5, ikisi bir A4'te.
  */
-
-const NO_COORD = "__none__";
 
 /**
  * PDF'yi yazdırma penceresiyle açar: görünmez bir çerçevede yüklenir, tarayıcının yazdır penceresi açılır. Tarayıcı
@@ -92,6 +90,8 @@ interface FormItem {
   id: string;
   name: string;
   coordinatorName: string | null;
+  /** Kişinin kendi (koordinatörü olduğu) işletmesi */
+  mine?: boolean;
   students: number;
   visitWeekday: number | null;
   date?: string | null;
@@ -163,12 +163,14 @@ export function InternshipForms() {
     setPicked(new Set(items.filter((b) => usable(b) && !b.holiday).map((b) => b.id)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
-  // Koordinatör öğretmene göre süzme (1): seçilen öğretmenin işletmeleri önizlenir ve yazdırılır
-  const [coord, setCoord] = useState("");
-  const coordNames = [...new Set(items.filter(usable).map((b) => b.coordinatorName ?? ""))].sort((a, b) => a.localeCompare(b, "tr"));
-  // Form türü ya da dönem değişince seçili öğretmenin işletmesi kalmadıysa hepsi gösterilir
-  const coordOn = coord && coordNames.includes(coord === NO_COORD ? "" : coord) ? coord : "";
-  const shown = items.filter((b) => usable(b) && (!coordOn || (b.coordinatorName ?? "") === (coordOn === NO_COORD ? "" : coordOn))).sort((a, b) => (daily ? (a.date ?? '').localeCompare(b.date ?? '') : 0));
+  // İdare: işletmeler sayfasındaki gibi önce kendi işletmeleri, "Bütün işletmeler" ile hepsi. Öğretmen ve alan şefine
+  // sunucu yalnızca kendi işletmelerini gönderir.
+  const [view, setView] = useState<"mine" | "all" | null>(null);
+  const mineCount = items.filter((b) => usable(b) && b.mine).length;
+  const allCount = items.filter(usable).length;
+  const toggle = mineCount > 0 && mineCount < allCount;
+  const scopeView = toggle ? (view ?? "mine") : "all";
+  const shown = items.filter((b) => usable(b) && (scopeView === "all" || b.mine)).sort((a, b) => (daily ? (a.date ?? '').localeCompare(b.date ?? '') : 0));
   const noDay = attendance ? 0 : items.filter((b) => !b.visitWeekday).length;
   const chosen = shown.filter((b) => picked.has(b.id));
   const formCount =
@@ -273,7 +275,7 @@ export function InternshipForms() {
               Yazdır
             </Button>
             <Button icon={<FileDown className="size-4" />} loading={busy === "download"} disabled={!formCount || Boolean(busy)} onClick={() => void output("download")}>
-              İndir{formCount ? ` · ${formCount} form, ${Math.ceil(formCount / 2)} sayfa` : ""}
+              PDF kaydet
             </Button>
           </div>
         }
@@ -308,17 +310,15 @@ export function InternshipForms() {
           </div>
         )}
 
-        {coordNames.length > 1 && (
-          <div className="w-72 max-w-full">
-            <Select value={coordOn} onChange={(e) => setCoord(e.target.value)} aria-label="Koordinatör öğretmen">
-              <option value="">Bütün koordinatörler</option>
-              {coordNames.map((n) => (
-                <option key={n || NO_COORD} value={n || NO_COORD}>
-                  {n || "Koordinatörü seçilmemiş"}
-                </option>
-              ))}
-            </Select>
-          </div>
+        {toggle && (
+          <Segmented<"mine" | "all">
+            value={scopeView}
+            onChange={setView}
+            options={[
+              { value: "mine", label: `Benim işletmelerim · ${mineCount}` },
+              { value: "all", label: `Bütün işletmeler · ${allCount}` },
+            ]}
+          />
         )}
 
         {q.isLoading ? (

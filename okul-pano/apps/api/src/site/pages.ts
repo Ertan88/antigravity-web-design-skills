@@ -102,10 +102,9 @@ function layout(i: SiteInfo, o: PageOpts): string {
       ${link(`${home}#fiyatlar`, 'Fiyatlar')}
       ${link(`${home}#sss`, 'SSS')}
       ${link('/iletisim', 'İletişim', o.nav === 'contact')}
-      <a class="only-sm" href="/admin/">Giriş yap</a>
     </nav>
-    <a class="btn btn-line hide-sm" href="/admin/">Giriş yap</a>
-    <a class="btn btn-brand" href="${trialHref(i)}">${trialText(i)}</a>
+    <a class="btn btn-line nav-login" href="/admin/">Giriş yap</a>
+    <a class="btn btn-brand nav-trial" href="${trialHref(i)}">${trialText(i)}</a>
     <button class="menu-btn" type="button" aria-controls="menu" aria-expanded="false" aria-label="Menüyü aç">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
     </button>
@@ -114,6 +113,7 @@ function layout(i: SiteInfo, o: PageOpts): string {
 <main id="icerik">
 ${o.body}
 </main>
+${o.nav === 'home' ? `<div class="mbar" hidden><a class="btn btn-brand" href="${trialHref(i)}">${trialText(i, true)}</a><a class="btn btn-line" href="/iletisim?konu=demo">Tanıtım iste</a></div>` : ''}
 ${footer(i)}
 </body>
 </html>`;
@@ -151,8 +151,11 @@ const img = (name: string, w: number, h: number, alt: string, cls = 'shot', lazy
 function homeBody(i: SiteInfo): string {
   const P = PRICES;
   const check = (items: string[]) => `<ul class="check">${items.map((x) => `<li>${x}</li>`).join('')}</ul>`;
-  const feat = (kicker: string, title: string, items: string[], media: string, rev = false) =>
-    `<div class="feat${rev ? ' rev' : ''}"><div><div class="kick">${kicker}</div><h2>${title}</h2>${check(items)}</div><div>${media}</div></div>`;
+  // Telefonda masaüstü ekran görüntüleri okunmaz: phone: 'hide' görseli gizler, ya da yerine telefon görüntüsü konur
+  const feat = (kicker: string, title: string, items: string[], media: string, rev = false, phone: 'keep' | 'hide' | string = 'keep') =>
+    `<div class="feat${rev ? ' rev' : ''}"><div><div class="kick">${kicker}</div><h2>${title}</h2>${check(items)}</div><div class="feat-media${phone === 'hide' ? ' no-phone' : ''}">${
+      phone !== 'keep' && phone !== 'hide' ? `<div class="only-desk">${media}</div><div class="only-phone">${phone}</div>` : media
+    }</div></div>`;
 
   const hero = `<section class="hero"><div class="wrap">
   <div class="hero-head">
@@ -177,12 +180,12 @@ function homeBody(i: SiteInfo): string {
     <div class="tour-cap" aria-live="polite"><span class="n">1 / ${SLIDES.length} · ${esc(SLIDES[0]!.kicker)}</span><span class="t">${esc(SLIDES[0]!.title)}</span></div>
     <div class="tour-bar">${SLIDES.map((s, k) => `<button class="seg${k === 0 ? ' on' : ''}" type="button" aria-label="${k + 1}. slayt: ${esc(s.kicker)}"></button>`).join('')}<button class="tour-pause" type="button">❚❚ Durdur</button></div>
   </div>
-  <p class="small center tour-note">Görüntülerdeki okul, öğretmen ve öğrenci bilgileri örnektir.</p>
+  <p class="small center tour-note"><span class="only-phone">Büyütmek için görsele dokunun. </span>Görüntülerdeki okul, öğretmen ve öğrenci bilgileri örnektir.</p>
 </div></section>`;
 
   const day = `<section class="sec"><div class="wrap">
   <div class="kick">Okulda bir gün</div><h2 style="margin-top:8px">Her saat başı bir iş daha az</h2>
-  <div class="grid4">${[
+  <div class="grid4 swipe">${[
     ['07:45', 'İzinli öğretmen', 'Boş dersler ve nöbet yeri listelenir, uygun öğretmen önerilir.'],
     ['08:30', 'Zil ve pano', 'Koridordaki ekran zili, şu anki dersi ve nöbetçiyi kendiliğinden gösterir.'],
     ['11:00', 'Duyuru', 'Telefondan hazırlanır, onaylanınca bütün panolarda yayınlanır.'],
@@ -194,15 +197,15 @@ function homeBody(i: SiteInfo): string {
 
   const features = `<section class="sec white" id="ozellikler"><div class="wrap">
   <h2 class="center">Pano yalnızca gösterir; asıl iş arka planda</h2>
-  ${feat('Koridor panosu', 'Okulun canlı yüzü', ['Zil vakti ve “Şu an derste”: hangi sınıfta hangi ders, hangi öğretmen', 'Nöbetçi öğretmenler, sınav sayacı, doğum günleri', 'Görselli ve videolu duyurular, kayan yazı', 'Acil durumda tek dokunuşla bütün panolarda uyarı ekranı'], img('pano-ders', 1600, 900, 'Koridor panosu'))}
-  ${feat('Ders görevlendirme', 'İzinli öğretmenin dersi boş kalmasın', ['Boş dersler ve nöbet yeri kendiliğinden listelenir', 'Nöbetçi ve o saatte boş olan öğretmen önerilir', 'Görevlendirme istatistiği ve sınıf geçmişi'], img('panel-gorevlendirme', 1440, 900, 'Ders görevlendirme sayfası'), true)}
+  ${feat('Koridor panosu', 'Okulun canlı yüzü', ['Zil vakti ve “Şu an derste”: hangi sınıfta hangi ders, hangi öğretmen', 'Nöbetçi öğretmenler, sınav sayacı, doğum günleri', 'Görselli ve videolu duyurular, kayan yazı', 'Acil durumda tek dokunuşla bütün panolarda uyarı ekranı'], img('pano-ders', 1600, 900, 'Koridor panosu'), false, 'hide')}
+  ${feat('Ders görevlendirme', 'İzinli öğretmenin dersi boş kalmasın', ['Boş dersler ve nöbet yeri kendiliğinden listelenir', 'Nöbetçi ve o saatte boş olan öğretmen önerilir', 'Görevlendirme istatistiği ve sınıf geçmişi'], img('panel-gorevlendirme', 1440, 900, 'Ders görevlendirme sayfası'), true, img('mobil-gorevlendirme', 600, 1222, 'Mobil uygulamada ders görevlendirme', 'phone'))}
   ${feat('Mobil uygulama', 'Okul cebinizde', ['Merkez: o anki ders, izinliler, nöbet, panolar', 'Öğretmen için ders programı, nöbet ve hatırlatmalar', 'İzin bildirimi ve onay', 'Panolara uzaktan komut'], img('mobil-merkez', 600, 1222, 'Mobil uygulamanın Merkez ekranı', 'phone'))}
-  ${feat('Zil ve ders düzeni', 'Okulunuzun gerçek işleyişine uyar', ['Günün ders sayısına göre zil', 'İkili öğretim, sınıfa özel zil, arife ve tatiller', 'e-Okul ders programını PDF’ten içe aktarma', 'MEB çalışma takvimi kendiliğinden gelir'], img('panel-zil', 1440, 900, 'Zil saatleri sayfası'), true)}
+  ${feat('Zil ve ders düzeni', 'Okulunuzun gerçek işleyişine uyar', ['Günün ders sayısına göre zil', 'İkili öğretim, sınıfa özel zil, arife ve tatiller', 'e-Okul ders programını PDF’ten içe aktarma', 'MEB çalışma takvimi kendiliğinden gelir'], img('panel-zil', 1440, 900, 'Zil saatleri sayfası'), true, 'hide')}
 </div></section>`;
 
   const mods = `<section class="sec mods"><div class="wrap">
   <h2>Bütün modüller</h2><p class="lead" style="margin-top:10px">Okulunuza gerekeni açın; gerekmeyen menüde görünmez.</p>
-  <div class="grid4">${[
+  <div class="grid4 mod-grid">${[
     ['📺', 'Koridor panosu', 'Yatay ya da dikey; tam pano, yalnızca duyurular ya da tam ekran saat'],
     ['🛡️', 'Nöbet çizelgesi', 'Excel’den yükleme, taşımalı ve öğle nöbeti'],
     ['👥', 'İzin ve görevlendirme', 'Boş ders ve nöbet yeri, öneri, istatistik'],
@@ -228,14 +231,14 @@ function homeBody(i: SiteInfo): string {
 </div></section>`;
 
   const kvkk = `<section class="sec"><div class="wrap">
-  ${feat('Güvenlik ve KVKK', 'Okulun verisi okulda kalır', ['Panoda kişisel veri yok: devamsızlık, telefon ve not gösterilmez', 'Öğretmen yalnızca kendi işini görür; yetkiler göreve göre verilir', 'Destek ekibi okul verisini ancak müdürün verdiği süreli izinle görür', 'Saklama süreleri tanımlı; eski kayıtlar kendiliğinden silinir', 'Şifreler özetlenerek saklanır, bağlantılar yalnızca HTTPS ile kurulur'], img('panel-nobet', 1440, 900, 'Nöbet çizelgesi sayfası'))}
+  ${feat('Güvenlik ve KVKK', 'Okulun verisi okulda kalır', ['Panoda kişisel veri yok: devamsızlık, telefon ve not gösterilmez', 'Öğretmen yalnızca kendi işini görür; yetkiler göreve göre verilir', 'Destek ekibi okul verisini ancak müdürün verdiği süreli izinle görür', 'Saklama süreleri tanımlı; eski kayıtlar kendiliğinden silinir', 'Şifreler özetlenerek saklanır, bağlantılar yalnızca HTTPS ile kurulur'], img('panel-nobet', 1440, 900, 'Nöbet çizelgesi sayfası'), false, 'hide')}
 </div></section>`;
 
   const priceCard = (o: { name: string; tag?: string; amount: string; unit: string; desc: string; items: string[]; best?: boolean; href: string; cta: string }) =>
     `<div class="card price${o.best ? ' best' : ''}"><div class="head"><div class="name">${o.name}</div>${o.tag ? `<span class="tag">${o.tag}</span>` : ''}</div><div class="amount">${o.amount}</div><div class="unit">${o.unit}</div><p class="desc">${o.desc}</p>${check(o.items)}<div class="spacer"></div><a class="btn ${o.best ? 'btn-brand' : 'btn-line'} btn-block" href="${o.href}">${o.cta}</a></div>`;
   const pricing = `<section class="sec" id="fiyatlar"><div class="wrap">
   <div class="center"><div class="kick">Fiyatlar</div><h2 style="margin-top:8px">Okul başına, eğitim yılı boyunca</h2><p class="lead" style="margin-top:10px">Fiyatlara KDV dahildir. Yıl ortasında başlayan okul kalan aylar kadar öder.</p></div>
-  <div class="grid3">
+  <div class="grid3 swipe prices">
     ${priceCard({ name: 'Pano', amount: P.board.amount, unit: `yıllık · ${P.board.screens} pano`, desc: 'Yalnızca koridor panosu isteyen okullar için.', items: ['Zil, şu an derste, nöbetçiler', 'Duyuru ve kayan yazı', 'Sınav sayacı, özel gün temaları', 'Mobil uzaktan kumanda'], href: trialHref(i), cta: trialText(i, true) })}
     ${priceCard({ name: 'Okul', tag: 'En kapsamlı', amount: P.school.amount, unit: `yıllık · ${P.school.screens} pano dahil`, desc: 'Panonun yanında okul yönetiminin tamamı.', items: ['Pano paketindeki her şey', 'İzin ve ders görevlendirme', 'Nöbet çizelgesi, zil düzenleri', 'Mobil uygulama (bütün öğretmenler)', 'Mesleki eğitim, sınav takvimi', `Ek pano: yıllık ${P.school.extraScreen}`], best: true, href: trialHref(i), cta: trialText(i, true) })}
     ${priceCard({ name: 'Kurum', amount: 'Teklif', unit: 'birden çok okul', desc: 'Kampüs, kolej ve okul grupları için.', items: ['Okul paketindeki her şey', 'Okullar arası tek giriş', 'Toplu kurulum ve eğitim', 'Fatura tek yerden'], href: '/iletisim?konu=quote', cta: 'Teklif iste' })}
@@ -253,7 +256,7 @@ function homeBody(i: SiteInfo): string {
   ];
   const faq = `<section class="sec white faq" id="sss"><div class="wrap">
   <h2>Sık sorulan sorular</h2>
-  <div class="grid2">${faqs.map(([q, a]) => `<div class="card"><h3>${q}</h3><p>${a}</p></div>`).join('')}</div>
+  <div class="grid2">${faqs.map(([q, a]) => `<details class="card"><summary><h3>${q}</h3></summary><p>${a}</p></details>`).join('')}</div>
 </div></section>`;
 
   const final = `<section class="sec"><div class="wrap"><div class="final">
