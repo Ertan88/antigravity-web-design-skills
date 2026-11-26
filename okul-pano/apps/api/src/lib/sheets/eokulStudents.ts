@@ -35,7 +35,7 @@ const fold = (s: string) =>
     .replace(/[^A-Z0-9]/g, '');
 
 /** Parçaları soldan sağa birleştirir; aradaki boşluk büyükse kelime arası sayılır */
-function join(items: PdfItem[]): string {
+export function join(items: PdfItem[]): string {
   let out = '';
   let end = -Infinity;
   for (const it of [...items].sort((a, b) => a.x - b.x)) {
@@ -46,7 +46,7 @@ function join(items: PdfItem[]): string {
   return tidyName(out);
 }
 
-function rows(items: PdfItem[]): PdfItem[][] {
+export function rows(items: PdfItem[]): PdfItem[][] {
   const out: { y: number; items: PdfItem[] }[] = [];
   for (const it of [...items].sort((a, b) => b.y - a.y)) {
     if (!it.str.trim()) continue;

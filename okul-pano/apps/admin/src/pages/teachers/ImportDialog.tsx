@@ -54,7 +54,7 @@ export function ImportDialog({ file, onClose }: { file: File | null; onClose: ()
           <Toggle
             checked={o.updateExisting}
             onChange={(v) => set({ updateExisting: v })}
-            label="Sistemde kayıtlı öğretmenlerin branş, ünvan ve iletişim bilgisini güncelle"
+            label="Sistemde kayıtlı öğretmenlerin ad yazımını, branş, ünvan ve iletişim bilgisini güncelle"
             description="Kapalıysa yalnızca yeni öğretmenler eklenir. Dosyadaki boş hücreler mevcut bilgiyi silmez."
           />
         )

@@ -160,7 +160,7 @@ export function ExcelImportDialog<R, P extends ImportPreview<R>, O>(props: Excel
       onClose={onClose}
       size="xl"
       title={file && /\.pdf$/i.test(file.name) ? "e-Okul listesinden içe aktar" : "Excel'den içe aktar"}
-      description={file ? `${file.name}${preview ? ` · "${preview.sheetName}" sayfası` : ''}` : undefined}
+      description={file ? `${file.name}${preview && !/\.pdf$/i.test(file.name) ? ` · "${preview.sheetName}" sayfası` : ''}` : undefined}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>

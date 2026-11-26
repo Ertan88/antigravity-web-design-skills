@@ -15,9 +15,10 @@ import { z } from 'zod';
 import { audit, schoolGuard } from '../context.ts';
 import type { DB } from '../db/client.ts';
 import { duties, teacherBranches, teacherLeaves, teachers, teacherTitles, timetableEntries } from '../db/schema.ts';
-import { exportFileName, readXlsxUpload, sendXlsx } from '../lib/excel.ts';
+import { exportFileName, sendXlsx } from '../lib/excel.ts';
 import { buildTeachersWorkbook, parseTeachersWorkbook } from '../lib/sheets/teachers.ts';
-import { conflict, parse } from '../lib/errors.ts';
+import { parsePersonnelPdf } from '../lib/sheets/eokulPersonnel.ts';
+import { badRequest, conflict, parse } from '../lib/errors.ts';
 import { registerResource } from './crud.ts';
 
 type OptionTable = typeof teacherBranches | typeof teacherTitles;
@@ -81,6 +82,26 @@ export async function addDefaultTeacherOptions(tx: Tx | DB, schoolId: string) {
   const b = await ensureOptions(tx, teacherBranches, schoolId, [...DEFAULT_BRANCHES]);
   const t = await ensureOptions(tx, teacherTitles, schoolId, [...DEFAULT_TITLES]);
   return { branchesAdded: b.created, titlesAdded: t.created };
+}
+
+const MAX_TEACHER_UPLOAD = 10 * 1024 * 1024;
+
+/** Kadro dosyası: Excel (.xlsx) ya da e-Okul personel listesi PDF'i */
+async function readTeacherUpload(req: FastifyRequest) {
+  const file = await req.file({ limits: { fileSize: MAX_TEACHER_UPLOAD } });
+  if (!file) throw badRequest('Dosya bulunamadı.');
+  const pdf = /\.pdf$/i.test(file.filename);
+  if (!pdf && !/\.xlsx$/i.test(file.filename)) {
+    throw badRequest(
+      /\.xls$/i.test(file.filename)
+        ? 'Eski .xls biçimi desteklenmiyor. Excel\'de "Farklı Kaydet → Excel Çalışma Kitabı (.xlsx)" seçin.'
+        : "Lütfen .xlsx uzantılı Excel dosyası ya da e-Okul personel listesi PDF'i yükleyin.",
+    );
+  }
+  const data = await file.toBuffer();
+  if (file.file.truncated) throw badRequest('Dosya 10 MB sınırını aşıyor.');
+  // Dosya saklanmaz: yalnızca okunur (KVKK)
+  return pdf ? parsePersonnelPdf(new Uint8Array(data)) : parseTeachersWorkbook(data);
 }
 
 export async function teacherRoutes(app: FastifyInstance) {
@@ -203,7 +224,7 @@ export async function teacherRoutes(app: FastifyInstance) {
     `${base}/teachers/import/preview`,
     { ...write, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
     async (req) => {
-      const parsed = await parseTeachersWorkbook(await readXlsxUpload(req));
+      const parsed = await readTeacherUpload(req);
 
       const schoolId = req.ctx.schoolId;
       const [existing, branchRows, titleRows] = await Promise.all([
@@ -234,6 +255,8 @@ export async function teacherRoutes(app: FastifyInstance) {
         let status: 'new' | 'update' | 'unchanged' = 'new';
         if (current) {
           const changed =
+            // Ad yalnızca yazımı farklıysa (büyük-küçük harf, boşluk) dosyadaki yazımla güncellenir
+            tidyName(r.fullName) !== current.fullName ||
             (r.email && r.email !== current.email) ||
             (r.phone && r.phone !== current.phone) ||
             (r.branch && normalizeName(r.branch) !== normalizeName(current.branch ?? '')) ||
@@ -293,6 +316,8 @@ export async function teacherRoutes(app: FastifyInstance) {
           continue;
         }
         const patch = {
+          // Aynı kişi (ad eşleşti): yazım farkı varsa dosyadaki yazım (e-Okul: "Ayşe YILMAZ") kadroya geçer
+          fullName: tidyName(r.fullName),
           branchId: branchId ?? existing.branchId,
           titleId: titleId ?? existing.titleId,
           isActive: r.isActive ?? existing.isActive,
@@ -301,6 +326,7 @@ export async function teacherRoutes(app: FastifyInstance) {
           phone: r.phone ?? existing.phone,
         };
         const changed =
+          patch.fullName !== existing.fullName ||
           patch.branchId !== existing.branchId || patch.titleId !== existing.titleId || patch.isActive !== existing.isActive || patch.email !== existing.email || patch.phone !== existing.phone;
         if (!changed || !body.updateExisting) {
           unchanged++;
@@ -313,7 +339,7 @@ export async function teacherRoutes(app: FastifyInstance) {
       return { created: inserts.length, updated, unchanged, branchesCreated: branches.created, titlesCreated: titles.created };
     });
 
-    await audit(req, 'create', 'Öğretmen', null, `Excel'den ${result.created} öğretmen eklendi, ${result.updated} güncellendi`);
+    await audit(req, 'create', 'Öğretmen', null, `Dosyadan ${result.created} öğretmen eklendi, ${result.updated} güncellendi`);
     bus.contentChanged(schoolId);
     return result;
   });

@@ -1,7 +1,7 @@
 import { normalizeName, surnameOf, teacherSchema, trCompare, errorText } from '@okulpano/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Download, FileDown, FileSpreadsheet, Search, Tags, Trash2, Upload, UserPlus, Users, X } from '../components/icons.tsx';
+import { Download, FileDown, FileSpreadsheet, FileUp, Search, Tags, Trash2, Upload, UserPlus, Users, X } from '../components/icons.tsx';
 import { useMemo, useRef, useState } from 'react';
 import { useToast } from '../components/Toast.tsx';
 import { Alert, Button, Card, EmptyState, Field, Input, Modal, PageHeader, Select, Spinner, Toggle } from '../components/ui.tsx';
@@ -47,6 +47,7 @@ export function Teachers() {
   const [downloading, setDownloading] = useState<'template' | 'export' | null>(null);
   const [drag, setDrag] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const pdfInput = useRef<HTMLInputElement>(null);
 
   const all = list.data ?? [];
   const sortedBranches = useMemo(() => [...(branches.data ?? [])].sort((a, b) => trCompare(a.name, b.name)), [branches.data]);
@@ -127,7 +128,7 @@ export function Teachers() {
     <>
       <PageHeader
         title="Öğretmen Kadrosu"
-        description="Nöbet çizelgesi, izinler ve ders programında seçilen öğretmenler. Excel'den toplu yükleyebilir, listeyi Excel'e aktarabilirsiniz."
+        description="Nöbet çizelgesi, izinler ve ders programında seçilen öğretmenler. e-Okul personel listesi PDF'inden ya da Excel'den toplu yükleyebilir, listeyi Excel'e aktarabilirsiniz."
       />
 
       <Card>
@@ -156,6 +157,22 @@ export function Teachers() {
               <Button size="sm" icon={<UserPlus className="size-4" />} onClick={() => openNew()}>
                 Manuel ekle
               </Button>
+              {/* e-Okul › Personel Listesi PDF'i: ad soyad, görev ve branş okunur */}
+              <Button size="sm" variant="secondary" icon={<FileUp className="size-4" />} onClick={() => pdfInput.current?.click()}>
+                e-Okul listesi (PDF)
+              </Button>
+              <input
+                ref={pdfInput}
+                type="file"
+                accept="application/pdf,.pdf"
+                className="hidden"
+                aria-label="e-Okul personel listesi PDF dosyası seç"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) setImportFile(f);
+                  e.target.value = '';
+                }}
+              />
               <Button size="sm" variant="secondary" icon={<Upload className="size-4" />} onClick={() => fileInput.current?.click()}>
                 Excel'den yükle
               </Button>
@@ -229,7 +246,7 @@ export function Teachers() {
             <EmptyState
               icon={<Users className="size-6" />}
               title="Henüz öğretmen eklenmemiş"
-              description="Yukarıdaki Manuel ekle düğmesiyle tek tek ekleyebilir ya da örnek şablonu indirip doldurduktan sonra Excel'den yükleyebilirsiniz."
+              description="e-Okul'dan indirdiğiniz personel listesi PDF'ini yükleyin; ad soyad, görev ve branş birlikte gelir. Manuel ekle düğmesiyle tek tek ya da örnek şablonla Excel'den de ekleyebilirsiniz."
               action={
                 editable && (
                   <Button variant="secondary" icon={<Download className="size-4" />} loading={downloading === 'template'} onClick={() => void download('template')}>

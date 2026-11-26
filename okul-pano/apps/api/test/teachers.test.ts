@@ -231,3 +231,22 @@ describe('tüm listeyi silme', () => {
     expect((await owner.get(path('teacher-branches'))).json().length).toBeGreaterThan(20);
   });
 });
+
+describe('e-Okul personel listesi (PDF) ile kadro', () => {
+  it('PDF kabul edilir; okunamayan PDF anlaşılır hata verir; .xls reddedilir', async () => {
+    const bad = await upload(Buffer.from('%PDF-1.4 bozuk'), 'ogretmenListesi.PDF');
+    expect(bad.statusCode).toBe(400);
+    expect(bad.json().message).toMatch(/personel listesi/);
+    expect((await upload(Buffer.from('x'), 'liste.xls')).json().message).toMatch(/xls/);
+  });
+
+  it('aynı kişi yazım farkıyla gelirse ad dosyadaki yazımla güncellenir', async () => {
+    const created = await owner.post(path('teachers'), { fullName: 'pınar deniz' });
+    expectStatus(created, 201);
+    const res = await owner.post(path('teachers/import'), { updateExisting: true, rows: [{ fullName: 'Pınar DENİZ', branch: 'Fizik', title: 'Öğretmen' }] });
+    expectStatus(res, 200);
+    expect(res.json()).toMatchObject({ created: 0, updated: 1 });
+    const list = (await owner.get(path('teachers'))).json() as { id: string; fullName: string }[];
+    expect(list.find((x) => x.id === created.json().id)?.fullName).toBe('Pınar DENİZ');
+  });
+});
