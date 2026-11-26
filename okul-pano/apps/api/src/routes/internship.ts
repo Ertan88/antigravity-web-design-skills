@@ -772,6 +772,7 @@ export async function internshipRoutes(app: FastifyInstance) {
         businessId: x.businessId,
         businessName: x.businessName,
         editable: s.canEdit(x.businessId),
+        mine: s.mine.has(x.businessId!),
         ...(absent.get(x.id) ?? { unexcused: 0, excused: 0 }),
       })),
     };

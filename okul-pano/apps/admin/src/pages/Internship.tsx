@@ -58,6 +58,7 @@ import { useAuth } from "../lib/auth.tsx";
 import { useInternshipAccess, useList, useSchoolPath, type Teacher } from "../lib/data.ts";
 import { VISIT_DAYS, VisitDayPicker } from "./InternshipForms.tsx";
 import { InternshipSettingsDialog, SettingsPanel } from "./InternshipSettings.tsx";
+import { InternStudentsPanel, useInterns } from "./internship/InternStudents.tsx";
 
 /*
  * İşletmelerde mesleki eğitim: işletmeler ve aylık işletmede devam çizelgesi. Okul günleri ders programından,
@@ -1333,7 +1334,10 @@ export function Businesses() {
   // Sekmeler: İşletmeler · Koordinatörler (yalnızca yönetim). Staj ayarları Genel Ayarlar › Mesleki eğitim'de; eski
   // ?ayarlar=1 bağlantısı oraya yönlenir
   const [settingsParams] = useSearchParams();
-  const [tab, setTab] = useState<"list" | "coord">("list");
+  // Sekmeler: İşletmeler · Öğrenciler (herkes) · Koordinatörler (yönetim); ?sekme=ogrenciler ile Öğrenciler açılır
+  const [tab, setTab] = useState<"list" | "students" | "coord">(settingsParams.get("sekme") === "ogrenciler" ? "students" : "list");
+  const interns = useInterns();
+  const [addingStudents, setAddingStudents] = useState(false);
   const [area, setArea] = useState<string>("");
   const [coordinator, setCoordinator] = useState("");
   const [q, setQ] = useState("");
@@ -1415,28 +1419,34 @@ export function Businesses() {
           <div className="flex flex-wrap items-center gap-2">
             {/* Staj ayarları Genel Ayarlar › Mesleki eğitim sekmesinde (tek yerde) */}
             {manager && <SettingsLink tab="mesleki" label="Staj ayarları" />}
-            {(manager || designated) && (
-              <Button icon={<Plus className="size-4" />} onClick={() => setEditing("new")}>
-                İşletme ekle
-              </Button>
-            )}
+            {tab === "students"
+              ? interns.data?.canAdd && (
+                  <Button icon={<Plus className="size-4" />} onClick={() => setAddingStudents(true)}>
+                    Öğrenci ekle
+                  </Button>
+                )
+              : (manager || designated) && (
+                  <Button icon={<Plus className="size-4" />} onClick={() => setEditing("new")}>
+                    İşletme ekle
+                  </Button>
+                )}
           </div>
         }
       />
-      {manager && (
-        <div className="mb-4">
-          <Segmented<"list" | "coord">
-            value={tab}
-            onChange={setTab}
-            options={[
-              { value: "list", label: `İşletmeler · ${everything.length}` },
-              { value: "coord", label: "Koordinatörler" },
-            ]}
-          />
-        </div>
-      )}
+      <div className="mb-4">
+        <Segmented<"list" | "students" | "coord">
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: "list", label: `İşletmeler · ${everything.length}` },
+            { value: "students", label: `Öğrenciler${interns.data ? ` · ${interns.data.students.length}` : ""}` },
+            ...(manager ? [{ value: "coord" as const, label: "Koordinatörler" }] : []),
+          ]}
+        />
+      </div>
       {manager && tab === "coord" && <CoordinatorsPanel businessCounts={businessCounts} />}
-      {(!manager || tab === "list") && (
+      {tab === "students" && <InternStudentsPanel />}
+      {tab === "list" && (
       <>
 
       {manager && areas.data && !areas.data.areas.length && (
@@ -1595,6 +1605,16 @@ export function Businesses() {
         areas={areas.data?.areas ?? []}
         onClose={() => setEditing(null)}
         onOpenAreas={() => setAreasOpen(true)}
+      />
+      {/* Öğrenci ekle: önce işletme seçilir, sonra o işletmenin öğrenci seçimi açılır (geçiş tarihi orada sorulur) */}
+      <PickBusinessDialog
+        open={addingStudents}
+        businesses={everything.filter((b) => b.canEdit)}
+        onClose={() => setAddingStudents(false)}
+        onPick={(b) => {
+          setAddingStudents(false);
+          setAssigning(b);
+        }}
       />
       <AssignStudents
         business={assigning}
@@ -2394,6 +2414,48 @@ function AssignStudents({
             </div>
           )}
         </div>
+      )}
+    </Modal>
+  );
+}
+
+/** Öğrenci ekle, 1. adım: öğrencilerin ekleneceği işletme (yalnızca kişinin düzenleyebildiği işletmeler) */
+function PickBusinessDialog({ open, businesses, onClose, onPick }: { open: boolean; businesses: Business[]; onClose: () => void; onPick: (b: Business) => void }) {
+  const [id, setId] = useState("");
+  const sorted = [...businesses].sort((a, b) => trCompare(a.name, b.name));
+  const chosen = sorted.find((b) => b.id === id) ?? null;
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Öğrenci ekle"
+      description="Öğrencilerin ekleneceği işletmeyi seçin; sonraki adımda öğrencileri seçersiniz. Başka işletmeden gelen öğrenci için geçiş tarihi sorulur."
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Vazgeç
+          </Button>
+          <Button disabled={!chosen} onClick={() => chosen && onPick(chosen)}>
+            Devam
+          </Button>
+        </>
+      }
+    >
+      {!sorted.length ? (
+        <Alert>Öğrenci ekleyebileceğiniz işletme yok. Önce İşletmeler sekmesinden işletme ekleyin.</Alert>
+      ) : (
+        <Field label="İşletme">
+          {(fid) => (
+            <Select id={fid} value={id} onChange={(e) => setId(e.target.value)}>
+              <option value="">Seçin</option>
+              {sorted.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
       )}
     </Modal>
   );
