@@ -48,6 +48,7 @@ import { privacyRoutes } from './routes/privacy.ts';
 import { runTrialReminders, signupRoutes } from './routes/signup.ts';
 import { eq, sql } from 'drizzle-orm';
 import { schoolRoutes } from './routes/schools.ts';
+import { backupRoutes } from './routes/backup.ts';
 import { screenRoutes } from './routes/screens.ts';
 import { studentRoutes } from './routes/students.ts';
 import { teacherRoutes } from './routes/teachers.ts';
@@ -188,6 +189,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
 
   await app.register(authRoutes);
   await app.register(schoolRoutes);
+  await app.register(backupRoutes);
   await app.register(memberRoutes);
   await app.register(enrollRoutes);
   await app.register(contentRoutes);

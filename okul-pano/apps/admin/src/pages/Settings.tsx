@@ -5,6 +5,7 @@ import { Copy, Download, ExternalLink, FileText, MapPin, Search, Settings2 } fro
 import { useEffect, useState, type ReactNode } from 'react';
 import { ImageUpload } from '../components/ImageUpload.tsx';
 import { SampleDataCard } from '../components/Onboarding.tsx';
+import { BackupCard } from '../components/BackupCard.tsx';
 import { SupportAccessCard } from '../components/SupportAccess.tsx';
 import { SaveBar } from '../components/SaveBar.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -513,6 +514,7 @@ export function Settings() {
               <Card className="p-6 sm:p-8">
                 <PrivacySection value={s.privacyNotice ?? ''} onChange={(x) => setting('privacyNotice', x)} slug={school.data!.slug} />
               </Card>
+              <BackupCard slug={school.data!.slug} />
               <SampleDataCard />
             </>
           )}

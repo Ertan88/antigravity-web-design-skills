@@ -148,6 +148,18 @@ const SLIDES: { img: string; w: number; h: number; tall?: boolean; kicker: strin
 const img = (name: string, w: number, h: number, alt: string, cls = 'shot', lazy = true) =>
   `<img class="${cls}" src="/site/img/${name}.webp" width="${w}" height="${h}" alt="${esc(alt)}"${lazy ? ' loading="lazy" decoding="async"' : ' fetchpriority="high"'}>`;
 
+/** Sık sorulan sorular (masaüstü ve telefon tasarımında aynı) */
+function faqList(i: SiteInfo): [string, string][] {
+  return [
+    ['Hangi TV gerekir?', 'İnternete bağlanan her TV ya da bilgisayar yeterlidir. Android TV kutularında kendi uygulamamız açılışta kendiliğinden başlar.'],
+    ['İnternet kesilirse ne olur?', 'Pano son aldığı bilgiyle çalışmaya devam eder; zil ve saat aksamaz. Bağlantı gelince kendini günceller.'],
+    ['Kurulum ne kadar sürer?', 'Kayıt ve TV eşleştirme yaklaşık 10 dakika sürer. Öğretmen ve nöbet listeleri Excel ile birkaç dakikada yüklenir.'],
+    ['Fatura kesiliyor mu?', 'Evet, her ödeme için fatura kesilir. Ödeme havale ya da EFT ile yapılır.'],
+    ['Deneme bitince ne olur?', 'Ödeme yapmazsanız hesap askıya alınır. Verilerinizi istediğiniz zaman dışa aktarabilir ya da sildirebilirsiniz.'],
+    ['Verilerimiz güvende mi?', `Okulun verisi yalnızca okulun yetkililerine görünür. Veriler ${esc(i.dataRegion)} konumundaki sunucularda saklanır. Ayrıntılar KVKK aydınlatma metnindedir.`],
+  ];
+}
+
 function homeBody(i: SiteInfo): string {
   const P = PRICES;
   const check = (items: string[]) => `<ul class="check">${items.map((x) => `<li>${x}</li>`).join('')}</ul>`;
@@ -246,14 +258,7 @@ function homeBody(i: SiteInfo): string {
   <div class="card note"><div class="ico" aria-hidden="true">🎓</div><div><b>Kurucu okul indirimi</b><p class="sub" style="font-size:14px;font-weight:600">İlk ${P.founding.schools} okul, ilk yıl %${P.founding.percent} indirimle başlar. Görüş ve önerileriyle ürünü birlikte geliştiririz.</p></div></div>
 </div></section>`;
 
-  const faqs: [string, string][] = [
-    ['Hangi TV gerekir?', 'İnternete bağlanan her TV ya da bilgisayar yeterlidir. Android TV kutularında kendi uygulamamız açılışta kendiliğinden başlar.'],
-    ['İnternet kesilirse ne olur?', 'Pano son aldığı bilgiyle çalışmaya devam eder; zil ve saat aksamaz. Bağlantı gelince kendini günceller.'],
-    ['Kurulum ne kadar sürer?', 'Kayıt ve TV eşleştirme yaklaşık 10 dakika sürer. Öğretmen ve nöbet listeleri Excel ile birkaç dakikada yüklenir.'],
-    ['Fatura kesiliyor mu?', 'Evet, her ödeme için fatura kesilir. Ödeme havale ya da EFT ile yapılır.'],
-    ['Deneme bitince ne olur?', 'Ödeme yapmazsanız hesap askıya alınır. Verilerinizi istediğiniz zaman dışa aktarabilir ya da sildirebilirsiniz.'],
-    ['Verilerimiz güvende mi?', `Okulun verisi yalnızca okulun yetkililerine görünür. Veriler ${esc(i.dataRegion)} konumundaki sunucularda saklanır. Ayrıntılar KVKK aydınlatma metnindedir.`],
-  ];
+  const faqs = faqList(i);
   const faq = `<section class="sec white faq" id="sss"><div class="wrap">
   <h2>Sık sorulan sorular</h2>
   <div class="grid2">${faqs.map(([q, a]) => `<details class="card"><summary><h3>${q}</h3></summary><p>${a}</p></details>`).join('')}</div>
@@ -267,13 +272,78 @@ function homeBody(i: SiteInfo): string {
   return hero + tour + day + features + mods + steps + kvkk + pricing + faq + final;
 }
 
+/**
+ * Telefon tasarımı (A, "uygulama mağazası gibi"): aynı adreste, yalnızca dar ekranda görünür; masaüstü tasarımı
+ * değişmez. Kısa başlık, tek büyük düğme, yapışkan sekmeler, telefon ekran görüntüleri yana kaydırılır.
+ */
+function phoneBody(i: SiteInfo): string {
+  const P = PRICES;
+  const shots: [string, string, string][] = [
+    ['mobil-merkez', 'Okul cebinizde', 'O anki ders, izinliler, nöbet ve panolar tek ekranda.'],
+    ['mobil-gorevlendirme', 'Ders görevlendirme', 'İzinli öğretmenin dersine boş öğretmen önerilir.'],
+    ['mobil-nobet', 'Nöbet', 'Boş nöbet yeri listelenir, tek dokunuşla atanır.'],
+    ['mobil-ogretmen', 'Öğretmen için', 'Ders programı, nöbet ve teneffüs sayacı.'],
+    ['mobil-kumanda', 'Pano kumandası', 'Koridordaki ekran telefondan yönetilir.'],
+  ];
+  const mods: [string, string][] = [
+    ['📺', 'Koridor panosu'],
+    ['🛡️', 'Nöbet çizelgesi'],
+    ['👥', 'İzin ve görevlendirme'],
+    ['🔔', 'Zil saatleri'],
+    ['📣', 'Duyuru ve onay'],
+    ['📝', 'Sınav takvimi'],
+    ['🏭', 'Mesleki eğitim'],
+    ['🚨', 'Acil durum'],
+  ];
+  const plan = (name: string, amount: string, unit: string, items: string[], best = false, href = trialHref(i), cta = trialText(i, true)) =>
+    `<div class="m-price${best ? ' best' : ''}"><div class="m-price-head"><b>${name}</b>${best ? '<span class="tag">En kapsamlı</span>' : ''}</div><div class="m-amount">${amount}</div><div class="m-unit">${unit}</div><ul class="check">${items.map((x) => `<li>${x}</li>`).join('')}</ul><a class="btn ${best ? 'btn-brand' : 'btn-line'} btn-block" href="${href}">${cta}</a></div>`;
+  return `<section class="m-hero"><div class="wrap">
+  <h1>Sabah ilk iş: bugün kim izinli, hangi ders boş?</h1>
+  <p class="m-lead">Nöbet, izin, ders görevlendirme ve koridor panosu tek yerde.</p>
+  <a class="btn btn-brand btn-block m-cta" href="${trialHref(i)}">${trialText(i, true)}</a>
+  <p class="small">Kurulum 10 dakika · Kredi kartı gerekmez</p>
+</div></section>
+<nav class="m-tabs" aria-label="Bölümler"><div class="wrap"><a href="#m-ozellikler">Neler yapar</a><a href="#m-fiyatlar">Fiyatlar</a><a href="#m-sss">SSS</a><a href="#m-iletisim">İletişim</a></div></nav>
+<section class="m-sec" id="m-ozellikler"><div class="wrap">
+  <h2>Neler yapar</h2>
+  <div class="m-shots">${shots
+    .map(([n, t, d]) => `<figure class="m-shot">${img(n, 600, n === 'mobil-merkez' || n === 'mobil-gorevlendirme' ? 1222 : 1298, t, 'phone')}<figcaption><b>${t}</b><span>${d}</span></figcaption></figure>`)
+    .join('')}</div>
+  <figure class="m-board"><button class="m-zoom" type="button" aria-label="Koridor panosunu büyüt">${img('pano-ders', 1600, 900, 'Koridor panosu: zil sayacı, şu an derste, nöbetçiler ve duyurular', 'shot')}</button><figcaption><b>Koridor panosu</b><span>Zil, şu an derste, nöbetçiler ve duyurular. Büyütmek için dokunun.</span></figcaption></figure>
+  <div class="m-mods">${mods.map(([e, t]) => `<div><span aria-hidden="true">${e}</span>${t}</div>`).join('')}</div>
+  <p class="small m-note">Görüntülerdeki okul, öğretmen ve öğrenci bilgileri örnektir.</p>
+</div></section>
+<section class="m-sec white" id="m-fiyatlar"><div class="wrap">
+  <h2>Fiyatlar</h2><p class="sub">Okul başına, eğitim yılı boyunca. KDV dahil.</p>
+  <div class="m-prices swipe prices">
+    ${plan('Pano', P.board.amount, `yıllık · ${P.board.screens} pano`, ['Zil, şu an derste, nöbetçiler', 'Duyuru ve kayan yazı', 'Mobil uzaktan kumanda'])}
+    ${plan('Okul', P.school.amount, `yıllık · ${P.school.screens} pano dahil`, ['Pano paketindeki her şey', 'İzin ve ders görevlendirme', 'Nöbet, zil, mesleki eğitim', 'Mobil uygulama (bütün öğretmenler)', `Ek pano: yıllık ${P.school.extraScreen}`], true)}
+    ${plan('Kurum', 'Teklif', 'birden çok okul', ['Okul paketindeki her şey', 'Okullar arası tek giriş', 'Toplu kurulum ve eğitim'], false, '/iletisim?konu=quote', 'Teklif iste')}
+  </div>
+  <p class="small m-note">İlk ${P.founding.schools} okula ilk yıl %${P.founding.percent} kurucu okul indirimi.</p>
+</div></section>
+<section class="m-sec faq" id="m-sss"><div class="wrap">
+  <h2>Sık sorulan sorular</h2>
+  <div class="m-faq">${faqList(i).map(([q, a]) => `<details class="card"><summary><h3>${q}</h3></summary><p>${a}</p></details>`).join('')}</div>
+</div></section>
+<section class="m-sec white" id="m-iletisim"><div class="wrap">
+  <h2>İletişim</h2>
+  <div class="m-contact">
+    <a class="btn btn-line btn-block" href="/iletisim?konu=demo">Tanıtım iste</a>
+    ${i.email ? `<a class="btn btn-line btn-block" href="mailto:${esc(i.email)}">${esc(i.email)}</a>` : ''}
+    ${i.phone ? `<a class="btn btn-line btn-block" href="${telHref(i.phone)}">${esc(i.phone)}</a>` : ''}
+    <a class="btn btn-line btn-block" href="/iletisim">Bize yazın</a>
+  </div>
+</div></section>`;
+}
+
 export function homePage(i: SiteInfo): string {
   return layout(i, {
     path: '/',
     nav: 'home',
     title: 'Okul Yayın · Okullar için dijital pano ve okul yönetimi',
     description: 'Koridordaki pano, yönetim paneli ve öğretmen uygulaması bir arada: zil, şu an derste, nöbet, izin ve ders görevlendirme, duyurular. 30 gün ücretsiz deneyin.',
-    body: homeBody(i),
+    body: `<div class="d-home">${homeBody(i)}</div><div class="m-home">${phoneBody(i)}</div>`,
   });
 }
 

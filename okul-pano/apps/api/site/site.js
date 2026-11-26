@@ -71,7 +71,7 @@
   var phone = window.matchMedia('(max-width: 640px)');
   var mbar = document.querySelector('.mbar');
   if (mbar) {
-    var heroCta = document.querySelector('.hero .cta-row');
+    var heroCta = document.querySelector(phone.matches ? '.m-hero .m-cta' : '.hero .cta-row');
     var finalCta = document.querySelector('.final');
     var seen = { hero: true, final: false };
     var update = function () {
@@ -99,17 +99,42 @@
   }
 
   /* Telefon: fiyat kartları yana kaydırılır; en kapsamlı paket ortada açılır */
-  var prices = document.querySelector('.swipe.prices');
-  var best = prices && prices.querySelector('.best');
-  if (best && phone.matches) prices.scrollLeft = best.offsetLeft - (prices.clientWidth - best.clientWidth) / 2;
+  document.querySelectorAll('.swipe.prices').forEach(function (row) {
+    var best = row.querySelector('.best');
+    if (best && phone.matches && row.offsetParent) row.scrollLeft = best.offsetLeft - row.offsetLeft - (row.clientWidth - best.clientWidth) / 2;
+  });
+
+  /* Telefon tasarımı: menüdeki bölüm bağlantıları (#fiyatlar) telefondaki karşılığına (#m-fiyatlar) gider */
+  document.addEventListener('click', function (ev) {
+    var a = ev.target && ev.target.closest ? ev.target.closest('a[href*="#"]') : null;
+    if (!a || !phone.matches) return;
+    var url = new URL(a.href, location.href);
+    if (url.pathname !== location.pathname || !url.hash) return;
+    var id = url.hash.slice(1);
+    var target = document.getElementById(id.indexOf('m-') === 0 ? id : 'm-' + id);
+    if (!target) return;
+    ev.preventDefault();
+    target.scrollIntoView({ behavior: 'smooth' });
+    history.replaceState(null, '', '#' + id);
+  });
+  if (phone.matches && location.hash && document.getElementById('m-' + location.hash.slice(1))) {
+    document.getElementById('m-' + location.hash.slice(1)).scrollIntoView();
+  }
+
+  /* Telefon tasarımı: görünür bölümün sekmesi koyu */
+  var tabs = document.querySelectorAll('.m-tabs a');
+  if (tabs.length && 'IntersectionObserver' in window) {
+    var tabIo = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        tabs.forEach(function (t) { t.classList.toggle('on', t.getAttribute('href') === '#' + e.target.id); });
+      });
+    }, { rootMargin: '-45% 0px -50% 0px' });
+    document.querySelectorAll('.m-sec[id]').forEach(function (s) { tabIo.observe(s); });
+  }
 
   /* Telefon: ürün turundaki görsele dokununca büyük açılır, yana kaydırılarak bakılır */
-  var stage = document.querySelector('.tour-stage');
-  if (stage) {
-    stage.addEventListener('click', function (ev) {
-      if (!phone.matches || (ev.target && ev.target.closest && ev.target.closest('button'))) return;
-      var cur = stage.querySelector('.tour-slide.on img');
-      if (!cur) return;
+  var openZoom = function (cur, back) {
       var box = document.createElement('div');
       box.className = 'zoom';
       box.setAttribute('role', 'dialog');
@@ -132,14 +157,24 @@
       scroller.appendChild(big);
       box.appendChild(bar);
       box.appendChild(scroller);
-      var done = function () { box.remove(); document.removeEventListener('keydown', onKey); stage.focus && stage.focus(); };
+      var done = function () { box.remove(); document.removeEventListener('keydown', onKey); if (back && back.focus) back.focus(); };
       var onKey = function (e) { if (e.key === 'Escape') done(); };
       close.addEventListener('click', done);
       document.addEventListener('keydown', onKey);
       document.body.appendChild(box);
       close.focus();
+  };
+  var stage = document.querySelector('.tour-stage');
+  if (stage) {
+    stage.addEventListener('click', function (ev) {
+      if (!phone.matches || (ev.target && ev.target.closest && ev.target.closest('button'))) return;
+      var cur = stage.querySelector('.tour-slide.on img');
+      if (cur) openZoom(cur, stage);
     });
   }
+  document.querySelectorAll('.m-zoom').forEach(function (b) {
+    b.addEventListener('click', function () { var im = b.querySelector('img'); if (im) openZoom(im, b); });
+  });
 
   /* İletişim formu */
   var form = document.querySelector('form[data-contact]');

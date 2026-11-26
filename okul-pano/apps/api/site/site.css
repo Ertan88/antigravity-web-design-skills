@@ -311,3 +311,50 @@ details.card[open] summary { margin-bottom: 8px; }
   .mbar .btn-line { flex: 1; }
   body.has-mbar .foot { padding-bottom: 96px; }
 }
+
+/* Telefon tasarımı (A): aynı adreste yalnızca dar ekranda; masaüstünde gizli */
+.m-home { display: none; }
+@media (max-width: 640px) {
+  .d-home { display: none; }
+  .m-home { display: block; padding-bottom: 8px; }
+  .m-hero { padding: 22px 0 18px; }
+  .m-hero h1 { font-size: 30px; line-height: 1.08; }
+  .m-lead { margin: 10px 0 16px; font-size: 16px; font-weight: 600; color: var(--sub); }
+  .m-hero .small { margin-top: 10px; text-align: center; }
+  .m-tabs { position: sticky; top: 62px; z-index: 15; background: rgba(247, 246, 243, .96); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+  .m-tabs .wrap { display: flex; gap: 6px; overflow-x: auto; padding-top: 8px; padding-bottom: 8px; scrollbar-width: none; }
+  .m-tabs .wrap::-webkit-scrollbar { display: none; }
+  .m-tabs a { flex: none; padding: 8px 14px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-size: 14px; font-weight: 800; text-decoration: none; color: var(--ink); }
+  .m-tabs a.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .m-sec { padding: 28px 0; scroll-margin-top: 116px; }
+  .m-sec.white { background: var(--surface); }
+  .m-sec h2 { font-size: 24px; }
+  .m-sec .sub { margin-top: 4px; font-size: 14.5px; font-weight: 600; }
+  .m-shots { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 14px -16px 0; padding: 4px 16px 12px; scrollbar-width: none; }
+  .m-shots::-webkit-scrollbar { display: none; }
+  .m-shot { flex: 0 0 62%; scroll-snap-align: center; margin: 0; }
+  .m-shot .phone { border-width: 6px; border-radius: 26px; box-shadow: 0 14px 28px rgba(0, 0, 0, .16); }
+  .m-shot figcaption, .m-board figcaption { margin-top: 10px; display: grid; gap: 2px; }
+  .m-shot figcaption b, .m-board figcaption b { font-size: 15px; }
+  .m-shot figcaption span, .m-board figcaption span { font-size: 13.5px; font-weight: 600; color: var(--sub); }
+  .m-board { margin: 18px 0 0; }
+  .m-zoom { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+  .m-mods { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 18px; }
+  .m-mods div { display: flex; gap: 8px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 11px 12px; font-size: 13.5px; font-weight: 800; }
+  .m-note { margin-top: 12px; }
+  .m-prices { margin-top: 14px; }
+  .m-price { background: var(--bg); border: 1px solid var(--line); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; }
+  .m-price.best { border: 2px solid var(--brand); background: var(--surface); }
+  .m-price-head { display: flex; justify-content: space-between; align-items: center; font-size: 17px; }
+  .m-price .tag { background: var(--gold); border-radius: 999px; padding: 3px 9px; font-size: 11.5px; font-weight: 800; }
+  .m-amount { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; margin-top: 6px; }
+  .m-unit { font-size: 13px; font-weight: 700; color: var(--sub); }
+  .m-price ul.check { margin: 10px 0 14px; flex: 1; }
+  .m-price ul.check li { font-size: 14px; padding: 3px 0 3px 24px; }
+  .m-faq { display: grid; gap: 8px; margin-top: 14px; }
+  .m-faq .card { padding: 14px 16px; background: var(--surface); }
+  .m-faq h3 { font-size: 15px; }
+  .m-faq p { font-size: 14px; font-weight: 600; color: var(--sub); }
+  .m-contact { display: grid; gap: 8px; margin-top: 14px; }
+  body.has-mbar .m-home { padding-bottom: 84px; }
+}

@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { View } from 'react-native';
 import { Text } from './text.tsx';
@@ -192,3 +192,27 @@ export function SignupList() {
     </>
   );
 }
+
+/** Tanıtım sitesinin iletişim formundan gelen talep (platform yöneticisi) */
+export interface ContactRequest {
+  id: string;
+  topic: 'demo' | 'quote' | 'question';
+  name: string;
+  role: string;
+  school: string;
+  city: string;
+  email: string;
+  phone: string | null;
+  preferredTime: string | null;
+  message: string;
+  status: 'new' | 'done';
+  handledAt: string | null;
+  createdAt: string;
+}
+
+
+export const useContactRequests = () => {
+  const { me } = useAuth();
+  return useQuery({ queryKey: ['platform', 'contact'], queryFn: () => api<ContactRequest[]>('/api/platform/contact'), enabled: Boolean(me?.user.isSuperAdmin), refetchInterval: 60_000 });
+};
+

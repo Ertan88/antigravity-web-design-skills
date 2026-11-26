@@ -25,6 +25,8 @@ export const ROUTES: Record<string, string> = {
   'leave-reviewed': '/izin',
   'leave-withdrawn': '/onaylar',
   'cover-needed': '/gorevlendirme',
+  // Tanıtım sitesinden gelen iletişim talebi (platform yöneticisi)
+  contact: '/platform/iletisim',
 };
 
 /**

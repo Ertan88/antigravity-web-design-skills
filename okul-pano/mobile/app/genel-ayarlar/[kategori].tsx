@@ -6,6 +6,7 @@ import { View } from 'react-native';
 import { api } from '../../src/api.ts';
 import { useAuth, useSchoolPath } from '../../src/auth.tsx';
 import { useSchoolInfo } from '../../src/data.ts';
+import { BackupCard } from '../../src/backup.tsx';
 import { SettingsTab } from '../../src/internshipManage.tsx';
 import { SETTINGS_CATEGORIES, type SettingsCategory } from '../../src/settingsCategories.ts';
 import { Text } from '../../src/text.tsx';
@@ -145,6 +146,7 @@ export default function AyarKategorisi() {
             <WebRow title="Hava durumu konumu" text="Şehir araması ve koordinatlar" />
             <WebRow title="KVKK aydınlatma metni" text="Okulun kişisel veri metni" last />
           </Card>
+          <BackupCard />
         </>
       ) : kategori === 'gorev' ? (
         <>

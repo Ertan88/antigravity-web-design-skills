@@ -9,7 +9,7 @@ import { Text } from '../../src/text.tsx';
 import { membershipLabel, useAuth, type AppRole } from '../../src/auth.tsx';
 import { schoolFullName, shortTitle } from '@okulpano/shared';
 import { useInternshipAccess, useMyLeaves } from '../../src/data.ts';
-import { useOpenSchool } from '../../src/platform.tsx';
+import { useContactRequests, useOpenSchool } from '../../src/platform.tsx';
 import { colors, radius, tiles, type TileTone } from '../../src/theme.ts';
 import { Avatar, Badge, Card, Chip, Icon, ListRow, Screen, SectionTitle, Segmented, T, type IconName } from '../../src/ui.tsx';
 import { useThemeMode } from '../../src/themeMode.tsx';
@@ -145,6 +145,8 @@ function ProfileTile({ name, email, school, badges }: { name: string; email: str
  */
 export default function Menu() {
   const { me, school, role, can, isTeacher, selectSchool, setPlatformMode, signOut, accounts } = useAuth();
+  const contact = useContactRequests();
+  const contactNew = (contact.data ?? []).filter((r) => r.status === 'new').length;
   const [accountsOpen, setAccountsOpen] = useState(false);
   const back = useTabBack('profil');
   // Menü bütün ekranları listeler; alt menüde ya da ana sayfanın hızlı işlemlerinde olanlar da burada bulunur (12)
@@ -193,6 +195,13 @@ export default function Menu() {
           to: '/platform/destek-okullar',
         },
         { title: 'Destek talepleri', subtitle: 'Okul müdürü ve yöneticilerinden gelen sorun, öneri, soru', icon: 'lifebuoy', to: '/platform/destek' },
+        {
+          title: 'İletişim talepleri',
+          subtitle: 'Tanıtım sitesinden gelen tanıtım, teklif ve sorular',
+          icon: 'mail-open-outline',
+          right: contactNew ? <Badge tone="primary">{String(contactNew)}</Badge> : undefined,
+          to: '/platform/iletisim',
+        },
       ],
     });
     sections.push({

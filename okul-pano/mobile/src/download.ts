@@ -9,9 +9,14 @@ import { apiFile } from './api.ts';
  * yazdırma uygulaması, e-posta ya da WhatsApp seçilebilir.
  */
 export async function sharePdf(path: string, name: string): Promise<void> {
+  await shareFile(path, name, 'application/pdf', 'com.adobe.pdf');
+}
+
+/** Sunucudan dosya indirir; web sürümünde tarayıcıya iner, telefonda paylaşım menüsü açılır ("Dosyalara kaydet") */
+export async function shareFile(path: string, name: string, mimeType: string, UTI?: string): Promise<void> {
   const bytes = await apiFile(path);
   if (Platform.OS === 'web') {
-    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+    const url = URL.createObjectURL(new Blob([bytes], { type: mimeType }));
     const a = document.createElement('a');
     a.href = url;
     a.download = name;
@@ -26,7 +31,7 @@ export async function sharePdf(path: string, name: string): Promise<void> {
   file.create();
   file.write(new Uint8Array(bytes));
   if (!(await Sharing.isAvailableAsync())) throw new Error('Bu cihazda dosya paylaşımı kullanılamıyor.');
-  await Sharing.shareAsync(file.uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf', dialogTitle: name });
+  await Sharing.shareAsync(file.uri, { mimeType, UTI, dialogTitle: name });
 }
 
 /**
