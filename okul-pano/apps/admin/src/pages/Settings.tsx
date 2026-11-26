@@ -1,7 +1,7 @@
 import { PlaceSelect } from '../components/PlaceSelect.tsx';
 import { RESPONSIBILITY_AREAS, SCHOOL_TYPE_OPTIONS, shortTitle, SPECIAL_DAYS, type Member, type ResponsibilityArea, specialDayFor, splitSchoolName, updateSchoolSchema, type SchoolSettings, errorText } from '@okulpano/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Copy, Download, ExternalLink, FileText, MapPin, Search } from '../components/icons.tsx';
+import { Copy, Download, ExternalLink, FileText, MapPin, Search, Settings2 } from '../components/icons.tsx';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ImageUpload } from '../components/ImageUpload.tsx';
 import { SampleDataCard } from '../components/Onboarding.tsx';
@@ -11,7 +11,7 @@ import { useToast } from '../components/Toast.tsx';
 import { Alert, Badge, Button, Card, Field, Input, PageHeader, Select, Spinner, Textarea, Toggle } from '../components/ui.tsx';
 import { confirm } from '../components/confirm.tsx';
 import { downloadJson } from '../lib/download.ts';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useSchool, useSchoolPath, type School } from '../lib/data.ts';
@@ -307,6 +307,7 @@ function SchoolTypeField({ id, value, derived, onChange }: { id: string; value: 
 }
 
 export function Settings() {
+  const navigate = useNavigate();
   const { schoolId, reloadMe } = useAuth();
   const path = useSchoolPath();
   const qc = useQueryClient();
@@ -458,13 +459,12 @@ export function Settings() {
             description="Meslek liseleri için: işletmeler, koordinatör öğretmenler ve aylık işletmede devam çizelgesi. Koordinatör öğretmenler devamsızlık ve raporu mobil uygulamadan girer."
           />
           {s.internshipEnabled && (
-            <p className="text-sm text-slate-500">
-              Koordinatör müdür yardımcısı, program adı ve teknik program stajı{' '}
-              <Link to="/isletmeler" className="font-semibold text-brand-700 hover:underline dark:text-slate-100">
-                İşletmeler
-              </Link>{' '}
-              sayfasındaki <b>Ayarlar</b> düğmesindedir.
-            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button size="sm" variant="secondary" icon={<Settings2 className="size-4" />} onClick={() => navigate('/isletmeler?ayarlar=1')}>
+                Staj ayarlarını aç
+              </Button>
+              <span className="text-sm text-slate-500">Koordinatör müdür yardımcısı, program adı ve teknik program stajı</span>
+            </div>
           )}
           <p className="text-sm text-slate-500">
             Panodaki kartların yeri, renkler ve slayt süreleri{' '}

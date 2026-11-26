@@ -669,47 +669,48 @@ export function MonthStudent() {
       <PageHeader
         title={`Ayın Öğrencisi · ${monthLabel(month)}`}
         description="Öğretmenlerin gözlem kayıtlarından ilk 5 öneri. Seçtiğiniz öğrenci panoya yalnızca adı ve sınıfıyla “Ayın öğrencisi” olarak çıkar; puanlar ve sıralama hiçbir zaman panoda görünmez."
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Segmented
-              value={scope}
-              onChange={(v) => {
-                setScope(v);
-                setKey('');
-              }}
-              // Düzey yalnızca okulda birden çok düzey varsa (ör. ilkokul ve ortaokul aynı binada); düzey sınıf adından anlaşılır
-              options={[
-                { value: 'school', label: 'Okul' },
-                ...(levels.length > 1 ? [{ value: 'level' as const, label: 'Düzey' }] : []),
-                { value: 'class', label: 'Sınıf' },
-              ]}
-            />
-            {/* Seçim kutusu her sekmede aynı yerde ve genişlikte durur: sekme değişince sayfa kaymaz */}
-            {scope === 'level' ? (
-              <Select value={effectiveKey} onChange={(e) => setKey(e.target.value)} className="w-40" aria-label="Düzey">
-                {levels.map((l) => (
-                  <option key={l} value={l}>
-                    {SCHOOL_LEVELS[l]}
-                  </option>
-                ))}
-              </Select>
-            ) : scope === 'class' ? (
-              <Select value={effectiveKey} onChange={(e) => setKey(e.target.value)} className="w-40" aria-label="Sınıf">
-                {(classes.data ?? []).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </Select>
-            ) : (
-              <Select value="" disabled className="w-40" aria-label="Kapsam">
-                <option value="">Bütün okul</option>
-              </Select>
-            )}
-            <MonthInput value={month} onChange={setMonth} />
-          </div>
-        }
       />
+      {/* Araç satırı: kapsam, (gerekirse) sınıf/düzey ve ay tek satırda; satırda yer olduğu için sekme değişince kayma olmaz */}
+      <div className="mb-5 flex flex-wrap items-center gap-2">
+        <Segmented
+          value={scope}
+          onChange={(v) => {
+            setScope(v);
+            setKey('');
+          }}
+          // Düzey yalnızca okulda birden çok düzey varsa (ör. ilkokul ve ortaokul aynı binada); düzey sınıf adından anlaşılır
+          options={[
+            { value: 'school', label: 'Okul' },
+            ...(levels.length > 1 ? [{ value: 'level' as const, label: 'Düzey' }] : []),
+            { value: 'class', label: 'Sınıf' },
+          ]}
+        />
+        {scope === 'level' && (
+          <div className="w-44 shrink-0">
+          <Select value={effectiveKey} onChange={(e) => setKey(e.target.value)} aria-label="Düzey">
+            {levels.map((l) => (
+              <option key={l} value={l}>
+                {SCHOOL_LEVELS[l]}
+              </option>
+            ))}
+          </Select>
+          </div>
+        )}
+        {scope === 'class' && (
+          <div className="w-44 shrink-0">
+          <Select value={effectiveKey} onChange={(e) => setKey(e.target.value)} aria-label="Sınıf">
+            {(classes.data ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+          </div>
+        )}
+        <div className="ml-auto">
+          <MonthInput value={month} onChange={setMonth} />
+        </div>
+      </div>
       {!d ? (
         <Spinner />
       ) : (

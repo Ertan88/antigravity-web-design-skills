@@ -1,4 +1,4 @@
-import { compareClassNames } from '@okulpano/shared';
+import { compareClassNames, parseClassName } from '@okulpano/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { useEffect, useState } from 'react';
@@ -45,7 +45,11 @@ export function InternshipSettingsDialog({ open, onClose }: { open: boolean; onC
 
   const tech = v?.internshipTechnical;
   const badRange = Boolean(tech?.start && tech?.end && tech.start > tech.end);
-  const list = [...(classes.data ?? [])].sort((a, b) => compareClassNames(a.name, b.name));
+  // Teknik program stajı Anadolu Teknik Programı (ATP) sınıfları içindir; AMP (Anadolu Meslek Programı) sınıfları
+  // işletmede haftalık mesleki eğitim görür, listelenmez. Daha önce seçilmiş başka bir sınıf varsa kaybolmasın diye görünür.
+  const list = [...(classes.data ?? [])]
+    .filter((c) => parseClassName(c.name)?.program === 'ATP' || tech?.classIds.includes(c.id))
+    .sort((a, b) => compareClassNames(a.name, b.name));
   const toggle = (id: string) =>
     v && tech && setV({ ...v, internshipTechnical: { ...tech, classIds: tech.classIds.includes(id) ? tech.classIds.filter((x) => x !== id) : [...tech.classIds, id] } });
   const people = candidates.data ?? [];
@@ -124,13 +128,13 @@ export function InternshipSettingsDialog({ open, onClose }: { open: boolean; onC
             <div>
               <p className="text-sm font-bold text-ink">Teknik program stajı</p>
               <p className="text-xs text-slate-500">
-                Seçilen sınıflar staj tarihleri arasında her iş günü işletmededir; bu günlerde devam çizelgesinde okul günü olmaz. Tarihlerin dışında ders programı geçerlidir.
+                Anadolu Teknik Programı (ATP) sınıfları listelenir. Seçilen sınıflar staj tarihleri arasında her iş günü işletmededir; bu günlerde devam çizelgesinde okul günü olmaz. Tarihlerin dışında ders programı geçerlidir.
               </p>
             </div>
             {classes.isLoading ? (
               <Spinner />
             ) : !list.length ? (
-              <p className="text-sm text-slate-500">Henüz sınıf yok. Sınıflar Ders Programı sayfasında eklenir.</p>
+              <p className="text-sm text-slate-500">Okulda Anadolu Teknik Programı (ATP) sınıfı yok. Sınıf adları e-Okul'daki gibi "ATP 12-A" biçiminde olmalıdır.</p>
             ) : (
               <div className="flex flex-wrap gap-1.5" role="group" aria-label="Teknik program sınıfları">
                 {list.map((c) => {

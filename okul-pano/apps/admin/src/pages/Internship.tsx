@@ -20,6 +20,7 @@ import {
   CheckCheck,
   Send,
   GraduationCap,
+  Pencil,
   Plus,
   Printer,
   Search,
@@ -42,6 +43,7 @@ import {
   DeleteButton,
   EmptyState,
   Field,
+  IconButton,
   Input,
   Modal,
   MonthPicker,
@@ -1197,7 +1199,17 @@ export function Businesses() {
   const [viewing, setViewing] = useState<Business | null>(null);
   const [areasOpen, setAreasOpen] = useState(false);
   const [formsOpen, setFormsOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  // Genel Ayarlar'daki "Staj ayarlarını aç" bu sayfaya ?ayarlar=1 ile gelir; pencere doğrudan açılır
+  const [settingsParams, setSettingsParams] = useSearchParams();
+  const [settingsOpen, setSettingsOpen] = useState(settingsParams.get("ayarlar") === "1");
+  const closeSettings = () => {
+    setSettingsOpen(false);
+    if (settingsParams.has("ayarlar")) {
+      const next = new URLSearchParams(settingsParams);
+      next.delete("ayarlar");
+      setSettingsParams(next, { replace: true });
+    }
+  };
   const [area, setArea] = useState<string>("");
   const [coordinator, setCoordinator] = useState("");
   const [q, setQ] = useState("");
@@ -1267,7 +1279,7 @@ export function Businesses() {
           <div className="flex flex-wrap gap-2">
             {manager && (
               <Button variant="secondary" icon={<Settings2 className="size-4" />} onClick={() => setSettingsOpen(true)}>
-                Ayarlar
+                Staj ayarları
               </Button>
             )}
             {manager && (
@@ -1424,6 +1436,12 @@ export function Businesses() {
                   </Button>
                 </Td>
                 <Td className="text-right whitespace-nowrap">
+                  {/* Düzenle ve sil yan yana (projenin satır işlemleri düzeni); adına tıklayınca bilgi penceresi açılır */}
+                  {b.canEdit && (
+                    <IconButton tone="edit" label="Düzenle" onClick={() => setEditing(b)}>
+                      <Pencil className="size-4" />
+                    </IconButton>
+                  )}
                   {b.canManage && (
                     <DeleteButton
                       onConfirm={() => remove.mutate(b.id)}
@@ -1460,7 +1478,7 @@ export function Businesses() {
         <AreasDialog open={areasOpen} onClose={() => setAreasOpen(false)} />
       )}
       <FormsDialog open={formsOpen} onClose={() => setFormsOpen(false)} />
-      <InternshipSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <InternshipSettingsDialog open={settingsOpen && manager} onClose={closeSettings} />
     </div>
   );
 }
